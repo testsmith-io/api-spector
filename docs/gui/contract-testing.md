@@ -40,7 +40,7 @@ You need the spec URL. You do not need to define any contract on your requests.
 4. `REQUEST BODY INVALID` violations mean the request body does not match the spec's `requestBody` schema. Update the request to fix it.
 5. No HTTP call is made, so you can run this without a live server.
 
-> **Note:** Provider mode validates your *requests* against the spec — not the responses. It answers "am I calling the API correctly?" not "is the API returning what I expect?"
+> **Note:** Provider mode validates your *requests* against the spec, not the responses. It answers "am I calling the API correctly?" not "is the API returning what I expect?"
 
 ---
 
@@ -48,9 +48,9 @@ You need the spec URL. You do not need to define any contract on your requests.
 
 This combines both sides in a single run.
 
-**Step 1 — Static schema compatibility check.** The response body schema you defined in the Contract tab is compared against the response schema documented in the provider's OpenAPI spec. Every field you *require* must exist in the provider schema with a compatible type. Extra provider fields are always allowed. No HTTP call needed for this step.
+**Step 1: Static schema compatibility check.** The response body schema you defined in the Contract tab is compared against the response schema documented in the provider's OpenAPI spec. Every field you *require* must exist in the provider schema with a compatible type. Extra provider fields are always allowed. No HTTP call needed for this step.
 
-**Step 2 — Live consumer verification.** The real request is sent and validated exactly as in Consumer mode.
+**Step 2: Live consumer verification.** The real request is sent and validated exactly as in Consumer mode.
 
 Violations from both steps appear together in the results.
 
@@ -74,16 +74,16 @@ You have two versions of the same API:
 | v3 | `https://api.practicesoftwaretesting.com/` | `https://api.practicesoftwaretesting.com/docs?api-docs.json` |
 | v4 | `https://api-v4.practicesoftwaretesting.com/` | `https://api-v4.practicesoftwaretesting.com/docs?api-docs.json` |
 
-**Step 1 — Build your collection against v3.**
+**Step 1: Build your collection against v3.**
 Send requests and use **⚡ Infer from response** to capture expected response shapes as contracts.
 
-**Step 2 — Run Provider mode with the v4 spec.**
+**Step 2: Run Provider mode with the v4 spec.**
 This immediately shows which of your requests use paths or parameters that no longer exist in v4, without making a single HTTP call. Any `UNKNOWN PATH` result means that endpoint moved or was removed.
 
-**Step 3 — Switch your environment URL to v4 and run Consumer mode.**
+**Step 3: Switch your environment URL to v4 and run Consumer mode.**
 This shows which responses changed shape between versions. A `SCHEMA VIOLATION` means a field was removed, renamed, or changed type.
 
-**Step 4 — Run Bi-dir for the requests you care about most.**
+**Step 4: Run Bi-dir for the requests you care about most.**
 This gives the full picture: schema compatibility between your expectations and the v4 spec, plus live verification that the API delivers what the spec promises.
 
 ---

@@ -18,5 +18,5 @@
 
 - **Reference**
   - [Variables & Scopes](reference/variables.md)
-  - [Faker — Dynamic Test Data](reference/faker.md)
+  - [Faker: Dynamic Test Data](reference/faker.md)
   - [Scripting API](reference/scripting.md)

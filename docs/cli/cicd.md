@@ -1,6 +1,6 @@
 # Pipeline Integration
 
-api Spector runs headlessly via the CLI — no display or GUI needed for `run` and `mock` commands. This makes it straightforward to drop into any CI/CD pipeline.
+api Spector runs headlessly via the CLI. No display or GUI needed for `run` and `mock` commands. This makes it straightforward to drop into any CI/CD pipeline.
 
 ## How it works in a pipeline
 
@@ -15,7 +15,7 @@ Exit code `0` = all tests passed. Exit code `1` = failures. Your pipeline fails 
 
 ## GitHub Actions
 
-### Basic — run on every push and PR
+### Basic: run on every push and PR
 
 ```yaml
 name: API Tests
@@ -55,7 +55,7 @@ jobs:
           path: results.xml
 ```
 
-### Advanced — smoke on PR, full suite on schedule
+### Advanced: smoke on PR, full suite on schedule
 
 ```yaml
 name: API Tests
@@ -247,7 +247,7 @@ COPY . .
 CMD ["api-spector", "run", "--workspace", "project.spector", "--env", "staging"]
 ```
 
-Run with the secret injected at runtime — never bake it into the image:
+Run with the secret injected at runtime. Never bake it into the image:
 
 ```bash
 docker run --rm \
@@ -288,8 +288,8 @@ Use tags on requests in the GUI to control what runs where:
 
 | Tag | When to run |
 |---|---|
-| `smoke` | Every push / PR — fast gate, critical paths only |
-| `regression` | Nightly or pre-release — full suite |
+| `smoke` | Every push / PR: fast gate, critical paths only |
+| `regression` | Nightly or pre-release: full suite |
 | `slow` | Exclude from PR gates with `--tags smoke,regression` |
 
 ```bash
@@ -304,8 +304,8 @@ api-spector run --workspace ./project.spector --tags regression,smoke
 
 ## Best practices
 
-- Store `API_SPECTOR_MASTER_KEY` as a CI secret — never commit it to the repo
+- Store `API_SPECTOR_MASTER_KEY` as a CI secret; never commit it to the repo
 - Pin the `@testsmith/api-spector` version in CI: `npm install -g @testsmith/api-spector@1.2.3`
 - Always pass `--output results.xml` so failures are visible in the CI dashboard even when the job passes overall
 - Use `--bail` in pre-merge pipelines to fail fast and save runner minutes
-- Keep your workspace and collection files committed to Git — they are safe to version-control (secrets are encrypted)
+- Keep your workspace and collection files committed to Git. They are safe to version-control (secrets are encrypted)

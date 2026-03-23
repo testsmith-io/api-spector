@@ -43,8 +43,8 @@ api-spector ui
 ![](../assets/welcome-screen.png)
 
 On first launch you will see the welcome screen with two options:
-- **Open Workspace** — open an existing `.spector` workspace file
-- **New Workspace** — create a new workspace and choose where to save it
+- **Open Workspace:** open an existing `.spector` workspace file
+- **New Workspace:** create a new workspace and choose where to save it
 
 ## Update
 

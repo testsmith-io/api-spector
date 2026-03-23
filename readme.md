@@ -1,6 +1,6 @@
 # api Spector
 
-Local-first API testing tool. Inspect, test and mock APIs — secrets stay on your machine.
+Local-first API testing tool. Inspect, test and mock APIs. Secrets stay on your machine.
 
 - GUI built with Electron + React
 - CLI for running tests and mock servers in CI/CD pipelines
@@ -57,7 +57,7 @@ Keeps running until `Ctrl+C`.
 
 ## Workspaces
 
-A workspace is a `.spector` file that references your collections, environments and mock servers. Safe to commit to Git — secrets are encrypted, not stored in plain text.
+A workspace is a `.spector` file that references your collections, environments and mock servers. Safe to commit to Git. Secrets are encrypted, not stored in plain text.
 
 ```
 my-project/
@@ -78,12 +78,12 @@ Secret variables are encrypted with AES-256-GCM using a master password. Set `AP
 export API_SPECTOR_MASTER_KEY="your-password"
 ```
 
-**Windows — PowerShell profile:**
+**Windows (PowerShell profile):**
 ```powershell
 $env:API_SPECTOR_MASTER_KEY = "your-password"
 ```
 
-**Windows — Command Prompt (permanent):**
+**Windows (Command Prompt, permanent):**
 ```cmd
 setx API_SPECTOR_MASTER_KEY "your-password"
 ```

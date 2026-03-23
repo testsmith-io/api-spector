@@ -51,7 +51,7 @@ Key/value query parameters. Enabled parameters are appended to the URL automatic
 
 ### Headers
 
-Add request headers as key/value pairs. Headers from the parent folder are merged automatically — request-level headers take precedence.
+Add request headers as key/value pairs. Headers from the parent folder are merged automatically; request-level headers take precedence.
 
 ### Body
 
@@ -82,8 +82,8 @@ Auth set on a **folder** is inherited by all requests in that folder. A request 
 
 Two script hooks are available per request:
 
-- **Pre-request** — runs before the request is sent
-- **Post-response** — runs after the response is received, used for tests and assertions
+- **Pre-request:** runs before the request is sent
+- **Post-response:** runs after the response is received, used for tests and assertions
 
 See [Scripting API](../reference/scripting.md) for full reference.
 

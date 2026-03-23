@@ -51,7 +51,7 @@ See [Mock Servers CLI](../cli/mock.md).
 
 ## Route matching
 
-- Routes are evaluated in order — the first match wins
+- Routes are evaluated in order; the first match wins
 - `ANY` matches all HTTP methods
 - Path parameters (`:id`) are matched positionally but the response is static (no interpolation)
 - Unmatched requests return `404`

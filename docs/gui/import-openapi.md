@@ -19,7 +19,7 @@ api Spector can import an OpenAPI 3.x specification and convert it into a collec
 | `.yaml` / `.yml` | Local file |
 | URL | Remote JSON or YAML spec fetched at import time |
 
-OpenAPI 2.x (Swagger) is not supported — use a converter like [swagger2openapi](https://github.com/Mermade/oas-tools) first.
+OpenAPI 2.x (Swagger) is not supported. Use a converter like [swagger2openapi](https://github.com/Mermade/oas-tools) first.
 
 ## What gets imported
 
@@ -36,7 +36,7 @@ OpenAPI 2.x (Swagger) is not supported — use a converter like [swagger2openapi
 
 ## After import
 
-The imported collection appears in the sidebar. All requests are ready to send — review and adjust:
+The imported collection appears in the sidebar. All requests are ready to send. Review and adjust:
 
 - Replace example values with `{{variables}}` to use your environment
 - Set auth credentials in the request or folder Auth tab

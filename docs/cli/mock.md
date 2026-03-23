@@ -65,5 +65,5 @@ Press `Ctrl+C`. All servers are stopped gracefully.
 - Mock servers listen on `127.0.0.1` (localhost only) by default
 - Each server uses the port defined in its configuration
 - If a port is already in use, that server fails to start but others continue
-- Routes are matched in order — first match wins
+- Routes are matched in order; first match wins
 - The `ANY` method matches all HTTP methods

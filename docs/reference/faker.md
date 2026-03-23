@@ -154,23 +154,23 @@ Or individual fields:
 }
 ```
 
-### Chain requests — create then verify
+### Chain requests: create then verify
 
-**Request 1 — Create** (pre-request script):
+**Request 1: Create** (pre-request script):
 
 ```js
 sp.variables.set('newEmail', faker.internet.email())
 sp.variables.set('newName',  faker.person.fullName())
 ```
 
-**Request 1 — Create** (post-response script):
+**Request 1: Create** (post-response script):
 
 ```js
 const body = sp.response.json()
 sp.collectionVariables.set('createdId', body.id)
 ```
 
-**Request 2 — Get** — use `{{createdId}}` in the URL:
+**Request 2: Get** - use `{{createdId}}` in the URL:
 
 ```
 GET {{BASE_URL}}/users/{{createdId}}
@@ -209,6 +209,6 @@ Available locales include: `en`, `nl`, `de`, `fr`, `es`, `it`, `ja`, `zh_CN`, `p
 | Global | Description |
 |---|---|
 | `faker` | Full `@faker-js/faker` instance |
-| `dayjs` | Date manipulation — pairs well with `faker.date.*` |
+| `dayjs` | Date manipulation; pairs well with `faker.date.*` |
 | `sp.variables.set(key, val)` | Store generated value for use in the request |
 | `sp.collectionVariables.set(key, val)` | Share generated value with other requests in the collection |

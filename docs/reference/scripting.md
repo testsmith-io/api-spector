@@ -2,8 +2,8 @@
 
 Each request has two JavaScript script hooks:
 
-- **Pre-request script** — runs before the request is sent. Use it to set variables, generate dynamic values, or modify the request.
-- **Post-response script** — runs after the response is received. Use it for tests, assertions, and extracting values from the response.
+- **Pre-request script:** runs before the request is sent. Use it to set variables, generate dynamic values, or modify the request.
+- **Post-response script:** runs after the response is received. Use it for tests, assertions, and extracting values from the response.
 
 Scripts run in a sandboxed Node.js VM context with a 5-second timeout.
 

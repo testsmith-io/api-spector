@@ -1,4 +1,4 @@
-# Variables — Scopes & Precedence
+# Variables: Scopes and Precedence
 
 api Spector has four variable scopes. Understanding how they relate lets you share data between requests, across collections, and across sessions.
 
@@ -6,7 +6,7 @@ api Spector has four variable scopes. Understanding how they relate lets you sha
 
 | Scope | Stored in | Lifetime | Shared across |
 |---|---|---|---|
-| **Local** | Memory only | Single request | Nothing — request-scoped |
+| **Local** | Memory only | Single request | Nothing (request-scoped) |
 | **Environment** | `.env.json` file | Persists on disk | All collections using that environment |
 | **Collection** | `.spector` collection file | Persists on disk | All requests in that collection |
 | **Global** | `globals.json` in workspace dir | Persists on disk | All collections in the workspace |
@@ -19,7 +19,7 @@ When `{{variableName}}` is resolved, the lookup order is:
 Local  →  Environment  →  Collection  →  Global
 ```
 
-**Local wins** — a variable set in a pre-request script overrides all other scopes for that request. A global with the same name is shadowed but not overwritten.
+**Local wins:** a variable set in a pre-request script overrides all other scopes for that request. A global with the same name is shadowed but not overwritten.
 
 ---
 
@@ -110,7 +110,7 @@ You can also set initial values in the GUI via **Collection → Variables** tab.
 
 Stored in `globals.json` in the workspace directory. Shared across all collections and all environments.
 
-**Best for:** values that are truly cross-collection — a shared auth token, a feature flag, a counter.
+**Best for:** values that are truly cross-collection: a shared auth token, a feature flag, a counter.
 
 ```js
 // Set from any script
@@ -160,7 +160,7 @@ sp.variables.get('requestId')
 sp.variables.set('requestId', faker.string.uuid())
 ```
 
-**Cross-scope read shorthand** — searches all scopes in resolution order:
+**Cross-scope read shorthand:** searches all scopes in resolution order:
 
 ```js
 sp.variables_get('BASE_URL')          // finds it in environment scope
@@ -173,7 +173,7 @@ sp.variables_set('key', 'value')      // always writes to local scope
 
 ### Login and reuse the token
 
-**Request 1 — POST /auth/login** (post-response script):
+**Request 1: POST /auth/login** (post-response script):
 
 ```js
 sp.test('login successful', () => {
@@ -188,16 +188,16 @@ All subsequent requests use `Authorization: Bearer {{authToken}}` in their heade
 
 ### Create → read → delete
 
-**Request 1 — POST /users** (post-response script):
+**Request 1: POST /users** (post-response script):
 
 ```js
 const body = sp.response.json()
 sp.collectionVariables.set('userId', String(body.id))
 ```
 
-**Request 2 — GET /users/{{userId}}**
+**Request 2: GET /users/{{userId}}**
 
-**Request 3 — DELETE /users/{{userId}}**
+**Request 3: DELETE /users/{{userId}}**
 
 ### Environment-specific base URL
 

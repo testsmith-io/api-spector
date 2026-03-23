@@ -15,9 +15,9 @@ api-spector run --workspace ./my-workspace.spector
 | `--workspace <path>` | Path to `.spector` workspace file **(required)** |
 | `--env <name>` | Environment name to activate |
 | `--collection <name>` | Run only this collection (by name) |
-| `--tags <a,b>` | Comma-separated tag filter — only run requests with matching tags |
+| `--tags <a,b>` | Comma-separated tag filter; only run requests with matching tags |
 | `--output <path>` | Write a results report to file (`.json` or `.xml`) |
-| `--format json\|junit` | Report format — inferred from `--output` extension if omitted |
+| `--format json\|junit` | Report format; inferred from `--output` extension if omitted |
 | `--verbose` | Print per-request console output and individual test results |
 | `--bail` | Stop after the first failed or errored request |
 | `--help` | Show usage |
