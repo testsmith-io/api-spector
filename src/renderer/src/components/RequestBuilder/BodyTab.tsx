@@ -1,29 +1,29 @@
-import React, { useMemo } from 'react'
-import CodeMirror from '@uiw/react-codemirror'
-import { json } from '@codemirror/lang-json'
-import { oneDark } from '@codemirror/theme-one-dark'
-import type { ApiRequest, RequestBody } from '../../../../shared/types'
-import { KVTable } from './KVTable'
-import { varCompletionExtension, varHoverTooltipExtension } from './atCompletions'
-import { useVarNames } from '../../hooks/useVarNames'
-import { useVarValues } from '../../hooks/useVarValues'
-import { GraphQLEditor } from './GraphQLEditor'
-import { SoapEditor } from './SoapEditor'
+import React, { useMemo } from 'react';
+import CodeMirror from '@uiw/react-codemirror';
+import { json } from '@codemirror/lang-json';
+import { oneDark } from '@codemirror/theme-one-dark';
+import type { ApiRequest, RequestBody } from '../../../../shared/types';
+import { KVTable } from './KVTable';
+import { varCompletionExtension, varHoverTooltipExtension } from './atCompletions';
+import { useVarNames } from '../../hooks/useVarNames';
+import { useVarValues } from '../../hooks/useVarValues';
+import { GraphQLEditor } from './GraphQLEditor';
+import { SoapEditor } from './SoapEditor';
 
 type BodyMode = RequestBody['mode']
 
 export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
-  const body     = request.body
-  const mode     = body.mode
-  const varNames  = useVarNames()
-  const varValues = useVarValues()
+  const body     = request.body;
+  const mode     = body.mode;
+  const varNames  = useVarNames();
+  const varValues = useVarValues();
   const varExt    = useMemo(
     () => [varCompletionExtension(varNames), varHoverTooltipExtension(varValues)],
     [varNames, varValues],
-  )
+  );
 
   function setMode(m: BodyMode) {
-    onChange({ body: { ...body, mode: m } })
+    onChange({ body: { ...body, mode: m } });
   }
 
   return (
@@ -103,5 +103,5 @@ export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: 
         </div>
       )}
     </div>
-  )
+  );
 }

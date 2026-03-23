@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { useStore } from '../../store'
-import type { ContractResult, ContractViolation } from '../../../../shared/types'
+import { useState } from 'react';
+import { useStore } from '../../store';
+import type { ContractResult, ContractViolation } from '../../../../shared/types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -12,11 +12,11 @@ const METHOD_COLOR: Record<string, string> = {
   DELETE:  'text-red-400',
   HEAD:    'text-purple-400',
   OPTIONS: 'text-gray-400',
-}
+};
 
 function statusColor(code: number): string {
-  const d = String(code)[0]
-  return d === '2' ? 'text-emerald-400' : d === '3' ? 'text-amber-400' : 'text-red-400'
+  const d = String(code)[0];
+  return d === '2' ? 'text-emerald-400' : d === '3' ? 'text-amber-400' : 'text-red-400';
 }
 
 // ─── Violation row ────────────────────────────────────────────────────────────
@@ -52,13 +52,13 @@ function ViolationRow({ v }: { v: ContractViolation }) {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ─── Result card ─────────────────────────────────────────────────────────────
 
 function ResultCard({ result }: { result: ContractResult }) {
-  const [open, setOpen] = useState(!result.passed)
+  const [open, setOpen] = useState(!result.passed);
 
   return (
     <div className={`rounded-lg border overflow-hidden ${
@@ -128,14 +128,14 @@ function ResultCard({ result }: { result: ContractResult }) {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ─── Main panel ───────────────────────────────────────────────────────────────
 
 export function ContractResultsPanel() {
-  const report      = useStore(s => s.lastContractReport)
-  const clearReport = useStore(s => s.setLastContractReport)
+  const report      = useStore(s => s.lastContractReport);
+  const clearReport = useStore(s => s.setLastContractReport);
 
   if (!report) {
     return (
@@ -144,10 +144,10 @@ export function ContractResultsPanel() {
         <p className="text-sm text-surface-500">No contract run yet.</p>
         <p className="text-xs text-surface-600">Configure a mode in the Contracts panel and click Run.</p>
       </div>
-    )
+    );
   }
 
-  const modeLabel = report.mode === 'bidirectional' ? 'Bi-directional' : report.mode.charAt(0).toUpperCase() + report.mode.slice(1)
+  const modeLabel = report.mode === 'bidirectional' ? 'Bi-directional' : report.mode.charAt(0).toUpperCase() + report.mode.slice(1);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -180,16 +180,16 @@ export function ContractResultsPanel() {
       <div className="flex-1 overflow-y-auto min-h-0 p-6">
         {/* Failed first, then passed */}
         {(() => {
-          const failed = report.results.filter(r => !r.passed)
-          const passed = report.results.filter(r => r.passed)
+          const failed = report.results.filter(r => !r.passed);
+          const passed = report.results.filter(r => r.passed);
           return (
             <div className="flex flex-col gap-3 max-w-4xl mx-auto">
               {failed.map(r => <ResultCard key={r.requestId} result={r} />)}
               {passed.map(r => <ResultCard key={r.requestId} result={r} />)}
             </div>
-          )
+          );
         })()}
       </div>
     </div>
-  )
+  );
 }

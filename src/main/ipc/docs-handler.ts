@@ -1,5 +1,5 @@
-import { type IpcMain } from 'electron'
-import type { Collection, ApiRequest, Folder } from '../../shared/types'
+import { type IpcMain } from 'electron';
+import type { Collection, ApiRequest, Folder } from '../../shared/types';
 
 // ─── Payload types ────────────────────────────────────────────────────────────
 
@@ -14,130 +14,130 @@ export interface DocsPayload {
 // ─── Markdown generation ─────────────────────────────────────────────────────
 
 export function escMd(s: string): string {
-  return s.replace(/[|\\`*_{}[\]()#+\-.!]/g, c => `\\${c}`)
+  return s.replace(/[|\\`*_{}[\]()#+\-.!]/g, c => `\\${c}`);
 }
 
 function requestToMarkdown(req: ApiRequest): string {
-  const lines: string[] = []
+  const lines: string[] = [];
 
-  const methodLabel = req.protocol === 'websocket' ? 'WS' : req.method
-  lines.push(`#### ${methodLabel} ${escMd(req.name)}`)
-  lines.push('')
+  const methodLabel = req.protocol === 'websocket' ? 'WS' : req.method;
+  lines.push(`#### ${methodLabel} ${escMd(req.name)}`);
+  lines.push('');
 
   if (req.description?.trim()) {
-    lines.push(req.description.trim())
-    lines.push('')
+    lines.push(req.description.trim());
+    lines.push('');
   }
 
-  lines.push('**URL**')
-  lines.push('```')
-  lines.push(req.url || '(no url)')
-  lines.push('```')
-  lines.push('')
+  lines.push('**URL**');
+  lines.push('```');
+  lines.push(req.url || '(no url)');
+  lines.push('```');
+  lines.push('');
 
-  const enabledParams = req.params.filter(p => p.enabled && p.key)
+  const enabledParams = req.params.filter(p => p.enabled && p.key);
   if (enabledParams.length) {
-    lines.push('**Query Parameters**')
-    lines.push('')
-    lines.push('| Key | Value | Description |')
-    lines.push('|-----|-------|-------------|')
+    lines.push('**Query Parameters**');
+    lines.push('');
+    lines.push('| Key | Value | Description |');
+    lines.push('|-----|-------|-------------|');
     for (const p of enabledParams) {
-      lines.push(`| ${escMd(p.key)} | ${escMd(p.value)} | ${escMd(p.description ?? '')} |`)
+      lines.push(`| ${escMd(p.key)} | ${escMd(p.value)} | ${escMd(p.description ?? '')} |`);
     }
-    lines.push('')
+    lines.push('');
   }
 
-  const enabledHeaders = req.headers.filter(h => h.enabled && h.key)
+  const enabledHeaders = req.headers.filter(h => h.enabled && h.key);
   if (enabledHeaders.length) {
-    lines.push('**Headers**')
-    lines.push('')
-    lines.push('| Key | Value |')
-    lines.push('|-----|-------|')
+    lines.push('**Headers**');
+    lines.push('');
+    lines.push('| Key | Value |');
+    lines.push('|-----|-------|');
     for (const h of enabledHeaders) {
-      lines.push(`| ${escMd(h.key)} | ${escMd(h.value)} |`)
+      lines.push(`| ${escMd(h.key)} | ${escMd(h.value)} |`);
     }
-    lines.push('')
+    lines.push('');
   }
 
   if (req.auth.type !== 'none') {
-    lines.push(`**Auth**: ${req.auth.type}`)
-    lines.push('')
+    lines.push(`**Auth**: ${req.auth.type}`);
+    lines.push('');
   }
 
-  const mode = req.body.mode
+  const mode = req.body.mode;
   if (mode === 'json' && req.body.json?.trim()) {
-    lines.push('**Body** (JSON)')
-    lines.push('```json')
-    lines.push(req.body.json.trim())
-    lines.push('```')
-    lines.push('')
+    lines.push('**Body** (JSON)');
+    lines.push('```json');
+    lines.push(req.body.json.trim());
+    lines.push('```');
+    lines.push('');
   } else if (mode === 'raw' && req.body.raw?.trim()) {
-    const ct = req.body.rawContentType ?? 'text'
-    lines.push(`**Body** (${ct})`)
-    lines.push('```')
-    lines.push(req.body.raw.trim())
-    lines.push('```')
-    lines.push('')
+    const ct = req.body.rawContentType ?? 'text';
+    lines.push(`**Body** (${ct})`);
+    lines.push('```');
+    lines.push(req.body.raw.trim());
+    lines.push('```');
+    lines.push('');
   } else if (mode === 'graphql' && req.body.graphql?.query?.trim()) {
-    lines.push('**Body** (GraphQL)')
-    lines.push('```graphql')
-    lines.push(req.body.graphql.query.trim())
-    lines.push('```')
-    lines.push('')
+    lines.push('**Body** (GraphQL)');
+    lines.push('```graphql');
+    lines.push(req.body.graphql.query.trim());
+    lines.push('```');
+    lines.push('');
   } else if (mode === 'soap' && req.body.soap?.envelope?.trim()) {
-    lines.push('**Body** (SOAP)')
-    lines.push('```xml')
-    lines.push(req.body.soap.envelope.trim())
-    lines.push('```')
-    lines.push('')
+    lines.push('**Body** (SOAP)');
+    lines.push('```xml');
+    lines.push(req.body.soap.envelope.trim());
+    lines.push('```');
+    lines.push('');
   }
 
-  return lines.join('\n')
+  return lines.join('\n');
 }
 
 function folderToMarkdown(folder: Folder, requests: Record<string, ApiRequest>, depth: number): string {
-  const lines: string[] = []
-  const heading = '#'.repeat(depth)
+  const lines: string[] = [];
+  const heading = '#'.repeat(depth);
 
   if (folder.name !== 'root') {
-    lines.push(`${heading} ${escMd(folder.name)}`)
-    lines.push('')
+    lines.push(`${heading} ${escMd(folder.name)}`);
+    lines.push('');
     if (folder.description?.trim()) {
-      lines.push(folder.description.trim())
-      lines.push('')
+      lines.push(folder.description.trim());
+      lines.push('');
     }
   }
 
   for (const reqId of folder.requestIds) {
-    const req = requests[reqId]
+    const req = requests[reqId];
     if (req) {
-      lines.push(requestToMarkdown(req))
+      lines.push(requestToMarkdown(req));
     }
   }
 
   for (const sub of folder.folders) {
-    lines.push(folderToMarkdown(sub, requests, depth + 1))
+    lines.push(folderToMarkdown(sub, requests, depth + 1));
   }
 
-  return lines.join('\n')
+  return lines.join('\n');
 }
 
 export function generateMarkdown(payload: DocsPayload): string {
-  const lines: string[] = []
-  lines.push('# API Documentation')
-  lines.push('')
+  const lines: string[] = [];
+  lines.push('# API Documentation');
+  lines.push('');
 
   for (const { collection, requests } of payload.collections) {
-    lines.push(`## ${escMd(collection.name)}`)
-    lines.push('')
+    lines.push(`## ${escMd(collection.name)}`);
+    lines.push('');
     if (collection.description?.trim()) {
-      lines.push(collection.description.trim())
-      lines.push('')
+      lines.push(collection.description.trim());
+      lines.push('');
     }
-    lines.push(folderToMarkdown(collection.rootFolder, requests, 3))
+    lines.push(folderToMarkdown(collection.rootFolder, requests, 3));
   }
 
-  return lines.join('\n')
+  return lines.join('\n');
 }
 
 // ─── HTML generation ──────────────────────────────────────────────────────────
@@ -147,95 +147,95 @@ export function escHtml(s: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+    .replace(/"/g, '&quot;');
 }
 
 const METHOD_COLORS: Record<string, string> = {
   GET: '#34d399', POST: '#60a5fa', PUT: '#fbbf24', PATCH: '#fb923c',
   DELETE: '#f87171', HEAD: '#6aa3c8', OPTIONS: '#9ca3af', WS: '#22d3ee',
-}
+};
 
 function requestToHtml(req: ApiRequest): string {
-  const methodLabel = req.protocol === 'websocket' ? 'WS' : req.method
-  const color = METHOD_COLORS[methodLabel] ?? '#9ca3af'
-  let html = `<div class="request">`
-  html += `<h4><span class="method" style="color:${color}">${escHtml(methodLabel)}</span> ${escHtml(req.name)}</h4>`
+  const methodLabel = req.protocol === 'websocket' ? 'WS' : req.method;
+  const color = METHOD_COLORS[methodLabel] ?? '#9ca3af';
+  let html = `<div class="request">`;
+  html += `<h4><span class="method" style="color:${color}">${escHtml(methodLabel)}</span> ${escHtml(req.name)}</h4>`;
 
   if (req.description?.trim()) {
-    html += `<p class="desc">${escHtml(req.description.trim())}</p>`
+    html += `<p class="desc">${escHtml(req.description.trim())}</p>`;
   }
 
-  html += `<div class="label">URL</div><pre><code>${escHtml(req.url || '(no url)')}</code></pre>`
+  html += `<div class="label">URL</div><pre><code>${escHtml(req.url || '(no url)')}</code></pre>`;
 
-  const enabledParams = req.params.filter(p => p.enabled && p.key)
+  const enabledParams = req.params.filter(p => p.enabled && p.key);
   if (enabledParams.length) {
-    html += `<div class="label">Query Parameters</div><table><thead><tr><th>Key</th><th>Value</th><th>Description</th></tr></thead><tbody>`
+    html += `<div class="label">Query Parameters</div><table><thead><tr><th>Key</th><th>Value</th><th>Description</th></tr></thead><tbody>`;
     for (const p of enabledParams) {
-      html += `<tr><td>${escHtml(p.key)}</td><td>${escHtml(p.value)}</td><td>${escHtml(p.description ?? '')}</td></tr>`
+      html += `<tr><td>${escHtml(p.key)}</td><td>${escHtml(p.value)}</td><td>${escHtml(p.description ?? '')}</td></tr>`;
     }
-    html += `</tbody></table>`
+    html += `</tbody></table>`;
   }
 
-  const enabledHeaders = req.headers.filter(h => h.enabled && h.key)
+  const enabledHeaders = req.headers.filter(h => h.enabled && h.key);
   if (enabledHeaders.length) {
-    html += `<div class="label">Headers</div><table><thead><tr><th>Key</th><th>Value</th></tr></thead><tbody>`
+    html += `<div class="label">Headers</div><table><thead><tr><th>Key</th><th>Value</th></tr></thead><tbody>`;
     for (const h of enabledHeaders) {
-      html += `<tr><td>${escHtml(h.key)}</td><td>${escHtml(h.value)}</td></tr>`
+      html += `<tr><td>${escHtml(h.key)}</td><td>${escHtml(h.value)}</td></tr>`;
     }
-    html += `</tbody></table>`
+    html += `</tbody></table>`;
   }
 
   if (req.auth.type !== 'none') {
-    html += `<div class="label">Auth</div><p class="auth-type">${escHtml(req.auth.type)}</p>`
+    html += `<div class="label">Auth</div><p class="auth-type">${escHtml(req.auth.type)}</p>`;
   }
 
-  const mode = req.body.mode
+  const mode = req.body.mode;
   if (mode === 'json' && req.body.json?.trim()) {
-    html += `<div class="label">Body (JSON)</div><pre><code class="lang-json">${escHtml(req.body.json.trim())}</code></pre>`
+    html += `<div class="label">Body (JSON)</div><pre><code class="lang-json">${escHtml(req.body.json.trim())}</code></pre>`;
   } else if (mode === 'raw' && req.body.raw?.trim()) {
-    html += `<div class="label">Body (${escHtml(req.body.rawContentType ?? 'text')})</div><pre><code>${escHtml(req.body.raw.trim())}</code></pre>`
+    html += `<div class="label">Body (${escHtml(req.body.rawContentType ?? 'text')})</div><pre><code>${escHtml(req.body.raw.trim())}</code></pre>`;
   } else if (mode === 'graphql' && req.body.graphql?.query?.trim()) {
-    html += `<div class="label">Body (GraphQL)</div><pre><code>${escHtml(req.body.graphql.query.trim())}</code></pre>`
+    html += `<div class="label">Body (GraphQL)</div><pre><code>${escHtml(req.body.graphql.query.trim())}</code></pre>`;
   } else if (mode === 'soap' && req.body.soap?.envelope?.trim()) {
-    html += `<div class="label">Body (SOAP)</div><pre><code>${escHtml(req.body.soap.envelope.trim())}</code></pre>`
+    html += `<div class="label">Body (SOAP)</div><pre><code>${escHtml(req.body.soap.envelope.trim())}</code></pre>`;
   }
 
-  html += `</div>`
-  return html
+  html += `</div>`;
+  return html;
 }
 
 function folderToHtml(folder: Folder, requests: Record<string, ApiRequest>, depth: number): string {
-  let html = ''
-  const tag = `h${Math.min(depth, 6)}`
+  let html = '';
+  const tag = `h${Math.min(depth, 6)}`;
 
   if (folder.name !== 'root') {
-    html += `<${tag} class="folder-heading">${escHtml(folder.name)}</${tag}>`
+    html += `<${tag} class="folder-heading">${escHtml(folder.name)}</${tag}>`;
     if (folder.description?.trim()) {
-      html += `<p class="folder-desc">${escHtml(folder.description.trim())}</p>`
+      html += `<p class="folder-desc">${escHtml(folder.description.trim())}</p>`;
     }
   }
 
   for (const reqId of folder.requestIds) {
-    const req = requests[reqId]
-    if (req) html += requestToHtml(req)
+    const req = requests[reqId];
+    if (req) html += requestToHtml(req);
   }
 
   for (const sub of folder.folders) {
-    html += folderToHtml(sub, requests, depth + 1)
+    html += folderToHtml(sub, requests, depth + 1);
   }
 
-  return html
+  return html;
 }
 
 export function generateHtml(payload: DocsPayload): string {
-  let body = ''
+  let body = '';
   for (const { collection, requests } of payload.collections) {
-    body += `<section class="collection"><h2>${escHtml(collection.name)}</h2>`
+    body += `<section class="collection"><h2>${escHtml(collection.name)}</h2>`;
     if (collection.description?.trim()) {
-      body += `<p class="collection-desc">${escHtml(collection.description.trim())}</p>`
+      body += `<p class="collection-desc">${escHtml(collection.description.trim())}</p>`;
     }
-    body += folderToHtml(collection.rootFolder, requests, 3)
-    body += `</section>`
+    body += folderToHtml(collection.rootFolder, requests, 3);
+    body += `</section>`;
   }
 
   return `<!DOCTYPE html>
@@ -269,7 +269,7 @@ export function generateHtml(payload: DocsPayload): string {
 <h1>API Documentation</h1>
 ${body}
 </body>
-</html>`
+</html>`;
 }
 
 // ─── IPC handler ─────────────────────────────────────────────────────────────
@@ -277,8 +277,8 @@ ${body}
 export function registerDocsHandlers(ipc: IpcMain): void {
   ipc.handle('docs:generate', async (_event, payload: DocsPayload): Promise<string> => {
     if (payload.format === 'html') {
-      return generateHtml(payload)
+      return generateHtml(payload);
     }
-    return generateMarkdown(payload)
-  })
+    return generateMarkdown(payload);
+  });
 }

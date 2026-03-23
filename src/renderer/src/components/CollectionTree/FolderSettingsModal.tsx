@@ -1,11 +1,11 @@
-import React, { useState } from 'react'
-import type { Folder, AuthConfig, KeyValuePair } from '../../../../shared/types'
-import { useStore } from '../../store'
-import { KVTable } from '../RequestBuilder/KVTable'
+import React, { useState } from 'react';
+import type { Folder, AuthConfig, KeyValuePair } from '../../../../shared/types';
+import { useStore } from '../../store';
+import { KVTable } from '../RequestBuilder/KVTable';
 
 type ModalTab = 'auth' | 'headers'
 
-const AUTH_TYPES: AuthConfig['type'][] = ['none', 'bearer', 'basic', 'digest', 'ntlm', 'apikey']
+const AUTH_TYPES: AuthConfig['type'][] = ['none', 'bearer', 'basic', 'digest', 'ntlm', 'apikey'];
 
 interface Props {
   collectionId: string
@@ -14,19 +14,19 @@ interface Props {
 }
 
 export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
-  const updateFolder = useStore(s => s.updateFolder)
+  const updateFolder = useStore(s => s.updateFolder);
 
-  const [activeTab, setActiveTab]   = useState<ModalTab>('auth')
-  const [auth, setAuth]             = useState<AuthConfig>(folder.auth ?? { type: 'none' })
-  const [headers, setHeaders]       = useState<KeyValuePair[]>(folder.headers ?? [])
+  const [activeTab, setActiveTab]   = useState<ModalTab>('auth');
+  const [auth, setAuth]             = useState<AuthConfig>(folder.auth ?? { type: 'none' });
+  const [headers, setHeaders]       = useState<KeyValuePair[]>(folder.headers ?? []);
 
   function patchAuth(patch: Partial<AuthConfig>) {
-    setAuth(prev => ({ ...prev, ...patch }))
+    setAuth(prev => ({ ...prev, ...patch }));
   }
 
   function save() {
-    updateFolder(collectionId, folder.id, { auth, headers })
-    onClose()
+    updateFolder(collectionId, folder.id, { auth, headers });
+    onClose();
   }
 
   return (
@@ -96,7 +96,7 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Folder auth panel (simplified — no keychain, just plain fields) ──────────
@@ -242,5 +242,5 @@ function FolderAuthPanel({ auth, onChange }: { auth: AuthConfig; onChange: (p: P
         </div>
       )}
     </div>
-  )
+  );
 }

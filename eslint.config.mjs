@@ -6,7 +6,7 @@ import reactHooks from 'eslint-plugin-react-hooks'
 export default tseslint.config(
   // ─── Ignore build outputs ────────────────────────────────────────────────────
   {
-    ignores: ['out/**', 'dist/**', 'dist-electron/**', 'node_modules/**'],
+    ignores: ['out/**', 'dist/**', 'dist-electron/**', 'node_modules/**', 'src/tests/**'],
   },
 
   // ─── JavaScript baseline ─────────────────────────────────────────────────────
@@ -32,6 +32,9 @@ export default tseslint.config(
         prefer: 'type-imports',
         fixStyle: 'inline-type-imports',
       }],
+
+      // Require semicolons
+      'semi': ['error', 'always'],
 
       // Prefer const over let when variable is never reassigned
       'prefer-const': 'error',

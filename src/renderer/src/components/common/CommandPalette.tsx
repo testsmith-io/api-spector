@@ -1,29 +1,29 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { useStore } from '../../store'
-import { MethodBadge } from './MethodBadge'
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useStore } from '../../store';
+import { MethodBadge } from './MethodBadge';
 
 export function CommandPalette() {
-  const open               = useStore(s => s.commandPaletteOpen)
-  const setOpen            = useStore(s => s.setCommandPaletteOpen)
-  const collections        = useStore(s => s.collections)
-  const openInTab          = useStore(s => s.openInTab)
+  const open               = useStore(s => s.commandPaletteOpen);
+  const setOpen            = useStore(s => s.setCommandPaletteOpen);
+  const collections        = useStore(s => s.collections);
+  const openInTab          = useStore(s => s.openInTab);
 
-  const [query, setQuery] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [activeIdx, setActiveIdx] = useState(0)
+  const [query, setQuery] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [activeIdx, setActiveIdx] = useState(0);
 
   // Reset state when opened
   useEffect(() => {
     if (open) {
-      setQuery('')
-      setActiveIdx(0)
-      setTimeout(() => inputRef.current?.focus(), 0)
+      setQuery('');
+      setActiveIdx(0);
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
-  }, [open])
+  }, [open]);
 
   // Build flat list of all requests with collection context
   const allRequests = useMemo(() => {
-    const results: { requestId: string; collectionId: string; name: string; url: string; method: string; collectionName: string }[] = []
+    const results: { requestId: string; collectionId: string; name: string; url: string; method: string; collectionName: string }[] = [];
     for (const { data: col } of Object.values(collections)) {
       for (const req of Object.values(col.requests)) {
         results.push({
@@ -33,44 +33,44 @@ export function CommandPalette() {
           url: req.url,
           method: req.method,
           collectionName: col.name,
-        })
+        });
       }
     }
-    return results
-  }, [collections])
+    return results;
+  }, [collections]);
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return allRequests.slice(0, 30)
-    const q = query.toLowerCase()
+    if (!query.trim()) return allRequests.slice(0, 30);
+    const q = query.toLowerCase();
     return allRequests.filter(r =>
       r.name.toLowerCase().includes(q) ||
       r.url.toLowerCase().includes(q) ||
       r.method.toLowerCase().includes(q)
-    ).slice(0, 30)
-  }, [allRequests, query])
+    ).slice(0, 30);
+  }, [allRequests, query]);
 
   // Clamp activeIdx when filtered list changes
   useEffect(() => {
-    setActiveIdx(prev => Math.min(prev, Math.max(0, filtered.length - 1)))
-  }, [filtered.length])
+    setActiveIdx(prev => Math.min(prev, Math.max(0, filtered.length - 1)));
+  }, [filtered.length]);
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setActiveIdx(i => Math.min(i + 1, filtered.length - 1))
+      e.preventDefault();
+      setActiveIdx(i => Math.min(i + 1, filtered.length - 1));
     } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setActiveIdx(i => Math.max(i - 1, 0))
+      e.preventDefault();
+      setActiveIdx(i => Math.max(i - 1, 0));
     } else if (e.key === 'Enter') {
-      e.preventDefault()
-      const item = filtered[activeIdx]
-      if (item) { openInTab(item.requestId, item.collectionId); setOpen(false) }
+      e.preventDefault();
+      const item = filtered[activeIdx];
+      if (item) { openInTab(item.requestId, item.collectionId); setOpen(false); }
     } else if (e.key === 'Escape') {
-      setOpen(false)
+      setOpen(false);
     }
   }
 
-  if (!open) return null
+  if (!open) return null;
 
   return (
     <div
@@ -89,7 +89,7 @@ export function CommandPalette() {
           <input
             ref={inputRef}
             value={query}
-            onChange={e => { setQuery(e.target.value); setActiveIdx(0) }}
+            onChange={e => { setQuery(e.target.value); setActiveIdx(0); }}
             onKeyDown={handleKeyDown}
             placeholder="Search requests by name, URL, or method..."
             className="flex-1 bg-transparent text-sm focus:outline-none placeholder-surface-600"
@@ -108,7 +108,7 @@ export function CommandPalette() {
             filtered.map((item, idx) => (
               <div
                 key={item.requestId}
-                onClick={() => { openInTab(item.requestId, item.collectionId); setOpen(false) }}
+                onClick={() => { openInTab(item.requestId, item.collectionId); setOpen(false); }}
                 onMouseEnter={() => setActiveIdx(idx)}
                 className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
                   idx === activeIdx ? 'bg-surface-800' : 'hover:bg-surface-800/50'
@@ -136,5 +136,5 @@ export function CommandPalette() {
         )}
       </div>
     </div>
-  )
+  );
 }

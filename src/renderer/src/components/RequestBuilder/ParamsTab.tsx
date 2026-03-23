@@ -1,6 +1,6 @@
-import React from 'react'
-import type { ApiRequest } from '../../../../shared/types'
-import { KVTable } from './KVTable'
+import React from 'react';
+import type { ApiRequest } from '../../../../shared/types';
+import { KVTable } from './KVTable';
 
 export function ParamsTab({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
   return (
@@ -10,5 +10,5 @@ export function ParamsTab({ request, onChange }: { request: ApiRequest; onChange
       keyPlaceholder="param"
       valuePlaceholder="value"
     />
-  )
+  );
 }

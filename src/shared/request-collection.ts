@@ -1,4 +1,4 @@
-import type { Folder, Collection, ApiRequest } from './types'
+import type { Folder, Collection, ApiRequest } from './types';
 
 export type CollectedRequest = { request: ApiRequest; collectionVars: Record<string, string> }
 
@@ -14,46 +14,46 @@ export function collectTagged(
   collectionVars: Record<string, string>,
   filterTags: string[],
 ): CollectedRequest[] {
-  const results: CollectedRequest[] = []
+  const results: CollectedRequest[] = [];
 
   for (const reqId of folder.requestIds) {
-    const req = requests[reqId]
-    if (!req) continue
-    const tags = req.meta?.tags ?? []
-    if (filterTags.length > 0 && !filterTags.some(t => tags.includes(t))) continue
-    results.push({ request: req, collectionVars })
+    const req = requests[reqId];
+    if (!req) continue;
+    const tags = req.meta?.tags ?? [];
+    if (filterTags.length > 0 && !filterTags.some(t => tags.includes(t))) continue;
+    results.push({ request: req, collectionVars });
   }
 
   for (const sub of folder.folders) {
     // A folder's tags count as tags on all its children:
     // if the folder matches the filter, include all requests inside it.
-    const folderTags = sub.tags ?? []
+    const folderTags = sub.tags ?? [];
     const effectiveTags = filterTags.length === 0
       ? filterTags
       : folderTags.some(t => filterTags.includes(t))
         ? []           // folder matches → include all requests inside
-        : filterTags   // apply request-level filter
+        : filterTags;   // apply request-level filter
 
-    results.push(...collectTagged(sub, requests, collectionVars, effectiveTags))
+    results.push(...collectTagged(sub, requests, collectionVars, effectiveTags));
   }
 
-  return results
+  return results;
 }
 
 /**
  * Collect all unique tags used across a folder tree (folders + requests).
  */
 export function collectAllTags(folder: Folder, requests: Collection['requests']): string[] {
-  const tags = new Set<string>()
+  const tags = new Set<string>();
 
   function walk(f: Folder) {
-    ;(f.tags ?? []).forEach(t => tags.add(t))
+    ;(f.tags ?? []).forEach(t => tags.add(t));
     for (const reqId of f.requestIds) {
-      ;(requests[reqId]?.meta?.tags ?? []).forEach(t => tags.add(t))
+      ;(requests[reqId]?.meta?.tags ?? []).forEach(t => tags.add(t));
     }
-    f.folders.forEach(walk)
+    f.folders.forEach(walk);
   }
 
-  walk(folder)
-  return Array.from(tags).sort()
+  walk(folder);
+  return Array.from(tags).sort();
 }

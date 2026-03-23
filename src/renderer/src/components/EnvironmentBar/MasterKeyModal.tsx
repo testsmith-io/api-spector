@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState } from 'react';
 
-const { electron } = window as any
+const { electron } = window;
 
 const EXAMPLES = [
   {
@@ -15,7 +15,7 @@ const EXAMPLES = [
     label: 'Windows — Command Prompt (permanent)',
     code: (pw: string) => `setx API_SPECTOR_MASTER_KEY "${pw || '<your-password>'}"`,
   },
-]
+];
 
 interface Props {
   onSuccess: (password: string) => void
@@ -23,23 +23,23 @@ interface Props {
 }
 
 export function MasterKeyModal({ onSuccess, onCancel }: Props) {
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [copied, setCopied] = useState<number | null>(null)
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState<number | null>(null);
 
   async function confirm() {
     if (!password.trim()) {
-      setError('Password cannot be empty.')
-      return
+      setError('Password cannot be empty.');
+      return;
     }
-    await electron.setMasterKey(password)
-    onSuccess(password)
+    await electron.setMasterKey(password);
+    onSuccess(password);
   }
 
   function copy(idx: number, text: string) {
-    navigator.clipboard.writeText(text)
-    setCopied(idx)
-    setTimeout(() => setCopied(null), 2000)
+    navigator.clipboard.writeText(text);
+    setCopied(idx);
+    setTimeout(() => setCopied(null), 2000);
   }
 
   return (
@@ -68,7 +68,7 @@ export function MasterKeyModal({ onSuccess, onCancel }: Props) {
             type="password"
             autoFocus
             value={password}
-            onChange={e => { setPassword(e.target.value); setError('') }}
+            onChange={e => { setPassword(e.target.value); setError(''); }}
             onKeyDown={e => e.key === 'Enter' && confirm()}
             placeholder="Enter master password…"
             className="bg-surface-800 border border-surface-700 rounded px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-blue-500"
@@ -115,5 +115,5 @@ export function MasterKeyModal({ onSuccess, onCancel }: Props) {
         </div>
       </div>
     </div>
-  )
+  );
 }

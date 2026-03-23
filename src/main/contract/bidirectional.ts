@@ -3,12 +3,12 @@ import type {
   ContractResult,
   ContractReport,
   ContractViolation,
-} from '../../shared/types'
-import { loadSpec, resolveSchema, findOperation } from './provider-verifier'
-import { validateConsumerResponse } from './consumer-verifier'
-import { fetch, Headers } from 'undici'
-import { interpolate, buildUrl } from '../interpolation'
-import { buildAuthHeaders } from '../auth-builder'
+} from '../../shared/types';
+import { loadSpec, resolveSchema, findOperation } from './provider-verifier';
+import { validateConsumerResponse } from './consumer-verifier';
+import { fetch, Headers } from 'undici';
+import { interpolate, buildUrl } from '../interpolation';
+import { buildAuthHeaders } from '../auth-builder';
 
 // ─── Bi-directional contract verifier ────────────────────────────────────────
 //
@@ -40,17 +40,17 @@ export function checkSchemaCompatibility(
   providerSchema: Record<string, unknown>,
   path = '',
 ): ContractViolation[] {
-  const violations: ContractViolation[] = []
+  const violations: ContractViolation[] = [];
 
-  if (!consumerSchema || !providerSchema) return violations
+  if (!consumerSchema || !providerSchema) return violations;
 
   // ── Root type mismatch ──
-  const cType = consumerSchema['type'] as string | undefined
-  const pType = providerSchema['type'] as string | undefined
+  const cType = consumerSchema['type'] as string | undefined;
+  const pType = providerSchema['type'] as string | undefined;
 
   if (cType && pType && cType !== pType) {
     // integer is compatible with number
-    const ok = (cType === 'integer' && pType === 'number') || (cType === 'number' && pType === 'integer')
+    const ok = (cType === 'integer' && pType === 'number') || (cType === 'number' && pType === 'integer');
     if (!ok) {
       violations.push({
         type:     'schema_incompatible',
@@ -58,29 +58,29 @@ export function checkSchemaCompatibility(
         path:     path || '/',
         expected: cType,
         actual:   pType,
-      })
-      return violations  // no point checking properties if root type differs
+      });
+      return violations;  // no point checking properties if root type differs
     }
   }
 
   // ── Array items ──
   if (cType === 'array' || Array.isArray(consumerSchema['items'])) {
-    const cItems = consumerSchema['items'] as Record<string, unknown> | undefined
-    const pItems = providerSchema['items'] as Record<string, unknown> | undefined
+    const cItems = consumerSchema['items'] as Record<string, unknown> | undefined;
+    const pItems = providerSchema['items'] as Record<string, unknown> | undefined;
     if (cItems && pItems) {
-      violations.push(...checkSchemaCompatibility(cItems, pItems, path ? `${path}[]` : '[]'))
+      violations.push(...checkSchemaCompatibility(cItems, pItems, path ? `${path}[]` : '[]'));
     }
-    return violations
+    return violations;
   }
 
   // ── Object properties ──
   if (cType === 'object' || consumerSchema['properties']) {
-    const cProps    = (consumerSchema['properties'] as Record<string, unknown>) ?? {}
-    const pProps    = (providerSchema['properties'] as Record<string, unknown>) ?? {}
-    const cRequired = (consumerSchema['required'] as string[]) ?? []
+    const cProps    = (consumerSchema['properties'] as Record<string, unknown>) ?? {};
+    const pProps    = (providerSchema['properties'] as Record<string, unknown>) ?? {};
+    const cRequired = (consumerSchema['required'] as string[]) ?? [];
 
     for (const field of cRequired) {
-      const fieldPath = path ? `${path}.${field}` : field
+      const fieldPath = path ? `${path}.${field}` : field;
       if (!(field in pProps)) {
         violations.push({
           type:     'schema_incompatible',
@@ -88,24 +88,24 @@ export function checkSchemaCompatibility(
           path:     fieldPath,
           expected: '(defined)',
           actual:   '(absent)',
-        })
+        });
       }
     }
 
     // Recursively check shared properties
     for (const [field, cPropSchema] of Object.entries(cProps)) {
       if (field in pProps) {
-        const fieldPath = path ? `${path}.${field}` : field
+        const fieldPath = path ? `${path}.${field}` : field;
         violations.push(...checkSchemaCompatibility(
           cPropSchema as Record<string, unknown>,
           pProps[field] as Record<string, unknown>,
           fieldPath,
-        ))
+        ));
       }
     }
   }
 
-  return violations
+  return violations;
 }
 
 // ─── Provider spec response schema lookup ────────────────────────────────────
@@ -117,25 +117,25 @@ function getProviderResponseSchema(
   statusCode:      number,
   requestBaseUrl?: string,
 ): Record<string, unknown> | null {
-  const url   = req.url.replace(/\{\{([^}]+)\}\}/g, (_, k: string) => envVars[k] ?? `{{${k}}}`)
-  const match = findOperation(spec, req.method, url, requestBaseUrl)
-  if (!match) return null
+  const url   = req.url.replace(/\{\{([^}]+)\}\}/g, (_, k: string) => envVars[k] ?? `{{${k}}}`);
+  const match = findOperation(spec, req.method, url, requestBaseUrl);
+  if (!match) return null;
 
-  const responses = (match.operation['responses'] as Record<string, unknown>) ?? {}
+  const responses = (match.operation['responses'] as Record<string, unknown>) ?? {};
   // Try exact status, then 2xx wildcard, then 'default'
-  const candidates = [String(statusCode), `${String(statusCode)[0]}xx`, '2XX', '2xx', 'default']
+  const candidates = [String(statusCode), `${String(statusCode)[0]}xx`, '2XX', '2xx', 'default'];
   for (const candidate of candidates) {
-    const resp = responses[candidate]
+    const resp = responses[candidate];
     if (resp) {
-      const resolved = resolveSchema(spec, resp) as Record<string, unknown>
-      const content  = (resolved['content'] as Record<string, unknown>) ?? {}
-      const json     = content['application/json'] as Record<string, unknown> | undefined
+      const resolved = resolveSchema(spec, resp) as Record<string, unknown>;
+      const content  = (resolved['content'] as Record<string, unknown>) ?? {};
+      const json     = content['application/json'] as Record<string, unknown> | undefined;
       if (json?.['schema']) {
-        return resolveSchema(spec, json['schema']) as Record<string, unknown>
+        return resolveSchema(spec, json['schema']) as Record<string, unknown>;
       }
     }
   }
-  return null
+  return null;
 }
 
 // ─── HTTP execution (same as consumer) ───────────────────────────────────────
@@ -144,32 +144,32 @@ async function executeRequest(
   req:  ApiRequest,
   vars: Record<string, string>,
 ): Promise<{ status: number; headers: Record<string, string>; body: string; durationMs: number } | Error> {
-  const url = buildUrl(req.url, req.params, vars)
-  const start = Date.now()
+  const url = buildUrl(req.url, req.params, vars);
+  const start = Date.now();
   try {
-    const headers = new Headers()
+    const headers = new Headers();
     for (const h of req.headers) {
-      if (h.enabled && h.key) headers.set(interpolate(h.key, vars), interpolate(h.value, vars))
+      if (h.enabled && h.key) headers.set(interpolate(h.key, vars), interpolate(h.value, vars));
     }
-    const authHeaders = await buildAuthHeaders(req.auth, vars)
-    for (const [k, v] of Object.entries(authHeaders)) headers.set(k, v)
+    const authHeaders = await buildAuthHeaders(req.auth, vars);
+    for (const [k, v] of Object.entries(authHeaders)) headers.set(k, v);
 
-    let body: string | undefined
+    let body: string | undefined;
     if (req.body.mode === 'json' && req.body.json) {
-      body = interpolate(req.body.json, vars)
-      if (!headers.has('content-type')) headers.set('Content-Type', 'application/json')
+      body = interpolate(req.body.json, vars);
+      if (!headers.has('content-type')) headers.set('Content-Type', 'application/json');
     }
 
     const resp     = await fetch(url, {
       method: req.method, headers,
       body:   !['GET', 'HEAD'].includes(req.method) ? body : undefined,
-    } as Parameters<typeof fetch>[1])
-    const bodyText = await resp.text()
-    const rawHdrs: Record<string, string> = {}
-    resp.headers.forEach((v, k) => { rawHdrs[k] = v })
-    return { status: resp.status, headers: rawHdrs, body: bodyText, durationMs: Date.now() - start }
+    } as Parameters<typeof fetch>[1]);
+    const bodyText = await resp.text();
+    const rawHdrs: Record<string, string> = {};
+    resp.headers.forEach((v, k) => { rawHdrs[k] = v; });
+    return { status: resp.status, headers: rawHdrs, body: bodyText, durationMs: Date.now() - start };
   } catch (err) {
-    return err instanceof Error ? err : new Error(String(err))
+    return err instanceof Error ? err : new Error(String(err));
   }
 }
 
@@ -183,48 +183,48 @@ export async function runBidirectional(
   specPath?:        string,
   requestBaseUrl?:  string,
 ): Promise<ContractReport> {
-  const spec  = await loadSpec(specUrl, specPath) as Record<string, unknown>
-  const vars  = { ...envVars, ...collectionVars }
-  const start = Date.now()
+  const spec  = await loadSpec(specUrl, specPath) as Record<string, unknown>;
+  const vars  = { ...envVars, ...collectionVars };
+  const start = Date.now();
 
   // Only requests that have a consumer contract
   const contractRequests = requests.filter(r =>
     r.contract && (r.contract.statusCode !== undefined || r.contract.bodySchema || r.contract.headers?.length),
-  )
+  );
 
   const results: ContractResult[] = await Promise.all(contractRequests.map(async req => {
-    const url        = buildUrl(req.url, req.params, vars)
-    const violations: ContractViolation[] = []
+    const url        = buildUrl(req.url, req.params, vars);
+    const violations: ContractViolation[] = [];
 
     // ── 1. Static schema compatibility check ──
-    const expectedStatus = req.contract!.statusCode ?? 200
+    const expectedStatus = req.contract!.statusCode ?? 200;
     const consumerSchema = req.contract!.bodySchema
-      ? (() => { try { return JSON.parse(req.contract!.bodySchema!) as Record<string, unknown> } catch { return null } })()
-      : null
+      ? (() => { try { return JSON.parse(req.contract!.bodySchema!) as Record<string, unknown>; } catch { return null; } })()
+      : null;
 
     if (consumerSchema) {
-      const providerSchema = getProviderResponseSchema(spec, req, vars, expectedStatus, requestBaseUrl)
+      const providerSchema = getProviderResponseSchema(spec, req, vars, expectedStatus, requestBaseUrl);
       if (!providerSchema) {
         violations.push({
           type:    'schema_incompatible',
           message: `No response schema found in spec for ${req.method} ${url} → ${expectedStatus}`,
-        })
+        });
       } else {
-        violations.push(...checkSchemaCompatibility(consumerSchema, providerSchema))
+        violations.push(...checkSchemaCompatibility(consumerSchema, providerSchema));
       }
     }
 
     // ── 2. Live consumer verification ──
-    const result = await executeRequest(req, vars)
+    const result = await executeRequest(req, vars);
     if (result instanceof Error) {
-      violations.push({ type: 'status_mismatch', message: `Request failed: ${result.message}` })
-      return { requestId: req.id, requestName: req.name, method: req.method, url, passed: false, violations }
+      violations.push({ type: 'status_mismatch', message: `Request failed: ${result.message}` });
+      return { requestId: req.id, requestName: req.name, method: req.method, url, passed: false, violations };
     }
 
     const liveViolations = validateConsumerResponse(
       req.contract!, result.status, result.headers, result.body,
-    )
-    violations.push(...liveViolations)
+    );
+    violations.push(...liveViolations);
 
     return {
       requestId:    req.id,
@@ -235,10 +235,10 @@ export async function runBidirectional(
       violations,
       durationMs:   result.durationMs,
       actualStatus: result.status,
-    }
-  }))
+    };
+  }));
 
-  const passed = results.filter(r => r.passed).length
+  const passed = results.filter(r => r.passed).length;
   return {
     mode:      'bidirectional',
     total:     results.length,
@@ -246,5 +246,5 @@ export async function runBidirectional(
     failed:    results.length - passed,
     results,
     durationMs: Date.now() - start,
-  }
+  };
 }

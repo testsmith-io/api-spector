@@ -1,19 +1,19 @@
-import React, { useState } from 'react'
-import { useStore } from '../../store'
-import type { ApiRequest, HttpMethod, KeyValuePair } from '../../../../shared/types'
-import { ParamsTab } from './ParamsTab'
-import { VarInput } from '../common/VarInput'
-import { HeadersTab } from './HeadersTab'
-import { BodyTab } from './BodyTab'
-import { AuthTab } from './AuthTab'
-import { ScriptsTab } from './ScriptsTab'
-import { SchemaTab } from './SchemaTab'
-import { ContractTab } from './ContractTab'
-import { WebSocketPanel } from '../WebSocket/WebSocketPanel'
+import React, { useState } from 'react';
+import { useStore } from '../../store';
+import type { ApiRequest, HttpMethod, KeyValuePair } from '../../../../shared/types';
+import { ParamsTab } from './ParamsTab';
+import { VarInput } from '../common/VarInput';
+import { HeadersTab } from './HeadersTab';
+import { BodyTab } from './BodyTab';
+import { AuthTab } from './AuthTab';
+import { ScriptsTab } from './ScriptsTab';
+import { SchemaTab } from './SchemaTab';
+import { ContractTab } from './ContractTab';
+import { WebSocketPanel } from '../WebSocket/WebSocketPanel';
 
-const { electron } = window as any
+const { electron } = window;
 
-const METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
+const METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
 const METHOD_COLORS: Record<string, string> = {
   GET:     'text-emerald-400',
@@ -23,65 +23,65 @@ const METHOD_COLORS: Record<string, string> = {
   DELETE:  'text-red-400',
   HEAD:    'text-purple-400',
   OPTIONS: 'text-gray-400',
-}
+};
 
 interface Props {
   request: ApiRequest
 }
 
 export function RequestBuilder({ request }: Props) {
-  const updateRequest       = useStore(s => s.updateRequest)
-  const activeEnvironmentId = useStore(s => s.activeEnvironmentId)
-  const activeCollectionId  = useStore(s => s.activeCollectionId)
-  const environments        = useStore(s => s.environments)
-  const collections         = useStore(s => s.collections)
-  const globals             = useStore(s => s.globals)
-  const activeTabId         = useStore(s => s.activeTabId)
-  const setTabResponse      = useStore(s => s.setTabResponse)
-  const setTabSending       = useStore(s => s.setTabSending)
-  const setTabRequestTab    = useStore(s => s.setTabRequestTab)
-  const addHistoryEntry     = useStore(s => s.addHistoryEntry)
-  const applyScriptUpdates  = useStore(s => s.applyScriptUpdates)
-  const workspaceSettings   = useStore(s => s.workspace?.settings)
+  const updateRequest       = useStore(s => s.updateRequest);
+  const activeEnvironmentId = useStore(s => s.activeEnvironmentId);
+  const activeCollectionId  = useStore(s => s.activeCollectionId);
+  const environments        = useStore(s => s.environments);
+  const collections         = useStore(s => s.collections);
+  const globals             = useStore(s => s.globals);
+  const activeTabId         = useStore(s => s.activeTabId);
+  const setTabResponse      = useStore(s => s.setTabResponse);
+  const setTabSending       = useStore(s => s.setTabSending);
+  const setTabRequestTab    = useStore(s => s.setTabRequestTab);
+  const addHistoryEntry     = useStore(s => s.addHistoryEntry);
+  const applyScriptUpdates  = useStore(s => s.applyScriptUpdates);
+  const workspaceSettings   = useStore(s => s.workspace?.settings);
 
   // Read per-tab state
-  const activeAppTab = useStore(s => s.tabs.find(t => t.id === s.activeTabId))
-  const isSending    = activeAppTab?.isSending ?? false
-  const activeTab    = activeAppTab?.requestTab ?? 'params'
+  const activeAppTab = useStore(s => s.tabs.find(t => t.id === s.activeTabId));
+  const isSending    = activeAppTab?.isSending ?? false;
+  const activeTab    = activeAppTab?.requestTab ?? 'params';
 
   function setActiveTab(t: typeof activeTab) {
-    if (activeTabId) setTabRequestTab(activeTabId, t)
+    if (activeTabId) setTabRequestTab(activeTabId, t);
   }
 
-  const [editingName, setEditingName] = useState(false)
+  const [editingName, setEditingName] = useState(false);
 
   function update(patch: Partial<ApiRequest>) {
-    updateRequest(request.id, patch)
+    updateRequest(request.id, patch);
   }
 
   async function sendRequest() {
-    if (!activeTabId) return
-    setTabSending(activeTabId, true)
-    setTabResponse(activeTabId, null, null)
+    if (!activeTabId) return;
+    setTabSending(activeTabId, true);
+    setTabResponse(activeTabId, null, null);
     try {
-      const activeEnv = activeEnvironmentId ? environments[activeEnvironmentId]?.data ?? null : null
+      const activeEnv = activeEnvironmentId ? environments[activeEnvironmentId]?.data ?? null : null;
       const collectionVars = activeCollectionId
         ? (collections[activeCollectionId]?.data.collectionVariables ?? {})
-        : {}
+        : {};
 
       // Merge folder-level auth and headers (request-level overrides if not 'none')
-      const inherited = useStore.getState().getInheritedAuthAndHeaders(request.id)
+      const inherited = useStore.getState().getInheritedAuthAndHeaders(request.id);
       const mergedAuth: typeof request.auth =
-        request.auth.type !== 'none' ? request.auth : (inherited.auth ?? request.auth)
+        request.auth.type !== 'none' ? request.auth : (inherited.auth ?? request.auth);
       const mergedHeaders: KeyValuePair[] = [
         ...inherited.headers.filter(h => h.enabled),
         ...request.headers,
-      ]
+      ];
       const mergedRequest = {
         ...request,
         auth: mergedAuth,
         headers: mergedHeaders,
-      }
+      };
 
       const result = await electron.sendRequest({
         request: mergedRequest,
@@ -91,10 +91,10 @@ export function RequestBuilder({ request }: Props) {
         proxy:           workspaceSettings?.proxy,
         tls:             workspaceSettings?.tls,
         piiMaskPatterns: workspaceSettings?.piiMaskPatterns,
-      })
+      });
 
-      setTabResponse(activeTabId, result.response, result.scriptResult, result.sentRequest)
-      applyScriptUpdates(result.scriptResult)
+      setTabResponse(activeTabId, result.response, result.scriptResult, result.sentRequest);
+      applyScriptUpdates(result.scriptResult);
 
       addHistoryEntry({
         id: crypto.randomUUID(),
@@ -104,15 +104,15 @@ export function RequestBuilder({ request }: Props) {
         response: result.response,
         environmentName: activeEnv?.name ?? null,
         scriptResult: result.scriptResult,
-      })
+      });
     } finally {
-      setTabSending(activeTabId, false)
+      setTabSending(activeTabId, false);
     }
   }
 
-  const hasPreScript  = Boolean(request.preRequestScript?.trim())
-  const hasPostScript = Boolean(request.postRequestScript?.trim())
-  const isWs         = request.protocol === 'websocket'
+  const hasPreScript  = Boolean(request.preRequestScript?.trim());
+  const hasPostScript = Boolean(request.postRequestScript?.trim());
+  const isWs         = request.protocol === 'websocket';
 
   const tabs = [
     { id: 'params',  label: 'Params',  count: request.params.filter(p => p.enabled && p.key).length },
@@ -124,7 +124,7 @@ export function RequestBuilder({ request }: Props) {
       { id: 'schema',   label: 'Schema',   count: request.schema?.trim() ? 1 : 0 },
       { id: 'contract', label: 'Contract', count: (request.contract?.statusCode !== undefined || request.contract?.bodySchema?.trim() || request.contract?.headers?.some(h => h.key)) ? 1 : 0 },
     ] : []),
-  ] as const
+  ] as const;
 
   return (
     <div className="flex flex-col h-full">
@@ -214,7 +214,7 @@ export function RequestBuilder({ request }: Props) {
             {tabs.map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
                 className={`px-3 py-1.5 text-xs transition-colors border-b-2 -mb-px ${
                   activeTab === tab.id
                     ? 'border-blue-500 text-white'
@@ -245,5 +245,5 @@ export function RequestBuilder({ request }: Props) {
         </>
       )}
     </div>
-  )
+  );
 }

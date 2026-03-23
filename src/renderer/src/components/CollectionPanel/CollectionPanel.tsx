@@ -1,107 +1,107 @@
-import React, { useRef, useState } from 'react'
-import { useStore } from '../../store'
-import type { DataSet } from '../../../../shared/types'
+import React, { useRef, useState } from 'react';
+import { useStore } from '../../store';
+import type { DataSet } from '../../../../shared/types';
 
 // ─── CSV helpers ──────────────────────────────────────────────────────────────
 
 function parseCSV(text: string): DataSet {
-  const lines = text.trim().split(/\r?\n/).filter(Boolean)
-  if (lines.length === 0) return { columns: [], rows: [] }
+  const lines = text.trim().split(/\r?\n/).filter(Boolean);
+  if (lines.length === 0) return { columns: [], rows: [] };
   function splitRow(line: string): string[] {
-    const cells: string[] = []
-    let cur = ''
-    let inQuote = false
+    const cells: string[] = [];
+    let cur = '';
+    let inQuote = false;
     for (let i = 0; i < line.length; i++) {
-      const ch = line[i]
-      if (ch === '"') { inQuote = !inQuote }
-      else if (ch === ',' && !inQuote) { cells.push(cur.trim()); cur = '' }
-      else { cur += ch }
+      const ch = line[i];
+      if (ch === '"') { inQuote = !inQuote; }
+      else if (ch === ',' && !inQuote) { cells.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
     }
-    cells.push(cur.trim())
-    return cells
+    cells.push(cur.trim());
+    return cells;
   }
-  const columns = splitRow(lines[0])
-  const rows    = lines.slice(1).map(splitRow)
-  return { columns, rows }
+  const columns = splitRow(lines[0]);
+  const rows    = lines.slice(1).map(splitRow);
+  return { columns, rows };
 }
 
 function toCSV(ds: DataSet): string {
-  const escape = (s: string) => s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s
-  return [ds.columns, ...ds.rows].map(row => row.map(escape).join(',')).join('\n')
+  const escape = (s: string) => s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+  return [ds.columns, ...ds.rows].map(row => row.map(escape).join(',')).join('\n');
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function CollectionPanel() {
-  const activeCollectionId        = useStore(s => s.activeCollectionId)
-  const collections               = useStore(s => s.collections)
-  const updateCollectionDataSet   = useStore(s => s.updateCollectionDataSet)
-  const openRunner                = useStore(s => s.openRunner)
+  const activeCollectionId        = useStore(s => s.activeCollectionId);
+  const collections               = useStore(s => s.collections);
+  const updateCollectionDataSet   = useStore(s => s.updateCollectionDataSet);
+  const openRunner                = useStore(s => s.openRunner);
 
-  const [activeTab, setActiveTab] = useState<'data' | 'variables'>('data')
-  const csvFileRef = useRef<HTMLInputElement>(null)
+  const [activeTab, setActiveTab] = useState<'data' | 'variables'>('data');
+  const csvFileRef = useRef<HTMLInputElement>(null);
 
   if (!activeCollectionId) {
     return (
       <div className="flex items-center justify-center h-full text-surface-400 text-sm">
         Select a request from the sidebar
       </div>
-    )
+    );
   }
 
-  const col = collections[activeCollectionId]?.data
-  if (!col) return null
+  const col = collections[activeCollectionId]?.data;
+  if (!col) return null;
 
-  const ds: DataSet = col.dataSet ?? { columns: [], rows: [] }
+  const ds: DataSet = col.dataSet ?? { columns: [], rows: [] };
 
   function setDs(next: DataSet) {
-    updateCollectionDataSet(activeCollectionId!, next)
+    updateCollectionDataSet(activeCollectionId!, next);
   }
 
   // ── Column ops ──────────────────────────────────────────────────────────────
   function addColumn() {
-    const name = `var${ds.columns.length + 1}`
-    setDs({ columns: [...ds.columns, name], rows: ds.rows.map(r => [...r, '']) })
+    const name = `var${ds.columns.length + 1}`;
+    setDs({ columns: [...ds.columns, name], rows: ds.rows.map(r => [...r, '']) });
   }
   function renameColumn(ci: number, name: string) {
-    setDs({ ...ds, columns: ds.columns.map((c, i) => i === ci ? name : c) })
+    setDs({ ...ds, columns: ds.columns.map((c, i) => i === ci ? name : c) });
   }
   function removeColumn(ci: number) {
-    setDs({ columns: ds.columns.filter((_, i) => i !== ci), rows: ds.rows.map(r => r.filter((_, i) => i !== ci)) })
+    setDs({ columns: ds.columns.filter((_, i) => i !== ci), rows: ds.rows.map(r => r.filter((_, i) => i !== ci)) });
   }
 
   // ── Row ops ─────────────────────────────────────────────────────────────────
   function addRow() {
-    setDs({ ...ds, rows: [...ds.rows, ds.columns.map(() => '')] })
+    setDs({ ...ds, rows: [...ds.rows, ds.columns.map(() => '')] });
   }
   function setCell(ri: number, ci: number, v: string) {
-    setDs({ ...ds, rows: ds.rows.map((row, i) => i === ri ? row.map((c, j) => j === ci ? v : c) : row) })
+    setDs({ ...ds, rows: ds.rows.map((row, i) => i === ri ? row.map((c, j) => j === ci ? v : c) : row) });
   }
   function removeRow(ri: number) {
-    setDs({ ...ds, rows: ds.rows.filter((_, i) => i !== ri) })
+    setDs({ ...ds, rows: ds.rows.filter((_, i) => i !== ri) });
   }
 
   // ── CSV import / export ─────────────────────────────────────────────────────
   function importCSV(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = ev => setDs(parseCSV(ev.target?.result as string))
-    reader.readAsText(file)
-    e.target.value = ''
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => setDs(parseCSV(ev.target?.result as string));
+    reader.readAsText(file);
+    e.target.value = '';
   }
   function exportCSV() {
-    const blob = new Blob([toCSV(ds)], { type: 'text/csv' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href     = url
-    a.download = `${col.name.replace(/\s+/g, '_')}_data.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    const blob = new Blob([toCSV(ds)], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `${col.name.replace(/\s+/g, '_')}_data.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
-  const hasColumns = ds.columns.length > 0
-  const iterCount  = ds.rows.length
+  const hasColumns = ds.columns.length > 0;
+  const iterCount  = ds.rows.length;
 
   return (
     <div className="flex flex-col h-full">
@@ -270,5 +270,5 @@ export function CollectionPanel() {
         )}
       </div>
     </div>
-  )
+  );
 }

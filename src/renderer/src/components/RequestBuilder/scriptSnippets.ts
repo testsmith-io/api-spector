@@ -156,4 +156,4 @@ export const SNIPPET_GROUPS: SnippetGroup[] = [
       },
     ],
   },
-]
+];

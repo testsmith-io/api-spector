@@ -1,10 +1,10 @@
-import React, { useState } from 'react'
-import { useStore } from '../../store'
-import CodeMirror from '@uiw/react-codemirror'
-import { oneDark } from '@codemirror/theme-one-dark'
-import type { GeneratedFile, GenerateTarget } from '../../../../shared/types'
+import React, { useState } from 'react';
+import { useStore } from '../../store';
+import CodeMirror from '@uiw/react-codemirror';
+import { oneDark } from '@codemirror/theme-one-dark';
+import type { GeneratedFile, GenerateTarget } from '../../../../shared/types';
 
-const { electron } = window as any
+const { electron } = window;
 
 interface TargetDef {
   id: GenerateTarget
@@ -19,51 +19,51 @@ const TARGETS: TargetDef[] = [
   { id: 'supertest_ts',    label: 'Supertest TS',    description: 'Jest + Supertest TypeScript tests' },
   { id: 'supertest_js',    label: 'Supertest JS',    description: 'Jest + Supertest JavaScript tests' },
   { id: 'rest_assured',    label: 'REST Assured',    description: 'Java + JUnit 5 + Maven pom.xml' },
-]
+];
 
 export function GeneratorPanel() {
-  const setShowGeneratorPanel = useStore(s => s.setShowGeneratorPanel)
-  const collections           = useStore(s => s.collections)
-  const environments          = useStore(s => s.environments)
-  const activeCollectionId    = useStore(s => s.activeCollectionId)
-  const activeEnvironmentId   = useStore(s => s.activeEnvironmentId)
+  const setShowGeneratorPanel = useStore(s => s.setShowGeneratorPanel);
+  const collections           = useStore(s => s.collections);
+  const environments          = useStore(s => s.environments);
+  const activeCollectionId    = useStore(s => s.activeCollectionId);
+  const activeEnvironmentId   = useStore(s => s.activeEnvironmentId);
 
-  const [target, setTarget]   = useState<GenerateTarget>('robot_framework')
-  const [files, setFiles]     = useState<GeneratedFile[]>([])
-  const [selectedFile, setSelectedFile] = useState<string | null>(null)
-  const [generating, setGenerating]     = useState(false)
-  const [error, setError]               = useState<string | null>(null)
+  const [target, setTarget]   = useState<GenerateTarget>('robot_framework');
+  const [files, setFiles]     = useState<GeneratedFile[]>([]);
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [generating, setGenerating]     = useState(false);
+  const [error, setError]               = useState<string | null>(null);
 
-  const colList = Object.values(collections)
+  const colList = Object.values(collections);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>(
     activeCollectionId ?? colList[0]?.data.id ?? ''
-  )
+  );
 
   async function generate() {
-    if (!selectedCollectionId) return
-    setGenerating(true)
-    setError(null)
+    if (!selectedCollectionId) return;
+    setGenerating(true);
+    setError(null);
     try {
-      const col = collections[selectedCollectionId]?.data
-      const env = activeEnvironmentId ? environments[activeEnvironmentId]?.data ?? null : null
-      const generated = await electron.generateCode({ collection: col, environment: env, target })
-      setFiles(generated)
-      setSelectedFile(generated[0]?.path ?? null)
-    } catch (e: any) {
-      setError(e?.message ?? String(e))
+      const col = collections[selectedCollectionId]?.data;
+      const env = activeEnvironmentId ? environments[activeEnvironmentId]?.data ?? null : null;
+      const generated = await electron.generateCode({ collection: col, environment: env, target });
+      setFiles(generated);
+      setSelectedFile(generated[0]?.path ?? null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setGenerating(false)
+      setGenerating(false);
     }
   }
 
   async function saveZip() {
-    if (files.length === 0) return
-    const col = collections[selectedCollectionId]?.data
-    await electron.saveGeneratedFilesAsZip(files, col?.name ?? 'api-tests', target)
+    if (files.length === 0) return;
+    const col = collections[selectedCollectionId]?.data;
+    await electron.saveGeneratedFilesAsZip(files, col?.name ?? 'api-tests', target);
   }
 
-  const selectedContent = files.find(f => f.path === selectedFile)?.content ?? ''
-  const activeTarget = TARGETS.find(t => t.id === target)
+  const selectedContent = files.find(f => f.path === selectedFile)?.content ?? '';
+  const activeTarget = TARGETS.find(t => t.id === target);
 
   return (
     <div className="flex flex-col h-full">
@@ -186,5 +186,5 @@ export function GeneratorPanel() {
         </div>
       )}
     </div>
-  )
+  );
 }

@@ -1,55 +1,55 @@
-import { useState } from 'react'
-import CodeMirror from '@uiw/react-codemirror'
-import { json } from '@codemirror/lang-json'
-import { oneDark } from '@codemirror/theme-one-dark'
-import type { ApiRequest, ContractExpectation } from '../../../../shared/types'
-import { useStore } from '../../store'
+import { useState } from 'react';
+import CodeMirror from '@uiw/react-codemirror';
+import { json } from '@codemirror/lang-json';
+import { oneDark } from '@codemirror/theme-one-dark';
+import type { ApiRequest, ContractExpectation } from '../../../../shared/types';
+import { useStore } from '../../store';
 
-const { electron } = window as any
+const { electron } = window;
 
 interface Props {
   request: ApiRequest
   onChange: (patch: Partial<ApiRequest>) => void
 }
 
-const EMPTY: ContractExpectation = { statusCode: 200, headers: [], bodySchema: '' }
+const EMPTY: ContractExpectation = { statusCode: 200, headers: [], bodySchema: '' };
 
 export function ContractTab({ request, onChange }: Props) {
-  const activeTab      = useStore(s => s.tabs.find(t => t.id === s.activeTabId))
-  const lastResponse   = activeTab?.lastResponse ?? null
-  const contract       = request.contract ?? EMPTY
-  const [inferring, setInferring] = useState(false)
+  const activeTab      = useStore(s => s.tabs.find(t => t.id === s.activeTabId));
+  const lastResponse   = activeTab?.lastResponse ?? null;
+  const contract       = request.contract ?? EMPTY;
+  const [inferring, setInferring] = useState(false);
 
   function update(patch: Partial<ContractExpectation>) {
-    onChange({ contract: { ...contract, ...patch } })
+    onChange({ contract: { ...contract, ...patch } });
   }
 
   async function inferSchema() {
-    if (!lastResponse?.body) return
-    setInferring(true)
+    if (!lastResponse?.body) return;
+    setInferring(true);
     try {
-      const schema = await electron.inferContractSchema(lastResponse.body)
-      if (schema) update({ bodySchema: schema })
+      const schema = await electron.inferContractSchema(lastResponse.body);
+      if (schema) update({ bodySchema: schema });
     } finally {
-      setInferring(false)
+      setInferring(false);
     }
   }
 
   function addHeader() {
-    update({ headers: [...(contract.headers ?? []), { key: '', value: '', required: true }] })
+    update({ headers: [...(contract.headers ?? []), { key: '', value: '', required: true }] });
   }
 
   function updateHeader(i: number, patch: Partial<ContractExpectation['headers'][0]>) {
-    const headers = [...(contract.headers ?? [])]
-    headers[i] = { ...headers[i], ...patch }
-    update({ headers })
+    const headers = [...(contract.headers ?? [])];
+    headers[i] = { ...headers[i], ...patch };
+    update({ headers });
   }
 
   function removeHeader(i: number) {
-    update({ headers: (contract.headers ?? []).filter((_, idx) => idx !== i) })
+    update({ headers: (contract.headers ?? []).filter((_, idx) => idx !== i) });
   }
 
-  const hasContract = contract.statusCode !== undefined || contract.bodySchema?.trim() || contract.headers?.some(h => h.key)
+  const hasContract = contract.statusCode !== undefined || contract.bodySchema?.trim() || contract.headers?.some(h => h.key);
 
   return (
     <div className="flex flex-col gap-4">
@@ -149,5 +149,5 @@ export function ContractTab({ request, onChange }: Props) {
         </div>
       </div>
     </div>
-  )
+  );
 }

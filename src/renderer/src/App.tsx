@@ -1,24 +1,24 @@
-import React, { useState, useEffect } from 'react'
-import { useStore } from './store'
-import { useAutoSave } from './hooks/useAutoSave'
-import { useWorkspaceLoader } from './hooks/useWorkspaceLoader'
-import { CollectionTree } from './components/CollectionTree/CollectionTree'
-import { RequestBuilder } from './components/RequestBuilder/RequestBuilder'
-import { ResponseViewer } from './components/ResponseViewer/ResponseViewer'
-import { GeneratorPanel } from './components/GeneratorPanel/GeneratorPanel'
-import { HistoryPanel } from './components/History/HistoryPanel'
-import { WelcomeScreen } from './components/common/WelcomeScreen'
-import { Toolbar } from './components/common/Toolbar'
-import { RunnerModal } from './components/Runner/RunnerModal'
-import { CollectionPanel } from './components/CollectionPanel/CollectionPanel'
-import { MockPanel } from './components/MockPanel/MockPanel'
-import { MockDetailPanel } from './components/MockPanel/MockDetailPanel'
-import { ContractPanel } from './components/ContractPanel/ContractPanel'
-import { ContractResultsPanel } from './components/ContractPanel/ContractResultsPanel'
-import { CommandPalette } from './components/common/CommandPalette'
-import { DocsGeneratorModal } from './components/common/DocsGeneratorModal'
+import React, { useState, useEffect } from 'react';
+import { useStore } from './store';
+import { useAutoSave } from './hooks/useAutoSave';
+import { useWorkspaceLoader } from './hooks/useWorkspaceLoader';
+import { CollectionTree } from './components/CollectionTree/CollectionTree';
+import { RequestBuilder } from './components/RequestBuilder/RequestBuilder';
+import { ResponseViewer } from './components/ResponseViewer/ResponseViewer';
+import { GeneratorPanel } from './components/GeneratorPanel/GeneratorPanel';
+import { HistoryPanel } from './components/History/HistoryPanel';
+import { WelcomeScreen } from './components/common/WelcomeScreen';
+import { Toolbar } from './components/common/Toolbar';
+import { RunnerModal } from './components/Runner/RunnerModal';
+import { CollectionPanel } from './components/CollectionPanel/CollectionPanel';
+import { MockPanel } from './components/MockPanel/MockPanel';
+import { MockDetailPanel } from './components/MockPanel/MockDetailPanel';
+import { ContractPanel } from './components/ContractPanel/ContractPanel';
+import { ContractResultsPanel } from './components/ContractPanel/ContractResultsPanel';
+import { CommandPalette } from './components/common/CommandPalette';
+import { DocsGeneratorModal } from './components/common/DocsGeneratorModal';
 
-const { electron } = window as any
+const { electron } = window;
 
 // ─── Activity bar icons ───────────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ function IconCollections() {
     <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
       <path d="M2 6a2 2 0 012-2h4l2 2h4a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
     </svg>
-  )
+  );
 }
 
 function IconHistory() {
@@ -39,7 +39,7 @@ function IconHistory() {
         clipRule="evenodd"
       />
     </svg>
-  )
+  );
 }
 
 function IconMock() {
@@ -47,7 +47,7 @@ function IconMock() {
     <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
       <path fillRule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm14 1a1 1 0 11-2 0 1 1 0 012 0zM2 13a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2zm14 1a1 1 0 11-2 0 1 1 0 012 0z" clipRule="evenodd" />
     </svg>
-  )
+  );
 }
 
 function IconContract() {
@@ -55,7 +55,7 @@ function IconContract() {
     <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
       <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 14a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 5.477V17H13a1 1 0 110 2H7a1 1 0 110-2h2V5.477L6.237 6.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 14a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.788l1.599.799L9 3.323V3a1 1 0 011-1z" clipRule="evenodd" />
     </svg>
-  )
+  );
 }
 
 function ActivityBarBtn({
@@ -88,7 +88,7 @@ function ActivityBarBtn({
         </span>
       )}
     </button>
-  )
+  );
 }
 
 // ─── App ──────────────────────────────────────────────────────────────────────
@@ -103,86 +103,86 @@ const TAB_METHOD_COLORS: Record<string, string> = {
   DELETE:  'text-red-400',
   HEAD:    'text-purple-400',
   OPTIONS: 'text-gray-400',
-}
+};
 
 export default function App() {
-  useAutoSave()
-  const { applyWorkspace } = useWorkspaceLoader()
-  const workspace          = useStore(s => s.workspace)
-  const collections        = useStore(s => s.collections)
-  const tabs               = useStore(s => s.tabs)
-  const activeTabId        = useStore(s => s.activeTabId)
-  const setActiveTabId     = useStore(s => s.setActiveTabId)
-  const closeTab           = useStore(s => s.closeTab)
-  const showGeneratorPanel = useStore(s => s.showGeneratorPanel)
-  const sidebarTab         = useStore(s => s.sidebarTab)
-  const setSidebarTab      = useStore(s => s.setSidebarTab)
-  const historyCount       = useStore(s => s.history.length)
-  const addMockHit             = useStore(s => s.addMockHit)
-  const activeMockId           = useStore(s => s.activeMockId)
-  const theme                  = useStore(s => s.theme)
-  const setCommandPaletteOpen  = useStore(s => s.setCommandPaletteOpen)
-  const setWsStatus            = useStore(s => s.setWsStatus)
-  const addWsMessage           = useStore(s => s.addWsMessage)
+  useAutoSave();
+  const { applyWorkspace } = useWorkspaceLoader();
+  const workspace          = useStore(s => s.workspace);
+  const collections        = useStore(s => s.collections);
+  const tabs               = useStore(s => s.tabs);
+  const activeTabId        = useStore(s => s.activeTabId);
+  const setActiveTabId     = useStore(s => s.setActiveTabId);
+  const closeTab           = useStore(s => s.closeTab);
+  const showGeneratorPanel = useStore(s => s.showGeneratorPanel);
+  const sidebarTab         = useStore(s => s.sidebarTab);
+  const setSidebarTab      = useStore(s => s.setSidebarTab);
+  const historyCount       = useStore(s => s.history.length);
+  const addMockHit             = useStore(s => s.addMockHit);
+  const activeMockId           = useStore(s => s.activeMockId);
+  const theme                  = useStore(s => s.theme);
+  const setCommandPaletteOpen  = useStore(s => s.setCommandPaletteOpen);
+  const setWsStatus            = useStore(s => s.setWsStatus);
+  const addWsMessage           = useStore(s => s.addWsMessage);
 
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [responseOpen, setResponseOpen] = useState(true)
-  const [docsModalOpen, setDocsModalOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [responseOpen, setResponseOpen] = useState(true);
+  const [docsModalOpen, setDocsModalOpen] = useState(false);
 
   // Auto-load last opened workspace on startup
   useEffect(() => {
-    electron.getLastWorkspace().then((result: { workspace: any; workspacePath: string } | null) => {
-      if (result) applyWorkspace(result.workspace, result.workspacePath)
-    })
-  }, [])
+    electron.getLastWorkspace().then((result: { workspace: unknown; workspacePath: string } | null) => {
+      if (result) applyWorkspace(result.workspace, result.workspacePath);
+    });
+  }, [applyWorkspace]);
 
   useEffect(() => {
-    electron.onMockHit(addMockHit)
-    return () => electron.offMockHit()
-  }, [])
+    electron.onMockHit(addMockHit);
+    return () => electron.offMockHit();
+  }, [addMockHit]);
 
   useEffect(() => {
     electron.onWsMessage(({ requestId, message }: { requestId: string; message: Parameters<typeof addWsMessage>[1] }) => {
-      addWsMessage(requestId, message)
-    })
-    electron.onWsStatus(({ requestId, status, error }: { requestId: string; status: any; error?: string }) => {
-      setWsStatus(requestId, status, error)
-    })
-    return () => electron.offWsEvents()
-  }, [])
+      addWsMessage(requestId, message);
+    });
+    electron.onWsStatus(({ requestId, status, error }: { requestId: string; status: Parameters<typeof setWsStatus>[1]; error?: string }) => {
+      setWsStatus(requestId, status, error);
+    });
+    return () => electron.offWsEvents();
+  }, [addWsMessage, setWsStatus]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault()
-        setCommandPaletteOpen(true)
+        e.preventDefault();
+        setCommandPaletteOpen(true);
       }
     }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [setCommandPaletteOpen])
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [setCommandPaletteOpen]);
 
   // Keep light class in sync when OS preference changes (system theme)
   useEffect(() => {
-    if (theme !== 'system') return
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    if (theme !== 'system') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const handler = (e: MediaQueryListEvent) =>
-      document.documentElement.classList.toggle('light', !e.matches)
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [theme])
+      document.documentElement.classList.toggle('light', !e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [theme]);
 
-  const activeTab = tabs.find(t => t.id === activeTabId) ?? null
+  const activeTab = tabs.find(t => t.id === activeTabId) ?? null;
   const activeRequest = activeTab?.requestId
     ? Object.values(collections).find(c => c.data.requests[activeTab.requestId!])?.data.requests[activeTab.requestId!]
-    : null
+    : null;
 
   function selectPanel(tab: 'collections' | 'history' | 'mocks' | 'contracts') {
     if (sidebarTab === tab && sidebarOpen) {
-      setSidebarOpen(false)
+      setSidebarOpen(false);
     } else {
-      setSidebarTab(tab)
-      setSidebarOpen(true)
+      setSidebarTab(tab);
+      setSidebarOpen(true);
     }
   }
 
@@ -279,8 +279,8 @@ export default function App() {
                 {tabs.map(tab => {
                   const req = tab.requestId
                     ? Object.values(collections).find(c => c.data.requests[tab.requestId!])?.data.requests[tab.requestId!]
-                    : null
-                  const isActive = tab.id === activeTabId
+                    : null;
+                  const isActive = tab.id === activeTabId;
                   return (
                     <div
                       key={tab.id}
@@ -300,14 +300,14 @@ export default function App() {
                         {req?.name ?? 'Untitled'}
                       </span>
                       <button
-                        onClick={e => { e.stopPropagation(); closeTab(tab.id) }}
+                        onClick={e => { e.stopPropagation(); closeTab(tab.id); }}
                         className="ml-auto opacity-0 group-hover:opacity-100 shrink-0 text-surface-600 hover:text-white transition-all leading-none"
                         title="Close tab"
                       >
                         ×
                       </button>
                     </div>
-                  )
+                  );
                 })}
               </div>
             )}
@@ -359,5 +359,5 @@ export default function App() {
         <WelcomeScreen />
       )}
     </div>
-  )
+  );
 }

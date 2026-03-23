@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react'
-import { useStore } from '../../store'
-import type { Folder, Collection } from '../../../../shared/types'
-import { MethodBadge } from '../common/MethodBadge'
-import { FolderSettingsModal } from './FolderSettingsModal'
+import React, { useState, useRef, useEffect } from 'react';
+import { useStore } from '../../store';
+import type { Folder, Collection } from '../../../../shared/types';
+import { MethodBadge } from '../common/MethodBadge';
+import { FolderSettingsModal } from './FolderSettingsModal';
 
 // ─── Inline rename ────────────────────────────────────────────────────────────
 
@@ -12,17 +12,17 @@ function InlineEdit({
   value: string; onCommit: (v: string) => void; onCancel: () => void; className?: string
   validate?: (v: string) => string | null
 }) {
-  const [draft, setDraft] = useState(value)
-  const [error, setError] = useState<string | null>(null)
-  const ref = useRef<HTMLInputElement>(null)
-  useEffect(() => { ref.current?.select() }, [])
+  const [draft, setDraft] = useState(value);
+  const [error, setError] = useState<string | null>(null);
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => { ref.current?.select(); }, []);
 
   function tryCommit(v: string) {
-    const trimmed = v.trim()
-    if (!trimmed) { onCancel(); return }
-    const err = validate?.(trimmed) ?? null
-    if (err) { setError(err); setTimeout(() => ref.current?.focus(), 0); return }
-    onCommit(trimmed)
+    const trimmed = v.trim();
+    if (!trimmed) { onCancel(); return; }
+    const err = validate?.(trimmed) ?? null;
+    if (err) { setError(err); setTimeout(() => ref.current?.focus(), 0); return; }
+    onCommit(trimmed);
   }
 
   return (
@@ -30,12 +30,12 @@ function InlineEdit({
       <input
         ref={ref}
         value={draft}
-        onChange={e => { setDraft(e.target.value); setError(null) }}
+        onChange={e => { setDraft(e.target.value); setError(null); }}
         onBlur={() => tryCommit(draft)}
         onKeyDown={e => {
-          if (e.key === 'Enter') tryCommit(draft)
-          if (e.key === 'Escape') onCancel()
-          e.stopPropagation()
+          if (e.key === 'Enter') tryCommit(draft);
+          if (e.key === 'Escape') onCancel();
+          e.stopPropagation();
         }}
         className={`bg-surface-700 rounded px-1 focus:outline-none focus:ring-1 w-full ${
           error ? 'ring-1 ring-red-500 focus:ring-red-500' : 'focus:ring-blue-500'
@@ -43,7 +43,7 @@ function InlineEdit({
       />
       {error && <p className="text-[10px] text-red-400 mt-0.5 px-1">{error}</p>}
     </div>
-  )
+  );
 }
 
 // ─── Tag chips ────────────────────────────────────────────────────────────────
@@ -55,16 +55,16 @@ function TagChips({
   onRemove: (tag: string) => void
   onAdd: (tag: string) => void
 }) {
-  const [adding, setAdding] = useState(false)
-  const [draft, setDraft]   = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
-  useEffect(() => { if (adding) inputRef.current?.focus() }, [adding])
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft]   = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (adding) inputRef.current?.focus(); }, [adding]);
 
   function commit() {
-    const t = draft.trim().toLowerCase()
-    if (t && !tags.includes(t)) onAdd(t)
-    setDraft('')
-    setAdding(false)
+    const t = draft.trim().toLowerCase();
+    if (t && !tags.includes(t)) onAdd(t);
+    setDraft('');
+    setAdding(false);
   }
 
   return (
@@ -86,7 +86,7 @@ function TagChips({
           ref={inputRef}
           value={draft}
           onChange={e => setDraft(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setAdding(false); setDraft('') } e.stopPropagation() }}
+          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setAdding(false); setDraft(''); } e.stopPropagation(); }}
           onBlur={commit}
           className="w-16 text-[9px] bg-surface-700 rounded px-1 py-px focus:outline-none focus:ring-1 focus:ring-blue-500"
           placeholder="tag…"
@@ -99,7 +99,7 @@ function TagChips({
         >+tag</button>
       )}
     </div>
-  )
+  );
 }
 
 // ─── Icon button ──────────────────────────────────────────────────────────────
@@ -116,60 +116,60 @@ function IconBtn({
   return (
     <button
       title={title}
-      onClick={e => { e.stopPropagation(); onClick(e) }}
+      onClick={e => { e.stopPropagation(); onClick(e); }}
       className={`px-1 py-0.5 rounded transition-colors ${
         alwaysVisible ? '' : 'opacity-0 group-hover:opacity-100'
       } ${danger ? 'hover:text-red-400' : 'hover:text-blue-400'} text-surface-400`}
     >
       {children}
     </button>
-  )
+  );
 }
 
 function RunBtn({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
   return (
     <button
       title="Run"
-      onClick={e => { e.stopPropagation(); onClick(e) }}
+      onClick={e => { e.stopPropagation(); onClick(e); }}
       className="opacity-0 group-hover:opacity-100 px-1 py-0.5 rounded text-emerald-500 hover:text-emerald-400 transition-all"
     >
       <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"/>
       </svg>
     </button>
-  )
+  );
 }
 
 // ─── Root tree ────────────────────────────────────────────────────────────────
 
 export function CollectionTree() {
-  const collections        = useStore(s => s.collections)
-  const activeCollectionId = useStore(s => s.activeCollectionId)
-  const activeTabId        = useStore(s => s.activeTabId)
-  const tabs               = useStore(s => s.tabs)
-  const openInTab          = useStore(s => s.openInTab)
-  const setActiveCollection = useStore(s => s.setActiveCollection)
+  const collections        = useStore(s => s.collections);
+  const activeCollectionId = useStore(s => s.activeCollectionId);
+  const activeTabId        = useStore(s => s.activeTabId);
+  const tabs               = useStore(s => s.tabs);
+  const openInTab          = useStore(s => s.openInTab);
+  const setActiveCollection = useStore(s => s.setActiveCollection);
 
   // Derive the active request id from the active tab
-  const activeRequestId = tabs.find(t => t.id === activeTabId)?.requestId ?? null
-  const addCollection     = useStore(s => s.addCollection)
-  const addRequest        = useStore(s => s.addRequest)
-  const addFolder         = useStore(s => s.addFolder)
-  const renameCollection  = useStore(s => s.renameCollection)
-  const deleteCollection  = useStore(s => s.deleteCollection)
-  const renameFolder      = useStore(s => s.renameFolder)
-  const deleteFolder      = useStore(s => s.deleteFolder)
-  const renameRequest     = useStore(s => s.renameRequest)
-  const deleteRequest     = useStore(s => s.deleteRequest)
-  const duplicateRequest  = useStore(s => s.duplicateRequest)
-  const updateFolderTags  = useStore(s => s.updateFolderTags)
-  const updateRequestTags = useStore(s => s.updateRequestTags)
-  const openRunner        = useStore(s => s.openRunner)
+  const activeRequestId = tabs.find(t => t.id === activeTabId)?.requestId ?? null;
+  const addCollection     = useStore(s => s.addCollection);
+  const addRequest        = useStore(s => s.addRequest);
+  const addFolder         = useStore(s => s.addFolder);
+  const renameCollection  = useStore(s => s.renameCollection);
+  const deleteCollection  = useStore(s => s.deleteCollection);
+  const renameFolder      = useStore(s => s.renameFolder);
+  const deleteFolder      = useStore(s => s.deleteFolder);
+  const renameRequest     = useStore(s => s.renameRequest);
+  const deleteRequest     = useStore(s => s.deleteRequest);
+  const duplicateRequest  = useStore(s => s.duplicateRequest);
+  const updateFolderTags  = useStore(s => s.updateFolderTags);
+  const updateRequestTags = useStore(s => s.updateRequestTags);
+  const openRunner        = useStore(s => s.openRunner);
 
-  const colList = Object.values(collections)
+  const colList = Object.values(collections);
 
   return (
-    <div className="flex flex-col h-full select-none">
+    <div className="flex flex-col flex-1 min-h-0 select-none">
       <div className="px-3 py-2 text-xs font-semibold text-surface-400 uppercase tracking-wider flex items-center justify-between flex-shrink-0">
         <span>Collections</span>
         <button
@@ -192,9 +192,9 @@ export function CollectionTree() {
             onAddRequest={folderId => addRequest(col.id, folderId)}
             onAddFolder={(parentId, name) => addFolder(col.id, parentId, name)}
             onRenameCollection={name => renameCollection(col.id, name)}
-            onDeleteCollection={() => { if (confirm(`Delete collection "${col.name}"?`)) deleteCollection(col.id) }}
+            onDeleteCollection={() => { if (confirm(`Delete collection "${col.name}"?`)) deleteCollection(col.id); }}
             onRenameFolder={(folderId, name) => renameFolder(col.id, folderId, name)}
-            onDeleteFolder={folderId => { if (confirm('Delete this folder and all its requests?')) deleteFolder(col.id, folderId) }}
+            onDeleteFolder={folderId => { if (confirm('Delete this folder and all its requests?')) deleteFolder(col.id, folderId); }}
             onRenameRequest={renameRequest}
             onDeleteRequest={reqId => deleteRequest(col.id, reqId)}
             onDuplicateRequest={reqId => duplicateRequest(col.id, reqId)}
@@ -216,7 +216,7 @@ export function CollectionTree() {
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Collection row ───────────────────────────────────────────────────────────
@@ -252,8 +252,8 @@ function CollectionNode({
   onRunCollection: () => void
   onRunFolder: (folderId: string) => void
 }) {
-  const [expanded, setExpanded] = useState(true)
-  const [renaming, setRenaming] = useState(false)
+  const [expanded, setExpanded] = useState(true);
+  const [renaming, setRenaming] = useState(false);
 
   return (
     <div>
@@ -261,7 +261,7 @@ function CollectionNode({
         className={`group flex items-start gap-1 px-2 py-1.5 cursor-pointer hover:bg-surface-800 transition-colors ${
           isActive ? 'text-[var(--text-primary)]' : 'text-surface-400'
         }`}
-        onClick={() => { onSelectCollection(); setExpanded(e => !e) }}
+        onClick={() => { onSelectCollection(); setExpanded(e => !e); }}
       >
         <span className="text-[10px] w-3 text-center shrink-0 mt-0.5">{expanded ? '▾' : '▸'}</span>
 
@@ -269,7 +269,7 @@ function CollectionNode({
           {renaming ? (
             <InlineEdit
               value={col.name}
-              onCommit={v => { onRenameCollection(v); setRenaming(false) }}
+              onCommit={v => { onRenameCollection(v); setRenaming(false); }}
               onCancel={() => setRenaming(false)}
               className="w-full text-xs"
               validate={v => existingCollectionNames.filter(n => n !== col.name).includes(v)
@@ -311,7 +311,7 @@ function CollectionNode({
         />
       )}
     </div>
-  )
+  );
 }
 
 // ─── Folder row ───────────────────────────────────────────────────────────────
@@ -334,12 +334,12 @@ function FolderRow({
   onRun: () => void
   children: React.ReactNode
 }) {
-  const [expanded, setExpanded] = useState(true)
-  const [renaming, setRenaming] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
-  const tags = folder.tags ?? []
-  const indent = depth * 12 + 8
-  const hasInheritedConfig = (folder.auth && folder.auth.type !== 'none') || (folder.headers && folder.headers.length > 0)
+  const [expanded, setExpanded] = useState(true);
+  const [renaming, setRenaming] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const tags = folder.tags ?? [];
+  const indent = depth * 12 + 8;
+  const hasInheritedConfig = (folder.auth && folder.auth.type !== 'none') || (folder.headers && folder.headers.length > 0);
 
   return (
     <div>
@@ -355,7 +355,7 @@ function FolderRow({
           {renaming ? (
             <InlineEdit
               value={folder.name}
-              onCommit={v => { onRename(v); setRenaming(false) }}
+              onCommit={v => { onRename(v); setRenaming(false); }}
               onCancel={() => setRenaming(false)}
               className="w-full text-xs"
             />
@@ -396,7 +396,7 @@ function FolderRow({
         />
       )}
     </div>
-  )
+  );
 }
 
 // ─── Folder contents (recursive) ─────────────────────────────────────────────
@@ -462,8 +462,8 @@ function FolderContents({
       ))}
 
       {folder.requestIds.map(reqId => {
-        const req = requests[reqId]
-        if (!req) return null
+        const req = requests[reqId];
+        if (!req) return null;
         return (
           <RequestRow
             key={req.id}
@@ -479,10 +479,10 @@ function FolderContents({
             onDuplicate={() => onDuplicateRequest(req.id)}
             onUpdateTags={tags => onUpdateRequestTags(req.id, tags)}
           />
-        )
+        );
       })}
     </>
-  )
+  );
 }
 
 // ─── Request row ──────────────────────────────────────────────────────────────
@@ -503,7 +503,7 @@ function RequestRow({
   onDuplicate: () => void
   onUpdateTags: (tags: string[]) => void
 }) {
-  const [renaming, setRenaming] = useState(false)
+  const [renaming, setRenaming] = useState(false);
 
   return (
     <div
@@ -520,7 +520,7 @@ function RequestRow({
         {renaming ? (
           <InlineEdit
             value={name}
-            onCommit={v => { onRename(v); setRenaming(false) }}
+            onCommit={v => { onRename(v); setRenaming(false); }}
             onCancel={() => setRenaming(false)}
             className="w-full text-xs"
           />
@@ -547,7 +547,7 @@ function RequestRow({
         <IconBtn title="Delete" onClick={onDelete} danger><TrashIcon /></IconBtn>
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Micro icons ──────────────────────────────────────────────────────────────
@@ -557,40 +557,40 @@ function FolderIcon({ className = '' }: { className?: string }) {
     <svg className={`w-3 h-3 ${className}`} fill="currentColor" viewBox="0 0 20 20">
       <path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
     </svg>
-  )
+  );
 }
 function PencilIcon() {
   return (
     <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.768-6.768a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H8v-2.414a2 2 0 01.586-1.414z" />
     </svg>
-  )
+  );
 }
 function TrashIcon() {
   return (
     <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0a1 1 0 00-1-1h-4a1 1 0 00-1 1m6 0H7" />
     </svg>
-  )
+  );
 }
 function TableIcon() {
   return (
     <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18M10 3v18M3 6a1 1 0 011-1h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6z" />
     </svg>
-  )
+  );
 }
 function CopyIcon() {
   return (
     <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
     </svg>
-  )
+  );
 }
 function KeyIcon() {
   return (
     <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a4 4 0 110 8 4 4 0 010-8zm-7 8l-1 1m0 0l-1 1m1-1l1 1M3 20l5-5" />
     </svg>
-  )
+  );
 }

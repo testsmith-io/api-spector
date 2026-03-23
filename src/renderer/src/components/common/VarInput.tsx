@@ -1,18 +1,18 @@
-import React, { useRef, useState, useCallback } from 'react'
-import { useVarNames } from '../../hooks/useVarNames'
-import { useVarValues } from '../../hooks/useVarValues'
+import React, { useRef, useState, useCallback } from 'react';
+import { useVarNames } from '../../hooks/useVarNames';
+import { useVarValues } from '../../hooks/useVarValues';
 
 // ─── Parse {{varname}} tokens ─────────────────────────────────────────────────
 
 function parseVarTokens(str: string): string[] {
-  const found: string[] = []
-  const re = /\{\{([^}]+)\}\}/g
-  let m
+  const found: string[] = [];
+  const re = /\{\{([^}]+)\}\}/g;
+  let m;
   while ((m = re.exec(str)) !== null) {
-    const name = m[1].trim()
-    if (!found.includes(name)) found.push(name)
+    const name = m[1].trim();
+    if (!found.includes(name)) found.push(name);
   }
-  return found
+  return found;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -25,78 +25,78 @@ interface Props extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onCha
 }
 
 export function VarInput({ value, onChange, className, wrapperClassName, ...rest }: Props) {
-  const varNames  = useVarNames()
-  const varValues = useVarValues()
-  const inputRef  = useRef<HTMLInputElement>(null)
+  const varNames  = useVarNames();
+  const varValues = useVarValues();
+  const inputRef  = useRef<HTMLInputElement>(null);
 
-  const [suggestions,  setSuggestions]  = useState<string[]>([])
-  const [activeIndex,  setActiveIndex]  = useState(-1)
-  const [showPreview,  setShowPreview]  = useState(false)
+  const [suggestions,  setSuggestions]  = useState<string[]>([]);
+  const [activeIndex,  setActiveIndex]  = useState(-1);
+  const [showPreview,  setShowPreview]  = useState(false);
 
   // ── Autocomplete ───────────────────────────────────────────────────────────
 
   function detectQuery(val: string, cursor: number) {
-    const before = val.slice(0, cursor)
-    const match  = /\{\{(\w*)$/.exec(before)
-    if (!match) { setSuggestions([]); return }
+    const before = val.slice(0, cursor);
+    const match  = /\{\{(\w*)$/.exec(before);
+    if (!match) { setSuggestions([]); return; }
 
-    const q        = match[1].toLowerCase()
-    const filtered = varNames.filter(n => n.toLowerCase().includes(q))
-    setSuggestions(filtered)
-    setActiveIndex(-1)
+    const q        = match[1].toLowerCase();
+    const filtered = varNames.filter(n => n.toLowerCase().includes(q));
+    setSuggestions(filtered);
+    setActiveIndex(-1);
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const newVal = e.target.value
-    const cursor = e.target.selectionStart ?? newVal.length
-    onChange(newVal)
-    detectQuery(newVal, cursor)
+    const newVal = e.target.value;
+    const cursor = e.target.selectionStart ?? newVal.length;
+    onChange(newVal);
+    detectQuery(newVal, cursor);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (suggestions.length === 0) return
+    if (suggestions.length === 0) return;
 
     if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setActiveIndex(i => Math.min(i + 1, suggestions.length - 1))
+      e.preventDefault();
+      setActiveIndex(i => Math.min(i + 1, suggestions.length - 1));
     } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setActiveIndex(i => Math.max(i - 1, -1))
+      e.preventDefault();
+      setActiveIndex(i => Math.max(i - 1, -1));
     } else if (e.key === 'Enter' && activeIndex >= 0) {
-      e.preventDefault()
-      apply(suggestions[activeIndex])
+      e.preventDefault();
+      apply(suggestions[activeIndex]);
     } else if (e.key === 'Escape') {
-      setSuggestions([])
+      setSuggestions([]);
     }
   }
 
   const apply = useCallback((name: string) => {
-    const el     = inputRef.current
-    const cursor = el?.selectionStart ?? value.length
-    const before = value.slice(0, cursor)
-    const after  = value.slice(cursor)
-    const match  = /\{\{(\w*)$/.exec(before)
-    if (!match) return
+    const el     = inputRef.current;
+    const cursor = el?.selectionStart ?? value.length;
+    const before = value.slice(0, cursor);
+    const after  = value.slice(cursor);
+    const match  = /\{\{(\w*)$/.exec(before);
+    if (!match) return;
 
-    const newVal    = before.slice(0, match.index) + `{{${name}}}` + after
-    const newCursor = match.index + name.length + 4
-    onChange(newVal)
-    setSuggestions([])
-    requestAnimationFrame(() => el?.setSelectionRange(newCursor, newCursor))
-  }, [value, onChange])
+    const newVal    = before.slice(0, match.index) + `{{${name}}}` + after;
+    const newCursor = match.index + name.length + 4;
+    onChange(newVal);
+    setSuggestions([]);
+    requestAnimationFrame(() => el?.setSelectionRange(newCursor, newCursor));
+  }, [value, onChange]);
 
   function handleBlur() {
-    setTimeout(() => setSuggestions([]), 150)
+    setTimeout(() => setSuggestions([]), 150);
   }
 
   // ── Hover preview ──────────────────────────────────────────────────────────
 
-  const tokens        = parseVarTokens(value)
-  const hasVars       = tokens.length > 0
+  const tokens        = parseVarTokens(value);
+  const hasVars       = tokens.length > 0;
   const previewItems  = tokens.map(name => ({
     name,
     resolved: varValues[name] ?? null,
-  }))
+  }));
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -122,7 +122,7 @@ export function VarInput({ value, onChange, className, wrapperClassName, ...rest
           {suggestions.map((name, i) => (
             <li key={name}>
               <button
-                onMouseDown={e => { e.preventDefault(); apply(name) }}
+                onMouseDown={e => { e.preventDefault(); apply(name); }}
                 className={`w-full text-left px-3 py-1.5 font-mono transition-colors ${
                   i === activeIndex
                     ? 'bg-blue-600 text-white'
@@ -154,5 +154,5 @@ export function VarInput({ value, onChange, className, wrapperClassName, ...rest
         </div>
       )}
     </div>
-  )
+  );
 }

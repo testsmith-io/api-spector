@@ -1,7 +1,7 @@
-import crypto from 'crypto'
-import type { AuthConfig } from '../shared/types'
-import { getSecret } from './ipc/secret-handler'
-import { interpolate } from './interpolation'
+import crypto from 'crypto';
+import type { AuthConfig } from '../shared/types';
+import { getSecret } from './ipc/secret-handler';
+import { interpolate } from './interpolation';
 
 // ─── Auth header builder ──────────────────────────────────────────────────────
 
@@ -9,28 +9,28 @@ export async function buildAuthHeaders(
   auth: AuthConfig,
   vars: Record<string, string>,
 ): Promise<Record<string, string>> {
-  const headers: Record<string, string> = {}
+  const headers: Record<string, string> = {};
 
   if (auth.type === 'bearer') {
-    let token = auth.token ?? ''
-    if (!token && auth.tokenSecretRef) token = (await getSecret(auth.tokenSecretRef)) ?? ''
-    token = interpolate(token, vars)
-    if (token) headers['Authorization'] = `Bearer ${token}`
+    let token = auth.token ?? '';
+    if (!token && auth.tokenSecretRef) token = (await getSecret(auth.tokenSecretRef)) ?? '';
+    token = interpolate(token, vars);
+    if (token) headers['Authorization'] = `Bearer ${token}`;
   }
 
   if (auth.type === 'basic') {
-    let password = auth.password ?? ''
-    if (!password && auth.passwordSecretRef) password = (await getSecret(auth.passwordSecretRef)) ?? ''
-    password = interpolate(password, vars)
-    const username = interpolate(auth.username ?? '', vars)
-    headers['Authorization'] = `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`
+    let password = auth.password ?? '';
+    if (!password && auth.passwordSecretRef) password = (await getSecret(auth.passwordSecretRef)) ?? '';
+    password = interpolate(password, vars);
+    const username = interpolate(auth.username ?? '', vars);
+    headers['Authorization'] = `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`;
   }
 
   if (auth.type === 'apikey' && auth.apiKeyIn === 'header') {
-    let value = auth.apiKeyValue ?? ''
-    if (!value && auth.apiKeySecretRef) value = (await getSecret(auth.apiKeySecretRef)) ?? ''
-    value = interpolate(value, vars)
-    headers[auth.apiKeyName ?? 'X-API-Key'] = value
+    let value = auth.apiKeyValue ?? '';
+    if (!value && auth.apiKeySecretRef) value = (await getSecret(auth.apiKeySecretRef)) ?? '';
+    value = interpolate(value, vars);
+    headers[auth.apiKeyName ?? 'X-API-Key'] = value;
   }
 
   // digest: handled separately via performDigestAuth — no headers set here
@@ -39,16 +39,16 @@ export async function buildAuthHeaders(
 
   if (auth.type === 'oauth2') {
     // Use cached token if still valid
-    const now = Date.now()
+    const now = Date.now();
     if (auth.oauth2CachedToken && auth.oauth2TokenExpiry && auth.oauth2TokenExpiry > now + 5000) {
-      headers['Authorization'] = `Bearer ${auth.oauth2CachedToken}`
+      headers['Authorization'] = `Bearer ${auth.oauth2CachedToken}`;
     }
     // Otherwise caller must invoke fetchOAuth2Token first, then retry
   }
 
   // apikey in query is handled at URL build time — nothing to add to headers
 
-  return headers
+  return headers;
 }
 
 // ─── Query-param apikey helper ────────────────────────────────────────────────
@@ -57,11 +57,11 @@ export async function buildApiKeyParam(
   auth: AuthConfig,
   vars: Record<string, string>,
 ): Promise<{ key: string; value: string } | null> {
-  if (auth.type !== 'apikey' || auth.apiKeyIn !== 'query') return null
-  let value = auth.apiKeyValue ?? ''
-  if (!value && auth.apiKeySecretRef) value = (await getSecret(auth.apiKeySecretRef)) ?? ''
-  value = interpolate(value, vars)
-  return { key: auth.apiKeyName ?? 'apikey', value }
+  if (auth.type !== 'apikey' || auth.apiKeyIn !== 'query') return null;
+  let value = auth.apiKeyValue ?? '';
+  if (!value && auth.apiKeySecretRef) value = (await getSecret(auth.apiKeySecretRef)) ?? '';
+  value = interpolate(value, vars);
+  return { key: auth.apiKeyName ?? 'apikey', value };
 }
 
 // ─── Digest auth helpers ──────────────────────────────────────────────────────
@@ -76,24 +76,24 @@ export interface DigestChallenge {
 
 function parseDigestChallenge(wwwAuth: string): DigestChallenge {
   const extract = (key: string): string => {
-    const m = new RegExp(`${key}="([^"]*)"`, 'i').exec(wwwAuth)
-    return m ? m[1] : ''
-  }
+    const m = new RegExp(`${key}="([^"]*)"`, 'i').exec(wwwAuth);
+    return m ? m[1] : '';
+  };
   const extractUnquoted = (key: string): string => {
-    const m = new RegExp(`${key}=([^,\\s]+)`, 'i').exec(wwwAuth)
-    return m ? m[1] : ''
-  }
+    const m = new RegExp(`${key}=([^,\\s]+)`, 'i').exec(wwwAuth);
+    return m ? m[1] : '';
+  };
   return {
     realm:     extract('realm'),
     nonce:     extract('nonce'),
     qop:       extract('qop') || extractUnquoted('qop') || undefined,
     algorithm: extract('algorithm') || extractUnquoted('algorithm') || 'MD5',
     opaque:    extract('opaque') || undefined,
-  }
+  };
 }
 
 function md5(s: string): string {
-  return crypto.createHash('md5').update(s).digest('hex')
+  return crypto.createHash('md5').update(s).digest('hex');
 }
 
 /**
@@ -107,35 +107,35 @@ export function buildDigestAuthHeader(
   method: string,
   uri: string,
 ): string {
-  const { realm, nonce, qop, algorithm, opaque } = challenge
-  const algo = (algorithm ?? 'MD5').toUpperCase()
+  const { realm, nonce, qop, algorithm, opaque } = challenge;
+  const algo = (algorithm ?? 'MD5').toUpperCase();
 
   const ha1 = algo === 'MD5-SESS'
     ? md5(`${md5(`${username}:${realm}:${password}`)}:${nonce}:`)
-    : md5(`${username}:${realm}:${password}`)
+    : md5(`${username}:${realm}:${password}`);
 
-  const ha2 = md5(`${method}:${uri}`)
+  const ha2 = md5(`${method}:${uri}`);
 
-  let response: string
-  let nc: string | undefined
-  let cnonce: string | undefined
+  let response: string;
+  let nc: string | undefined;
+  let cnonce: string | undefined;
 
   if (qop === 'auth' || qop === 'auth-int') {
-    nc     = '00000001'
-    cnonce = crypto.randomBytes(8).toString('hex')
-    response = md5(`${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}`)
+    nc     = '00000001';
+    cnonce = crypto.randomBytes(8).toString('hex');
+    response = md5(`${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}`);
   } else {
-    response = md5(`${ha1}:${nonce}:${ha2}`)
+    response = md5(`${ha1}:${nonce}:${ha2}`);
   }
 
-  let header = `Digest username="${username}", realm="${realm}", nonce="${nonce}", uri="${uri}", response="${response}"`
-  if (qop)    header += `, qop=${qop}`
-  if (nc)     header += `, nc=${nc}`
-  if (cnonce) header += `, cnonce="${cnonce}"`
-  if (opaque) header += `, opaque="${opaque}"`
-  if (algo !== 'MD5') header += `, algorithm=${algo}`
+  let header = `Digest username="${username}", realm="${realm}", nonce="${nonce}", uri="${uri}", response="${response}"`;
+  if (qop)    header += `, qop=${qop}`;
+  if (nc)     header += `, nc=${nc}`;
+  if (cnonce) header += `, cnonce="${cnonce}"`;
+  if (opaque) header += `, opaque="${opaque}"`;
+  if (algo !== 'MD5') header += `, algorithm=${algo}`;
 
-  return header
+  return header;
 }
 
 /**
@@ -152,24 +152,24 @@ export async function performDigestAuth(
   fetchFn: (url: string, init: Record<string, unknown>) => Promise<{ status: number; headers: { get(k: string): string | null } }>,
 ): Promise<string | null> {
   // Round 1: bare request to get the WWW-Authenticate challenge
-  const probeResp = await fetchFn(url, { method, headers: {} })
-  if (probeResp.status !== 401) return null
+  const probeResp = await fetchFn(url, { method, headers: {} });
+  if (probeResp.status !== 401) return null;
 
-  const wwwAuth = probeResp.headers.get('www-authenticate') ?? ''
-  if (!wwwAuth.toLowerCase().startsWith('digest')) return null
+  const wwwAuth = probeResp.headers.get('www-authenticate') ?? '';
+  if (!wwwAuth.toLowerCase().startsWith('digest')) return null;
 
-  const challenge = parseDigestChallenge(wwwAuth)
+  const challenge = parseDigestChallenge(wwwAuth);
 
-  let password = auth.password ?? ''
-  if (!password && auth.passwordSecretRef) password = (await getSecret(auth.passwordSecretRef)) ?? ''
-  password = interpolate(password, vars)
-  const username = interpolate(auth.username ?? '', vars)
+  let password = auth.password ?? '';
+  if (!password && auth.passwordSecretRef) password = (await getSecret(auth.passwordSecretRef)) ?? '';
+  password = interpolate(password, vars);
+  const username = interpolate(auth.username ?? '', vars);
 
   // Extract path + query from URL for the uri field
-  let uri = '/'
-  try { uri = new URL(url).pathname + (new URL(url).search ?? '') } catch { /* keep '/' */ }
+  let uri = '/';
+  try { uri = new URL(url).pathname + (new URL(url).search ?? ''); } catch { /* keep '/' */ }
 
-  return buildDigestAuthHeader(challenge, username, password, method, uri)
+  return buildDigestAuthHeader(challenge, username, password, method, uri);
 }
 
 // ─── NTLM helpers ─────────────────────────────────────────────────────────────
@@ -190,7 +190,7 @@ export async function performNtlmRequest(
 ): Promise<never> {
   throw new Error(
     'NTLM auth is not yet implemented. Add "httpntlm" to package.json dependencies and implement performNtlmRequest in auth-builder.ts.',
-  )
+  );
 }
 
 // ─── OAuth 2.0 token fetch ────────────────────────────────────────────────────
@@ -209,61 +209,61 @@ export async function fetchOAuth2Token(
   auth: AuthConfig,
   vars: Record<string, string>,
 ): Promise<OAuth2TokenResult> {
-  const flow = auth.oauth2Flow ?? 'client_credentials'
+  const flow = auth.oauth2Flow ?? 'client_credentials';
 
   if (flow === 'authorization_code') {
-    throw new Error('authorization_code flow requires the oauth2:startFlow IPC call from the renderer.')
+    throw new Error('authorization_code flow requires the oauth2:startFlow IPC call from the renderer.');
   }
   if (flow === 'implicit') {
-    throw new Error('implicit flow cannot be performed server-side — tokens must be obtained via the browser redirect.')
+    throw new Error('implicit flow cannot be performed server-side — tokens must be obtained via the browser redirect.');
   }
 
-  const tokenUrl = interpolate(auth.oauth2TokenUrl ?? '', vars)
-  if (!tokenUrl) throw new Error('OAuth 2.0: tokenUrl is required.')
+  const tokenUrl = interpolate(auth.oauth2TokenUrl ?? '', vars);
+  if (!tokenUrl) throw new Error('OAuth 2.0: tokenUrl is required.');
 
-  const clientId     = interpolate(auth.oauth2ClientId ?? '', vars)
-  let clientSecret   = auth.oauth2ClientSecret ?? ''
+  const clientId     = interpolate(auth.oauth2ClientId ?? '', vars);
+  let clientSecret   = auth.oauth2ClientSecret ?? '';
   if (!clientSecret && auth.oauth2ClientSecretRef) {
-    clientSecret = (await getSecret(auth.oauth2ClientSecretRef)) ?? ''
+    clientSecret = (await getSecret(auth.oauth2ClientSecretRef)) ?? '';
   }
-  clientSecret = interpolate(clientSecret, vars)
+  clientSecret = interpolate(clientSecret, vars);
 
-  const params = new URLSearchParams()
-  params.set('grant_type', flow === 'password' ? 'password' : 'client_credentials')
-  params.set('client_id', clientId)
-  params.set('client_secret', clientSecret)
-  if (auth.oauth2Scopes) params.set('scope', auth.oauth2Scopes)
+  const params = new URLSearchParams();
+  params.set('grant_type', flow === 'password' ? 'password' : 'client_credentials');
+  params.set('client_id', clientId);
+  params.set('client_secret', clientSecret);
+  if (auth.oauth2Scopes) params.set('scope', auth.oauth2Scopes);
 
   if (flow === 'password') {
-    let password = auth.password ?? ''
-    if (!password && auth.passwordSecretRef) password = (await getSecret(auth.passwordSecretRef)) ?? ''
-    password = interpolate(password, vars)
-    params.set('username', interpolate(auth.username ?? '', vars))
-    params.set('password', password)
+    let password = auth.password ?? '';
+    if (!password && auth.passwordSecretRef) password = (await getSecret(auth.passwordSecretRef)) ?? '';
+    password = interpolate(password, vars);
+    params.set('username', interpolate(auth.username ?? '', vars));
+    params.set('password', password);
   }
 
-  const { fetch: nodeFetch } = await import('undici')
+  const { fetch: nodeFetch } = await import('undici');
   const resp = await nodeFetch(tokenUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
-  })
+  });
 
   if (!resp.ok) {
-    const body = await resp.text()
-    throw new Error(`OAuth 2.0 token request failed (${resp.status}): ${body}`)
+    const body = await resp.text();
+    throw new Error(`OAuth 2.0 token request failed (${resp.status}): ${body}`);
   }
 
-  const json = await resp.json() as Record<string, unknown>
-  const accessToken = String(json['access_token'] ?? '')
-  if (!accessToken) throw new Error('OAuth 2.0: token response missing access_token.')
+  const json = await resp.json() as Record<string, unknown>;
+  const accessToken = String(json['access_token'] ?? '');
+  if (!accessToken) throw new Error('OAuth 2.0: token response missing access_token.');
 
-  const expiresIn = Number(json['expires_in'] ?? 3600)
-  const expiresAt = Date.now() + expiresIn * 1000
+  const expiresIn = Number(json['expires_in'] ?? 3600);
+  const expiresAt = Date.now() + expiresIn * 1000;
 
   return {
     accessToken,
     expiresAt,
     refreshToken: json['refresh_token'] ? String(json['refresh_token']) : undefined,
-  }
+  };
 }

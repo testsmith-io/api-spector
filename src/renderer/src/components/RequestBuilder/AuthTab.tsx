@@ -1,99 +1,99 @@
-import React, { useState } from 'react'
-import type { ApiRequest, AuthConfig } from '../../../../shared/types'
+import React, { useState } from 'react';
+import type { ApiRequest, AuthConfig } from '../../../../shared/types';
 
-const { electron } = window as any
+const { electron } = window;
 
 type AuthType = AuthConfig['type']
 
-const AUTH_TYPES: AuthType[] = ['none', 'bearer', 'basic', 'digest', 'ntlm', 'apikey', 'oauth2']
+const AUTH_TYPES: AuthType[] = ['none', 'bearer', 'basic', 'digest', 'ntlm', 'apikey', 'oauth2'];
 
 export function AuthTab({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
-  const auth = request.auth
-  const [secretValue, setSecretValue]       = useState('')
-  const [saved, setSaved]                   = useState(false)
-  const [oauth2Status, setOauth2Status]     = useState<'idle' | 'fetching' | 'ok' | 'error'>('idle')
-  const [oauth2Error, setOauth2Error]       = useState<string>('')
-  const [oauth2RefreshToken, setOauth2RT]   = useState<string>('')
+  const auth = request.auth;
+  const [secretValue, setSecretValue]       = useState('');
+  const [saved, setSaved]                   = useState(false);
+  const [oauth2Status, setOauth2Status]     = useState<'idle' | 'fetching' | 'ok' | 'error'>('idle');
+  const [oauth2Error, setOauth2Error]       = useState<string>('');
+  const [oauth2RefreshToken, setOauth2RT]   = useState<string>('');
 
   function setAuth(patch: Partial<AuthConfig>) {
-    onChange({ auth: { ...auth, ...patch } })
+    onChange({ auth: { ...auth, ...patch } });
   }
 
   async function saveSecret(ref: string) {
-    if (!secretValue || !ref) return
-    await electron.setSecret(ref, secretValue)
-    setSaved(true)
-    setSecretValue('')
-    setTimeout(() => setSaved(false), 2000)
+    if (!secretValue || !ref) return;
+    await electron.setSecret(ref, secretValue);
+    setSaved(true);
+    setSecretValue('');
+    setTimeout(() => setSaved(false), 2000);
   }
 
   // ── OAuth 2.0 token fetch ──────────────────────────────────────────────────
 
   async function fetchOAuth2Token() {
-    setOauth2Status('fetching')
-    setOauth2Error('')
+    setOauth2Status('fetching');
+    setOauth2Error('');
     try {
-      const vars: Record<string, string> = {}
+      const vars: Record<string, string> = {};
       if (auth.oauth2Flow === 'authorization_code') {
-        const result = await electron.oauth2StartFlow(auth, vars)
+        const result = await electron.oauth2StartFlow(auth, vars);
         setAuth({
           oauth2CachedToken: result.accessToken,
           oauth2TokenExpiry: result.expiresAt,
-        })
-        if (result.refreshToken) setOauth2RT(result.refreshToken)
+        });
+        if (result.refreshToken) setOauth2RT(result.refreshToken);
       } else {
         // client_credentials / password — handled in main process
-        const result = await electron.oauth2StartFlow(auth, vars) // triggers fetchOAuth2Token on main side via IPC
+        const result = await electron.oauth2StartFlow(auth, vars); // triggers fetchOAuth2Token on main side via IPC
         setAuth({
           oauth2CachedToken: result.accessToken,
           oauth2TokenExpiry: result.expiresAt,
-        })
-        if (result.refreshToken) setOauth2RT(result.refreshToken)
+        });
+        if (result.refreshToken) setOauth2RT(result.refreshToken);
       }
-      setOauth2Status('ok')
+      setOauth2Status('ok');
     } catch (e: unknown) {
-      setOauth2Status('error')
-      setOauth2Error(e instanceof Error ? e.message : String(e))
+      setOauth2Status('error');
+      setOauth2Error(e instanceof Error ? e.message : String(e));
     }
   }
 
   async function refreshOAuth2Token() {
-    if (!oauth2RefreshToken) return
-    setOauth2Status('fetching')
-    setOauth2Error('')
+    if (!oauth2RefreshToken) return;
+    setOauth2Status('fetching');
+    setOauth2Error('');
     try {
-      const result = await electron.oauth2RefreshToken(auth, {}, oauth2RefreshToken)
+      const result = await electron.oauth2RefreshToken(auth, {}, oauth2RefreshToken);
       setAuth({
         oauth2CachedToken: result.accessToken,
         oauth2TokenExpiry: result.expiresAt,
-      })
-      if (result.refreshToken) setOauth2RT(result.refreshToken)
-      setOauth2Status('ok')
+      });
+      if (result.refreshToken) setOauth2RT(result.refreshToken);
+      setOauth2Status('ok');
     } catch (e: unknown) {
-      setOauth2Status('error')
-      setOauth2Error(e instanceof Error ? e.message : String(e))
+      setOauth2Status('error');
+      setOauth2Error(e instanceof Error ? e.message : String(e));
     }
   }
 
   function clearOAuth2Token() {
-    setAuth({ oauth2CachedToken: undefined, oauth2TokenExpiry: undefined })
-    setOauth2RT('')
-    setOauth2Status('idle')
-    setOauth2Error('')
+    setAuth({ oauth2CachedToken: undefined, oauth2TokenExpiry: undefined });
+    setOauth2RT('');
+    setOauth2Status('idle');
+    setOauth2Error('');
   }
 
   const tokenPreview = (() => {
-    const t = auth.oauth2CachedToken
-    if (!t) return null
-    const preview = t.length > 16 ? `${t.slice(0, 6)}…${t.slice(-6)}` : t
-    const expiry  = auth.oauth2TokenExpiry
-    let expiryLabel = ''
+    const t = auth.oauth2CachedToken;
+    if (!t) return null;
+    const preview = t.length > 16 ? `${t.slice(0, 6)}…${t.slice(-6)}` : t;
+    const expiry  = auth.oauth2TokenExpiry;
+    let expiryLabel = '';
     if (expiry) {
-      const secsLeft = Math.round((expiry - Date.now()) / 1000)
-      expiryLabel = secsLeft > 0 ? ` (expires in ${secsLeft}s)` : ' (EXPIRED)'
+      const secsLeft = Math.round((expiry - Date.now()) / 1000);
+      expiryLabel = secsLeft > 0 ? ` (expires in ${secsLeft}s)` : ' (EXPIRED)';
     }
-    return `${preview}${expiryLabel}`
-  })()
+    return `${preview}${expiryLabel}`;
+  })();
 
   return (
     <div className="flex flex-col gap-3 text-xs">
@@ -439,7 +439,7 @@ export function AuthTab({ request, onChange }: { request: ApiRequest; onChange: 
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ─── Shared username/password sub-component ───────────────────────────────────
@@ -506,5 +506,5 @@ function BasicCredentialsFields({
         <p className="text-surface-600 text-[10px]">{note}</p>
       )}
     </div>
-  )
+  );
 }

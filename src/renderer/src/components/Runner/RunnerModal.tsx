@@ -1,14 +1,14 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react'
-import { useStore } from '../../store'
-import type { RunRequestResult, RunSummary, RunnerItem } from '../../../../shared/types'
-import { findFolder } from '../../store'
-import { buildJsonReport, buildJUnitReport, buildHtmlReport } from '../../../../shared/report'
-import { collectTagged, collectAllTags } from '../../../../shared/request-collection'
-import { buildCliArgs, generateGitHub, generateAzure, generateGitLab } from '../../../../shared/ci-generators'
-import { getMethodColor } from '../../../../shared/colors'
-import { EmptyState } from '../common/EmptyState'
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { useStore } from '../../store';
+import type { RunRequestResult, RunSummary, RunnerItem } from '../../../../shared/types';
+import { findFolder } from '../../store';
+import { buildJsonReport, buildJUnitReport, buildHtmlReport } from '../../../../shared/report';
+import { collectTagged, collectAllTags } from '../../../../shared/request-collection';
+import { buildCliArgs, generateGitHub, generateAzure, generateGitLab } from '../../../../shared/ci-generators';
+import { getMethodColor } from '../../../../shared/colors';
+import { EmptyState } from '../common/EmptyState';
 
-const { electron } = window as any
+const { electron } = window;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -17,24 +17,24 @@ function collectRequests(
   folderId: string | null,
   filterTags: string[],
 ) {
-  const state = useStore.getState()
-  const col   = state.collections[collectionId]?.data
-  if (!col) return []
-  const collectionVars = col.collectionVariables ?? {}
+  const state = useStore.getState();
+  const col   = state.collections[collectionId]?.data;
+  if (!col) return [];
+  const collectionVars = col.collectionVariables ?? {};
   const rootFolder     = folderId
     ? findFolder(col.rootFolder, folderId) ?? col.rootFolder
-    : col.rootFolder
-  return collectTagged(rootFolder, col.requests, collectionVars, filterTags)
+    : col.rootFolder;
+  return collectTagged(rootFolder, col.requests, collectionVars, filterTags);
 }
 
 function allTagsIn(collectionId: string, folderId: string | null): string[] {
-  const state = useStore.getState()
-  const col   = state.collections[collectionId]?.data
-  if (!col) return []
+  const state = useStore.getState();
+  const col   = state.collections[collectionId]?.data;
+  if (!col) return [];
   const rootFolder = folderId
     ? findFolder(col.rootFolder, folderId) ?? col.rootFolder
-    : col.rootFolder
-  return collectAllTags(rootFolder, col.requests)
+    : col.rootFolder;
+  return collectAllTags(rootFolder, col.requests);
 }
 
 // ─── Status indicator ─────────────────────────────────────────────────────────
@@ -46,81 +46,87 @@ function StatusDot({ status }: { status: RunRequestResult['status'] }) {
     passed:  'bg-emerald-500',
     failed:  'bg-red-500',
     error:   'bg-orange-500',
-  }
-  return <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${colors[status] ?? 'bg-surface-700'}`} />
+  };
+  return <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${colors[status] ?? 'bg-surface-700'}`} />;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function RunnerModal() {
-  const runnerModal         = useStore(s => s.runnerModal)
-  const collections         = useStore(s => s.collections)
-  const environments        = useStore(s => s.environments)
-  const activeEnvId         = useStore(s => s.activeEnvironmentId)
-  const globals             = useStore(s => s.globals)
-  const workspaceSettings   = useStore(s => s.workspace?.settings)
-  const runnerResults       = useStore(s => s.runnerResults)
-  const runnerRunning       = useStore(s => s.runnerRunning)
-  const closeRunner         = useStore(s => s.closeRunner)
-  const setRunnerResults    = useStore(s => s.setRunnerResults)
-  const patchRunnerResult   = useStore(s => s.patchRunnerResult)
-  const setRunnerRunning    = useStore(s => s.setRunnerRunning)
+  const runnerModal         = useStore(s => s.runnerModal);
+  const collections         = useStore(s => s.collections);
+  const environments        = useStore(s => s.environments);
+  const activeEnvId         = useStore(s => s.activeEnvironmentId);
+  const globals             = useStore(s => s.globals);
+  const workspaceSettings   = useStore(s => s.workspace?.settings);
+  const runnerResults       = useStore(s => s.runnerResults);
+  const runnerRunning       = useStore(s => s.runnerRunning);
+  const closeRunner         = useStore(s => s.closeRunner);
+  const setRunnerResults    = useStore(s => s.setRunnerResults);
+  const patchRunnerResult   = useStore(s => s.patchRunnerResult);
+  const setRunnerRunning    = useStore(s => s.setRunnerRunning);
 
-  const [selectedEnvId, setSelectedEnvId] = useState<string>(activeEnvId ?? '')
-  const [filterTags,    setFilterTags]    = useState<string[]>(runnerModal.filterTags)
-  const [summary,       setSummary]       = useState<RunSummary | null>(null)
-  const [copiedKey,     setCopiedKey]     = useState<string | null>(null)
-  const [exportFormat,  setExportFormat]  = useState<'json' | 'junit' | 'html'>('json')
-  const [requestDelay,  setRequestDelay]  = useState<number>(0)
+  const [selectedEnvId, setSelectedEnvId] = useState<string>(activeEnvId ?? '');
+  const [filterTags,    setFilterTags]    = useState<string[]>(runnerModal.filterTags);
+  const [summary,       setSummary]       = useState<RunSummary | null>(null);
+  const [copiedKey,     setCopiedKey]     = useState<string | null>(null);
+  const [exportFormat,  setExportFormat]  = useState<'json' | 'junit' | 'html'>('json');
+  const [requestDelay,  setRequestDelay]  = useState<number>(0);
 
-  const { collectionId, folderId } = runnerModal
-  const colEntry   = collectionId ? collections[collectionId] : null
-  const colName    = colEntry?.data.name ?? 'Collection'
+  const { collectionId, folderId } = runnerModal;
+  const colEntry   = collectionId ? collections[collectionId] : null;
+  const colName    = colEntry?.data.name ?? 'Collection';
   const folderName = folderId && colEntry
     ? (findFolder(colEntry.data.rootFolder, folderId)?.name ?? 'Folder')
-    : null
+    : null;
 
-  const dataSet = colEntry?.data.dataSet ?? { columns: [], rows: [] }
-  const iterCount = dataSet.rows.length
+  const dataSet = colEntry?.data.dataSet ?? { columns: [], rows: [] };
+  const iterCount = dataSet.rows.length;
 
-  const availableTags = collectionId ? allTagsIn(collectionId, folderId) : []
+  const availableTags = collectionId ? allTagsIn(collectionId, folderId) : [];
 
-  const progressIdxRef = useRef(0)
+  const progressIdxRef = useRef(0);
+  const initFilterTagsRef = useRef(runnerModal.filterTags);
+  initFilterTagsRef.current = runnerModal.filterTags;
+  const initEnvIdRef = useRef(activeEnvId);
+  initEnvIdRef.current = activeEnvId;
 
-  // Reset when modal opens
+  // Reset when modal opens — reads refs so we snapshot values at open time
+  // without re-running when filterTags or activeEnvId change mid-session
   useEffect(() => {
-    setFilterTags(runnerModal.filterTags)
-    setSelectedEnvId(activeEnvId ?? '')
-    setSummary(null)
-    progressIdxRef.current = 0
-  }, [runnerModal.open])
+    setFilterTags(initFilterTagsRef.current);
+    setSelectedEnvId(initEnvIdRef.current ?? '');
+    setSummary(null);
+    progressIdxRef.current = 0;
+  }, [runnerModal.open]);
 
   const toggleTag = (tag: string) =>
-    setFilterTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
+    setFilterTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
 
   // ── Run ───────────────────────────────────────────────────────────────────
 
   const run = useCallback(async () => {
-    const baseItems = collectionId ? collectRequests(collectionId, folderId, filterTags) : []
-    if (baseItems.length === 0) return
+    const ds = colEntry?.data.dataSet ?? { columns: [], rows: [] };
+    const baseItems = collectionId ? collectRequests(collectionId, folderId, filterTags) : [];
+    if (baseItems.length === 0) return;
 
     // Expand with data rows if defined
-    let items: RunnerItem[]
-    if (dataSet.rows.length > 0) {
-      items = dataSet.rows.flatMap((row, ri) => {
-        const dataRow: Record<string, string> = {}
-        dataSet.columns.forEach((col, ci) => { dataRow[col] = row[ci] ?? '' })
+    let items: RunnerItem[];
+    if (ds.rows.length > 0) {
+      items = ds.rows.flatMap((row, ri) => {
+        const dataRow: Record<string, string> = {};
+        ds.columns.forEach((col, ci) => { dataRow[col] = row[ci] ?? ''; });
         return baseItems.map(item => ({
           ...item,
           dataRow,
-          iterationLabel: `${ri + 1}/${dataSet.rows.length}`,
-        }))
-      })
+          iterationLabel: `${ri + 1}/${ds.rows.length}`,
+        }));
+      });
     } else {
-      items = baseItems
+      items = baseItems;
     }
 
-    const env = selectedEnvId ? environments[selectedEnvId]?.data ?? null : null
+    const env = selectedEnvId ? environments[selectedEnvId]?.data ?? null : null;
 
     setRunnerResults(items.map(item => ({
       requestId:      item.request.id,
@@ -129,16 +135,16 @@ export function RunnerModal() {
       resolvedUrl:    item.request.url,
       status:         'pending',
       iterationLabel: item.iterationLabel,
-    })))
-    setSummary(null)
-    setRunnerRunning(true)
-    progressIdxRef.current = 0
+    })));
+    setSummary(null);
+    setRunnerRunning(true);
+    progressIdxRef.current = 0;
 
     electron.onRunProgress((result: RunRequestResult) => {
-      const idx = progressIdxRef.current
-      patchRunnerResult(idx, result)
-      if (result.status !== 'running') progressIdxRef.current++
-    })
+      const idx = progressIdxRef.current;
+      patchRunnerResult(idx, result);
+      if (result.status !== 'running') progressIdxRef.current++;
+    });
 
     try {
       const s: RunSummary = await electron.runCollection({
@@ -149,22 +155,23 @@ export function RunnerModal() {
         tls:             workspaceSettings?.tls,
         piiMaskPatterns: workspaceSettings?.piiMaskPatterns,
         requestDelay,
-      })
-      setSummary(s)
+      });
+      setSummary(s);
     } finally {
-      electron.offRunProgress()
-      setRunnerRunning(false)
+      electron.offRunProgress();
+      setRunnerRunning(false);
     }
-  }, [collectionId, folderId, filterTags, selectedEnvId, environments, globals, colEntry, requestDelay])
+   
+  }, [collectionId, folderId, filterTags, selectedEnvId, environments, globals, colEntry, requestDelay, workspaceSettings, setRunnerResults, patchRunnerResult, setRunnerRunning]);
 
-  if (!runnerModal.open) return null
+  if (!runnerModal.open) return null;
 
-  const envName = selectedEnvId ? environments[selectedEnvId]?.data.name ?? null : null
+  const envName = selectedEnvId ? environments[selectedEnvId]?.data.name ?? null : null;
 
   function copyCI(key: string, content: string) {
-    navigator.clipboard.writeText(content)
-    setCopiedKey(key)
-    setTimeout(() => setCopiedKey(null), 2000)
+    navigator.clipboard.writeText(content);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
   }
 
   return (
@@ -375,12 +382,12 @@ export function RunnerModal() {
                     environment: selectedEnvId ? environments[selectedEnvId]?.data.name ?? null : null,
                     collection: colName,
                     timestamp: new Date().toISOString(),
-                  }
+                  };
                   const content = exportFormat === 'junit' ? buildJUnitReport(runnerResults, summary, meta)
                     : exportFormat === 'html'  ? buildHtmlReport(runnerResults, summary, meta)
-                    : buildJsonReport(runnerResults, summary, meta)
-                  const ext = exportFormat === 'junit' ? 'xml' : exportFormat === 'html' ? 'html' : 'json'
-                  electron.saveResults(content, `spector-results.${ext}`)
+                    : buildJsonReport(runnerResults, summary, meta);
+                  const ext = exportFormat === 'junit' ? 'xml' : exportFormat === 'html' ? 'html' : 'json';
+                  electron.saveResults(content, `spector-results.${ext}`);
                 }}
                 className="px-2.5 py-0.5 bg-surface-800 hover:bg-surface-700 rounded transition-colors text-[11px] whitespace-nowrap"
               >
@@ -391,5 +398,5 @@ export function RunnerModal() {
         )}
       </div>
     </div>
-  )
+  );
 }

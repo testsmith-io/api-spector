@@ -1,21 +1,21 @@
-import React, { useState } from 'react'
-import { useStore } from '../../store'
-import type { EnvVariable } from '../../../../shared/types'
-import { MasterKeyModal } from './MasterKeyModal'
-import { envRelPath } from '../../../../shared/naming-utils'
+import React, { useState } from 'react';
+import { useStore } from '../../store';
+import type { EnvVariable } from '../../../../shared/types';
+import { MasterKeyModal } from './MasterKeyModal';
+import { envRelPath } from '../../../../shared/naming-utils';
 
-const { electron } = window as any
+const { electron } = window;
 
 // ─── Crypto helpers (Web Crypto API) ─────────────────────────────────────────
 
 /** First 8 hex chars of SHA-256(value) — fingerprint only, not reversible. */
 async function shortHash(value: string): Promise<string> {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 8)
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 8);
 }
 
 function b64(buf: ArrayBuffer | Uint8Array): string {
-  return btoa(String.fromCharCode(...new Uint8Array(buf instanceof ArrayBuffer ? buf : buf.buffer)))
+  return btoa(String.fromCharCode(...new Uint8Array(buf instanceof ArrayBuffer ? buf : buf.buffer)));
 }
 
 /**
@@ -28,26 +28,26 @@ async function encryptSecret(plaintext: string, password: string): Promise<{
   secretIv: string
   secretHash: string
 }> {
-  const enc  = new TextEncoder()
-  const salt = crypto.getRandomValues(new Uint8Array(16))
-  const iv   = crypto.getRandomValues(new Uint8Array(12))
+  const enc  = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv   = crypto.getRandomValues(new Uint8Array(12));
 
-  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey'])
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
   const key = await crypto.subtle.deriveKey(
     { name: 'PBKDF2', salt, iterations: 100_000, hash: 'SHA-256' },
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
     false,
     ['encrypt'],
-  )
-  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(plaintext))
+  );
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(plaintext));
 
   return {
     secretEncrypted: b64(encrypted),
     secretSalt: b64(salt),
     secretIv: b64(iv),
     secretHash: await shortHash(plaintext),
-  }
+  };
 }
 
 // ─── Source mode ──────────────────────────────────────────────────────────────
@@ -55,110 +55,110 @@ async function encryptSecret(plaintext: string, password: string): Promise<{
 type SourceMode = 'plain' | 'encrypted' | 'env'
 
 function getSourceMode(v: EnvVariable): SourceMode {
-  if (v.envRef  !== undefined) return 'env'
-  if (v.secret)               return 'encrypted'
-  return 'plain'
+  if (v.envRef  !== undefined) return 'env';
+  if (v.secret)               return 'encrypted';
+  return 'plain';
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
-  const environments         = useStore(s => s.environments)
-  const activeEnvironmentId  = useStore(s => s.activeEnvironmentId)
-  const updateEnvironment    = useStore(s => s.updateEnvironment)
-  const setActiveEnvironment = useStore(s => s.setActiveEnvironment)
+  const environments         = useStore(s => s.environments);
+  const activeEnvironmentId  = useStore(s => s.activeEnvironmentId);
+  const updateEnvironment    = useStore(s => s.updateEnvironment);
+  const setActiveEnvironment = useStore(s => s.setActiveEnvironment);
 
   const [selectedId,   setSelectedId]   = useState<string>(
     activeEnvironmentId ?? Object.keys(environments)[0] ?? ''
-  )
+  );
   // Pending plaintext input per row (cleared after encrypting)
-  const [secretInputs, setSecretInputs] = useState<Record<number, string>>({})
+  const [secretInputs, setSecretInputs] = useState<Record<number, string>>({});
   // Row that just got saved
-  const [savedIdx,     setSavedIdx]     = useState<number | null>(null)
+  const [savedIdx,     setSavedIdx]     = useState<number | null>(null);
   // Show master key setup modal for a pending row
-  const [pendingEncryptIdx, setPendingEncryptIdx] = useState<number | null>(null)
-  const [nameError, setNameError] = useState<string | null>(null)
+  const [pendingEncryptIdx, setPendingEncryptIdx] = useState<number | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
 
-  const envList = Object.values(environments)
-  const env = selectedId ? environments[selectedId]?.data ?? null : null
+  const envList = Object.values(environments);
+  const env = selectedId ? environments[selectedId]?.data ?? null : null;
 
   function updateVar(idx: number, patch: Partial<EnvVariable>) {
-    if (!env) return
-    const vars = env.variables.map((v, i) => i === idx ? { ...v, ...patch } : v)
-    updateEnvironment(env.id, { ...env, variables: vars })
+    if (!env) return;
+    const vars = env.variables.map((v, i) => i === idx ? { ...v, ...patch } : v);
+    updateEnvironment(env.id, { ...env, variables: vars });
   }
 
   function addVar() {
-    if (!env) return
-    const newVar: EnvVariable = { key: '', value: '', enabled: true }
-    updateEnvironment(env.id, { ...env, variables: [...env.variables, newVar] })
+    if (!env) return;
+    const newVar: EnvVariable = { key: '', value: '', enabled: true };
+    updateEnvironment(env.id, { ...env, variables: [...env.variables, newVar] });
   }
 
   function removeVar(idx: number) {
-    if (!env) return
-    updateEnvironment(env.id, { ...env, variables: env.variables.filter((_, i) => i !== idx) })
+    if (!env) return;
+    updateEnvironment(env.id, { ...env, variables: env.variables.filter((_, i) => i !== idx) });
   }
 
   function cycleSource(idx: number) {
-    if (!env) return
-    const v = env.variables[idx]
-    const current = getSourceMode(v)
-    const next: SourceMode = current === 'plain' ? 'encrypted' : current === 'encrypted' ? 'env' : 'plain'
+    if (!env) return;
+    const v = env.variables[idx];
+    const current = getSourceMode(v);
+    const next: SourceMode = current === 'plain' ? 'encrypted' : current === 'encrypted' ? 'env' : 'plain';
 
     if (next === 'plain') {
-      updateVar(idx, { secret: false, secretEncrypted: undefined, secretSalt: undefined, secretIv: undefined, secretHash: undefined, envRef: undefined, value: '' })
+      updateVar(idx, { secret: false, secretEncrypted: undefined, secretSalt: undefined, secretIv: undefined, secretHash: undefined, envRef: undefined, value: '' });
     } else if (next === 'encrypted') {
-      updateVar(idx, { secret: true, secretEncrypted: undefined, secretSalt: undefined, secretIv: undefined, secretHash: undefined, envRef: undefined, value: '' })
+      updateVar(idx, { secret: true, secretEncrypted: undefined, secretSalt: undefined, secretIv: undefined, secretHash: undefined, envRef: undefined, value: '' });
     } else {
-      updateVar(idx, { secret: false, secretEncrypted: undefined, secretSalt: undefined, secretIv: undefined, secretHash: undefined, envRef: '', value: '' })
+      updateVar(idx, { secret: false, secretEncrypted: undefined, secretSalt: undefined, secretIv: undefined, secretHash: undefined, envRef: '', value: '' });
     }
-    setSecretInputs(s => { const n = { ...s }; delete n[idx]; return n })
+    setSecretInputs(s => { const n = { ...s }; delete n[idx]; return n; });
   }
 
   async function doEncrypt(idx: number, password: string) {
-    const plaintext = secretInputs[idx] ?? ''
-    if (!plaintext) return
+    const plaintext = secretInputs[idx] ?? '';
+    if (!plaintext) return;
 
-    const fields = await encryptSecret(plaintext, password)
-    updateVar(idx, { ...fields, value: '' })
-    setSecretInputs(s => { const n = { ...s }; delete n[idx]; return n })
-    setSavedIdx(idx)
-    setTimeout(() => setSavedIdx(null), 2500)
+    const fields = await encryptSecret(plaintext, password);
+    updateVar(idx, { ...fields, value: '' });
+    setSecretInputs(s => { const n = { ...s }; delete n[idx]; return n; });
+    setSavedIdx(idx);
+    setTimeout(() => setSavedIdx(null), 2500);
   }
 
   async function saveEncrypted(idx: number) {
-    const plaintext = secretInputs[idx] ?? ''
-    if (!plaintext) return
+    const plaintext = secretInputs[idx] ?? '';
+    if (!plaintext) return;
 
-    const { set } = await electron.checkMasterKey()
+    const { set } = await electron.checkMasterKey();
     if (!set) {
-      setPendingEncryptIdx(idx)
-      return
+      setPendingEncryptIdx(idx);
+      return;
     }
     // Master key already set in process — but we need the value to encrypt in renderer.
     // Prompt user since we can't read it back from main.
-    setPendingEncryptIdx(idx)
+    setPendingEncryptIdx(idx);
   }
 
   function selectEnv(id: string) {
-    setSelectedId(id)
-    setActiveEnvironment(id)
-    setSecretInputs({})
-    setNameError(null)
+    setSelectedId(id);
+    setActiveEnvironment(id);
+    setSecretInputs({});
+    setNameError(null);
   }
 
   async function saveEnv() {
-    if (!env) return
+    if (!env) return;
     const duplicate = Object.values(environments).some(
       e => e.data.id !== env.id && e.data.name.toLowerCase() === env.name.trim().toLowerCase()
-    )
+    );
     if (duplicate) {
-      setNameError(`"${env.name.trim()}" already exists`)
-      return
+      setNameError(`"${env.name.trim()}" already exists`);
+      return;
     }
-    setNameError(null)
-    const currentRelPath = environments[env.id]?.relPath ?? `environments/${env.id}.env.json`
-    const newRelPath = envRelPath(env.name, env.id)
+    setNameError(null);
+    const currentRelPath = environments[env.id]?.relPath ?? `environments/${env.id}.env.json`;
+    const newRelPath = envRelPath(env.name, env.id);
 
     // Update store and workspace if the path changed (name was renamed)
     if (newRelPath !== currentRelPath) {
@@ -171,12 +171,12 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
           ...state.workspace,
           environments: state.workspace.environments.map(p => p === currentRelPath ? newRelPath : p),
         } : state.workspace,
-      }))
-      const ws = useStore.getState().workspace
-      if (ws) await electron.saveWorkspace(ws)
+      }));
+      const ws = useStore.getState().workspace;
+      if (ws) await electron.saveWorkspace(ws);
     }
 
-    await electron.saveEnvironment(newRelPath, env)
+    await electron.saveEnvironment(newRelPath, env);
   }
 
   return (
@@ -184,8 +184,8 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
       {pendingEncryptIdx !== null && (
         <MasterKeyModal
           onSuccess={async (password) => {
-            setPendingEncryptIdx(null)
-            await doEncrypt(pendingEncryptIdx, password)
+            setPendingEncryptIdx(null);
+            await doEncrypt(pendingEncryptIdx, password);
           }}
           onCancel={() => setPendingEncryptIdx(null)}
         />
@@ -221,9 +221,9 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
             </div>
             <button
               onClick={() => {
-                useStore.getState().addEnvironment()
-                const newId = Object.keys(useStore.getState().environments).at(-1) ?? ''
-                selectEnv(newId)
+                useStore.getState().addEnvironment();
+                const newId = Object.keys(useStore.getState().environments).at(-1) ?? '';
+                selectEnv(newId);
               }}
               className="px-3 py-2 text-xs text-surface-400 hover:text-white border-t border-surface-800 transition-colors text-left"
             >
@@ -239,7 +239,7 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                 <div className="flex items-center gap-3">
                   <input
                     value={env.name}
-                    onChange={e => { updateEnvironment(env.id, { ...env, name: e.target.value }); setNameError(null) }}
+                    onChange={e => { updateEnvironment(env.id, { ...env, name: e.target.value }); setNameError(null); }}
                     className={`flex-1 bg-surface-800 rounded px-2 py-1 text-sm font-semibold focus:outline-none focus:ring-1 ${
                       nameError ? 'ring-1 ring-red-500 focus:ring-red-500' : 'focus:ring-blue-500'
                     }`}
@@ -264,7 +264,7 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                   </thead>
                   <tbody>
                     {env.variables.map((v, idx) => {
-                      const mode = getSourceMode(v)
+                      const mode = getSourceMode(v);
                       return (
                         <tr key={idx} className="group border-b border-surface-800/50 hover:bg-surface-800/30">
                           {/* Enabled */}
@@ -373,7 +373,7 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                             >×</button>
                           </td>
                         </tr>
-                      )
+                      );
                     })}
                   </tbody>
                 </table>
@@ -407,7 +407,7 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                   Cancel
                 </button>
                 <button
-                  onClick={() => { saveEnv(); onClose() }}
+                  onClick={() => { saveEnv(); onClose(); }}
                   className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 rounded transition-colors"
                 >
                   Save
@@ -418,7 +418,7 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
             <div className="flex-1 flex flex-col items-center justify-center gap-3 text-surface-400 text-xs">
               <p>No environment selected.</p>
               <button
-                onClick={() => { useStore.getState().addEnvironment(); const id = Object.keys(useStore.getState().environments).at(-1) ?? ''; selectEnv(id) }}
+                onClick={() => { useStore.getState().addEnvironment(); const id = Object.keys(useStore.getState().environments).at(-1) ?? ''; selectEnv(id); }}
                 className="text-blue-400 hover:text-blue-300"
               >
                 + Create environment
@@ -428,5 +428,5 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
         </div>
       </div>
     </>
-  )
+  );
 }

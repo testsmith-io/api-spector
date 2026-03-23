@@ -1,39 +1,39 @@
-import React, { useState } from 'react'
-import { useStore } from '../../store'
-import { EnvironmentEditor } from './EnvironmentEditor'
-import { MasterKeyModal } from './MasterKeyModal'
+import React, { useState } from 'react';
+import { useStore } from '../../store';
+import { EnvironmentEditor } from './EnvironmentEditor';
+import { MasterKeyModal } from './MasterKeyModal';
 
-const { electron } = window as any
+const { electron } = window;
 
 export function EnvironmentBar({ inline = false }: { inline?: boolean }) {
-  const environments = useStore(s => s.environments)
-  const activeEnvironmentId = useStore(s => s.activeEnvironmentId)
-  const setActiveEnvironment = useStore(s => s.setActiveEnvironment)
-  const addEnvironment = useStore(s => s.addEnvironment)
-  const [showEditor, setShowEditor] = useState(false)
-  const [pendingEnvId, setPendingEnvId] = useState<string | null>(null)
+  const environments = useStore(s => s.environments);
+  const activeEnvironmentId = useStore(s => s.activeEnvironmentId);
+  const setActiveEnvironment = useStore(s => s.setActiveEnvironment);
+  const addEnvironment = useStore(s => s.addEnvironment);
+  const [showEditor, setShowEditor] = useState(false);
+  const [pendingEnvId, setPendingEnvId] = useState<string | null>(null);
 
-  const envList = Object.values(environments)
-  const activeEnv = activeEnvironmentId ? environments[activeEnvironmentId]?.data : null
-  const varCount = activeEnv?.variables.filter(v => v.enabled).length ?? 0
+  const envList = Object.values(environments);
+  const activeEnv = activeEnvironmentId ? environments[activeEnvironmentId]?.data : null;
+  const varCount = activeEnv?.variables.filter(v => v.enabled).length ?? 0;
 
   function handleNew() {
-    addEnvironment()
-    setShowEditor(true)
+    addEnvironment();
+    setShowEditor(true);
   }
 
   async function handleEnvChange(id: string | null) {
     if (id) {
-      const hasSecrets = environments[id]?.data.variables.some(v => v.enabled && v.secret)
+      const hasSecrets = environments[id]?.data.variables.some(v => v.enabled && v.secret);
       if (hasSecrets) {
-        const { set } = await electron.checkMasterKey()
+        const { set } = await electron.checkMasterKey();
         if (!set) {
-          setPendingEnvId(id)
-          return
+          setPendingEnvId(id);
+          return;
         }
       }
     }
-    setActiveEnvironment(id)
+    setActiveEnvironment(id);
   }
 
   const controls = (
@@ -41,8 +41,8 @@ export function EnvironmentBar({ inline = false }: { inline?: boolean }) {
       {pendingEnvId !== null && (
         <MasterKeyModal
           onSuccess={() => {
-            setActiveEnvironment(pendingEnvId)
-            setPendingEnvId(null)
+            setActiveEnvironment(pendingEnvId);
+            setPendingEnvId(null);
           }}
           onCancel={() => setPendingEnvId(null)}
         />
@@ -82,14 +82,14 @@ export function EnvironmentBar({ inline = false }: { inline?: boolean }) {
 
       {showEditor && <EnvironmentEditor onClose={() => setShowEditor(false)} />}
     </>
-  )
+  );
 
-  if (inline) return <>{controls}</>
+  if (inline) return <>{controls}</>;
 
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 border-b border-surface-800 bg-surface-950 flex-shrink-0">
       <span className="text-surface-400 font-medium text-xs">Env:</span>
       {controls}
     </div>
-  )
+  );
 }

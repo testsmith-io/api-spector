@@ -1,43 +1,43 @@
-import { useEffect, useRef, useState } from 'react'
-import { useStore } from '../../store'
-import type { Collection } from '../../../../shared/types'
-import { EnvironmentBar } from '../EnvironmentBar/EnvironmentBar'
-import { WorkspaceSettingsModal } from './WorkspaceSettingsModal'
-import { DocsGeneratorModal } from './DocsGeneratorModal'
-import { ImportModal } from './ImportModal'
-import { useWorkspaceLoader } from '../../hooks/useWorkspaceLoader'
-import { colRelPath } from '../../store'
+import { useEffect, useRef, useState } from 'react';
+import { useStore } from '../../store';
+import type { Collection } from '../../../../shared/types';
+import { EnvironmentBar } from '../EnvironmentBar/EnvironmentBar';
+import { WorkspaceSettingsModal } from './WorkspaceSettingsModal';
+import { DocsGeneratorModal } from './DocsGeneratorModal';
+import { ImportModal } from './ImportModal';
+import { useWorkspaceLoader } from '../../hooks/useWorkspaceLoader';
+import { colRelPath } from '../../store';
 
-const { electron } = window as any
+const { electron } = window;
 
 // ─── Preferences popover ──────────────────────────────────────────────────────
 
-const ZOOM_STEPS = [0.75, 0.90, 1.0, 1.10, 1.25, 1.50]
+const ZOOM_STEPS = [0.75, 0.90, 1.0, 1.10, 1.25, 1.50];
 
 function PreferencesPopover() {
-  const theme    = useStore(s => s.theme)
-  const zoom     = useStore(s => s.zoom)
-  const setTheme = useStore(s => s.setTheme)
-  const setZoom  = useStore(s => s.setZoom)
+  const theme    = useStore(s => s.theme);
+  const zoom     = useStore(s => s.zoom);
+  const setTheme = useStore(s => s.setTheme);
+  const setZoom  = useStore(s => s.setZoom);
 
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
 
   function zoomStep(dir: 1 | -1) {
-    const idx = ZOOM_STEPS.indexOf(zoom)
+    const idx = ZOOM_STEPS.indexOf(zoom);
     const next = idx === -1
       ? ZOOM_STEPS[2]
-      : ZOOM_STEPS[Math.max(0, Math.min(ZOOM_STEPS.length - 1, idx + dir))]
-    setZoom(next)
+      : ZOOM_STEPS[Math.max(0, Math.min(ZOOM_STEPS.length - 1, idx + dir))];
+    setZoom(next);
   }
 
   return (
@@ -109,63 +109,63 @@ function PreferencesPopover() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ─── Toolbar ──────────────────────────────────────────────────────────────────
 
 export function Toolbar({ onOpenDocs: _onOpenDocs }: { onOpenDocs?: () => void }) {
-  const { applyWorkspace } = useWorkspaceLoader()
-  const workspace = useStore(s => s.workspace)
-  const closeWorkspace = useStore(s => s.closeWorkspace)
-  const collections = useStore(s => s.collections)
-  const environments = useStore(s => s.environments)
-  const markCollectionClean = useStore(s => s.markCollectionClean)
-  const showGeneratorPanel = useStore(s => s.showGeneratorPanel)
-  const setShowGeneratorPanel = useStore(s => s.setShowGeneratorPanel)
-  const loadCollection = useStore(s => s.loadCollection)
-  const setActiveCollection = useStore(s => s.setActiveCollection)
-  const workspaceSettingsOpen = useStore(s => s.workspaceSettingsOpen)
-  const setWorkspaceSettingsOpen = useStore(s => s.setWorkspaceSettingsOpen)
+  const { applyWorkspace } = useWorkspaceLoader();
+  const workspace = useStore(s => s.workspace);
+  const closeWorkspace = useStore(s => s.closeWorkspace);
+  const collections = useStore(s => s.collections);
+  const environments = useStore(s => s.environments);
+  const markCollectionClean = useStore(s => s.markCollectionClean);
+  const showGeneratorPanel = useStore(s => s.showGeneratorPanel);
+  const setShowGeneratorPanel = useStore(s => s.setShowGeneratorPanel);
+  const loadCollection = useStore(s => s.loadCollection);
+  const setActiveCollection = useStore(s => s.setActiveCollection);
+  const workspaceSettingsOpen = useStore(s => s.workspaceSettingsOpen);
+  const setWorkspaceSettingsOpen = useStore(s => s.setWorkspaceSettingsOpen);
 
-  const [saving, setSaving]       = useState(false)
-  const [docsOpen, setDocsOpen]   = useState(false)
-  const [importOpen, setImportOpen] = useState(false)
+  const [saving, setSaving]       = useState(false);
+  const [docsOpen, setDocsOpen]   = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
-  const hasDirty = Object.values(collections).some(c => c.dirty)
+  const hasDirty = Object.values(collections).some(c => c.dirty);
 
   async function saveAll() {
-    setSaving(true)
+    setSaving(true);
     try {
       for (const { relPath, data, dirty } of Object.values(collections)) {
-        if (!dirty) continue
-        await electron.saveCollection(relPath, data)
-        markCollectionClean(data.id)
+        if (!dirty) continue;
+        await electron.saveCollection(relPath, data);
+        markCollectionClean(data.id);
       }
       for (const { relPath, data } of Object.values(environments)) {
-        await electron.saveEnvironment(relPath, data)
+        await electron.saveEnvironment(relPath, data);
       }
-      if (workspace) await electron.saveWorkspace(workspace)
+      if (workspace) await electron.saveWorkspace(workspace);
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
   async function afterImport(col: Collection | null) {
-    if (!col) return
-    const relPath = colRelPath(col.name, col.id)
-    await electron.saveCollection(relPath, col)
-    loadCollection(relPath, col)
-    setActiveCollection(col.id)
-    const ws = useStore.getState().workspace
+    if (!col) return;
+    const relPath = colRelPath(col.name, col.id);
+    await electron.saveCollection(relPath, col);
+    loadCollection(relPath, col);
+    setActiveCollection(col.id);
+    const ws = useStore.getState().workspace;
     if (ws && !ws.collections.includes(relPath)) {
-      const updated = { ...ws, collections: [...ws.collections, relPath] }
-      useStore.setState({ workspace: updated })
-      await electron.saveWorkspace(updated)
+      const updated = { ...ws, collections: [...ws.collections, relPath] };
+      useStore.setState({ workspace: updated });
+      await electron.saveWorkspace(updated);
     }
   }
 
-  if (!workspace) return null
+  if (!workspace) return null;
 
   return (
     <div className="no-drag bg-surface-950 border-b border-surface-800 flex-shrink-0">
@@ -242,8 +242,8 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { onOpenDocs?: () => void }
           {/* Workspace switcher */}
           <button
             onClick={async () => {
-              const result = await electron.openWorkspace()
-              if (result) await applyWorkspace(result.workspace, result.workspacePath)
+              const result = await electron.openWorkspace();
+              if (result) await applyWorkspace(result.workspace, result.workspacePath);
             }}
             className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
             title="Open a different workspace"
@@ -252,8 +252,8 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { onOpenDocs?: () => void }
           </button>
           <button
             onClick={async () => {
-              const result = await electron.newWorkspace()
-              if (result) await applyWorkspace(result.workspace, result.workspacePath)
+              const result = await electron.newWorkspace();
+              if (result) await applyWorkspace(result.workspace, result.workspacePath);
             }}
             className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
             title="Create a new workspace"
@@ -262,8 +262,8 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { onOpenDocs?: () => void }
           </button>
           <button
             onClick={async () => {
-              await electron.closeWorkspace()
-              closeWorkspace()
+              await electron.closeWorkspace();
+              closeWorkspace();
             }}
             className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
             title="Close current workspace"
@@ -316,5 +316,5 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { onOpenDocs?: () => void }
         </div>
       </div>
     </div>
-  )
+  );
 }

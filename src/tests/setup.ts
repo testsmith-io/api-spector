@@ -6,4 +6,4 @@ globalThis.localStorage = {
   clear: () => {},
   key: () => null,
   length: 0,
-} as unknown as Storage
+} as unknown as Storage;

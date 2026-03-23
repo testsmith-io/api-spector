@@ -1,52 +1,52 @@
-import { useState } from 'react'
-import { useStore } from '../../store'
-import type { ContractMode } from '../../../../shared/types'
+import { useState } from 'react';
+import { useStore } from '../../store';
+import type { ContractMode } from '../../../../shared/types';
 
-const { electron } = window as any
+const { electron } = window;
 
 // ─── Main panel ───────────────────────────────────────────────────────────────
 
 export function ContractPanel() {
-  const collections          = useStore(s => s.collections)
-  const environments         = useStore(s => s.environments)
-  const activeEnvId          = useStore(s => s.activeEnvironmentId)
-  const activeCollId         = useStore(s => s.activeCollectionId)
-  const report               = useStore(s => s.lastContractReport)
-  const setReport            = useStore(s => s.setLastContractReport)
+  const collections          = useStore(s => s.collections);
+  const environments         = useStore(s => s.environments);
+  const activeEnvId          = useStore(s => s.activeEnvironmentId);
+  const activeCollId         = useStore(s => s.activeCollectionId);
+  const report               = useStore(s => s.lastContractReport);
+  const setReport            = useStore(s => s.setLastContractReport);
 
-  const [mode, setMode]               = useState<ContractMode>('consumer')
-  const [specUrl, setSpecUrl]         = useState('')
-  const [requestBaseUrl, setRequestBaseUrl] = useState('')
-  const [running, setRunning]         = useState(false)
-  const [error, setError]             = useState<string | null>(null)
+  const [mode, setMode]               = useState<ContractMode>('consumer');
+  const [specUrl, setSpecUrl]         = useState('');
+  const [requestBaseUrl, setRequestBaseUrl] = useState('');
+  const [running, setRunning]         = useState(false);
+  const [error, setError]             = useState<string | null>(null);
 
-  const allRequests = Object.values(collections).flatMap(c => Object.values(c.data.requests))
+  const allRequests = Object.values(collections).flatMap(c => Object.values(c.data.requests));
   const contractRequests = allRequests.filter(r =>
     r.contract && (r.contract.statusCode !== undefined || r.contract.bodySchema || r.contract.headers?.length),
-  )
+  );
   const collectionVars = activeCollId
     ? (collections[activeCollId]?.data.collectionVariables ?? {})
-    : {}
+    : {};
   const envVars = activeEnvId
     ? Object.fromEntries(
         (environments[activeEnvId]?.data.variables ?? [])
           .filter(v => v.enabled)
           .map(v => [v.key, v.value]),
       )
-    : {}
+    : {};
 
   async function runContracts() {
     if (mode !== 'consumer' && !specUrl.trim()) {
-      setError('Provide an OpenAPI spec URL for provider / bi-directional mode.')
-      return
+      setError('Provide an OpenAPI spec URL for provider / bi-directional mode.');
+      return;
     }
-    setRunning(true)
-    setError(null)
-    setReport(null)
+    setRunning(true);
+    setError(null);
+    setReport(null);
     try {
       const requests = mode === 'provider'
         ? allRequests          // provider validates ALL requests against spec
-        : contractRequests     // consumer / bidirectional only runs requests with contracts
+        : contractRequests;     // consumer / bidirectional only runs requests with contracts
       const result = await electron.runContracts({
         mode,
         requests,
@@ -54,17 +54,17 @@ export function ContractPanel() {
         collectionVars,
         specUrl:        specUrl.trim() || undefined,
         requestBaseUrl: requestBaseUrl.trim() || undefined,
-      })
-      setReport(result)
+      });
+      setReport(result);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setRunning(false)
+      setRunning(false);
     }
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Config area */}
       <div className="flex flex-col gap-3 px-3 py-3 border-b border-surface-800 flex-shrink-0">
         {/* Mode tabs */}
@@ -72,7 +72,7 @@ export function ContractPanel() {
           {(['consumer', 'provider', 'bidirectional'] as ContractMode[]).map(m => (
             <button
               key={m}
-              onClick={() => { setMode(m); setReport(null) }}
+              onClick={() => { setMode(m); setReport(null); }}
               className={`flex-1 py-1 text-[10px] font-semibold rounded capitalize transition-colors ${
                 mode === m ? 'bg-blue-600 text-white' : 'text-surface-400 hover:text-surface-200'
               }`}
@@ -168,5 +168,5 @@ export function ContractPanel() {
         )}
       </div>
     </div>
-  )
+  );
 }

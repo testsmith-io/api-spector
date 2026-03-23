@@ -1,6 +1,6 @@
-import React from 'react'
-import type { KeyValuePair } from '../../../../shared/types'
-import { VarInput } from '../common/VarInput'
+import React from 'react';
+import type { KeyValuePair } from '../../../../shared/types';
+import { VarInput } from '../common/VarInput';
 
 interface Props {
   rows: KeyValuePair[]
@@ -11,17 +11,17 @@ interface Props {
 
 export function KVTable({ rows, onChange, keyPlaceholder = 'Key', valuePlaceholder = 'Value' }: Props) {
   function update(idx: number, patch: Partial<KeyValuePair>) {
-    const next = [...rows]
-    next[idx] = { ...next[idx], ...patch }
-    onChange(next)
+    const next = [...rows];
+    next[idx] = { ...next[idx], ...patch };
+    onChange(next);
   }
 
   function add() {
-    onChange([...rows, { key: '', value: '', enabled: true }])
+    onChange([...rows, { key: '', value: '', enabled: true }]);
   }
 
   function remove(idx: number) {
-    onChange(rows.filter((_, i) => i !== idx))
+    onChange(rows.filter((_, i) => i !== idx));
   }
 
   return (
@@ -58,5 +58,5 @@ export function KVTable({ rows, onChange, keyPlaceholder = 'Key', valuePlacehold
         + Add
       </button>
     </div>
-  )
+  );
 }

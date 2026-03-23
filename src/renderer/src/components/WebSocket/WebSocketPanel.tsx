@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { useStore } from '../../store'
-import type { ApiRequest, WsMessage } from '../../../../shared/types'
+import React, { useEffect, useRef, useState } from 'react';
+import { useStore } from '../../store';
+import type { ApiRequest, WsMessage } from '../../../../shared/types';
 
-const { electron } = window as any
+const { electron } = window;
 
 interface Props {
   request: ApiRequest
@@ -10,84 +10,84 @@ interface Props {
 
 // Format timestamp as HH:MM:SS.mmm
 function formatTime(ts: number): string {
-  const d = new Date(ts)
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  const ss = String(d.getSeconds()).padStart(2, '0')
-  const ms = String(d.getMilliseconds()).padStart(3, '0')
-  return `${hh}:${mm}:${ss}.${ms}`
+  const d = new Date(ts);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  const ms = String(d.getMilliseconds()).padStart(3, '0');
+  return `${hh}:${mm}:${ss}.${ms}`;
 }
 
 export function WebSocketPanel({ request }: Props) {
-  const wsConnections    = useStore(s => s.wsConnections)
-  const setWsStatus      = useStore(s => s.setWsStatus)
-  const addWsMessage     = useStore(s => s.addWsMessage)
-  const clearWsMessages  = useStore(s => s.clearWsMessages)
+  const wsConnections    = useStore(s => s.wsConnections);
+  const setWsStatus      = useStore(s => s.setWsStatus);
+  const addWsMessage     = useStore(s => s.addWsMessage);
+  const clearWsMessages  = useStore(s => s.clearWsMessages);
 
-  const conn = wsConnections[request.id] ?? { status: 'disconnected', messages: [] }
-  const isConnected = conn.status === 'connected'
-  const isConnecting = conn.status === 'connecting'
+  const conn = wsConnections[request.id] ?? { status: 'disconnected', messages: [] };
+  const isConnected = conn.status === 'connected';
+  const isConnecting = conn.status === 'connecting';
 
-  const [sendText, setSendText] = useState('')
-  const logEndRef = useRef<HTMLDivElement>(null)
+  const [sendText, setSendText] = useState('');
+  const logEndRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to WS events from main process
   useEffect(() => {
     electron.onWsMessage(({ requestId, message }: { requestId: string; message: WsMessage }) => {
-      addWsMessage(requestId, message)
-    })
-    electron.onWsStatus(({ requestId, status, error }: { requestId: string; status: string; error?: string }) => {
-      setWsStatus(requestId, status as WsMessage['direction'] extends infer _ ? any : never, error)
-    })
+      addWsMessage(requestId, message);
+    });
+    electron.onWsStatus(({ requestId, status, error }: { requestId: string; status: Parameters<typeof setWsStatus>[1]; error?: string }) => {
+      setWsStatus(requestId, status, error);
+    });
     return () => {
-      electron.offWsEvents()
-    }
-  }, [])
+      electron.offWsEvents();
+    };
+  }, [addWsMessage, setWsStatus]);
 
   // Auto-scroll to latest message
   useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [conn.messages.length])
+    logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [conn.messages.length]);
 
   async function connect() {
-    if (!request.url) return
-    const headers: Record<string, string> = {}
+    if (!request.url) return;
+    const headers: Record<string, string> = {};
     for (const h of request.headers) {
-      if (h.enabled && h.key) headers[h.key] = h.value
+      if (h.enabled && h.key) headers[h.key] = h.value;
     }
     try {
-      await electron.wsConnect(request.id, request.url, headers)
+      await electron.wsConnect(request.id, request.url, headers);
     } catch (err) {
-      setWsStatus(request.id, 'error', err instanceof Error ? err.message : String(err))
+      setWsStatus(request.id, 'error', err instanceof Error ? err.message : String(err));
     }
   }
 
   async function disconnect() {
-    await electron.wsDisconnect(request.id)
+    await electron.wsDisconnect(request.id);
   }
 
   async function sendMessage() {
-    const text = sendText.trim()
-    if (!text || !isConnected) return
+    const text = sendText.trim();
+    if (!text || !isConnected) return;
     try {
-      await electron.wsSend(request.id, text)
+      await electron.wsSend(request.id, text);
       const msg: WsMessage = {
         id: crypto.randomUUID(),
         direction: 'sent',
         data: text,
         timestamp: Date.now(),
-      }
-      addWsMessage(request.id, msg)
-      setSendText('')
+      };
+      addWsMessage(request.id, msg);
+      setSendText('');
     } catch (err) {
-      setWsStatus(request.id, 'error', err instanceof Error ? err.message : String(err))
+      setWsStatus(request.id, 'error', err instanceof Error ? err.message : String(err));
     }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault()
-      sendMessage()
+      e.preventDefault();
+      sendMessage();
     }
   }
 
@@ -97,7 +97,7 @@ export function WebSocketPanel({ request }: Props) {
     connecting: 'bg-amber-400',
     error: 'bg-red-500',
     disconnected: 'bg-surface-600',
-  }
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -220,5 +220,5 @@ export function WebSocketPanel({ request }: Props) {
         </button>
       </div>
     </div>
-  )
+  );
 }

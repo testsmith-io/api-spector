@@ -1,12 +1,12 @@
-import React, { useState } from 'react'
-import { useStore } from '../../store'
-import type { MockRoute, MockServer } from '../../../../shared/types'
-import { v4 as uuidv4 } from 'uuid'
-import { getMethodColor } from '../../../../shared/colors'
+import React, { useState } from 'react';
+import { useStore } from '../../store';
+import type { MockRoute, MockServer } from '../../../../shared/types';
+import { v4 as uuidv4 } from 'uuid';
+import { getMethodColor } from '../../../../shared/colors';
 
-const { electron } = window as any
+const { electron } = window;
 
-const METHODS_PLUS_ANY = ['ANY', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const
+const METHODS_PLUS_ANY = ['ANY', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
 
 // ─── Route row ────────────────────────────────────────────────────────────────
 
@@ -21,8 +21,8 @@ function RouteRow({
   onDelete: () => void
   initialEditing?: boolean
 }) {
-  const [editing, setEditing] = useState(initialEditing)
-  const [draft,   setDraft]   = useState(route)
+  const [editing, setEditing] = useState(initialEditing);
+  const [draft,   setDraft]   = useState(route);
 
   if (!editing) {
     return (
@@ -42,7 +42,7 @@ function RouteRow({
           <span className="text-[11px] text-surface-600 shrink-0">{draft.delay}ms</span>
         ) : null}
         <button
-          onClick={() => { setDraft(route); setEditing(true) }}
+          onClick={() => { setDraft(route); setEditing(true); }}
           className="opacity-0 group-hover:opacity-100 text-xs text-surface-600 hover:text-surface-200 transition-opacity px-1"
         >
           Edit
@@ -54,7 +54,7 @@ function RouteRow({
           ✕
         </button>
       </div>
-    )
+    );
   }
 
   return (
@@ -122,8 +122,8 @@ function RouteRow({
             <input
               value={k}
               onChange={e => {
-                const h = { ...draft.headers }; delete h[k]; h[e.target.value] = v
-                setDraft(d => ({ ...d, headers: h }))
+                const h = { ...draft.headers }; delete h[k]; h[e.target.value] = v;
+                setDraft(d => ({ ...d, headers: h }));
               }}
               placeholder="Header-Name"
               className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:border-blue-500 placeholder-surface-700"
@@ -135,7 +135,7 @@ function RouteRow({
               className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:border-blue-500 placeholder-surface-700"
             />
             <button
-              onClick={() => { const h = { ...draft.headers }; delete h[k]; setDraft(d => ({ ...d, headers: h })) }}
+              onClick={() => { const h = { ...draft.headers }; delete h[k]; setDraft(d => ({ ...d, headers: h })); }}
               className="text-surface-600 hover:text-red-400 px-1 text-sm"
             >✕</button>
           </div>
@@ -148,7 +148,7 @@ function RouteRow({
 
       <div className="flex gap-2 pt-1 border-t border-surface-800">
         <button
-          onClick={() => { onSave(draft); setEditing(false) }}
+          onClick={() => { onSave(draft); setEditing(false); }}
           className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition-colors"
         >
           Save route
@@ -164,23 +164,23 @@ function RouteRow({
         </button>
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Request log ──────────────────────────────────────────────────────────────
 
 
 function timeAgo(ts: number): string {
-  const s = Math.floor((Date.now() - ts) / 1000)
-  if (s < 60)   return `${s}s ago`
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`
-  return `${Math.floor(s / 3600)}h ago`
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60)   return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  return `${Math.floor(s / 3600)}h ago`;
 }
 
 function RequestLog({ serverId, routes }: { serverId: string; routes: MockRoute[] }) {
-  const hits      = useStore(s => s.mockLogs[serverId] ?? [])
-  const clearLogs = useStore(s => s.clearMockLogs)
-  const routeMap  = new Map(routes.map(r => [r.id, r]))
+  const hits      = useStore(s => s.mockLogs[serverId] ?? []);
+  const clearLogs = useStore(s => s.clearMockLogs);
+  const routeMap  = new Map(routes.map(r => [r.id, r]));
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -218,8 +218,8 @@ function RequestLog({ serverId, routes }: { serverId: string; routes: MockRoute[
           </div>
 
           {hits.map(hit => {
-            const matched   = hit.matchedRouteId ? routeMap.get(hit.matchedRouteId) : null
-            const unmatched = !hit.matchedRouteId
+            const matched   = hit.matchedRouteId ? routeMap.get(hit.matchedRouteId) : null;
+            const unmatched = !hit.matchedRouteId;
             return (
               <div
                 key={hit.id}
@@ -247,55 +247,55 @@ function RequestLog({ serverId, routes }: { serverId: string; routes: MockRoute[
                   {timeAgo(hit.timestamp)}
                 </span>
               </div>
-            )
+            );
           })}
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ─── MockDetailPanel ──────────────────────────────────────────────────────────
 
 export function MockDetailPanel({ mockId }: { mockId: string }) {
-  const entry      = useStore(s => s.mocks[mockId])
-  const updateMock = useStore(s => s.updateMock)
-  const deleteMock = useStore(s => s.deleteMock)
-  const setRunning = useStore(s => s.setMockRunning)
-  const setActive  = useStore(s => s.setActiveMockId)
-  const workspace  = useStore(s => s.workspace)
+  const entry      = useStore(s => s.mocks[mockId]);
+  const updateMock = useStore(s => s.updateMock);
+  const deleteMock = useStore(s => s.deleteMock);
+  const setRunning = useStore(s => s.setMockRunning);
+  const setActive  = useStore(s => s.setActiveMockId);
+  const workspace  = useStore(s => s.workspace);
 
-  const [editMeta,   setEditMeta]   = useState(false)
-  const [nameDraft,  setNameDraft]  = useState(entry?.data.name ?? '')
-  const [portDraft,  setPortDraft]  = useState(String(entry?.data.port ?? ''))
-  const [error,      setError]      = useState<string | null>(null)
-  const [newRouteId, setNewRouteId] = useState<string | null>(null)
-  const [activeTab,  setActiveTab]  = useState<'routes' | 'requests'>('routes')
+  const [editMeta,   setEditMeta]   = useState(false);
+  const [nameDraft,  setNameDraft]  = useState(entry?.data.name ?? '');
+  const [portDraft,  setPortDraft]  = useState(String(entry?.data.port ?? ''));
+  const [error,      setError]      = useState<string | null>(null);
+  const [newRouteId, setNewRouteId] = useState<string | null>(null);
+  const [activeTab,  setActiveTab]  = useState<'routes' | 'requests'>('routes');
 
-  if (!entry) return null
-  const { data: mock, running } = entry
+  if (!entry) return null;
+  const { data: mock, running } = entry;
 
   async function save(updated: MockServer) {
-    updateMock(mock.id, updated)
-    await electron.saveMock(entry.relPath, updated)
-    if (running) await electron.mockUpdateRoutes(mock.id, updated.routes)
-    if (workspace) await electron.saveWorkspace(workspace)
+    updateMock(mock.id, updated);
+    await electron.saveMock(entry.relPath, updated);
+    if (running) await electron.mockUpdateRoutes(mock.id, updated.routes);
+    if (workspace) await electron.saveWorkspace(workspace);
   }
 
   async function toggleRunning() {
-    setError(null)
+    setError(null);
     try {
       if (running) {
-        await electron.mockStop(mock.id)
-        setRunning(mock.id, false)
+        await electron.mockStop(mock.id);
+        setRunning(mock.id, false);
       } else {
-        const latest = useStore.getState().mocks[mock.id].data
-        await electron.saveMock(entry.relPath, latest)
-        await electron.mockStart(latest)
-        setRunning(mock.id, true)
+        const latest = useStore.getState().mocks[mock.id].data;
+        await electron.saveMock(entry.relPath, latest);
+        await electron.mockStart(latest);
+        setRunning(mock.id, true);
       }
-    } catch (e: any) {
-      setError(e.message ?? String(e))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -307,17 +307,17 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
       statusCode: 200,
       headers: {},
       body: '{\n  "message": "ok"\n}',
-    }
-    setNewRouteId(route.id)
-    setActiveTab('routes')
-    save({ ...mock, routes: [...mock.routes, route] })
+    };
+    setNewRouteId(route.id);
+    setActiveTab('routes');
+    save({ ...mock, routes: [...mock.routes, route] });
   }
 
   function saveMeta() {
-    const port = Number(portDraft)
-    if (!port || port < 1 || port > 65535) return
-    save({ ...mock, name: nameDraft, port })
-    setEditMeta(false)
+    const port = Number(portDraft);
+    if (!port || port < 1 || port > 65535) return;
+    save({ ...mock, name: nameDraft, port });
+    setEditMeta(false);
   }
 
   return (
@@ -330,14 +330,14 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
               autoFocus
               value={nameDraft}
               onChange={e => setNameDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') saveMeta(); if (e.key === 'Escape') setEditMeta(false) }}
+              onKeyDown={e => { if (e.key === 'Enter') saveMeta(); if (e.key === 'Escape') setEditMeta(false); }}
               className="flex-1 max-w-xs bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500"
             />
             <span className="text-surface-400">:</span>
             <input
               value={portDraft}
               onChange={e => setPortDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') saveMeta(); if (e.key === 'Escape') setEditMeta(false) }}
+              onKeyDown={e => { if (e.key === 'Enter') saveMeta(); if (e.key === 'Escape') setEditMeta(false); }}
               className="w-20 bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:border-blue-500"
             />
             <button onClick={saveMeta} className="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded text-sm transition-colors">Save</button>
@@ -345,7 +345,7 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
           </div>
         ) : (
           <button
-            onClick={() => { setNameDraft(mock.name); setPortDraft(String(mock.port)); setEditMeta(true) }}
+            onClick={() => { setNameDraft(mock.name); setPortDraft(String(mock.port)); setEditMeta(true); }}
             className="flex items-center gap-2 hover:text-blue-400 transition-colors group"
             title="Click to edit name and port"
           >
@@ -382,9 +382,9 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
           </button>
           <button
             onClick={() => {
-              if (running) electron.mockStop(mock.id)
-              deleteMock(mock.id)
-              setActive(null)
+              if (running) electron.mockStop(mock.id);
+              deleteMock(mock.id);
+              setActive(null);
             }}
             className="px-2 py-1.5 text-sm text-surface-600 hover:text-red-400 transition-colors"
             title="Delete server"
@@ -437,8 +437,8 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
                     key={route.id}
                     route={route}
                     onSave={updated => {
-                      save({ ...mock, routes: mock.routes.map(r => r.id === route.id ? updated : r) })
-                      setNewRouteId(null)
+                      save({ ...mock, routes: mock.routes.map(r => r.id === route.id ? updated : r) });
+                      setNewRouteId(null);
                     }}
                     onDelete={() => save({ ...mock, routes: mock.routes.filter(r => r.id !== route.id) })}
                     initialEditing={route.id === newRouteId}
@@ -464,5 +464,5 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
         )}
       </div>
     </div>
-  )
+  );
 }

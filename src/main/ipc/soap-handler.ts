@@ -1,21 +1,21 @@
-import { type IpcMain } from 'electron'
-import https from 'https'
-import http from 'http'
+import { type IpcMain } from 'electron';
+import https from 'https';
+import http from 'http';
 
 // ─── WSDL fetch & parse ───────────────────────────────────────────────────────
 
 function fetchUrl(url: string, headers: Record<string, string> = {}): Promise<string> {
   return new Promise((resolve, reject) => {
-    const lib = url.startsWith('https') ? https : http
+    const lib = url.startsWith('https') ? https : http;
     const req = lib.get(url, { headers }, res => {
-      const chunks: Buffer[] = []
-      res.on('data', (chunk: Buffer) => chunks.push(chunk))
-      res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
-      res.on('error', reject)
-    })
-    req.on('error', reject)
-    req.setTimeout(15000, () => { req.destroy(); reject(new Error('WSDL fetch timed out')) })
-  })
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk: Buffer) => chunks.push(chunk));
+      res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+      res.on('error', reject);
+    });
+    req.on('error', reject);
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('WSDL fetch timed out')); });
+  });
 }
 
 interface WsdlOperation {
@@ -36,38 +36,38 @@ interface WsdlResult {
  */
 export function parseWsdl(wsdlText: string): WsdlResult {
   // Extract targetNamespace from definitions element
-  const nsMatch = wsdlText.match(/targetNamespace\s*=\s*["']([^"']+)["']/)
-  const targetNamespace = nsMatch ? nsMatch[1] : ''
+  const nsMatch = wsdlText.match(/targetNamespace\s*=\s*["']([^"']+)["']/);
+  const targetNamespace = nsMatch ? nsMatch[1] : '';
 
   // Extract all operation names from <wsdl:operation name="..."> or <operation name="...">
-  const operationRegex = /<(?:wsdl:)?operation\s+name\s*=\s*["']([^"']+)["']/g
-  const operationNames = new Set<string>()
-  let m: RegExpExecArray | null
+  const operationRegex = /<(?:wsdl:)?operation\s+name\s*=\s*["']([^"']+)["']/g;
+  const operationNames = new Set<string>();
+  let m: RegExpExecArray | null;
   while ((m = operationRegex.exec(wsdlText)) !== null) {
-    operationNames.add(m[1])
+    operationNames.add(m[1]);
   }
 
   // Extract SOAPActions from <soap:operation soapAction="..."> inside each <wsdl:operation> block
   // Build a map: operationName -> soapAction
-  const soapActionMap: Record<string, string> = {}
+  const soapActionMap: Record<string, string> = {};
   // Match binding operation blocks
-  const bindingOpRegex = /<(?:wsdl:)?operation\s+name\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/(?:wsdl:)?operation>/g
+  const bindingOpRegex = /<(?:wsdl:)?operation\s+name\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/(?:wsdl:)?operation>/g;
   while ((m = bindingOpRegex.exec(wsdlText)) !== null) {
-    const opName = m[1]
-    const block = m[2]
-    const saMatch = block.match(/soapAction\s*=\s*["']([^"']*)["']/)
-    if (saMatch) soapActionMap[opName] = saMatch[1]
+    const opName = m[1];
+    const block = m[2];
+    const saMatch = block.match(/soapAction\s*=\s*["']([^"']*)["']/);
+    if (saMatch) soapActionMap[opName] = saMatch[1];
   }
 
   // Build envelope templates for each operation
-  const operations: WsdlOperation[] = []
+  const operations: WsdlOperation[] = [];
   for (const name of operationNames) {
-    const soapAction = soapActionMap[name]
-    const inputTemplate = buildEnvelopeTemplate(name, targetNamespace)
-    operations.push({ name, soapAction, inputTemplate })
+    const soapAction = soapActionMap[name];
+    const inputTemplate = buildEnvelopeTemplate(name, targetNamespace);
+    operations.push({ name, soapAction, inputTemplate });
   }
 
-  return { operations, targetNamespace }
+  return { operations, targetNamespace };
 }
 
 export function buildEnvelopeTemplate(operationName: string, namespace: string): string {
@@ -81,14 +81,14 @@ export function buildEnvelopeTemplate(operationName: string, namespace: string):
       <!-- Add parameters here -->
     </tns:${operationName}>
   </soap:Body>
-</soap:Envelope>`
+</soap:Envelope>`;
 }
 
 // ─── IPC handler ─────────────────────────────────────────────────────────────
 
 export function registerSoapHandlers(ipc: IpcMain): void {
   ipc.handle('wsdl:fetch', async (_event, url: string, extraHeaders: Record<string, string> = {}): Promise<WsdlResult> => {
-    const wsdlText = await fetchUrl(url, extraHeaders)
-    return parseWsdl(wsdlText)
-  })
+    const wsdlText = await fetchUrl(url, extraHeaders);
+    return parseWsdl(wsdlText);
+  });
 }

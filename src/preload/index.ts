@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron';
 import type {
   Collection,
   Environment,
@@ -19,7 +19,7 @@ import type {
   ApiRequest,
   ContractRunPayload,
   ContractReport,
-} from '../shared/types'
+} from '../shared/types';
 
 
 // Expose a typed API to the renderer. Note: getSecret is intentionally absent —
@@ -54,6 +54,9 @@ const api = {
     ipcRenderer.invoke('secret:checkMasterKey'),
   setMasterKey: (value: string): Promise<void> =>
     ipcRenderer.invoke('secret:setMasterKey', value),
+  /** Save a named secret to the OS keychain (safeStorage). */
+  setSecret: (ref: string, value: string): Promise<void> =>
+    ipcRenderer.invoke('secret:set', ref, value),
 
   // ─── Globals ──────────────────────────────────────────────────────────────
   getGlobals: (): Promise<Record<string, string>> =>
@@ -65,10 +68,10 @@ const api = {
   runCollection: (payload: RunnerPayload): Promise<RunSummary> =>
     ipcRenderer.invoke('runner:start', payload),
   onRunProgress: (cb: (result: RunRequestResult) => void): void => {
-    ipcRenderer.on('runner:progress', (_e, result) => cb(result))
+    ipcRenderer.on('runner:progress', (_e, result) => cb(result));
   },
   offRunProgress: (): void => {
-    ipcRenderer.removeAllListeners('runner:progress')
+    ipcRenderer.removeAllListeners('runner:progress');
   },
   saveResults: (content: string, defaultName: string): Promise<boolean> =>
     ipcRenderer.invoke('results:save', content, defaultName),
@@ -125,10 +128,10 @@ const api = {
   mockUpdateRoutes: (id: string, routes: MockRoute[]): Promise<void> =>
     ipcRenderer.invoke('mock:updateRoutes', id, routes),
   onMockHit:    (cb: (hit: MockHit) => void): void => {
-    ipcRenderer.on('mock:hit', (_e, hit) => cb(hit))
+    ipcRenderer.on('mock:hit', (_e, hit) => cb(hit));
   },
   offMockHit:   (): void => {
-    ipcRenderer.removeAllListeners('mock:hit')
+    ipcRenderer.removeAllListeners('mock:hit');
   },
 
   // ─── WebSocket ────────────────────────────────────────────────────────────
@@ -142,16 +145,16 @@ const api = {
     ipcRenderer.invoke('ws:disconnect', requestId),
 
   onWsMessage: (cb: (event: { requestId: string; message: WsMessage }) => void): void => {
-    ipcRenderer.on('ws:message', (_e, payload) => cb(payload))
+    ipcRenderer.on('ws:message', (_e, payload) => cb(payload));
   },
 
   onWsStatus: (cb: (event: { requestId: string; status: string; error?: string }) => void): void => {
-    ipcRenderer.on('ws:status', (_e, payload) => cb(payload))
+    ipcRenderer.on('ws:status', (_e, payload) => cb(payload));
   },
 
   offWsEvents: (): void => {
-    ipcRenderer.removeAllListeners('ws:message')
-    ipcRenderer.removeAllListeners('ws:status')
+    ipcRenderer.removeAllListeners('ws:message');
+    ipcRenderer.removeAllListeners('ws:status');
   },
 
   // ─── SOAP / WSDL ──────────────────────────────────────────────────────────
@@ -171,8 +174,8 @@ const api = {
     ipcRenderer.invoke('contract:run', payload),
   inferContractSchema: (jsonBody: string): Promise<string | null> =>
     ipcRenderer.invoke('contract:inferSchema', jsonBody),
-}
+};
 
-contextBridge.exposeInMainWorld('electron', api)
+contextBridge.exposeInMainWorld('electron', api);
 
 export type ElectronAPI = typeof api

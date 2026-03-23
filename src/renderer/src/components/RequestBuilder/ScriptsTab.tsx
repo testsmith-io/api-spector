@@ -1,13 +1,13 @@
-import React, { useMemo, useState } from 'react'
-import CodeMirror from '@uiw/react-codemirror'
-import { javascript } from '@codemirror/lang-javascript'
-import { oneDark } from '@codemirror/theme-one-dark'
-import type { ApiRequest } from '../../../../shared/types'
-import { SNIPPET_GROUPS } from './scriptSnippets'
-import { atCompletionExtension, varHoverTooltipExtension } from './atCompletions'
-import { useVarNames } from '../../hooks/useVarNames'
-import { useVarValues } from '../../hooks/useVarValues'
-import { useStore } from '../../store'
+import React, { useMemo, useState } from 'react';
+import CodeMirror from '@uiw/react-codemirror';
+import { javascript } from '@codemirror/lang-javascript';
+import { oneDark } from '@codemirror/theme-one-dark';
+import type { ApiRequest } from '../../../../shared/types';
+import { SNIPPET_GROUPS } from './scriptSnippets';
+import { atCompletionExtension, varHoverTooltipExtension } from './atCompletions';
+import { useVarNames } from '../../hooks/useVarNames';
+import { useVarValues } from '../../hooks/useVarValues';
+import { useStore } from '../../store';
 
 interface Props {
   request: ApiRequest
@@ -17,33 +17,33 @@ interface Props {
 type ScriptType = 'pre' | 'post'
 
 export function ScriptsTab({ request, onChange }: Props) {
-  const activeTabId     = useStore(s => s.activeTabId)
-  const activeAppTab    = useStore(s => s.tabs.find(t => t.id === s.activeTabId))
-  const setTabScriptTab = useStore(s => s.setTabScriptTab)
-  const scriptType      = activeAppTab?.scriptTab ?? 'pre'
-  const setScriptType   = (t: ScriptType) => { if (activeTabId) setTabScriptTab(activeTabId, t) }
-  const [expandedGroup, setExpandedGroup] = useState<string | null>(SNIPPET_GROUPS[0].group)
+  const activeTabId     = useStore(s => s.activeTabId);
+  const activeAppTab    = useStore(s => s.tabs.find(t => t.id === s.activeTabId));
+  const setTabScriptTab = useStore(s => s.setTabScriptTab);
+  const scriptType      = activeAppTab?.scriptTab ?? 'pre';
+  const setScriptType   = (t: ScriptType) => { if (activeTabId) setTabScriptTab(activeTabId, t); };
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(SNIPPET_GROUPS[0].group);
 
-  const varNames   = useVarNames()
-  const varValues  = useVarValues()
+  const varNames   = useVarNames();
+  const varValues  = useVarValues();
   const extensions = useMemo(
     () => [javascript(), atCompletionExtension(varNames), varHoverTooltipExtension(varValues)],
     [varNames, varValues],
-  )
+  );
 
   const value = scriptType === 'pre'
     ? (request.preRequestScript ?? '')
-    : (request.postRequestScript ?? '')
+    : (request.postRequestScript ?? '');
 
   function handleChange(code: string) {
-    if (scriptType === 'pre') onChange({ preRequestScript: code })
-    else onChange({ postRequestScript: code })
+    if (scriptType === 'pre') onChange({ preRequestScript: code });
+    else onChange({ postRequestScript: code });
   }
 
   function insertSnippet(code: string) {
-    const current = value
-    const separator = current.trim() ? '\n\n' : ''
-    handleChange(current + separator + code)
+    const current = value;
+    const separator = current.trim() ? '\n\n' : '';
+    handleChange(current + separator + code);
   }
 
   return (
@@ -114,5 +114,5 @@ export function ScriptsTab({ request, onChange }: Props) {
         ))}
       </div>
     </div>
-  )
+  );
 }

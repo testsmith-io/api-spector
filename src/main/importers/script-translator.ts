@@ -46,7 +46,7 @@ const POSTMAN_RULES: Rule[] = [
   // Response — body
   [/\bpm\.response\.json\(\)/g,                    'sp.response.json()'],
   [/\bpm\.response\.text\(\)/g,                    'sp.response.text()'],
-]
+];
 
 // ─── Bruno (bru.* / res.*) ────────────────────────────────────────────────────
 
@@ -79,7 +79,7 @@ const BRUNO_RULES: Rule[] = [
   // Tests & assertions (bare expect/test — Bruno exposes them as globals)
   [/(?<!\.)(?<!\w)expect\(/g,                      'sp.expect('],
   [/(?<!\.)(?<!\w)test\(/g,                        'sp.test('],
-]
+];
 
 // ─── Insomnia (insomnia.* / context.*) ───────────────────────────────────────
 
@@ -101,7 +101,7 @@ const INSOMNIA_RULES: Rule[] = [
   [/\bcontext\.response\.getBody\(\)/g,            'sp.response.text()'],
   [/\bcontext\.response\.getStatusCode\(\)/g,      'sp.response.code'],
   [/\bcontext\.response\.getHeader\(/g,            'sp.response.headers.get('],
-]
+];
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
@@ -111,7 +111,7 @@ export function translateScript(source: string, format: ScriptFormat): string {
   const rules =
     format === 'postman'  ? POSTMAN_RULES  :
     format === 'bruno'    ? BRUNO_RULES    :
-                            INSOMNIA_RULES
+                            INSOMNIA_RULES;
 
-  return rules.reduce((src, [pattern, replacement]) => src.replace(pattern, replacement), source)
+  return rules.reduce((src, [pattern, replacement]) => src.replace(pattern, replacement), source);
 }

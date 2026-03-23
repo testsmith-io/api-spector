@@ -1,4 +1,4 @@
-import type { RunRequestResult, RunSummary } from './types'
+import type { RunRequestResult, RunSummary } from './types';
 
 export interface ReportMeta {
   workspace?: string
@@ -36,7 +36,7 @@ export function buildJsonReport(
       request:         r.sentRequest ?? null,
       response:        r.receivedResponse ?? null,
     })),
-  }, null, 2)
+  }, null, 2);
 }
 
 // ─── HTML report ─────────────────────────────────────────────────────────────
@@ -47,29 +47,29 @@ export function buildHtmlReport(
   meta: ReportMeta = {},
 ): string {
   const esc = (s: string) =>
-    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
   function prettyJson(s: string): string {
-    try { return esc(JSON.stringify(JSON.parse(s), null, 2)) } catch { return esc(s) }
+    try { return esc(JSON.stringify(JSON.parse(s), null, 2)); } catch { return esc(s); }
   }
 
   function headersTable(h: Record<string, string>): string {
     const rows = Object.entries(h).map(([k, v]) =>
       `<tr><td class="hk">${esc(k)}</td><td class="hv">${esc(v)}</td></tr>`
-    ).join('')
-    return rows ? `<table class="htable"><tbody>${rows}</tbody></table>` : '<span class="muted">none</span>'
+    ).join('');
+    return rows ? `<table class="htable"><tbody>${rows}</tbody></table>` : '<span class="muted">none</span>';
   }
 
-  const ts         = meta.timestamp ?? new Date().toISOString()
-  const collection = meta.collection ?? 'API Tests'
-  const env        = meta.environment ?? '—'
-  const passRate   = summary.total > 0 ? Math.round((summary.passed / summary.total) * 100) : 0
+  const ts         = meta.timestamp ?? new Date().toISOString();
+  const collection = meta.collection ?? 'API Tests';
+  const env        = meta.environment ?? '—';
+  const passRate   = summary.total > 0 ? Math.round((summary.passed / summary.total) * 100) : 0;
 
   const cards = results.map((r, idx) => {
-    const statusCls = r.status === 'passed' ? 'badge-pass' : r.status === 'failed' ? 'badge-fail' : 'badge-err'
-    const httpCls   = r.httpStatus && r.httpStatus < 300 ? 'http-ok' : r.httpStatus && r.httpStatus < 400 ? 'http-redir' : 'http-err'
-    const dur       = r.durationMs != null ? `${r.durationMs} ms` : '—'
-    const label     = r.iterationLabel ? ` <span class="muted">#${esc(r.iterationLabel)}</span>` : ''
+    const statusCls = r.status === 'passed' ? 'badge-pass' : r.status === 'failed' ? 'badge-fail' : 'badge-err';
+    const httpCls   = r.httpStatus && r.httpStatus < 300 ? 'http-ok' : r.httpStatus && r.httpStatus < 400 ? 'http-redir' : 'http-err';
+    const dur       = r.durationMs != null ? `${r.durationMs} ms` : '—';
+    const label     = r.iterationLabel ? ` <span class="muted">#${esc(r.iterationLabel)}</span>` : '';
 
     // Tests
     const testRows = (r.testResults ?? []).map(t =>
@@ -77,24 +77,24 @@ export function buildHtmlReport(
         <span class="dot">${t.passed ? '✓' : '✗'}</span> ${esc(t.name)}
         ${!t.passed ? `<div class="test-err">${esc(t.error ?? '')}</div>` : ''}
       </div>`
-    ).join('')
+    ).join('');
 
     // Errors
     const errRows = [
       r.error           ? `<div class="err-row">&#x26a0; ${esc(r.error)}</div>` : '',
       r.preScriptError  ? `<div class="err-row">&#x26a0; Pre-script: ${esc(r.preScriptError)}</div>` : '',
       r.postScriptError ? `<div class="err-row">&#x26a0; Post-script: ${esc(r.postScriptError)}</div>` : '',
-    ].filter(Boolean).join('')
+    ].filter(Boolean).join('');
 
     // Console
     const consoleHtml = (r.consoleOutput ?? []).length
       ? `<div class="section-label">Console</div>
          <div class="code-block">${(r.consoleOutput ?? []).map(l => `<div>${esc(l)}</div>`).join('')}</div>`
-      : ''
+      : '';
 
     // Request panel
-    const reqHeaders = r.sentRequest?.headers ?? {}
-    const reqBody    = r.sentRequest?.body
+    const reqHeaders = r.sentRequest?.headers ?? {};
+    const reqBody    = r.sentRequest?.body;
     const reqHtml = `
       <div class="panel-label">Request</div>
       <div class="panel req-panel">
@@ -102,10 +102,10 @@ export function buildHtmlReport(
         <div class="section-label">Headers</div>
         ${headersTable(reqHeaders)}
         ${reqBody ? `<div class="section-label">Body</div><pre class="code-block">${prettyJson(reqBody)}</pre>` : ''}
-      </div>`
+      </div>`;
 
     // Response panel
-    const resp    = r.receivedResponse
+    const resp    = r.receivedResponse;
     const respHtml = resp ? `
       <div class="panel-label">Response</div>
       <div class="panel resp-panel">
@@ -113,7 +113,7 @@ export function buildHtmlReport(
         <div class="section-label">Headers</div>
         ${headersTable(resp.headers)}
         ${resp.body ? `<div class="section-label">Body</div><pre class="code-block">${prettyJson(resp.body)}</pre>` : ''}
-      </div>` : ''
+      </div>` : '';
 
     return `
     <div class="card" id="r${idx}">
@@ -135,8 +135,8 @@ export function buildHtmlReport(
           ${respHtml}
         </div>
       </div>
-    </div>`
-  }).join('\n')
+    </div>`;
+  }).join('\n');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -229,7 +229,7 @@ export function buildHtmlReport(
 </script>
 </body>
 </html>
-`
+`;
 }
 
 // ─── JUnit XML report ─────────────────────────────────────────────────────────
@@ -245,39 +245,39 @@ export function buildJUnitReport(
     s.replace(/&/g, '&amp;')
      .replace(/</g, '&lt;')
      .replace(/>/g, '&gt;')
-     .replace(/"/g, '&quot;')
+     .replace(/"/g, '&quot;');
 
-  const suiteName = esc(meta.collection ?? 'API Tests')
-  const totalSec  = (summary.durationMs / 1000).toFixed(3)
-  const ts        = meta.timestamp ?? new Date().toISOString()
+  const suiteName = esc(meta.collection ?? 'API Tests');
+  const totalSec  = (summary.durationMs / 1000).toFixed(3);
+  const ts        = meta.timestamp ?? new Date().toISOString();
 
   const cases = results.map(r => {
-    const label     = r.iterationLabel ? ` #${r.iterationLabel}` : ''
-    const name      = esc(r.name + label)
-    const classname = esc(`${r.method} ${r.resolvedUrl}`)
-    const timeSec   = ((r.durationMs ?? 0) / 1000).toFixed(3)
+    const label     = r.iterationLabel ? ` #${r.iterationLabel}` : '';
+    const name      = esc(r.name + label);
+    const classname = esc(`${r.method} ${r.resolvedUrl}`);
+    const timeSec   = ((r.durationMs ?? 0) / 1000).toFixed(3);
 
-    const failures: string[] = []
+    const failures: string[] = [];
 
     if (r.status === 'error') {
-      failures.push(`      <error message="${esc(r.error ?? 'Network error')}" type="NetworkError" />`)
+      failures.push(`      <error message="${esc(r.error ?? 'Network error')}" type="NetworkError" />`);
     } else if (r.preScriptError) {
-      failures.push(`      <error message="${esc(r.preScriptError)}" type="PreScriptError" />`)
+      failures.push(`      <error message="${esc(r.preScriptError)}" type="PreScriptError" />`);
     } else if (r.postScriptError) {
-      failures.push(`      <error message="${esc(r.postScriptError)}" type="PostScriptError" />`)
+      failures.push(`      <error message="${esc(r.postScriptError)}" type="PostScriptError" />`);
     } else if (r.testResults?.length) {
       for (const t of r.testResults) {
         if (!t.passed) {
           failures.push(
             `      <failure message="${esc(t.name)}" type="AssertionError">${esc(t.error ?? 'Assertion failed')}</failure>`
-          )
+          );
         }
       }
     }
 
-    const inner = failures.length ? `\n${failures.join('\n')}\n    ` : ''
-    return `    <testcase name="${name}" classname="${classname}" time="${timeSec}">${inner}</testcase>`
-  })
+    const inner = failures.length ? `\n${failures.join('\n')}\n    ` : '';
+    return `    <testcase name="${name}" classname="${classname}" time="${timeSec}">${inner}</testcase>`;
+  });
 
   const lines = [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -286,7 +286,7 @@ export function buildJUnitReport(
     ...cases,
     '  </testsuite>',
     '</testsuites>',
-  ]
+  ];
 
-  return lines.join('\n') + '\n'
+  return lines.join('\n') + '\n';
 }

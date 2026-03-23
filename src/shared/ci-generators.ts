@@ -1,12 +1,12 @@
 export function buildCliArgs(wsPath: string, envName: string | null, tags: string[]): string {
-  const parts = [`node out/main/runner.js --workspace ${wsPath}`]
-  if (envName) parts.push(`--env "${envName}"`)
-  if (tags.length) parts.push(`--tags "${tags.join(',')}"`)
-  return parts.join(' ')
+  const parts = [`node out/main/runner.js --workspace ${wsPath}`];
+  if (envName) parts.push(`--env "${envName}"`);
+  if (tags.length) parts.push(`--tags "${tags.join(',')}"`);
+  return parts.join(' ');
 }
 
 export function generateGitHub(envName: string | null, tags: string[]): string {
-  const cmd = buildCliArgs('./workspace.json', envName, tags)
+  const cmd = buildCliArgs('./workspace.json', envName, tags);
   return `name: API Tests
 
 on:
@@ -28,11 +28,11 @@ jobs:
         run: ${cmd}
         env:
           API_SPECTOR_MASTER_KEY: \${{ secrets.API_SPECTOR_MASTER_KEY }}
-`
+`;
 }
 
 export function generateAzure(envName: string | null, tags: string[]): string {
-  const cmd = buildCliArgs('./workspace.json', envName, tags)
+  const cmd = buildCliArgs('./workspace.json', envName, tags);
   return `trigger:
   - main
 
@@ -55,11 +55,11 @@ steps:
     displayName: 'Run API tests'
     env:
       API_SPECTOR_MASTER_KEY: $(API_SPECTOR_MASTER_KEY)
-`
+`;
 }
 
 export function generateGitLab(envName: string | null, tags: string[]): string {
-  const cmd = buildCliArgs('./workspace.json', envName, tags)
+  const cmd = buildCliArgs('./workspace.json', envName, tags);
   return `stages:
   - test
 
@@ -72,5 +72,5 @@ api-tests:
     - ${cmd}
   variables:
     API_SPECTOR_MASTER_KEY: $API_SPECTOR_MASTER_KEY
-`
+`;
 }

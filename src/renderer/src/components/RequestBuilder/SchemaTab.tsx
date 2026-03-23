@@ -1,12 +1,12 @@
-import React, { useState } from 'react'
-import CodeMirror from '@uiw/react-codemirror'
-import { json } from '@codemirror/lang-json'
-import { oneDark } from '@codemirror/theme-one-dark'
-import Ajv from 'ajv'
-import type { ApiRequest } from '../../../../shared/types'
-import { useStore } from '../../store'
+import React, { useState } from 'react';
+import CodeMirror from '@uiw/react-codemirror';
+import { json } from '@codemirror/lang-json';
+import { oneDark } from '@codemirror/theme-one-dark';
+import Ajv from 'ajv';
+import type { ApiRequest } from '../../../../shared/types';
+import { useStore } from '../../store';
 
-const ajv = new Ajv({ allErrors: true })
+const ajv = new Ajv({ allErrors: true });
 
 interface ValidationResult {
   valid: boolean
@@ -19,54 +19,54 @@ interface Props {
 }
 
 export function SchemaTab({ request, onChange }: Props) {
-  const activeTab      = useStore(s => s.tabs.find(t => t.id === s.activeTabId))
-  const lastResponse   = activeTab?.lastResponse ?? null
-  const [result, setResult] = useState<ValidationResult | null>(null)
-  const [error, setError]   = useState<string | null>(null)
+  const activeTab      = useStore(s => s.tabs.find(t => t.id === s.activeTabId));
+  const lastResponse   = activeTab?.lastResponse ?? null;
+  const [result, setResult] = useState<ValidationResult | null>(null);
+  const [error, setError]   = useState<string | null>(null);
 
-  const schemaValue = request.schema ?? ''
+  const schemaValue = request.schema ?? '';
 
   function validate() {
-    setError(null)
-    setResult(null)
+    setError(null);
+    setResult(null);
 
     if (!schemaValue.trim()) {
-      setError('No schema defined. Enter a JSON Schema above.')
-      return
+      setError('No schema defined. Enter a JSON Schema above.');
+      return;
     }
     if (!lastResponse) {
-      setError('No response yet. Send the request first, then validate.')
-      return
+      setError('No response yet. Send the request first, then validate.');
+      return;
     }
 
-    let schema: unknown
+    let schema: unknown;
     try {
-      schema = JSON.parse(schemaValue)
+      schema = JSON.parse(schemaValue);
     } catch {
-      setError('Schema is not valid JSON. Fix the syntax and try again.')
-      return
+      setError('Schema is not valid JSON. Fix the syntax and try again.');
+      return;
     }
 
-    let data: unknown
+    let data: unknown;
     try {
-      data = JSON.parse(lastResponse.body)
+      data = JSON.parse(lastResponse.body);
     } catch {
-      setError('Response body is not valid JSON and cannot be validated against a schema.')
-      return
+      setError('Response body is not valid JSON and cannot be validated against a schema.');
+      return;
     }
 
     try {
-      const validate = ajv.compile(schema as object)
-      const valid = validate(data)
+      const validate = ajv.compile(schema as object);
+      const valid = validate(data);
       setResult({
         valid: !!valid,
         errors: (validate.errors ?? []).map(e => ({
           instancePath: e.instancePath,
           message: e.message,
         })),
-      })
+      });
     } catch (e: unknown) {
-      setError(`Schema compile error: ${e instanceof Error ? e.message : String(e)}`)
+      setError(`Schema compile error: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -125,5 +125,5 @@ export function SchemaTab({ request, onChange }: Props) {
         </div>
       )}
     </div>
-  )
+  );
 }

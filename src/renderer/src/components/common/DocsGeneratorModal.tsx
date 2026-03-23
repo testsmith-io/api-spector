@@ -1,34 +1,34 @@
-import React, { useState } from 'react'
-import { useStore } from '../../store'
-import CodeMirror from '@uiw/react-codemirror'
-import { oneDark } from '@codemirror/theme-one-dark'
+import React, { useState } from 'react';
+import { useStore } from '../../store';
+import CodeMirror from '@uiw/react-codemirror';
+import { oneDark } from '@codemirror/theme-one-dark';
 
-const { electron } = window as any
+const { electron } = window;
 
 interface Props {
   onClose: () => void
 }
 
 export function DocsGeneratorModal({ onClose }: Props) {
-  const collections = useStore(s => s.collections)
+  const collections = useStore(s => s.collections);
 
-  const collectionList = Object.values(collections)
+  const collectionList = Object.values(collections);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(collectionList.map(c => c.data.id)),
-  )
-  const [format, setFormat] = useState<'markdown' | 'html'>('markdown')
-  const [generating, setGenerating] = useState(false)
-  const [preview, setPreview] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  );
+  const [format, setFormat] = useState<'markdown' | 'html'>('markdown');
+  const [generating, setGenerating] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   function toggleCollection(id: string) {
     setSelectedIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
   function buildPayload() {
@@ -37,33 +37,33 @@ export function DocsGeneratorModal({ onClose }: Props) {
         .filter(c => selectedIds.has(c.data.id))
         .map(c => ({ collection: c.data, requests: c.data.requests })),
       format,
-    }
+    };
   }
 
   async function handleGenerateAndSave() {
-    setGenerating(true)
-    setError(null)
+    setGenerating(true);
+    setError(null);
     try {
-      const content = await electron.generateDocs(buildPayload())
-      const filename = format === 'html' ? 'api-docs.html' : 'api-docs.md'
-      await electron.saveResults(content, filename)
+      const content = await electron.generateDocs(buildPayload());
+      const filename = format === 'html' ? 'api-docs.html' : 'api-docs.md';
+      await electron.saveResults(content, filename);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setGenerating(false)
+      setGenerating(false);
     }
   }
 
   async function handlePreview() {
-    setGenerating(true)
-    setError(null)
+    setGenerating(true);
+    setError(null);
     try {
-      const content = await electron.generateDocs(buildPayload())
-      setPreview(content)
+      const content = await electron.generateDocs(buildPayload());
+      setPreview(content);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setGenerating(false)
+      setGenerating(false);
     }
   }
 
@@ -119,7 +119,7 @@ export function DocsGeneratorModal({ onClose }: Props) {
                     type="radio"
                     value={f}
                     checked={format === f}
-                    onChange={() => { setFormat(f); setPreview(null) }}
+                    onChange={() => { setFormat(f); setPreview(null); }}
                     className="accent-blue-500"
                   />
                   <span className={`text-sm ${format === f ? 'text-white' : 'text-surface-600'}`}>
@@ -186,5 +186,5 @@ export function DocsGeneratorModal({ onClose }: Props) {
         </div>
       </div>
     </div>
-  )
+  );
 }

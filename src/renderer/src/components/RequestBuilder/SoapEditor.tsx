@@ -1,10 +1,10 @@
-import React, { useState } from 'react'
-import CodeMirror from '@uiw/react-codemirror'
-import { xml } from '@codemirror/lang-xml'
-import { oneDark } from '@codemirror/theme-one-dark'
-import type { ApiRequest, SoapBody } from '../../../../shared/types'
+import React, { useState } from 'react';
+import CodeMirror from '@uiw/react-codemirror';
+import { xml } from '@codemirror/lang-xml';
+import { oneDark } from '@codemirror/theme-one-dark';
+import type { ApiRequest, SoapBody } from '../../../../shared/types';
 
-const { electron } = window as any
+const { electron } = window;
 
 interface WsdlOperation {
   name: string
@@ -21,46 +21,46 @@ export function SoapEditor({ request, onChange }: Props) {
   const soap: SoapBody = request.body.soap ?? {
     wsdlUrl: '',
     envelope: '',
-  }
+  };
 
-  const [operations, setOperations] = useState<WsdlOperation[]>([])
-  const [fetchError, setFetchError] = useState<string | null>(null)
-  const [fetching, setFetching] = useState(false)
+  const [operations, setOperations] = useState<WsdlOperation[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fetching, setFetching] = useState(false);
 
   function updateSoap(patch: Partial<SoapBody>) {
-    onChange({ body: { ...request.body, soap: { ...soap, ...patch } } })
+    onChange({ body: { ...request.body, soap: { ...soap, ...patch } } });
   }
 
   async function fetchWsdl() {
-    if (!soap.wsdlUrl.trim()) return
-    setFetching(true)
-    setFetchError(null)
+    if (!soap.wsdlUrl.trim()) return;
+    setFetching(true);
+    setFetchError(null);
     try {
-      const result = await electron.wsdlFetch(soap.wsdlUrl.trim())
-      setOperations(result.operations)
+      const result = await electron.wsdlFetch(soap.wsdlUrl.trim());
+      setOperations(result.operations);
       if (result.operations.length > 0) {
-        const first = result.operations[0]
+        const first = result.operations[0];
         updateSoap({
           operationName: first.name,
           soapAction: first.soapAction ?? '',
           envelope: first.inputTemplate,
-        })
+        });
       }
     } catch (err) {
-      setFetchError(err instanceof Error ? err.message : String(err))
+      setFetchError(err instanceof Error ? err.message : String(err));
     } finally {
-      setFetching(false)
+      setFetching(false);
     }
   }
 
   function selectOperation(name: string) {
-    const op = operations.find(o => o.name === name)
-    if (!op) return
+    const op = operations.find(o => o.name === name);
+    if (!op) return;
     updateSoap({
       operationName: op.name,
       soapAction: op.soapAction ?? soap.soapAction ?? '',
       envelope: op.inputTemplate,
-    })
+    });
   }
 
   return (
@@ -128,5 +128,5 @@ export function SoapEditor({ request, onChange }: Props) {
         </div>
       </div>
     </div>
-  )
+  );
 }

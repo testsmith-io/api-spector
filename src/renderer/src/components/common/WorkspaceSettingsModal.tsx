@@ -1,56 +1,56 @@
-import React, { useState } from 'react'
-import { useStore } from '../../store'
+import React, { useState } from 'react';
+import { useStore } from '../../store';
 
-const { electron } = window as any
+const { electron } = window;
 
-const DEFAULT_PII_PATTERNS = ['authorization', 'password', 'token', 'secret', 'api-key', 'x-api-key']
+const DEFAULT_PII_PATTERNS = ['authorization', 'password', 'token', 'secret', 'api-key', 'x-api-key'];
 
 type SettingsTab = 'proxy' | 'tls' | 'privacy'
 
 export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
-  const workspace = useStore(s => s.workspace)
-  const updateWorkspaceSettings = useStore(s => s.updateWorkspaceSettings)
+  const workspace = useStore(s => s.workspace);
+  const updateWorkspaceSettings = useStore(s => s.updateWorkspaceSettings);
 
-  const existing = workspace?.settings ?? {}
+  const existing = workspace?.settings ?? {};
 
-  const [activeTab, setActiveTab] = useState<SettingsTab>('proxy')
+  const [activeTab, setActiveTab] = useState<SettingsTab>('proxy');
 
   // Proxy state
-  const [proxyUrl,      setProxyUrl]      = useState(existing.proxy?.url ?? '')
-  const [proxyUser,     setProxyUser]     = useState(existing.proxy?.auth?.username ?? '')
-  const [proxyPass,     setProxyPass]     = useState(existing.proxy?.auth?.password ?? '')
+  const [proxyUrl,      setProxyUrl]      = useState(existing.proxy?.url ?? '');
+  const [proxyUser,     setProxyUser]     = useState(existing.proxy?.auth?.username ?? '');
+  const [proxyPass,     setProxyPass]     = useState(existing.proxy?.auth?.password ?? '');
 
   // TLS state
-  const [caCertPath,      setCaCertPath]      = useState(existing.tls?.caCertPath ?? '')
-  const [clientCertPath,  setClientCertPath]  = useState(existing.tls?.clientCertPath ?? '')
-  const [clientKeyPath,   setClientKeyPath]   = useState(existing.tls?.clientKeyPath ?? '')
+  const [caCertPath,      setCaCertPath]      = useState(existing.tls?.caCertPath ?? '');
+  const [clientCertPath,  setClientCertPath]  = useState(existing.tls?.clientCertPath ?? '');
+  const [clientKeyPath,   setClientKeyPath]   = useState(existing.tls?.clientKeyPath ?? '');
   const [rejectUnauthorized, setRejectUnauthorized] = useState(
     existing.tls?.rejectUnauthorized !== false, // default true
-  )
+  );
 
   // Privacy state
   const [patterns, setPatterns] = useState<string[]>(
     existing.piiMaskPatterns ?? DEFAULT_PII_PATTERNS,
-  )
-  const [newPattern, setNewPattern] = useState('')
+  );
+  const [newPattern, setNewPattern] = useState('');
 
   function addPattern() {
-    const p = newPattern.trim().toLowerCase()
-    if (p && !patterns.includes(p)) setPatterns(prev => [...prev, p])
-    setNewPattern('')
+    const p = newPattern.trim().toLowerCase();
+    if (p && !patterns.includes(p)) setPatterns(prev => [...prev, p]);
+    setNewPattern('');
   }
 
   function removePattern(p: string) {
-    setPatterns(prev => prev.filter(x => x !== p))
+    setPatterns(prev => prev.filter(x => x !== p));
   }
 
   async function save() {
-    const settings: NonNullable<NonNullable<typeof workspace>['settings']> = {}
+    const settings: NonNullable<NonNullable<typeof workspace>['settings']> = {};
 
     if (proxyUrl.trim()) {
-      settings.proxy = { url: proxyUrl.trim() }
+      settings.proxy = { url: proxyUrl.trim() };
       if (proxyUser.trim() || proxyPass.trim()) {
-        settings.proxy.auth = { username: proxyUser, password: proxyPass }
+        settings.proxy.auth = { username: proxyUser, password: proxyPass };
       }
     }
 
@@ -59,22 +59,22 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
       clientCertPath: clientCertPath.trim() || undefined,
       clientKeyPath:  clientKeyPath.trim()  || undefined,
       rejectUnauthorized,
-    }
+    };
 
-    settings.piiMaskPatterns = patterns
+    settings.piiMaskPatterns = patterns;
 
-    updateWorkspaceSettings(settings)
+    updateWorkspaceSettings(settings);
 
-    const updated = useStore.getState().workspace
-    if (updated) await electron.saveWorkspace(updated)
-    onClose()
+    const updated = useStore.getState().workspace;
+    if (updated) await electron.saveWorkspace(updated);
+    onClose();
   }
 
   const tabs: { id: SettingsTab; label: string }[] = [
     { id: 'proxy',   label: 'Proxy' },
     { id: 'tls',     label: 'TLS / Certificates' },
     { id: 'privacy', label: 'Privacy' },
-  ]
+  ];
 
   return (
     <div
@@ -230,7 +230,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
                 <input
                   value={newPattern}
                   onChange={e => setNewPattern(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') addPattern() }}
+                  onKeyDown={e => { if (e.key === 'Enter') addPattern(); }}
                   placeholder="Add pattern…"
                   className="flex-1 bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
                 />
@@ -263,5 +263,5 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
         </div>
       </div>
     </div>
-  )
+  );
 }

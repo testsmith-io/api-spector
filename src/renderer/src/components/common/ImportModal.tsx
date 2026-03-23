@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react'
-import type { Collection } from '../../../../shared/types'
+import { useRef, useState } from 'react';
+import type { Collection } from '../../../../shared/types';
 
-const { electron } = window as any
+const { electron } = window;
 
 interface Props {
   onImport: (col: Collection | null) => void
@@ -20,46 +20,46 @@ const OPTIONS: ImportOption[] = [
   { id: 'openapi',  label: 'OpenAPI',  description: 'JSON or YAML (v3.x)', supportsUrl: true },
   { id: 'insomnia', label: 'Insomnia', description: 'Export v4 JSON' },
   { id: 'bruno',    label: 'Bruno',    description: 'bruno.json collection file' },
-]
+];
 
 export function ImportModal({ onImport, onClose }: Props) {
-  const [selected, setSelected]   = useState<string | null>(null)
-  const [url, setUrl]             = useState('')
-  const [loading, setLoading]     = useState(false)
-  const [error, setError]         = useState<string | null>(null)
-  const urlInputRef               = useRef<HTMLInputElement>(null)
+  const [selected, setSelected]   = useState<string | null>(null);
+  const [url, setUrl]             = useState('');
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState<string | null>(null);
+  const urlInputRef               = useRef<HTMLInputElement>(null);
 
   async function runImport(opt: ImportOption) {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
-      let col: Collection | null = null
-      if (opt.id === 'postman')  col = await electron.importPostman()
-      if (opt.id === 'openapi')  col = await electron.importOpenApi()
-      if (opt.id === 'insomnia') col = await electron.importInsomnia()
-      if (opt.id === 'bruno')    col = await electron.importBruno()
-      onImport(col)
-      onClose()
+      let col: Collection | null = null;
+      if (opt.id === 'postman')  col = await electron.importPostman();
+      if (opt.id === 'openapi')  col = await electron.importOpenApi();
+      if (opt.id === 'insomnia') col = await electron.importInsomnia();
+      if (opt.id === 'bruno')    col = await electron.importBruno();
+      onImport(col);
+      onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   async function importFromUrl() {
-    const trimmed = url.trim()
-    if (!trimmed) return
-    setLoading(true)
-    setError(null)
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    setLoading(true);
+    setError(null);
     try {
-      const col = await electron.importOpenApiFromUrl(trimmed)
-      onImport(col)
-      onClose()
+      const col = await electron.importOpenApiFromUrl(trimmed);
+      onImport(col);
+      onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -106,8 +106,8 @@ export function ImportModal({ onImport, onClose }: Props) {
               <input
                 ref={urlInputRef}
                 value={url}
-                onChange={e => { setUrl(e.target.value); setError(null) }}
-                onKeyDown={e => { if (e.key === 'Enter') importFromUrl() }}
+                onChange={e => { setUrl(e.target.value); setError(null); }}
+                onKeyDown={e => { if (e.key === 'Enter') importFromUrl(); }}
                 placeholder="https://api.example.com/openapi.json"
                 className="flex-1 text-xs bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 placeholder-surface-600 font-mono"
               />
@@ -136,8 +136,8 @@ export function ImportModal({ onImport, onClose }: Props) {
           <button
             disabled={!selected || loading}
             onClick={() => {
-              const opt = OPTIONS.find(o => o.id === selected)
-              if (opt) runImport(opt)
+              const opt = OPTIONS.find(o => o.id === selected);
+              if (opt) runImport(opt);
             }}
             className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors"
           >
@@ -146,5 +146,5 @@ export function ImportModal({ onImport, onClose }: Props) {
         </div>
       </div>
     </div>
-  )
+  );
 }

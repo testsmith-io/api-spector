@@ -1,40 +1,40 @@
-import React, { useState } from 'react'
-import { useStore } from '../../store'
-import type { HistoryEntry } from '../../../../shared/types'
-import { MethodBadge } from '../common/MethodBadge'
+import React, { useState } from 'react';
+import { useStore } from '../../store';
+import type { HistoryEntry } from '../../../../shared/types';
+import { MethodBadge } from '../common/MethodBadge';
 
 const STATUS_COLOR: Record<string, string> = {
   '2': 'text-emerald-400',
   '3': 'text-amber-400',
   '4': 'text-orange-400',
   '5': 'text-red-400',
-}
+};
 function statusColor(status: number) {
-  return STATUS_COLOR[String(status)[0]] ?? 'text-surface-400'
+  return STATUS_COLOR[String(status)[0]] ?? 'text-surface-400';
 }
 
 function formatTime(ts: number): string {
-  const d = new Date(ts)
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const d = new Date(ts);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 function formatDate(ts: number): string {
-  const d = new Date(ts)
-  const today = new Date()
-  if (d.toDateString() === today.toDateString()) return 'Today'
-  const yesterday = new Date(today)
-  yesterday.setDate(today.getDate() - 1)
-  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday'
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
+  const d = new Date(ts);
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 export function HistoryPanel() {
-  const history = useStore(s => s.history)
-  const clearHistory = useStore(s => s.clearHistory)
-  const activeTabId = useStore(s => s.activeTabId)
-  const setTabResponse = useStore(s => s.setTabResponse)
-  const [selected, setSelected] = useState<HistoryEntry | null>(null)
-  const [search, setSearch] = useState('')
+  const history = useStore(s => s.history);
+  const clearHistory = useStore(s => s.clearHistory);
+  const activeTabId = useStore(s => s.activeTabId);
+  const setTabResponse = useStore(s => s.setTabResponse);
+  const [selected, setSelected] = useState<HistoryEntry | null>(null);
+  const [search, setSearch] = useState('');
 
   const filtered = search
     ? history.filter(e =>
@@ -42,29 +42,29 @@ export function HistoryPanel() {
         e.resolvedUrl.toLowerCase().includes(search.toLowerCase()) ||
         e.request.method.toLowerCase().includes(search.toLowerCase())
       )
-    : history
+    : history;
 
   // Group by date label
-  const groups: { label: string; entries: HistoryEntry[] }[] = []
+  const groups: { label: string; entries: HistoryEntry[] }[] = [];
   for (const entry of filtered) {
-    const label = formatDate(entry.timestamp)
-    const last = groups.at(-1)
+    const label = formatDate(entry.timestamp);
+    const last = groups.at(-1);
     if (last?.label === label) {
-      last.entries.push(entry)
+      last.entries.push(entry);
     } else {
-      groups.push({ label, entries: [entry] })
+      groups.push({ label, entries: [entry] });
     }
   }
 
   function open(entry: HistoryEntry) {
-    setSelected(entry)
+    setSelected(entry);
     if (activeTabId) {
-      setTabResponse(activeTabId, entry.response, entry.scriptResult ?? null)
+      setTabResponse(activeTabId, entry.response, entry.scriptResult ?? null);
     }
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Search + clear */}
       <div className="px-2 py-2 border-b border-surface-800 flex gap-1.5 flex-shrink-0">
         <input
@@ -75,7 +75,7 @@ export function HistoryPanel() {
         />
         {history.length > 0 && (
           <button
-            onClick={() => { clearHistory(); setSelected(null) }}
+            onClick={() => { clearHistory(); setSelected(null); }}
             className="text-xs text-surface-400 hover:text-red-400 transition-colors px-1"
             title="Clear all history"
           >
@@ -111,7 +111,7 @@ export function HistoryPanel() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 function HistoryRow({
@@ -121,8 +121,8 @@ function HistoryRow({
   isSelected: boolean
   onSelect: () => void
 }) {
-  const status = entry.response.status
-  const hasError = !!entry.response.error
+  const status = entry.response.status;
+  const hasError = !!entry.response.error;
 
   return (
     <button
@@ -151,5 +151,5 @@ function HistoryRow({
         <div className="text-[10px] text-surface-400 mt-0.5">env: {entry.environmentName}</div>
       )}
     </button>
-  )
+  );
 }

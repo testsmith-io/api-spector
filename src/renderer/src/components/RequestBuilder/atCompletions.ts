@@ -1,6 +1,6 @@
-import type { CompletionContext, CompletionResult, Completion } from '@codemirror/autocomplete'
-import { autocompletion } from '@codemirror/autocomplete'
-import { hoverTooltip } from '@codemirror/view'
+import type { CompletionContext, CompletionResult, Completion } from '@codemirror/autocomplete';
+import { autocompletion } from '@codemirror/autocomplete';
+import { hoverTooltip } from '@codemirror/view';
 
 // ─── sp API ──────────────────────────────────────────────────────────────────
 
@@ -12,7 +12,7 @@ const AT_TOP: Completion[] = [
   { label: 'environment',         type: 'property',                         info: 'Environment variable scope' },
   { label: 'collectionVariables', type: 'property',                         info: 'Collection variable scope' },
   { label: 'globals',             type: 'property',                         info: 'Global variable scope' },
-]
+];
 
 const SCOPE_METHODS: Completion[] = [
   { label: 'get',      type: 'function', detail: '(key)',         info: 'Get a variable value' },
@@ -20,7 +20,7 @@ const SCOPE_METHODS: Completion[] = [
   { label: 'clear',    type: 'function', detail: '(key)',         info: 'Delete a variable' },
   { label: 'has',      type: 'function', detail: '(key)',         info: 'Check if variable exists' },
   { label: 'toObject', type: 'function', detail: '()',            info: 'Return all variables as a plain object' },
-]
+];
 
 const RESPONSE_MEMBERS: Completion[] = [
   { label: 'code',         type: 'property', detail: 'number', info: 'HTTP status code (e.g. 200)' },
@@ -31,12 +31,12 @@ const RESPONSE_MEMBERS: Completion[] = [
   { label: 'headers',      type: 'property',                   info: 'Response headers — use .get(name) or .toObject()' },
   { label: 'json',         type: 'function', detail: '()',     info: 'Parse body as JSON and return it' },
   { label: 'text',         type: 'function', detail: '()',     info: 'Return body as a raw string' },
-]
+];
 
 const HEADERS_METHODS: Completion[] = [
   { label: 'get',      type: 'function', detail: '(name)', info: 'Get a header value by name (case-insensitive)' },
   { label: 'toObject', type: 'function', detail: '()',     info: 'Return all headers as a plain object' },
-]
+];
 
 // ─── faker ───────────────────────────────────────────────────────────────────
 
@@ -50,7 +50,7 @@ const FAKER_NAMESPACES: Completion[] = [
   { label: 'location', type: 'property', info: 'Addresses, cities, countries' },
   { label: 'finance',  type: 'property', info: 'Credit cards, currency, etc.' },
   { label: 'color',    type: 'property', info: 'Color values' },
-]
+];
 
 const FAKER_SUB: Record<string, Completion[]> = {
   string: [
@@ -89,19 +89,19 @@ const FAKER_SUB: Record<string, Completion[]> = {
     { label: 'sentence',  type: 'function', detail: '()',      info: 'Lorem sentence' },
     { label: 'paragraph', type: 'function', detail: '()',      info: 'Lorem paragraph' },
   ],
-}
+};
 
 // ─── Completion source factory ────────────────────────────────────────────────
 
 export function makeAtCompletionSource(varNames: string[]) {
   return function atSource(context: CompletionContext): CompletionResult | null {
-    const line       = context.state.doc.lineAt(context.pos)
-    const textBefore = line.text.slice(0, context.pos - line.from)
+    const line       = context.state.doc.lineAt(context.pos);
+    const textBefore = line.text.slice(0, context.pos - line.from);
 
     // {{varname}} — must be highest priority so it works inside strings too
-    const varMatch = /\{\{(\w*)$/.exec(textBefore)
+    const varMatch = /\{\{(\w*)$/.exec(textBefore);
     if (varMatch) {
-      const q = varMatch[1].toLowerCase()
+      const q = varMatch[1].toLowerCase();
       return {
         from:    context.pos - varMatch[1].length,
         options: varNames
@@ -113,53 +113,53 @@ export function makeAtCompletionSource(varNames: string[]) {
             boost:  2,
           })),
         validFor: /^\w*$/,
-      }
+      };
     }
 
     // at.response.headers.xxx
-    const headersMatch = /\bsp\.response\.headers\.(\w*)$/.exec(textBefore)
+    const headersMatch = /\bsp\.response\.headers\.(\w*)$/.exec(textBefore);
     if (headersMatch) {
-      return { from: context.pos - headersMatch[1].length, options: HEADERS_METHODS, validFor: /^\w*$/ }
+      return { from: context.pos - headersMatch[1].length, options: HEADERS_METHODS, validFor: /^\w*$/ };
     }
 
     // at.response.xxx
-    const responseMatch = /\bsp\.response\.(\w*)$/.exec(textBefore)
+    const responseMatch = /\bsp\.response\.(\w*)$/.exec(textBefore);
     if (responseMatch) {
-      return { from: context.pos - responseMatch[1].length, options: RESPONSE_MEMBERS, validFor: /^\w*$/ }
+      return { from: context.pos - responseMatch[1].length, options: RESPONSE_MEMBERS, validFor: /^\w*$/ };
     }
 
     // at.variables.xxx | at.environment.xxx | at.collectionVariables.xxx | at.globals.xxx
-    const scopeMatch = /\bsp\.(variables|environment|collectionVariables|globals)\.(\w*)$/.exec(textBefore)
+    const scopeMatch = /\bsp\.(variables|environment|collectionVariables|globals)\.(\w*)$/.exec(textBefore);
     if (scopeMatch) {
-      return { from: context.pos - scopeMatch[2].length, options: SCOPE_METHODS, validFor: /^\w*$/ }
+      return { from: context.pos - scopeMatch[2].length, options: SCOPE_METHODS, validFor: /^\w*$/ };
     }
 
     // at.xxx
-    const atMatch = /\bsp\.(\w*)$/.exec(textBefore)
+    const atMatch = /\bsp\.(\w*)$/.exec(textBefore);
     if (atMatch) {
-      return { from: context.pos - atMatch[1].length, options: AT_TOP, validFor: /^\w*$/ }
+      return { from: context.pos - atMatch[1].length, options: AT_TOP, validFor: /^\w*$/ };
     }
 
     // faker.namespace.xxx
-    const fakerSubMatch = /\bfaker\.(\w+)\.(\w*)$/.exec(textBefore)
+    const fakerSubMatch = /\bfaker\.(\w+)\.(\w*)$/.exec(textBefore);
     if (fakerSubMatch) {
-      const subs = FAKER_SUB[fakerSubMatch[1]] ?? []
-      return { from: context.pos - fakerSubMatch[2].length, options: subs, validFor: /^\w*$/ }
+      const subs = FAKER_SUB[fakerSubMatch[1]] ?? [];
+      return { from: context.pos - fakerSubMatch[2].length, options: subs, validFor: /^\w*$/ };
     }
 
     // faker.xxx
-    const fakerMatch = /\bfaker\.(\w*)$/.exec(textBefore)
+    const fakerMatch = /\bfaker\.(\w*)$/.exec(textBefore);
     if (fakerMatch) {
-      return { from: context.pos - fakerMatch[1].length, options: FAKER_NAMESPACES, validFor: /^\w*$/ }
+      return { from: context.pos - fakerMatch[1].length, options: FAKER_NAMESPACES, validFor: /^\w*$/ };
     }
 
-    return null
-  }
+    return null;
+  };
 }
 
 /** CodeMirror extension: at.* API + {{varname}} completions for script editors. */
 export function atCompletionExtension(varNames: string[]) {
-  return autocompletion({ override: [makeAtCompletionSource(varNames)] })
+  return autocompletion({ override: [makeAtCompletionSource(varNames)] });
 }
 
 // ─── Hover tooltip ────────────────────────────────────────────────────────────
@@ -170,57 +170,57 @@ export function atCompletionExtension(varNames: string[]) {
  */
 export function varHoverTooltipExtension(varValues: Record<string, string>) {
   return hoverTooltip((view, pos) => {
-    const line      = view.state.doc.lineAt(pos)
-    const lineText  = line.text
-    const posInLine = pos - line.from
+    const line      = view.state.doc.lineAt(pos);
+    const lineText  = line.text;
+    const posInLine = pos - line.from;
 
-    const re = /\{\{([^}]+)\}\}/g
-    let m: RegExpExecArray | null
+    const re = /\{\{([^}]+)\}\}/g;
+    let m: RegExpExecArray | null;
     while ((m = re.exec(lineText)) !== null) {
       if (m.index <= posInLine && posInLine < m.index + m[0].length) {
-        const name     = m[1].trim()
-        const resolved = varValues[name]
-        const tokenFrom = line.from + m.index
-        const tokenTo   = tokenFrom + m[0].length
+        const name     = m[1].trim();
+        const resolved = varValues[name];
+        const tokenFrom = line.from + m.index;
+        const tokenTo   = tokenFrom + m[0].length;
 
         return {
           pos: tokenFrom,
           end: tokenTo,
           above: true,
           create() {
-            const dom = document.createElement('div')
+            const dom = document.createElement('div');
             dom.style.cssText =
               'display:flex;align-items:center;gap:6px;padding:4px 10px;' +
-              'font-size:11px;font-family:monospace;white-space:nowrap;'
+              'font-size:11px;font-family:monospace;white-space:nowrap;';
 
-            const nameEl = document.createElement('span')
-            nameEl.style.color = '#60a5fa'
-            nameEl.textContent = `{{${name}}}`
+            const nameEl = document.createElement('span');
+            nameEl.style.color = '#60a5fa';
+            nameEl.textContent = `{{${name}}}`;
 
-            const arrow = document.createElement('span')
-            arrow.style.color = '#6b7280'
-            arrow.textContent = '→'
+            const arrow = document.createElement('span');
+            arrow.style.color = '#6b7280';
+            arrow.textContent = '→';
 
-            const valEl = document.createElement('span')
+            const valEl = document.createElement('span');
             if (resolved !== undefined) {
-              valEl.style.color = '#34d399'
-              valEl.textContent = resolved.length > 60 ? resolved.slice(0, 60) + '…' : resolved
+              valEl.style.color = '#34d399';
+              valEl.textContent = resolved.length > 60 ? resolved.slice(0, 60) + '…' : resolved;
             } else {
-              valEl.style.color = '#f97316'
-              valEl.style.fontStyle = 'italic'
-              valEl.textContent = 'undefined'
+              valEl.style.color = '#f97316';
+              valEl.style.fontStyle = 'italic';
+              valEl.textContent = 'undefined';
             }
 
-            dom.appendChild(nameEl)
-            dom.appendChild(arrow)
-            dom.appendChild(valEl)
-            return { dom }
+            dom.appendChild(nameEl);
+            dom.appendChild(arrow);
+            dom.appendChild(valEl);
+            return { dom };
           },
-        }
+        };
       }
     }
-    return null
-  })
+    return null;
+  });
 }
 
 /** CodeMirror extension: only {{varname}} completions, for body/raw editors. */
@@ -228,19 +228,19 @@ export function varCompletionExtension(varNames: string[]) {
   return autocompletion({
     override: [
       (context: CompletionContext): CompletionResult | null => {
-        const line       = context.state.doc.lineAt(context.pos)
-        const textBefore = line.text.slice(0, context.pos - line.from)
-        const varMatch   = /\{\{(\w*)$/.exec(textBefore)
-        if (!varMatch) return null
-        const q = varMatch[1].toLowerCase()
+        const line       = context.state.doc.lineAt(context.pos);
+        const textBefore = line.text.slice(0, context.pos - line.from);
+        const varMatch   = /\{\{(\w*)$/.exec(textBefore);
+        if (!varMatch) return null;
+        const q = varMatch[1].toLowerCase();
         return {
           from:    context.pos - varMatch[1].length,
           options: varNames
             .filter(n => n.toLowerCase().includes(q))
             .map(n => ({ label: n, type: 'variable', apply: n + '}}' })),
           validFor: /^\w*$/,
-        }
+        };
       },
     ],
-  })
+  });
 }

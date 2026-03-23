@@ -1,20 +1,20 @@
-import { useWorkspaceLoader } from '../../hooks/useWorkspaceLoader'
+import { useWorkspaceLoader } from '../../hooks/useWorkspaceLoader';
 
-const { electron } = window as any
+const { electron } = window;
 
 export function WelcomeScreen() {
-  const { applyWorkspace } = useWorkspaceLoader()
+  const { applyWorkspace } = useWorkspaceLoader();
 
   async function openWorkspace() {
-    const result = await electron.openWorkspace()
-    if (!result) return
-    await applyWorkspace(result.workspace, result.workspacePath)
+    const result = await electron.openWorkspace();
+    if (!result) return;
+    await applyWorkspace(result.workspace, result.workspacePath);
   }
 
   async function newWorkspace() {
-    const result = await electron.newWorkspace()
-    if (!result) return
-    await applyWorkspace(result.workspace, result.workspacePath)
+    const result = await electron.newWorkspace();
+    if (!result) return;
+    await applyWorkspace(result.workspace, result.workspacePath);
   }
 
   return (
@@ -47,5 +47,5 @@ export function WelcomeScreen() {
         Commit it and your collections to Git — secrets are stored in your OS keychain, never on disk.
       </p>
     </div>
-  )
+  );
 }

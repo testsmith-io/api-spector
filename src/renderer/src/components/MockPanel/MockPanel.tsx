@@ -1,49 +1,49 @@
-import React from 'react'
-import { useStore } from '../../store'
+import React from 'react';
+import { useStore } from '../../store';
 
-const { electron } = window as any
+const { electron } = window;
 
 export function MockPanel() {
-  const mocks         = useStore(s => s.mocks)
-  const activeMockId  = useStore(s => s.activeMockId)
-  const setActiveMock = useStore(s => s.setActiveMockId)
-  const addMock       = useStore(s => s.addMock)
-  const setRunning    = useStore(s => s.setMockRunning)
+  const mocks         = useStore(s => s.mocks);
+  const activeMockId  = useStore(s => s.activeMockId);
+  const setActiveMock = useStore(s => s.setActiveMockId);
+  const addMock       = useStore(s => s.addMock);
+  const setRunning    = useStore(s => s.setMockRunning);
 
-  const mockList = Object.values(mocks)
+  const mockList = Object.values(mocks);
 
   async function handleAddMock() {
-    addMock()
-    const ws = useStore.getState().workspace
-    if (ws) await electron.saveWorkspace(ws)
-    const state = useStore.getState()
-    const newId = state.activeMockId
+    addMock();
+    const ws = useStore.getState().workspace;
+    if (ws) await electron.saveWorkspace(ws);
+    const state = useStore.getState();
+    const newId = state.activeMockId;
     if (newId) {
-      const entry = state.mocks[newId]
-      await electron.saveMock(entry.relPath, entry.data)
-      setActiveMock(newId)
+      const entry = state.mocks[newId];
+      await electron.saveMock(entry.relPath, entry.data);
+      setActiveMock(newId);
     }
   }
 
   async function toggleRunning(e: React.MouseEvent, mockId: string) {
-    e.stopPropagation()
-    const entry = useStore.getState().mocks[mockId]
-    if (!entry) return
+    e.stopPropagation();
+    const entry = useStore.getState().mocks[mockId];
+    if (!entry) return;
     try {
       if (entry.running) {
-        await electron.mockStop(mockId)
-        setRunning(mockId, false)
+        await electron.mockStop(mockId);
+        setRunning(mockId, false);
       } else {
-        const latest = useStore.getState().mocks[mockId].data
-        await electron.saveMock(entry.relPath, latest)
-        await electron.mockStart(latest)
-        setRunning(mockId, true)
+        const latest = useStore.getState().mocks[mockId].data;
+        await electron.saveMock(entry.relPath, latest);
+        await electron.mockStart(latest);
+        setRunning(mockId, true);
       }
     } catch { /* errors shown in detail panel */ }
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       <div className="px-3 py-2 flex items-center justify-between border-b border-surface-800 flex-shrink-0">
         <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-600">
           Mock Servers
@@ -69,8 +69,8 @@ export function MockPanel() {
           </div>
         ) : (
           mockList.map(entry => {
-            const mock    = entry.data
-            const active  = activeMockId === mock.id
+            const mock    = entry.data;
+            const active  = activeMockId === mock.id;
             return (
               <button
                 key={mock.id}
@@ -103,10 +103,10 @@ export function MockPanel() {
                   {entry.running ? '■' : '▶'}
                 </button>
               </button>
-            )
+            );
           })
         )}
       </div>
     </div>
-  )
+  );
 }

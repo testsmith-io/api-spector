@@ -1,8 +1,8 @@
-import type { Collection, Environment } from '../../shared/types'
+import type { Collection, Environment } from '../../shared/types';
 
-export const REQUEST_ID_1 = 'req-get-users'
-export const REQUEST_ID_2 = 'req-create-user'
-export const REQUEST_ID_3 = 'req-delete-user'
+export const REQUEST_ID_1 = 'req-get-users';
+export const REQUEST_ID_2 = 'req-create-user';
+export const REQUEST_ID_3 = 'req-delete-user';
 
 export function makeCollection(): Collection {
   return {
@@ -57,7 +57,7 @@ export function makeCollection(): Collection {
         body: { mode: 'none' },
       },
     },
-  }
+  };
 }
 
 export function makeEnvironment(): Environment {
@@ -70,5 +70,5 @@ export function makeEnvironment(): Environment {
       { key: 'AUTH_TOKEN', value: 'staging-token-123', enabled: true },
       { key: 'API_KEY', value: '', enabled: true, secret: true, secretEncrypted: 'enc', secretSalt: 'salt', secretIv: 'iv' },
     ],
-  }
+  };
 }

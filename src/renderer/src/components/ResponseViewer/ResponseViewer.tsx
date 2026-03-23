@@ -1,98 +1,98 @@
-import { useState } from 'react'
-import { useStore } from '../../store'
-import CodeMirror from '@uiw/react-codemirror'
-import { json } from '@codemirror/lang-json'
-import { oneDark } from '@codemirror/theme-one-dark'
-import { v4 as uuidv4 } from 'uuid'
-import type { ResponsePayload, MockRoute, ScriptExecutionMeta, SentRequest } from '../../../../shared/types'
-import { getStatusColor } from '../../../../shared/colors'
-import { InteractiveBody } from './InteractiveBody'
+import { useState } from 'react';
+import { useStore } from '../../store';
+import CodeMirror from '@uiw/react-codemirror';
+import { json } from '@codemirror/lang-json';
+import { oneDark } from '@codemirror/theme-one-dark';
+import { v4 as uuidv4 } from 'uuid';
+import type { ResponsePayload, MockRoute, ScriptExecutionMeta, SentRequest } from '../../../../shared/types';
+import { getStatusColor } from '../../../../shared/colors';
+import { InteractiveBody } from './InteractiveBody';
 
-const { electron } = window as any
+const { electron } = window;
 
 type RespTab = 'body' | 'headers' | 'tests' | 'console' | 'request'
 
 function prettyJson ( raw: string ): string {
   try {
-    return JSON.stringify( JSON.parse( raw ), null, 2 )
+    return JSON.stringify( JSON.parse( raw ), null, 2 );
   } catch {
-    return raw
+    return raw;
   }
 }
 
 // ─── Save as mock modal ───────────────────────────────────────────────────────
 
 function SaveAsMockModal ( { onClose }: { onClose: () => void } ) {
-  const mocks = useStore( s => s.mocks )
-  const addMock = useStore( s => s.addMock )
-  const updateMock = useStore( s => s.updateMock )
-  const collections = useStore( s => s.collections )
-  const activeTab = useStore( s => s.tabs.find( t => t.id === s.activeTabId ) )
-  const response = activeTab?.lastResponse ?? null as ResponsePayload | null
+  const mocks = useStore( s => s.mocks );
+  const addMock = useStore( s => s.addMock );
+  const updateMock = useStore( s => s.updateMock );
+  const collections = useStore( s => s.collections );
+  const activeTab = useStore( s => s.tabs.find( t => t.id === s.activeTabId ) );
+  const response = activeTab?.lastResponse ?? null as ResponsePayload | null;
 
-  const activeRequestId = activeTab?.requestId ?? null
+  const activeRequestId = activeTab?.requestId ?? null;
 
   // Get the active request for method + URL
   const activeRequest = activeRequestId
     ? Object.values( collections ).find( c => c.data.requests[activeRequestId] )?.data.requests[activeRequestId]
-    : null
+    : null;
 
   // Extract path from URL
   function extractPath ( url: string ): string {
     try {
-      return new URL( url ).pathname || '/'
+      return new URL( url ).pathname || '/';
     } catch {
-      const match = url.match( /(?:https?:\/\/[^/]+)?(\/[^?]*)/ )
-      return match?.[1] ?? '/'
+      const match = url.match( /(?:https?:\/\/[^/]+)?(\/[^?]*)/ );
+      return match?.[1] ?? '/';
     }
   }
 
-  const [targetMockId, setTargetMockId] = useState<string>( Object.keys( mocks )[0] ?? '__new__' )
-  const [newServerName, setNewServerName] = useState( 'Mock Server' )
-  const [newServerPort, setNewServerPort] = useState( '3900' )
-  const [method, setMethod] = useState<string>( activeRequest?.method ?? 'GET' )
-  const [path, setPath] = useState( extractPath( activeRequest?.url ?? '/' ) )
-  const [statusCode, setStatusCode] = useState( response.status )
+  const [targetMockId, setTargetMockId] = useState<string>( Object.keys( mocks )[0] ?? '__new__' );
+  const [newServerName, setNewServerName] = useState( 'Mock Server' );
+  const [newServerPort, setNewServerPort] = useState( '3900' );
+  const [method, setMethod] = useState<string>( activeRequest?.method ?? 'GET' );
+  const [path, setPath] = useState( extractPath( activeRequest?.url ?? '/' ) );
+  const [statusCode, setStatusCode] = useState( response.status );
   const [body, setBody] = useState( () => {
-    try { return JSON.stringify( JSON.parse( response.body ), null, 2 ) } catch { return response.body }
-  } )
-  const [saving, setSaving] = useState( false )
+    try { return JSON.stringify( JSON.parse( response.body ), null, 2 ); } catch { return response.body; }
+  } );
+  const [saving, setSaving] = useState( false );
 
-  const mockList = Object.values( mocks )
-  const isNew = targetMockId === '__new__' || mockList.length === 0
+  const mockList = Object.values( mocks );
+  const isNew = targetMockId === '__new__' || mockList.length === 0;
 
   async function save () {
-    setSaving( true )
+    setSaving( true );
     try {
       const route: MockRoute = {
         id: uuidv4(),
-        method: method as any,
+        method: method as MockRoute['method'],
         path,
         statusCode,
         headers: {},
         body,
-      }
+      };
 
-      let serverId = targetMockId
+      let serverId = targetMockId;
       if ( isNew ) {
-        addMock()
-        const state = useStore.getState()
-        serverId = state.activeMockId!
-        const entry = state.mocks[serverId]
-        const updated = { ...entry.data, name: newServerName, port: Number( newServerPort ), routes: [route] }
-        updateMock( serverId, updated )
-        await electron.saveMock( entry.relPath, updated )
-        const ws = useStore.getState().workspace
-        if ( ws ) await electron.saveWorkspace( ws )
+        addMock();
+        const state = useStore.getState();
+        serverId = state.activeMockId!;
+        const entry = state.mocks[serverId];
+        const updated = { ...entry.data, name: newServerName, port: Number( newServerPort ), routes: [route] };
+        updateMock( serverId, updated );
+        await electron.saveMock( entry.relPath, updated );
+        const ws = useStore.getState().workspace;
+        if ( ws ) await electron.saveWorkspace( ws );
       } else {
-        const entry = useStore.getState().mocks[serverId]
-        const updated = { ...entry.data, routes: [...entry.data.routes, route] }
-        updateMock( serverId, updated )
-        await electron.saveMock( entry.relPath, updated )
+        const entry = useStore.getState().mocks[serverId];
+        const updated = { ...entry.data, routes: [...entry.data.routes, route] };
+        updateMock( serverId, updated );
+        await electron.saveMock( entry.relPath, updated );
       }
-      onClose()
+      onClose();
     } finally {
-      setSaving( false )
+      setSaving( false );
     }
   }
 
@@ -200,7 +200,7 @@ function SaveAsMockModal ( { onClose }: { onClose: () => void } ) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Diff view ────────────────────────────────────────────────────────────────
@@ -209,53 +209,53 @@ type DiffLineType = 'equal' | 'removed' | 'added'
 interface DiffLine { type: DiffLineType; text: string }
 
 function computeLineDiff ( a: string, b: string ): DiffLine[] {
-  const aLines = a.split( '\n' )
-  const bLines = b.split( '\n' )
+  const aLines = a.split( '\n' );
+  const bLines = b.split( '\n' );
   // Simple LCS-based diff: O(n*m) but fine for response bodies
-  const m = aLines.length
-  const n = bLines.length
+  const m = aLines.length;
+  const n = bLines.length;
   // dp[i][j] = length of LCS for aLines[0..i-1] and bLines[0..j-1]
-  const dp: number[][] = Array.from( { length: m + 1 }, () => new Array( n + 1 ).fill( 0 ) )
+  const dp: number[][] = Array.from( { length: m + 1 }, () => new Array( n + 1 ).fill( 0 ) );
   for ( let i = 1; i <= m; i++ ) {
     for ( let j = 1; j <= n; j++ ) {
       dp[i][j] = aLines[i - 1] === bLines[j - 1]
         ? dp[i - 1][j - 1] + 1
-        : Math.max( dp[i - 1][j], dp[i][j - 1] )
+        : Math.max( dp[i - 1][j], dp[i][j - 1] );
     }
   }
   // Backtrack
-  const result: DiffLine[] = []
-  let i = m, j = n
+  const result: DiffLine[] = [];
+  let i = m, j = n;
   while ( i > 0 || j > 0 ) {
     if ( i > 0 && j > 0 && aLines[i - 1] === bLines[j - 1] ) {
-      result.unshift( { type: 'equal', text: aLines[i - 1] } )
-      i--; j--
+      result.unshift( { type: 'equal', text: aLines[i - 1] } );
+      i--; j--;
     } else if ( j > 0 && ( i === 0 || dp[i][j - 1] >= dp[i - 1][j] ) ) {
-      result.unshift( { type: 'added', text: bLines[j - 1] } )
-      j--
+      result.unshift( { type: 'added', text: bLines[j - 1] } );
+      j--;
     } else {
-      result.unshift( { type: 'removed', text: aLines[i - 1] } )
-      i--
+      result.unshift( { type: 'removed', text: aLines[i - 1] } );
+      i--;
     }
   }
-  return result
+  return result;
 }
 
 function DiffView ( { pinned, current }: { pinned: ResponsePayload; current: ResponsePayload } ) {
-  const pinnedBody = prettyJson( pinned.body )
-  const currentBody = prettyJson( current.body )
-  const diffLines = computeLineDiff( pinnedBody, currentBody )
+  const pinnedBody = prettyJson( pinned.body );
+  const currentBody = prettyJson( current.body );
+  const diffLines = computeLineDiff( pinnedBody, currentBody );
 
   const lineStyle: Record<DiffLineType, string> = {
     equal: 'text-surface-400',
     removed: 'bg-red-900/30 text-red-300',
     added: 'bg-emerald-900/30 text-emerald-300',
-  }
+  };
   const linePrefix: Record<DiffLineType, string> = {
     equal: ' ',
     removed: '-',
     added: '+',
-  }
+  };
 
   return (
     <div className="flex flex-col h-full overflow-auto">
@@ -292,65 +292,65 @@ function DiffView ( { pinned, current }: { pinned: ResponsePayload; current: Res
         )}
       </div>
     </div>
-  )
+  );
 }
 
 export function ResponseViewer () {
-  const activeTab = useStore( s => s.tabs.find( t => t.id === s.activeTabId ) )
-  const activeTabId = useStore( s => s.activeTabId )
-  const pinnedResponse = useStore( s => s.pinnedResponse )
-  const setPinned = useStore( s => s.setPinnedResponse )
-  const updateRequest = useStore( s => s.updateRequest )
-  const setTabRequestTab = useStore( s => s.setTabRequestTab )
-  const setTabScriptTab = useStore( s => s.setTabScriptTab )
-  const isSending = activeTab?.isSending ?? false
-  const response = activeTab?.lastResponse ?? null
-  const scriptResult = activeTab?.lastScriptResult ?? null
-  const sentRequest = activeTab?.lastSentRequest ?? null
-  const requestId = activeTab?.requestId ?? null
-  const [tab, setTab] = useState<RespTab>( 'body' )
-  const [diffMode, setDiffMode] = useState( false )
-  const [showMockModal, setShowMockModal] = useState( false )
-  const [bodyView, setBodyView] = useState<'tree' | 'raw'>('raw')
-  const [assertToast, setAssertToast] = useState( false )
-  const [contractToast, setContractToast] = useState( false )
+  const activeTab = useStore( s => s.tabs.find( t => t.id === s.activeTabId ) );
+  const activeTabId = useStore( s => s.activeTabId );
+  const pinnedResponse = useStore( s => s.pinnedResponse );
+  const setPinned = useStore( s => s.setPinnedResponse );
+  const updateRequest = useStore( s => s.updateRequest );
+  const setTabRequestTab = useStore( s => s.setTabRequestTab );
+  const setTabScriptTab = useStore( s => s.setTabScriptTab );
+  const isSending = activeTab?.isSending ?? false;
+  const response = activeTab?.lastResponse ?? null;
+  const scriptResult = activeTab?.lastScriptResult ?? null;
+  const sentRequest = activeTab?.lastSentRequest ?? null;
+  const requestId = activeTab?.requestId ?? null;
+  const [tab, setTab] = useState<RespTab>( 'body' );
+  const [diffMode, setDiffMode] = useState( false );
+  const [showMockModal, setShowMockModal] = useState( false );
+  const [bodyView, setBodyView] = useState<'tree' | 'raw'>( 'raw' );
+  const [assertToast, setAssertToast] = useState( false );
+  const [contractToast, setContractToast] = useState( false );
 
   async function saveAsContract () {
-    if ( !response || !requestId || !activeTabId ) return
+    if ( !response || !requestId || !activeTabId ) return;
     const schema: string | null = response.body
       ? await electron.inferContractSchema( response.body )
-      : null
-    const contentType = response.headers['content-type']
+      : null;
+    const contentType = response.headers['content-type'];
     const headers: { key: string; value: string; required: boolean }[] = contentType
       ? [{ key: 'content-type', value: contentType, required: true }]
-      : []
+      : [];
     updateRequest( requestId, {
       contract: {
         statusCode: response.status,
         headers,
         bodySchema: schema ?? '',
       },
-    } )
-    setTabRequestTab( activeTabId, 'contract' )
-    setContractToast( true )
-    setTimeout( () => setContractToast( false ), 2500 )
+    } );
+    setTabRequestTab( activeTabId, 'contract' );
+    setContractToast( true );
+    setTimeout( () => setContractToast( false ), 2500 );
   }
 
   function handleAssert ( snippet: string ) {
-    if ( !requestId ) return
-    const state = useStore.getState()
+    if ( !requestId ) return;
+    const state = useStore.getState();
     const req = Object.values( state.collections )
-      .find( c => c.data.requests[requestId] )?.data.requests[requestId]
-    if ( !req ) return
-    const existing = req.postRequestScript ?? ''
-    const sep = existing.trim() ? '\n\n' : ''
-    updateRequest( requestId, { postRequestScript: existing + sep + snippet } )
+      .find( c => c.data.requests[requestId] )?.data.requests[requestId];
+    if ( !req ) return;
+    const existing = req.postRequestScript ?? '';
+    const sep = existing.trim() ? '\n\n' : '';
+    updateRequest( requestId, { postRequestScript: existing + sep + snippet } );
     if ( activeTabId ) {
-      setTabRequestTab( activeTabId, 'scripts' )
-      setTabScriptTab( activeTabId, 'post' )
+      setTabRequestTab( activeTabId, 'scripts' );
+      setTabScriptTab( activeTabId, 'post' );
     }
-    setAssertToast( true )
-    setTimeout( () => setAssertToast( false ), 2500 )
+    setAssertToast( true );
+    setTimeout( () => setAssertToast( false ), 2500 );
   }
 
   if ( isSending ) {
@@ -358,7 +358,7 @@ export function ResponseViewer () {
       <div className="h-full flex items-center justify-center text-surface-400 text-sm">
         Sending...
       </div>
-    )
+    );
   }
 
   if ( !response ) {
@@ -366,7 +366,7 @@ export function ResponseViewer () {
       <div className="h-full flex items-center justify-center text-surface-400 text-sm">
         Hit Send to see the response
       </div>
-    )
+    );
   }
 
   if ( response.error ) {
@@ -375,18 +375,18 @@ export function ResponseViewer () {
         <div className="text-red-400 text-sm font-medium">Request failed</div>
         <pre className="text-xs text-red-300 whitespace-pre-wrap">{response.error}</pre>
       </div>
-    )
+    );
   }
 
-  const contentType = response.headers['content-type'] ?? ''
-  const isJson = contentType.includes( 'json' )
-  const isXml = !isJson && ( contentType.includes( 'xml' ) || contentType.includes( 'html' ) )
-  const supportsTree = isJson || isXml
-  const displayBody = isJson ? prettyJson( response.body ) : response.body
+  const contentType = response.headers['content-type'] ?? '';
+  const isJson = contentType.includes( 'json' );
+  const isXml = !isJson && ( contentType.includes( 'xml' ) || contentType.includes( 'html' ) );
+  const supportsTree = isJson || isXml;
+  const displayBody = isJson ? prettyJson( response.body ) : response.body;
 
-  const passedCount = scriptResult?.testResults.filter( t => t.passed ).length ?? 0
-  const totalCount = scriptResult?.testResults.length ?? 0
-  const consoleCount = scriptResult?.consoleOutput.length ?? 0
+  const passedCount = scriptResult?.testResults.filter( t => t.passed ).length ?? 0;
+  const totalCount = scriptResult?.testResults.length ?? 0;
+  const consoleCount = scriptResult?.consoleOutput.length ?? 0;
 
   const tabList: { id: RespTab; label: string; badge?: number | string }[] = [
     { id: 'request', label: 'Request' },
@@ -394,7 +394,7 @@ export function ResponseViewer () {
     { id: 'headers', label: 'Headers' },
     { id: 'tests', label: 'Tests', badge: totalCount > 0 ? `${passedCount}/${totalCount}` : undefined },
     { id: 'console', label: 'Console', badge: consoleCount > 0 ? consoleCount : undefined },
-  ]
+  ];
 
   return (
     <div className="h-full flex flex-col">
@@ -549,20 +549,20 @@ export function ResponseViewer () {
         ) : null}
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Tests panel ─────────────────────────────────────────────────────────────
 
-function TestsPanel ( { scriptResult }: { scriptResult: ReturnType<typeof useStore<any>> | null } ) {
-  const sr = scriptResult as ScriptExecutionMeta | null
+function TestsPanel ( { scriptResult }: { scriptResult: ScriptExecutionMeta | null } ) {
+  const sr = scriptResult as ScriptExecutionMeta | null;
 
   if ( !sr || ( sr.testResults.length === 0 && !sr.preScriptError && !sr.postScriptError ) ) {
     return (
       <div className="flex items-center justify-center h-full text-surface-400 text-xs">
         No tests ran. Add <code className="mx-1 bg-surface-800 px-1 rounded">pm.test()</code> calls to your post-response script.
       </div>
-    )
+    );
   }
 
   return (
@@ -599,7 +599,7 @@ function TestsPanel ( { scriptResult }: { scriptResult: ReturnType<typeof useSto
         </div>
       ) )}
     </div>
-  )
+  );
 }
 
 // ─── Request panel ───────────────────────────────────────────────────────────
@@ -610,10 +610,10 @@ function RequestPanel ( { sentRequest }: { sentRequest: SentRequest | null } ) {
       <div className="flex items-center justify-center h-full text-surface-400 text-xs">
         Send a request to see what was transmitted.
       </div>
-    )
+    );
   }
 
-  const hasBody = sentRequest.body !== undefined && sentRequest.body !== ''
+  const hasBody = sentRequest.body !== undefined && sentRequest.body !== '';
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto text-xs font-mono">
@@ -650,20 +650,20 @@ function RequestPanel ( { sentRequest }: { sentRequest: SentRequest | null } ) {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ─── Console panel ────────────────────────────────────────────────────────────
 
-function ConsolePanel ( { scriptResult }: { scriptResult: ReturnType<typeof useStore<any>> | null } ) {
-  const sr = scriptResult as ScriptExecutionMeta | null
+function ConsolePanel ( { scriptResult }: { scriptResult: ScriptExecutionMeta | null } ) {
+  const sr = scriptResult as ScriptExecutionMeta | null;
 
   if ( !sr || sr.consoleOutput.length === 0 ) {
     return (
       <div className="flex items-center justify-center h-full text-surface-400 text-xs">
         No console output. Use <code className="mx-1 bg-surface-800 px-1 rounded">console.log()</code> in your scripts.
       </div>
-    )
+    );
   }
 
   return (
@@ -672,14 +672,14 @@ function ConsolePanel ( { scriptResult }: { scriptResult: ReturnType<typeof useS
         <div
           key={i}
           className={`text-xs font-mono py-0.5 border-b border-surface-800/50 last:border-0 ${line.startsWith( '[error]' ) ? 'text-red-300' :
-            line.startsWith( '[warn]' )  ? 'text-amber-300' :
-            line.startsWith( '[set]' )   ? 'text-cyan-400' :
-              'text-surface-400'
+            line.startsWith( '[warn]' ) ? 'text-amber-300' :
+              line.startsWith( '[set]' ) ? 'text-cyan-400' :
+                'text-surface-400'
             }`}
         >
           {line}
         </div>
       ) )}
     </div>
-  )
+  );
 }

@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from 'react'
-import CodeMirror from '@uiw/react-codemirror'
-import { json } from '@codemirror/lang-json'
-import { oneDark } from '@codemirror/theme-one-dark'
-import type { ApiRequest, GraphQLBody } from '../../../../shared/types'
+import React, { useState, useCallback } from 'react';
+import CodeMirror from '@uiw/react-codemirror';
+import { json } from '@codemirror/lang-json';
+import { oneDark } from '@codemirror/theme-one-dark';
+import type { ApiRequest, GraphQLBody } from '../../../../shared/types';
 
 // ─── Introspection types ──────────────────────────────────────────────────────
 
@@ -42,58 +42,58 @@ interface ParsedSchema {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function displayType(ref: GqlTypeRef | null): string {
-  if (!ref) return ''
-  if (ref.kind === 'NON_NULL') return displayType(ref.ofType) + '!'
-  if (ref.kind === 'LIST') return '[' + displayType(ref.ofType) + ']'
-  return ref.name ?? ''
+  if (!ref) return '';
+  if (ref.kind === 'NON_NULL') return displayType(ref.ofType) + '!';
+  if (ref.kind === 'LIST') return '[' + displayType(ref.ofType) + ']';
+  return ref.name ?? '';
 }
 
 function getBaseTypeName(ref: GqlTypeRef | null): string {
-  if (!ref) return ''
-  if (ref.kind === 'NON_NULL' || ref.kind === 'LIST') return getBaseTypeName(ref.ofType)
-  return ref.name ?? ''
+  if (!ref) return '';
+  if (ref.kind === 'NON_NULL' || ref.kind === 'LIST') return getBaseTypeName(ref.ofType);
+  return ref.name ?? '';
 }
 
 function getBaseKind(ref: GqlTypeRef | null): string {
-  if (!ref) return ''
-  if (ref.kind === 'NON_NULL' || ref.kind === 'LIST') return getBaseKind(ref.ofType)
-  return ref.kind
+  if (!ref) return '';
+  if (ref.kind === 'NON_NULL' || ref.kind === 'LIST') return getBaseKind(ref.ofType);
+  return ref.kind;
 }
 
 function isLeafKind(kind: string): boolean {
-  return kind === 'SCALAR' || kind === 'ENUM'
+  return kind === 'SCALAR' || kind === 'ENUM';
 }
 
 /** Build a smart field snippet: scalars → plain name, objects → name { <first scalars> } */
 function buildSnippet(field: GqlField, typeMap: Map<string, GqlType>): string {
-  const baseTypeName = getBaseTypeName(field.type)
-  const baseKind     = getBaseKind(field.type)
-  const type         = typeMap.get(baseTypeName)
+  const baseTypeName = getBaseTypeName(field.type);
+  const baseKind     = getBaseKind(field.type);
+  const type         = typeMap.get(baseTypeName);
 
   const args = field.args.length > 0
     ? `(${field.args.map(a => `${a.name}: $${a.name}`).join(', ')})`
-    : ''
+    : '';
 
   if ((baseKind === 'OBJECT' || baseKind === 'INTERFACE') && type?.fields?.length) {
     const leaves = type.fields
       .filter(f => isLeafKind(getBaseKind(f.type)))
       .slice(0, 4)
       .map(f => `    ${f.name}`)
-      .join('\n')
-    return `  ${field.name}${args} {\n${leaves || '    # fields'}\n  }`
+      .join('\n');
+    return `  ${field.name}${args} {\n${leaves || '    # fields'}\n  }`;
   }
-  return `  ${field.name}${args}`
+  return `  ${field.name}${args}`;
 }
 
 /** Insert a snippet into a query string, before the last closing brace. */
 function insertSnippet(query: string, snippet: string): string {
-  const trimmed = query.trim()
-  if (!trimmed) return `query {\n${snippet}\n}`
+  const trimmed = query.trim();
+  if (!trimmed) return `query {\n${snippet}\n}`;
 
-  const lastBrace = trimmed.lastIndexOf('}')
-  if (lastBrace === -1) return trimmed + '\n' + snippet
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (lastBrace === -1) return trimmed + '\n' + snippet;
 
-  return trimmed.slice(0, lastBrace).trimEnd() + '\n' + snippet + '\n' + trimmed.slice(lastBrace)
+  return trimmed.slice(0, lastBrace).trimEnd() + '\n' + snippet + '\n' + trimmed.slice(lastBrace);
 }
 
 // ─── Introspection ────────────────────────────────────────────────────────────
@@ -115,24 +115,24 @@ const INTROSPECTION_QUERY = `query IntrospectionQuery {
       }
     }
   }
-}`
+}`;
 
 async function fetchSchema(url: string, extraHeaders: Record<string, string> = {}): Promise<ParsedSchema> {
   const resp = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...extraHeaders },
     body: JSON.stringify({ query: INTROSPECTION_QUERY }),
-  })
-  const data = await resp.json()
-  const schema = data?.data?.__schema
+  });
+  const data = await resp.json();
+  const schema = data?.data?.__schema;
   if (!schema) {
-    const msg = data?.errors?.[0]?.message ?? 'Invalid introspection response'
-    throw new Error(msg)
+    const msg = data?.errors?.[0]?.message ?? 'Invalid introspection response';
+    throw new Error(msg);
   }
 
-  const typeMap = new Map<string, GqlType>()
+  const typeMap = new Map<string, GqlType>();
   for (const t of schema.types as GqlType[]) {
-    if (t.name && !t.name.startsWith('__')) typeMap.set(t.name, t)
+    if (t.name && !t.name.startsWith('__')) typeMap.set(t.name, t);
   }
 
   return {
@@ -140,7 +140,7 @@ async function fetchSchema(url: string, extraHeaders: Record<string, string> = {
     mutationType: schema.mutationType?.name ?? null,
     subscriptionType: schema.subscriptionType?.name ?? null,
     typeMap,
-  }
+  };
 }
 
 // ─── Schema explorer components ──────────────────────────────────────────────
@@ -156,12 +156,12 @@ function FieldNode({
   depth: number
   onInsert: (snippet: string) => void
 }) {
-  const [expanded, setExpanded] = useState(false)
-  const baseTypeName = getBaseTypeName(field.type)
-  const baseKind     = getBaseKind(field.type)
-  const isObject     = baseKind === 'OBJECT' || baseKind === 'INTERFACE'
-  const nestedType   = typeMap.get(baseTypeName)
-  const hasChildren  = isObject && !!nestedType?.fields?.length
+  const [expanded, setExpanded] = useState(false);
+  const baseTypeName = getBaseTypeName(field.type);
+  const baseKind     = getBaseKind(field.type);
+  const isObject     = baseKind === 'OBJECT' || baseKind === 'INTERFACE';
+  const nestedType   = typeMap.get(baseTypeName);
+  const hasChildren  = isObject && !!nestedType?.fields?.length;
 
   return (
     <div>
@@ -206,7 +206,7 @@ function FieldNode({
         <FieldNode key={f.name} field={f} typeMap={typeMap} depth={depth + 1} onInsert={onInsert} />
       ))}
     </div>
-  )
+  );
 }
 
 function RootTypeSection({
@@ -220,9 +220,9 @@ function RootTypeSection({
   typeMap: Map<string, GqlType>
   onInsert: (snippet: string) => void
 }) {
-  const [expanded, setExpanded] = useState(true)
-  const type = typeMap.get(typeName)
-  if (!type?.fields?.length) return null
+  const [expanded, setExpanded] = useState(true);
+  const type = typeMap.get(typeName);
+  if (!type?.fields?.length) return null;
 
   return (
     <div>
@@ -238,7 +238,7 @@ function RootTypeSection({
         <FieldNode key={f.name} field={f} typeMap={typeMap} depth={0} onInsert={onInsert} />
       ))}
     </div>
-  )
+  );
 }
 
 function SchemaExplorer({
@@ -248,23 +248,23 @@ function SchemaExplorer({
   schema: ParsedSchema
   onInsert: (snippet: string) => void
 }) {
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState('');
 
-  const filter = search.trim().toLowerCase()
+  const filter = search.trim().toLowerCase();
 
-  function filteredInsert(snippet: string) { onInsert(snippet) }
+  function filteredInsert(snippet: string) { onInsert(snippet); }
 
   // When searching, show a flat filtered list across all root type fields
-  const rootTypeNames = [schema.queryType, schema.mutationType, schema.subscriptionType].filter(Boolean) as string[]
+  const rootTypeNames = [schema.queryType, schema.mutationType, schema.subscriptionType].filter(Boolean) as string[];
 
-  const allFields: { rootLabel: string; field: GqlField }[] = []
+  const allFields: { rootLabel: string; field: GqlField }[] = [];
   if (filter) {
     for (const typeName of rootTypeNames) {
-      const type = schema.typeMap.get(typeName)
+      const type = schema.typeMap.get(typeName);
       const label = typeName === schema.queryType ? 'Query'
-        : typeName === schema.mutationType ? 'Mutation' : 'Subscription'
+        : typeName === schema.mutationType ? 'Mutation' : 'Subscription';
       for (const f of type?.fields ?? []) {
-        if (f.name.toLowerCase().includes(filter)) allFields.push({ rootLabel: label, field: f })
+        if (f.name.toLowerCase().includes(filter)) allFields.push({ rootLabel: label, field: f });
       }
     }
   }
@@ -304,7 +304,7 @@ function SchemaExplorer({
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // ─── GraphQL Editor ───────────────────────────────────────────────────────────
@@ -315,44 +315,44 @@ interface Props {
 }
 
 export function GraphQLEditor({ request, onChange }: Props) {
-  const gql = request.body.graphql ?? { query: '', variables: '' }
+  const gql = request.body.graphql ?? { query: '', variables: '' };
 
-  const [schema,      setSchema]      = useState<ParsedSchema | null>(null)
-  const [schemaState, setSchemaState] = useState<'idle' | 'loading' | 'error'>('idle')
-  const [schemaError, setSchemaError] = useState<string | null>(null)
-  const [showVars,    setShowVars]    = useState(false)
-  const [showExplorer, setShowExplorer] = useState(true)
+  const [schema,      setSchema]      = useState<ParsedSchema | null>(null);
+  const [schemaState, setSchemaState] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [schemaError, setSchemaError] = useState<string | null>(null);
+  const [showVars,    setShowVars]    = useState(false);
+  const [showExplorer, setShowExplorer] = useState(true);
 
   function updateGql(patch: Partial<GraphQLBody>) {
-    onChange({ body: { ...request.body, graphql: { ...gql, ...patch } } })
+    onChange({ body: { ...request.body, graphql: { ...gql, ...patch } } });
   }
 
   const handleInsert = useCallback((snippet: string) => {
-    updateGql({ query: insertSnippet(gql.query, snippet) })
-  }, [gql.query])
+    onChange({ body: { ...request.body, graphql: { ...gql, query: insertSnippet(gql.query, snippet) } } });
+  }, [gql, onChange, request.body]);
 
   async function loadSchema() {
-    const url = request.url.trim()
-    if (!url) return
-    setSchemaState('loading')
-    setSchemaError(null)
+    const url = request.url.trim();
+    if (!url) return;
+    setSchemaState('loading');
+    setSchemaError(null);
     try {
       // Include any enabled request headers for auth
-      const extraHeaders: Record<string, string> = {}
+      const extraHeaders: Record<string, string> = {};
       for (const h of request.headers) {
-        if (h.enabled && h.key) extraHeaders[h.key] = h.value
+        if (h.enabled && h.key) extraHeaders[h.key] = h.value;
       }
-      const parsed = await fetchSchema(url, extraHeaders)
-      setSchema(parsed)
-      setSchemaState('idle')
-      setShowExplorer(true)
-    } catch (e: any) {
-      setSchemaError(e.message ?? String(e))
-      setSchemaState('error')
+      const parsed = await fetchSchema(url, extraHeaders);
+      setSchema(parsed);
+      setSchemaState('idle');
+      setShowExplorer(true);
+    } catch (e) {
+      setSchemaError(e instanceof Error ? e.message : String(e));
+      setSchemaState('error');
     }
   }
 
-  const hasSchema = !!schema
+  const hasSchema = !!schema;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -442,5 +442,5 @@ export function GraphQLEditor({ request, onChange }: Props) {
         </div>
       </div>
     </div>
-  )
+  );
 }
