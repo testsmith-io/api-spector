@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 420px;
+      height: 280px;
+      background: #1e1b2e;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      -webkit-app-region: drag;
+      user-select: none;
+    }
+    .ghost {
+      width: 90px;
+      height: 90px;
+      animation: float 2.4s ease-in-out infinite;
+      filter: drop-shadow(0 0 20px rgba(106, 163, 200, 0.7));
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50%       { transform: translateY(-10px); }
+    }
+    .name {
+      margin-top: 18px;
+      color: #e4e3ea;
+      font-size: 26px;
+      font-weight: 300;
+      letter-spacing: 3px;
+    }
+    .name .hl {
+      color: #6aa3c8;
+      font-weight: 600;
+    }
+    .tagline {
+      margin-top: 7px;
+      color: #615e6d;
+      font-size: 11px;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+    }
+    .loader {
+      margin-top: 30px;
+      width: 110px;
+      height: 2px;
+      background: #2a2740;
+      border-radius: 1px;
+      overflow: hidden;
+    }
+    .loader-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #1a4e7e 0%, #6aa3c8 50%, #1a4e7e 100%);
+      background-size: 200% 100%;
+      border-radius: 1px;
+      animation: shimmer 1.5s linear infinite;
+    }
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    /* Eye roll — pupils move in a circle, then rest, then repeat */
+    .pupil {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: eyeRoll 5s ease-in-out infinite;
+    }
+    .pupil-r {
+      animation-delay: 0.04s; /* tiny lag so eyes don't look robotic */
+    }
+    @keyframes eyeRoll {
+      0%,  18% { transform: translate(0px,   0px);  }  /* rest */
+      23%      { transform: translate(-7px, -5px);  }  /* up-left */
+      28%      { transform: translate(0px,  -8px);  }  /* up */
+      33%      { transform: translate(7px,  -5px);  }  /* up-right */
+      38%      { transform: translate(9px,   0px);  }  /* right */
+      43%      { transform: translate(7px,   5px);  }  /* down-right */
+      48%      { transform: translate(0px,   7px);  }  /* down */
+      53%      { transform: translate(-7px,  5px);  }  /* down-left */
+      58%      { transform: translate(-9px,  0px);  }  /* left */
+      63%      { transform: translate(0px,   0px);  }  /* back */
+      100%     { transform: translate(0px,   0px);  }  /* rest until next cycle */
+    }
+  </style>
+</head>
+<body>
+  <svg class="ghost" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+    <rect width="512" height="512" rx="115" ry="115" fill="#1e1b2e"/>
+    <ellipse cx="256" cy="300" rx="145" ry="150" fill="#205d96" opacity="0.15"/>
+    <path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z" fill="#205d96"/>
+    <path d="M 155,235 C 155,125 357,125 357,235 L 357,248 C 357,138 155,138 155,248 Z" fill="#6aa3c8" opacity="0.3"/>
+    <ellipse cx="198" cy="262" rx="29" ry="33" fill="white"/>
+    <ellipse cx="314" cy="262" rx="29" ry="33" fill="white"/>
+    <ellipse cx="204" cy="268" rx="16" ry="20" fill="#1e1b2e" class="pupil"/>
+    <ellipse cx="320" cy="268" rx="16" ry="20" fill="#1e1b2e" class="pupil pupil-r"/>
+    <ellipse cx="194" cy="254" rx="6" ry="7" fill="white" opacity="0.55"/>
+    <ellipse cx="310" cy="254" rx="6" ry="7" fill="white" opacity="0.55"/>
+  </svg>
+
+  <div class="name">api <span class="hl">Spector</span></div>
+  <div class="tagline">Sharp eyes on every API</div>
+  <div class="loader"><div class="loader-fill"></div></div>
+</body>
+</html>

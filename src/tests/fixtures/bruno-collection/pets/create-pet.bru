@@ -1,0 +1,26 @@
+meta {
+  name: Create pet
+  type: http
+  seq: 2
+}
+
+post {
+  url: https://api.petstore.com/v1/pets
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Fido",
+    "age": 3
+  }
+}
+
+auth:bearer {
+  token: {{AUTH_TOKEN}}
+}

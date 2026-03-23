@@ -1,0 +1,19 @@
+meta {
+  name: List pets
+  type: http
+  seq: 1
+}
+
+get {
+  url: https://api.petstore.com/v1/pets
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+params:query {
+  limit: 10
+}

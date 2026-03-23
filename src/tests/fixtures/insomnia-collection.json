@@ -1,0 +1,56 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "resources": [
+    {
+      "_type": "workspace",
+      "_id": "wrk_001",
+      "parentId": null,
+      "name": "Pet Store",
+      "description": "Pet Store API"
+    },
+    {
+      "_type": "request_group",
+      "_id": "fld_001",
+      "parentId": "wrk_001",
+      "name": "Pets",
+      "description": ""
+    },
+    {
+      "_type": "request",
+      "_id": "req_001",
+      "parentId": "fld_001",
+      "name": "List pets",
+      "method": "GET",
+      "url": "https://api.petstore.com/v1/pets",
+      "headers": [
+        { "name": "Accept", "value": "application/json", "disabled": false }
+      ],
+      "parameters": [
+        { "name": "limit", "value": "10", "disabled": false }
+      ],
+      "body": {},
+      "authentication": { "type": "none" }
+    },
+    {
+      "_type": "request",
+      "_id": "req_002",
+      "parentId": "fld_001",
+      "name": "Create pet",
+      "method": "POST",
+      "url": "https://api.petstore.com/v1/pets",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json", "disabled": false }
+      ],
+      "parameters": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"name\": \"Fido\", \"age\": 3}"
+      },
+      "authentication": {
+        "type": "bearer",
+        "token": "{{AUTH_TOKEN}}"
+      }
+    }
+  ]
+}

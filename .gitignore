@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+dist/
+dist-electron/
+release/
+
+# Electron builder output
+build/frames/
+build/*.icns
+build/*.ico
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets / local env
+*.secrets
+.env
+.env.local
+
+# Editor
+.vscode/settings.json
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Claude
+.claude

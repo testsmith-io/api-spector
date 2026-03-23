@@ -1,0 +1,140 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Testsmith brand tokens ────────────────────────────────────────────────── */
+:root {
+  /* Blue (#205d96) scale */
+  --ts-blue-400: #6aa3c8;
+  --ts-blue-500: #3d7fb2;
+  --ts-blue-600: #205d96;
+  --ts-blue-700: #1a4e7e;
+
+  /* Green (#9fc93c) scale */
+  --ts-green-400: #9fc93c;
+  --ts-green-800: #4a5e1d;
+  --ts-green-900: #2d3a12;
+
+  /* Drag region height */
+  --drag-region: 28px;
+}
+
+/* ─── Dark theme (default) ─────────────────────────────────────────────────── */
+/* Charcoal-purple scale — lifted from near-black to a comfortable slate       */
+:root {
+  --surface-50:  #f0eff4;
+  --surface-100: #dddce3;
+  --surface-200: #c4c2cb;
+  --surface-400: #9d9aa8;
+  --surface-500: #7a7785;
+  --surface-700: #615e6d;
+  --surface-800: #3d3b48;
+  --surface-900: #312f3b;
+  --surface-950: #272630;
+  --text-primary: #e4e3ea;
+  --text-muted:   #9d9aa8;
+
+  --bg-app:  #272630;
+  --border:  #3d3b48;
+}
+
+/* ─── Light theme ──────────────────────────────────────────────────────────── */
+/* Warm stone scale — pulled down from near-white to a readable grey-paper     */
+:root.light {
+  --surface-50:  #272630;
+  --surface-100: #312f3b;
+  --surface-200: #3d3b48;
+  --surface-400: #615e6d;
+  --surface-500: #716e7b;
+  --surface-700: #908e9a;
+  --surface-800: #c4c2cb;
+  --surface-900: #d5d3dc;
+  --surface-950: #e2e0e9;
+  --text-primary: #1c1b24;
+  --text-muted:   #615e6d;
+
+  --bg-app:  #e2e0e9;
+  --border:  #c4c2cb;
+
+  /* Green: darken for legibility on light background (#9fc93c → ~35% lightness) */
+  --ts-green-400: #567818;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+.drag-region { -webkit-app-region: drag; height: var(--drag-region); }
+.no-drag     { -webkit-app-region: no-drag; }
+
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.cm-editor  { height: 100%; }
+.cm-scroller { overflow: auto; }
+
+/* ─── Light mode: re-map white to readable primary text ───────────────────── */
+/* In dark mode "text-white" means "foreground text". In light mode it becomes  */
+/* invisible (white-on-white). Override to the semantic primary text color.     */
+:root.light .text-white,
+:root.light .hover\:text-white:hover {
+  color: var(--text-primary) !important;
+}
+/* Exception: coloured action buttons must keep white text regardless           */
+:root.light .bg-blue-500,
+:root.light .bg-blue-600,
+:root.light .bg-blue-700,
+:root.light .hover\:bg-blue-500:hover,
+:root.light .hover\:bg-blue-600:hover,
+:root.light .bg-emerald-600,
+:root.light .bg-red-600,
+:root.light .bg-amber-600,
+:root.light .bg-orange-600 {
+  color: #ffffff !important;
+}
+/* Inputs & textareas need dark placeholder text in light mode */
+:root.light input::placeholder,
+:root.light textarea::placeholder {
+  color: var(--text-muted) !important;
+  opacity: 1;
+}
+/* Ensure surface-800 interactive backgrounds are clearly visible in light mode */
+:root.light .bg-surface-800 {
+  background-color: var(--surface-800);
+}
+/* Option elements inherit white bg from OS in light mode – ensure readable text */
+:root.light option {
+  color: #1c1b24;
+  background: #d5d3dc;
+}
+
+/* ─── Light mode: semantic status colors ────────────────────────────────────── */
+/* Red — errors, failures */
+:root.light .text-red-300 { color: #b91c1c !important; }   /* red-700  */
+:root.light .text-red-400 { color: #dc2626 !important; }   /* red-600  */
+:root.light .text-red-500 { color: #991b1b !important; }   /* red-800  */
+:root.light .bg-red-900\/30 { background-color: #fee2e2 !important; }  /* red-100  */
+:root.light .bg-red-900\/20 { background-color: #fef2f2 !important; }  /* red-50   */
+:root.light .border-red-700 { border-color: #fca5a5 !important; }      /* red-300  */
+:root.light .border-red-800 { border-color: #fca5a5 !important; }      /* red-300  */
+
+/* Emerald — success, passed tests, diff additions */
+:root.light .text-emerald-300 { color: #15803d !important; }  /* green-700 */
+:root.light .text-emerald-400 { color: #16a34a !important; }  /* green-600 */
+:root.light .bg-emerald-900\/20 { background-color: #f0fdf4 !important; }  /* green-50  */
+:root.light .bg-emerald-900\/30 { background-color: #dcfce7 !important; }  /* green-100 */
+:root.light .border-emerald-800 { border-color: #86efac !important; }      /* green-300 */
+:root.light .border-emerald-700 { border-color: #86efac !important; }      /* green-300 */
+
+/* Amber — warnings */
+:root.light .text-amber-300 { color: #b45309 !important; }  /* amber-700 */
+:root.light .text-amber-400 { color: #d97706 !important; }  /* amber-500 */

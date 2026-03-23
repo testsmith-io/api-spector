@@ -1,0 +1,41 @@
+{
+  "info": {
+    "name": "Pet Store",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Pets",
+      "item": [
+        {
+          "name": "List pets",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "https://api.petstore.com/v1/pets?limit=10",
+              "query": [{ "key": "limit", "value": "10" }]
+            }
+          }
+        },
+        {
+          "name": "Create pet",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"Fido\", \"age\": 3}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "https://api.petstore.com/v1/pets" }
+          }
+        }
+      ]
+    }
+  ]
+}
