@@ -22,7 +22,7 @@ const { electron } = window;
 
 // ─── Activity bar icons ───────────────────────────────────────────────────────
 
-function IconCollections() {
+function IconCollections () {
   return (
     <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
       <path d="M2 6a2 2 0 012-2h4l2 2h4a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
@@ -30,7 +30,7 @@ function IconCollections() {
   );
 }
 
-function IconHistory() {
+function IconHistory () {
   return (
     <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
       <path
@@ -42,7 +42,7 @@ function IconHistory() {
   );
 }
 
-function IconMock() {
+function IconMock () {
   return (
     <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
       <path fillRule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm14 1a1 1 0 11-2 0 1 1 0 012 0zM2 13a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2zm14 1a1 1 0 11-2 0 1 1 0 012 0z" clipRule="evenodd" />
@@ -50,7 +50,7 @@ function IconMock() {
   );
 }
 
-function IconContract() {
+function IconContract () {
   return (
     <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
       <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 14a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 5.477V17H13a1 1 0 110 2H7a1 1 0 110-2h2V5.477L6.237 6.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 14a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.788l1.599.799L9 3.323V3a1 1 0 011-1z" clipRule="evenodd" />
@@ -58,7 +58,7 @@ function IconContract() {
   );
 }
 
-function ActivityBarBtn({
+function ActivityBarBtn ( {
   active,
   onClick,
   title,
@@ -70,16 +70,15 @@ function ActivityBarBtn({
   title: string
   badge?: number
   children: React.ReactNode
-}) {
+} ) {
   return (
     <button
       onClick={onClick}
       title={title}
-      className={`relative w-10 h-10 flex items-center justify-center rounded transition-colors ${
-        active
-          ? 'text-white bg-surface-800'
-          : 'text-surface-600 hover:text-surface-300 hover:bg-surface-800/50'
-      }`}
+      className={`relative w-10 h-10 flex items-center justify-center rounded transition-colors ${active
+        ? 'text-white bg-surface-800'
+        : 'text-surface-600 hover:text-surface-300 hover:bg-surface-800/50'
+        }`}
     >
       {children}
       {badge !== undefined && badge > 0 && (
@@ -96,93 +95,93 @@ function ActivityBarBtn({
 // ─── Method badge colors for tab bar ─────────────────────────────────────────
 
 const TAB_METHOD_COLORS: Record<string, string> = {
-  GET:     'text-emerald-400',
-  POST:    'text-blue-400',
-  PUT:     'text-amber-400',
-  PATCH:   'text-orange-400',
-  DELETE:  'text-red-400',
-  HEAD:    'text-purple-400',
+  GET: 'text-emerald-400',
+  POST: 'text-blue-400',
+  PUT: 'text-amber-400',
+  PATCH: 'text-orange-400',
+  DELETE: 'text-red-400',
+  HEAD: 'text-purple-400',
   OPTIONS: 'text-gray-400',
 };
 
-export default function App() {
+export default function App () {
   useAutoSave();
   const { applyWorkspace } = useWorkspaceLoader();
-  const workspace          = useStore(s => s.workspace);
-  const collections        = useStore(s => s.collections);
-  const tabs               = useStore(s => s.tabs);
-  const activeTabId        = useStore(s => s.activeTabId);
-  const setActiveTabId     = useStore(s => s.setActiveTabId);
-  const closeTab           = useStore(s => s.closeTab);
-  const showGeneratorPanel = useStore(s => s.showGeneratorPanel);
-  const sidebarTab         = useStore(s => s.sidebarTab);
-  const setSidebarTab      = useStore(s => s.setSidebarTab);
-  const historyCount       = useStore(s => s.history.length);
-  const addMockHit             = useStore(s => s.addMockHit);
-  const activeMockId           = useStore(s => s.activeMockId);
-  const theme                  = useStore(s => s.theme);
-  const setCommandPaletteOpen  = useStore(s => s.setCommandPaletteOpen);
-  const setWsStatus            = useStore(s => s.setWsStatus);
-  const addWsMessage           = useStore(s => s.addWsMessage);
+  const workspace = useStore( s => s.workspace );
+  const collections = useStore( s => s.collections );
+  const tabs = useStore( s => s.tabs );
+  const activeTabId = useStore( s => s.activeTabId );
+  const setActiveTabId = useStore( s => s.setActiveTabId );
+  const closeTab = useStore( s => s.closeTab );
+  const showGeneratorPanel = useStore( s => s.showGeneratorPanel );
+  const sidebarTab = useStore( s => s.sidebarTab );
+  const setSidebarTab = useStore( s => s.setSidebarTab );
+  const historyCount = useStore( s => s.history.length );
+  const addMockHit = useStore( s => s.addMockHit );
+  const activeMockId = useStore( s => s.activeMockId );
+  const theme = useStore( s => s.theme );
+  const setCommandPaletteOpen = useStore( s => s.setCommandPaletteOpen );
+  const setWsStatus = useStore( s => s.setWsStatus );
+  const addWsMessage = useStore( s => s.addWsMessage );
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [responseOpen, setResponseOpen] = useState(true);
-  const [docsModalOpen, setDocsModalOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState( true );
+  const [responseOpen, setResponseOpen] = useState( true );
+  const [docsModalOpen, setDocsModalOpen] = useState( false );
 
   // Auto-load last opened workspace on startup
-  useEffect(() => {
-    electron.getLastWorkspace().then((result: { workspace: unknown; workspacePath: string } | null) => {
-      if (result) applyWorkspace(result.workspace, result.workspacePath);
-    });
-  }, [applyWorkspace]);
+  useEffect( () => {
+    electron.getLastWorkspace().then( ( result: { workspace: unknown; workspacePath: string } | null ) => {
+      if ( result ) applyWorkspace( result.workspace, result.workspacePath );
+    } );
+  }, [applyWorkspace] );
 
-  useEffect(() => {
-    electron.onMockHit(addMockHit);
+  useEffect( () => {
+    electron.onMockHit( addMockHit );
     return () => electron.offMockHit();
-  }, [addMockHit]);
+  }, [addMockHit] );
 
-  useEffect(() => {
-    electron.onWsMessage(({ requestId, message }: { requestId: string; message: Parameters<typeof addWsMessage>[1] }) => {
-      addWsMessage(requestId, message);
-    });
-    electron.onWsStatus(({ requestId, status, error }: { requestId: string; status: Parameters<typeof setWsStatus>[1]; error?: string }) => {
-      setWsStatus(requestId, status, error);
-    });
+  useEffect( () => {
+    electron.onWsMessage( ( { requestId, message }: { requestId: string; message: Parameters<typeof addWsMessage>[1] } ) => {
+      addWsMessage( requestId, message );
+    } );
+    electron.onWsStatus( ( { requestId, status, error }: { requestId: string; status: Parameters<typeof setWsStatus>[1]; error?: string } ) => {
+      setWsStatus( requestId, status, error );
+    } );
     return () => electron.offWsEvents();
-  }, [addWsMessage, setWsStatus]);
+  }, [addWsMessage, setWsStatus] );
 
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+  useEffect( () => {
+    function handleKeyDown ( e: KeyboardEvent ) {
+      if ( e.key === 'k' && ( e.metaKey || e.ctrlKey ) ) {
         e.preventDefault();
-        setCommandPaletteOpen(true);
+        setCommandPaletteOpen( true );
       }
     }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setCommandPaletteOpen]);
+    window.addEventListener( 'keydown', handleKeyDown );
+    return () => window.removeEventListener( 'keydown', handleKeyDown );
+  }, [setCommandPaletteOpen] );
 
   // Keep light class in sync when OS preference changes (system theme)
-  useEffect(() => {
-    if (theme !== 'system') return;
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = (e: MediaQueryListEvent) =>
-      document.documentElement.classList.toggle('light', !e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, [theme]);
+  useEffect( () => {
+    if ( theme !== 'system' ) return;
+    const mq = window.matchMedia( '(prefers-color-scheme: dark)' );
+    const handler = ( e: MediaQueryListEvent ) =>
+      document.documentElement.classList.toggle( 'light', !e.matches );
+    mq.addEventListener( 'change', handler );
+    return () => mq.removeEventListener( 'change', handler );
+  }, [theme] );
 
-  const activeTab = tabs.find(t => t.id === activeTabId) ?? null;
+  const activeTab = tabs.find( t => t.id === activeTabId ) ?? null;
   const activeRequest = activeTab?.requestId
-    ? Object.values(collections).find(c => c.data.requests[activeTab.requestId!])?.data.requests[activeTab.requestId!]
+    ? Object.values( collections ).find( c => c.data.requests[activeTab.requestId!] )?.data.requests[activeTab.requestId!]
     : null;
 
-  function selectPanel(tab: 'collections' | 'history' | 'mocks' | 'contracts') {
-    if (sidebarTab === tab && sidebarOpen) {
-      setSidebarOpen(false);
+  function selectPanel ( tab: 'collections' | 'history' | 'mocks' | 'contracts' ) {
+    if ( sidebarTab === tab && sidebarOpen ) {
+      setSidebarOpen( false );
     } else {
-      setSidebarTab(tab);
-      setSidebarOpen(true);
+      setSidebarTab( tab );
+      setSidebarOpen( true );
     }
   }
 
@@ -190,16 +189,17 @@ export default function App() {
     <div className="flex flex-col h-screen bg-surface-950" style={{ color: 'var(--text-primary)' }}>
       <RunnerModal />
       <CommandPalette />
-      {docsModalOpen && <DocsGeneratorModal onClose={() => setDocsModalOpen(false)} />}
+      {docsModalOpen && <DocsGeneratorModal onClose={() => setDocsModalOpen( false )} />}
       {/* macOS drag region with centered title */}
       <div className="drag-region flex-shrink-0 bg-surface-950 flex items-center justify-center">
         <span className="no-drag text-[11px] font-medium tracking-widest select-none" style={{ color: 'var(--text-muted)' }}>
           api <span style={{ color: '#6aa3c8' }}>Spector</span>
+          {__APP_VERSION__ && <span className="ml-2 text-[10px] font-normal opacity-50">v{__APP_VERSION__}</span>}
         </span>
       </div>
 
       {/* Header */}
-      <Toolbar onOpenDocs={() => setDocsModalOpen(true)} />
+      <Toolbar onOpenDocs={() => setDocsModalOpen( true )} />
 
       {workspace ? (
         <div className="flex flex-1 min-h-0">
@@ -207,14 +207,14 @@ export default function App() {
           <div className="w-12 flex-shrink-0 flex flex-col items-center pt-1 gap-0.5 border-r border-surface-800 bg-surface-950">
             <ActivityBarBtn
               active={sidebarOpen && sidebarTab === 'collections'}
-              onClick={() => selectPanel('collections')}
+              onClick={() => selectPanel( 'collections' )}
               title="Collections"
             >
               <IconCollections />
             </ActivityBarBtn>
             <ActivityBarBtn
               active={sidebarOpen && sidebarTab === 'history'}
-              onClick={() => selectPanel('history')}
+              onClick={() => selectPanel( 'history' )}
               title="History"
               badge={historyCount}
             >
@@ -222,14 +222,14 @@ export default function App() {
             </ActivityBarBtn>
             <ActivityBarBtn
               active={sidebarOpen && sidebarTab === 'mocks'}
-              onClick={() => selectPanel('mocks')}
+              onClick={() => selectPanel( 'mocks' )}
               title="Mock servers"
             >
               <IconMock />
             </ActivityBarBtn>
             <ActivityBarBtn
               active={sidebarOpen && sidebarTab === 'contracts'}
-              onClick={() => selectPanel('contracts')}
+              onClick={() => selectPanel( 'contracts' )}
               title="Contract testing"
             >
               <IconContract />
@@ -250,20 +250,20 @@ export default function App() {
                     </span>
                   )}
                   <button
-                    onClick={() => setSidebarOpen(false)}
+                    onClick={() => setSidebarOpen( false )}
                     title="Collapse sidebar"
                     className="text-surface-600 hover:text-surface-300 transition-colors text-sm leading-none px-0.5"
                   >‹</button>
                 </div>
               </div>
               {sidebarTab === 'collections' ? <CollectionTree /> :
-               sidebarTab === 'history'     ? <HistoryPanel /> :
-               sidebarTab === 'mocks'       ? <MockPanel /> :
-                                              <ContractPanel />}
+                sidebarTab === 'history' ? <HistoryPanel /> :
+                  sidebarTab === 'mocks' ? <MockPanel /> :
+                    <ContractPanel />}
             </aside>
           ) : (
             <button
-              onClick={() => setSidebarOpen(true)}
+              onClick={() => setSidebarOpen( true )}
               title="Expand sidebar"
               className="flex-shrink-0 w-5 flex items-center justify-center border-r border-surface-800 bg-surface-950 hover:bg-surface-800 text-surface-700 hover:text-surface-300 transition-colors"
             >
@@ -276,20 +276,19 @@ export default function App() {
             {/* Tab bar */}
             {tabs.length > 0 && (
               <div className="flex items-center border-b border-surface-800 bg-surface-950 overflow-x-auto flex-shrink-0">
-                {tabs.map(tab => {
+                {tabs.map( tab => {
                   const req = tab.requestId
-                    ? Object.values(collections).find(c => c.data.requests[tab.requestId!])?.data.requests[tab.requestId!]
+                    ? Object.values( collections ).find( c => c.data.requests[tab.requestId!] )?.data.requests[tab.requestId!]
                     : null;
                   const isActive = tab.id === activeTabId;
                   return (
                     <div
                       key={tab.id}
-                      onClick={() => setActiveTabId(tab.id)}
-                      className={`group flex items-center gap-1.5 px-3 py-1.5 border-r border-surface-800 cursor-pointer min-w-0 max-w-[200px] flex-shrink-0 transition-colors ${
-                        isActive
-                          ? 'bg-surface-900 border-b-2 border-b-blue-500 -mb-px'
-                          : 'hover:bg-surface-900/50 text-surface-600'
-                      }`}
+                      onClick={() => setActiveTabId( tab.id )}
+                      className={`group flex items-center gap-1.5 px-3 py-1.5 border-r border-surface-800 cursor-pointer min-w-0 max-w-[200px] flex-shrink-0 transition-colors ${isActive
+                        ? 'bg-surface-900 border-b-2 border-b-blue-500 -mb-px'
+                        : 'hover:bg-surface-900/50 text-surface-600'
+                        }`}
                     >
                       {req && (
                         <span className={`text-[10px] font-bold shrink-0 ${TAB_METHOD_COLORS[req.method] ?? 'text-gray-400'}`}>
@@ -300,7 +299,7 @@ export default function App() {
                         {req?.name ?? 'Untitled'}
                       </span>
                       <button
-                        onClick={e => { e.stopPropagation(); closeTab(tab.id); }}
+                        onClick={e => { e.stopPropagation(); closeTab( tab.id ); }}
                         className="ml-auto opacity-0 group-hover:opacity-100 shrink-0 text-surface-600 hover:text-white transition-all leading-none"
                         title="Close tab"
                       >
@@ -308,7 +307,7 @@ export default function App() {
                       </button>
                     </div>
                   );
-                })}
+                } )}
               </div>
             )}
 
@@ -328,7 +327,7 @@ export default function App() {
                 </div>
                 {/* Response panel toggle strip */}
                 <button
-                  onClick={() => setResponseOpen(v => !v)}
+                  onClick={() => setResponseOpen( v => !v )}
                   title={responseOpen ? 'Collapse response' : 'Expand response'}
                   className="flex-shrink-0 w-5 flex items-center justify-center border-x border-surface-800 bg-surface-950 hover:bg-surface-800 text-surface-700 hover:text-surface-300 transition-colors"
                 >

@@ -114,15 +114,21 @@ function IconBtn({
   alwaysVisible?: boolean
 }) {
   return (
-    <button
-      title={title}
-      onClick={e => { e.stopPropagation(); onClick(e); }}
-      className={`px-1 py-0.5 rounded transition-colors ${
-        alwaysVisible ? '' : 'opacity-0 group-hover:opacity-100'
-      } ${danger ? 'hover:text-red-400' : 'hover:text-blue-400'} text-surface-400`}
-    >
-      {children}
-    </button>
+    <div className="relative group/tip">
+      <button
+        onClick={e => { e.stopPropagation(); onClick(e); }}
+        className={`px-1 py-0.5 rounded transition-all ${
+          alwaysVisible ? '' : 'opacity-0 group-hover:opacity-100'
+        } ${danger ? 'hover:text-red-400' : 'hover:text-blue-400'} text-surface-400 hover:scale-150`}
+      >
+        {children}
+      </button>
+      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 hidden group-hover/tip:block">
+        <span className="whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] bg-[#1e1b2e] text-gray-300 border border-white/10 shadow-lg">
+          {title}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -221,6 +227,8 @@ export function CollectionTree() {
 
 // ─── Collection row ───────────────────────────────────────────────────────────
 
+type ExpandCtrl = { value: boolean; seq: number };
+
 function CollectionNode({
   col, isActive, activeRequestId,
   existingCollectionNames,
@@ -254,6 +262,10 @@ function CollectionNode({
 }) {
   const [expanded, setExpanded] = useState(true);
   const [renaming, setRenaming] = useState(false);
+  const [expandCtrl, setExpandCtrl] = useState<ExpandCtrl>({ value: true, seq: 0 });
+
+  function expandAll()   { setExpandCtrl(c => ({ value: true,  seq: c.seq + 1 })); }
+  function collapseAll() { setExpandCtrl(c => ({ value: false, seq: c.seq + 1 })); }
 
   return (
     <div>
@@ -282,6 +294,8 @@ function CollectionNode({
 
         <div className="flex items-center shrink-0 gap-0">
           <RunBtn onClick={onRunCollection} />
+          <IconBtn title="Expand all folders" onClick={expandAll}><ExpandAllIcon /></IconBtn>
+          <IconBtn title="Collapse all folders" onClick={collapseAll}><CollapseAllIcon /></IconBtn>
           <IconBtn title="Collection data (iterations)" onClick={onSelectCollection}><TableIcon /></IconBtn>
           <IconBtn title="Add request" onClick={() => onAddRequest(col.rootFolder.id)}><span className="text-xs">+</span></IconBtn>
           <IconBtn title="Add folder" onClick={() => onAddFolder(col.rootFolder.id, 'New Folder')}><FolderIcon /></IconBtn>
@@ -297,6 +311,7 @@ function CollectionNode({
           requests={col.requests}
           activeRequestId={activeRequestId}
           depth={0}
+          expandCtrl={expandCtrl}
           onSelectRequest={onSelectRequest}
           onAddRequest={onAddRequest}
           onAddFolder={onAddFolder}
@@ -318,6 +333,7 @@ function CollectionNode({
 
 function FolderRow({
   folder, collectionId, depth,
+  expandCtrl,
   onAddRequest, onAddFolder,
   onRename, onDelete,
   onUpdateTags, onRun,
@@ -326,6 +342,7 @@ function FolderRow({
   folder: Folder
   collectionId: string
   depth: number
+  expandCtrl: ExpandCtrl
   onAddRequest: () => void
   onAddFolder: () => void
   onRename: (name: string) => void
@@ -335,6 +352,9 @@ function FolderRow({
   children: React.ReactNode
 }) {
   const [expanded, setExpanded] = useState(true);
+  useEffect(() => {
+    if (expandCtrl.seq > 0) setExpanded(expandCtrl.value);
+  }, [expandCtrl.seq]); // eslint-disable-line react-hooks/exhaustive-deps
   const [renaming, setRenaming] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const tags = folder.tags ?? [];
@@ -403,6 +423,7 @@ function FolderRow({
 
 function FolderContents({
   folder, collectionId, requests, activeRequestId, depth,
+  expandCtrl,
   onSelectRequest, onAddRequest, onAddFolder,
   onRenameFolder, onDeleteFolder,
   onRenameRequest, onDeleteRequest, onDuplicateRequest,
@@ -413,6 +434,7 @@ function FolderContents({
   requests: Collection['requests']
   activeRequestId: string | null
   depth: number
+  expandCtrl: ExpandCtrl
   onSelectRequest: (id: string) => void
   onAddRequest: (folderId: string) => void
   onAddFolder: (parentId: string, name: string) => void
@@ -433,6 +455,7 @@ function FolderContents({
           folder={sub}
           collectionId={collectionId}
           depth={depth + 1}
+          expandCtrl={expandCtrl}
           onAddRequest={() => onAddRequest(sub.id)}
           onAddFolder={() => onAddFolder(sub.id, 'New Folder')}
           onRename={name => onRenameFolder(sub.id, name)}
@@ -446,6 +469,7 @@ function FolderContents({
             requests={requests}
             activeRequestId={activeRequestId}
             depth={depth + 1}
+            expandCtrl={expandCtrl}
             onSelectRequest={onSelectRequest}
             onAddRequest={onAddRequest}
             onAddFolder={onAddFolder}
@@ -591,6 +615,20 @@ function KeyIcon() {
   return (
     <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a4 4 0 110 8 4 4 0 010-8zm-7 8l-1 1m0 0l-1 1m1-1l1 1M3 20l5-5" />
+    </svg>
+  );
+}
+function ExpandAllIcon() {
+  return (
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h8M4 18h16M15 15l3 3 3-3" />
+    </svg>
+  );
+}
+function CollapseAllIcon() {
+  return (
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h8M4 18h16M21 12l-3-3-3 3" />
     </svg>
   );
 }
