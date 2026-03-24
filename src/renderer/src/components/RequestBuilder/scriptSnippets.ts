@@ -1,3 +1,19 @@
+// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
+//
+// This file is part of api Spector.
+//
+// api Spector is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 3.
+//
+// api Spector is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+
 export interface Snippet {
   label: string
   code: string
@@ -153,6 +169,22 @@ export const SNIPPET_GROUPS: SnippetGroup[] = [
       {
         label: 'Save JSON field to environment',
         code: `const json = sp.response.json();\nsp.environment.set("token", json.token);`,
+      },
+      {
+        label: 'Extract via JSONPath to variable',
+        code: `const matches = sp.jsonPath(sp.response.json(), '$.data[0].id');\nsp.variables.set("extracted_value", String(matches[0] ?? ''));`,
+      },
+      {
+        label: 'Extract via JSONPath to environment',
+        code: `const matches = sp.jsonPath(sp.response.json(), '$.data[0].id');\nsp.environment.set("extracted_value", String(matches[0] ?? ''));`,
+      },
+      {
+        label: 'Extract from XML to variable',
+        code: `sp.variables.set("extracted_value", sp.response.xmlText("ElementName") ?? '');`,
+      },
+      {
+        label: 'Extract from XML to environment',
+        code: `sp.environment.set("extracted_value", sp.response.xmlText("ElementName") ?? '');`,
       },
     ],
   },

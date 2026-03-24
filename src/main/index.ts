@@ -1,3 +1,19 @@
+// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
+//
+// This file is part of api Spector.
+//
+// api Spector is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 3.
+//
+// api Spector is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+
 import { app, BrowserWindow, ipcMain, nativeImage } from 'electron';
 import { join } from 'path';
 import { existsSync, readFileSync } from 'fs';
@@ -101,6 +117,13 @@ function createWindow(): void {
       win.show();
     }, 1200);
   });
+
+  // On Windows the native title bar is shown — include the version in the title
+  if (process.platform === 'win32') {
+    const version = app.getVersion();
+    win.setTitle(`api Spector${version ? ` v${version}` : ''}`);
+    win.webContents.on('page-title-updated', e => e.preventDefault());
+  }
 
   // Toggle DevTools with F12 or Cmd/Ctrl+Shift+I
   win.webContents.on('before-input-event', (_e, input) => {

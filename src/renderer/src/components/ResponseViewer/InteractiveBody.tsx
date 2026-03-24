@@ -1,3 +1,19 @@
+// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
+//
+// This file is part of api Spector.
+//
+// api Spector is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 3.
+//
+// api Spector is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+
 import React, { useState, useEffect, useRef } from 'react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -5,7 +21,7 @@ import React, { useState, useEffect, useRef } from 'react';
 type JsonPath = (string | number)[]
 
 type PopoverState =
-  | { type: 'json'; path: JsonPath; value: unknown; x: number; y: number }
+  | { type: 'json'; path: JsonPath; value: unknown; root: unknown; x: number; y: number }
   | { type: 'xml';  selector: string; value: string; x: number; y: number }
 
 // ─── Snippet helpers ──────────────────────────────────────────────────────────
@@ -56,22 +72,76 @@ function makeJsonSnippet(
   }
 }
 
+function getAtPath(root: unknown, path: JsonPath): unknown {
+  let cur = root;
+  for (const key of path) {
+    if (cur == null || typeof cur !== 'object') return undefined;
+    cur = (cur as Record<string | number, unknown>)[key];
+  }
+  return cur;
+}
+
+function toJsonPathExpr(path: JsonPath, filterKey: string, filterValue: string): string {
+  // Find last numeric index in path — that's the array boundary
+  let arrayIdx = -1;
+  for (let i = path.length - 1; i >= 0; i--) {
+    if (typeof path[i] === 'number') { arrayIdx = i; break; }
+  }
+  if (arrayIdx < 0) return '';
+
+  const arrayPart = '$.' + path.slice(0, arrayIdx).join('.');        // e.g. $.data
+  const leafPart  = path.slice(arrayIdx + 1).join('.');               // e.g. price
+  const filterVal = isNaN(Number(filterValue))
+    ? `"${filterValue.replace(/"/g, '\\"')}"`
+    : filterValue;
+
+  const expr = leafPart
+    ? `${arrayPart}[?(@.${filterKey}==${filterVal})].${leafPart}`
+    : `${arrayPart}[?(@.${filterKey}==${filterVal})]`;
+
+  return expr;
+}
+
+function makeJsonPathSnippet(path: JsonPath, value: unknown, filterKey: string, filterValue: string): string {
+  const expr = toJsonPathExpr(path, filterKey, filterValue);
+  const lit  = toLit(value);
+  return `sp.test('${expr} equals ${lit}', function() {\n  const matches = sp.jsonPath(sp.response.json(), '${expr}');\n  sp.expect(matches.length).to.be.above(0);\n  sp.expect(matches[0]).to.equal(${lit});\n});`;
+}
+
 function makeXmlSnippet(
   selector: string,
   value: string,
   mode: 'equals' | 'exists' | 'contains',
 ): string {
-  const parse = `const doc = new DOMParser().parseFromString(sp.response.text(), "text/xml");`;
-  const query = `const el = doc.querySelector("${selector.replace(/"/g, '\\"')}");`;
-
+  const sel = selector.replace(/"/g, '\\"');
   switch (mode) {
     case 'equals':
-      return `sp.test('${selector} equals "${esc(value)}"', function() {\n  ${parse}\n  ${query}\n  sp.expect(el?.textContent?.trim()).to.equal("${esc(value)}");\n});`;
+      return `sp.test('${selector} equals "${esc(value)}"', function() {\n  sp.expect(sp.response.xmlText("${sel}")).to.equal("${esc(value)}");\n});`;
     case 'exists':
-      return `sp.test('${selector} exists', function() {\n  ${parse}\n  ${query}\n  sp.expect(el).to.not.equal(null);\n});`;
+      return `sp.test('${selector} exists', function() {\n  sp.expect(sp.response.xmlText("${sel}")).to.not.equal(null);\n});`;
     case 'contains':
-      return `sp.test('${selector} contains "${esc(value)}"', function() {\n  ${parse}\n  ${query}\n  sp.expect(el?.textContent).to.include("${esc(value)}");\n});`;
+      return `sp.test('${selector} contains "${esc(value)}"', function() {\n  sp.expect(sp.response.xmlText("${sel}")).to.include("${esc(value)}");\n});`;
   }
+}
+
+function varNameFromPath(path: JsonPath): string {
+  return path.filter(k => typeof k === 'string').at(-1) as string ?? 'extracted_value';
+}
+
+function makeJsonExtractSnippet(path: JsonPath, target: 'variables' | 'environment'): string {
+  const acc     = jsonAccessor(path);
+  const varName = varNameFromPath(path);
+  return `const json = sp.response.json();\nsp.${target}.set("${varName}", String(${acc}));`;
+}
+
+function makeJsonPathExtractSnippet(path: JsonPath, filterKey: string, filterValue: string, target: 'variables' | 'environment'): string {
+  const expr    = toJsonPathExpr(path, filterKey, filterValue);
+  const varName = varNameFromPath(path);
+  return `const matches = sp.jsonPath(sp.response.json(), '${expr}');\nsp.${target}.set("${varName}", String(matches[0] ?? ''));`;
+}
+
+function makeXmlExtractSnippet(selector: string, target: 'variables' | 'environment'): string {
+  return `sp.${target}.set("extracted_value", sp.response.xmlText("${selector.replace(/"/g, '\\"')}") ?? '');`;
 }
 
 // ─── Assertion popover ────────────────────────────────────────────────────────
@@ -86,6 +156,9 @@ function AssertMenu({
   onConfirm: (snippet: string) => void
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [jpOpen, setJpOpen] = useState(false);
+  const [filterKey, setFilterKey] = useState('');
+  const [filterVal, setFilterVal] = useState('');
 
   useEffect(() => {
     function onMouse(e: MouseEvent) {
@@ -104,9 +177,11 @@ function AssertMenu({
 
   let title = '';
   let options: { label: string; snippet: string }[] = [];
+  let jpSiblingKeys: string[] = [];
+  let jpAvailable = false;
 
   if (state.type === 'json') {
-    const { path, value } = state;
+    const { path, value, root } = state;
     const isStr = typeof value === 'string';
     const preview = isStr
       ? `"${(value as string).length > 22 ? (value as string).slice(0, 22) + '…' : value}"`
@@ -118,6 +193,29 @@ function AssertMenu({
       { label: `is ${value === null ? 'null' : typeof value}`, snippet: makeJsonSnippet(path, value, 'type') },
       ...(isStr ? [{ label: `contains ${preview}`, snippet: makeJsonSnippet(path, value, 'contains') }] : []),
     ];
+
+    // JSONPath filter: only when value is inside an array
+    const arrayIdx = [...path].reverse().findIndex(k => typeof k === 'number');
+    if (arrayIdx >= 0) {
+      jpAvailable = true;
+      const realIdx = path.length - 1 - arrayIdx;
+      const itemObj = getAtPath(root, path.slice(0, realIdx + 1));
+      if (itemObj != null && typeof itemObj === 'object' && !Array.isArray(itemObj)) {
+        jpSiblingKeys = Object.keys(itemObj as Record<string, unknown>).filter(k => {
+          const v = (itemObj as Record<string, unknown>)[k];
+          return typeof v !== 'object' || v === null;
+        });
+      }
+      if (!filterKey && jpSiblingKeys.length > 0) {
+        // seed defaults once
+        const defaultKey = jpSiblingKeys.find(k => k === 'name' || k === 'id') ?? jpSiblingKeys[0];
+        setTimeout(() => {
+          setFilterKey(defaultKey);
+          const seed = getAtPath(root, [...path.slice(0, realIdx + 1), defaultKey]);
+          setFilterVal(seed != null ? String(seed) : '');
+        }, 0);
+      }
+    }
   } else {
     const { selector, value } = state;
     const preview = `"${value.length > 22 ? value.slice(0, 22) + '…' : value}"`;
@@ -129,14 +227,14 @@ function AssertMenu({
     ];
   }
 
-  const x = Math.min(state.x, window.innerWidth  - 260);
-  const y = Math.min(state.y, window.innerHeight - 220);
+  const x = Math.min(state.x, window.innerWidth  - 280);
+  const y = Math.min(state.y, window.innerHeight - 280);
 
   return (
     <div
       ref={ref}
       style={{ top: y, left: x, position: 'fixed' }}
-      className="z-[200] bg-surface-900 border border-surface-700 rounded-lg shadow-2xl p-2 min-w-[240px]"
+      className="z-[200] bg-surface-900 border border-surface-700 rounded-lg shadow-2xl p-2 min-w-[260px]"
     >
       <div className="text-[10px] text-surface-500 font-mono px-1.5 pb-1.5 mb-1.5 border-b border-surface-800 truncate">
         {title}
@@ -150,6 +248,107 @@ function AssertMenu({
           {opt.label}
         </button>
       ))}
+
+      {jpAvailable && (
+        <div className="mt-1 border-t border-surface-800 pt-1">
+          <button
+            onClick={() => setJpOpen(o => !o)}
+            className="w-full text-left text-xs text-blue-400 hover:text-blue-300 hover:bg-surface-800 rounded px-2 py-1.5 transition-colors flex items-center gap-1"
+          >
+            <span>{jpOpen ? '▾' : '▸'}</span>
+            <span>JSONPath assert (with filter)</span>
+          </button>
+          {jpOpen && state.type === 'json' && (
+            <div className="mt-1 px-2 flex flex-col gap-1.5">
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-surface-400 w-16 shrink-0">filter by</span>
+                <select
+                  value={filterKey}
+                  onChange={e => {
+                    const k = e.target.value;
+                    setFilterKey(k);
+                    const arrayIdx2 = [...state.path].reverse().findIndex(seg => typeof seg === 'number');
+                    const realIdx2 = state.path.length - 1 - arrayIdx2;
+                    const itemObj2 = getAtPath(state.root, state.path.slice(0, realIdx2 + 1));
+                    const seed = itemObj2 != null ? (itemObj2 as Record<string, unknown>)[k] : undefined;
+                    setFilterVal(seed != null ? String(seed) : '');
+                  }}
+                  className="flex-1 bg-surface-800 border border-surface-700 rounded px-1 py-0.5 text-xs focus:outline-none"
+                >
+                  {jpSiblingKeys.map(k => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-surface-400 w-16 shrink-0">equals</span>
+                <input
+                  value={filterVal}
+                  onChange={e => setFilterVal(e.target.value)}
+                  className="flex-1 bg-surface-800 border border-surface-700 rounded px-1 py-0.5 text-xs font-mono focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div className="flex gap-1 self-end">
+                <button
+                  disabled={!filterKey || !filterVal}
+                  onClick={() => { onConfirm(makeJsonPathSnippet(state.path, state.value, filterKey, filterVal)); onClose(); }}
+                  className="text-xs px-2 py-1 bg-blue-700 hover:bg-blue-600 disabled:opacity-40 rounded transition-colors"
+                >
+                  Assert
+                </button>
+                <button
+                  disabled={!filterKey || !filterVal}
+                  onClick={() => { onConfirm(makeJsonPathExtractSnippet(state.path, filterKey, filterVal, 'variables')); onClose(); }}
+                  className="text-xs px-2 py-1 bg-surface-700 hover:bg-surface-600 disabled:opacity-40 rounded transition-colors"
+                >
+                  → variable
+                </button>
+                <button
+                  disabled={!filterKey || !filterVal}
+                  onClick={() => { onConfirm(makeJsonPathExtractSnippet(state.path, filterKey, filterVal, 'environment')); onClose(); }}
+                  className="text-xs px-2 py-1 bg-surface-700 hover:bg-surface-600 disabled:opacity-40 rounded transition-colors"
+                >
+                  → env
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Extract section ── */}
+      <div className="mt-1 border-t border-surface-800 pt-1">
+        <div className="text-[10px] text-surface-500 uppercase tracking-wider px-2 py-1">Extract</div>
+        {state.type === 'json' ? (
+          <>
+            <button
+              onClick={() => { onConfirm(makeJsonExtractSnippet(state.path, 'variables')); onClose(); }}
+              className="w-full text-left text-xs text-surface-300 hover:text-white hover:bg-surface-800 rounded px-2 py-1.5 transition-colors"
+            >
+              Save to variable
+            </button>
+            <button
+              onClick={() => { onConfirm(makeJsonExtractSnippet(state.path, 'environment')); onClose(); }}
+              className="w-full text-left text-xs text-surface-300 hover:text-white hover:bg-surface-800 rounded px-2 py-1.5 transition-colors"
+            >
+              Save to environment
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => { onConfirm(makeXmlExtractSnippet((state as { selector: string }).selector, 'variables')); onClose(); }}
+              className="w-full text-left text-xs text-surface-300 hover:text-white hover:bg-surface-800 rounded px-2 py-1.5 transition-colors"
+            >
+              Save to variable
+            </button>
+            <button
+              onClick={() => { onConfirm(makeXmlExtractSnippet((state as { selector: string }).selector, 'environment')); onClose(); }}
+              className="w-full text-left text-xs text-surface-300 hover:text-white hover:bg-surface-800 rounded px-2 py-1.5 transition-colors"
+            >
+              Save to environment
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -205,7 +404,7 @@ function JsonNode({
           className="ml-auto opacity-0 group-hover:opacity-100 shrink-0 text-[10px] px-1.5 leading-4 py-0.5 text-blue-400 border border-blue-800 hover:border-blue-500 hover:text-blue-300 rounded transition-all"
           title="Add assertion for this value"
         >
-          + assert
+          + insert
         </button>
       </div>
     );
@@ -292,7 +491,7 @@ function XmlNode({
           className="ml-auto opacity-0 group-hover:opacity-100 shrink-0 text-[10px] px-1.5 leading-4 py-0.5 text-blue-400 border border-blue-800 hover:border-blue-500 hover:text-blue-300 rounded transition-all"
           title="Add assertion for this value"
         >
-          + assert
+          + insert
         </button>
       </div>
     );
@@ -335,9 +534,14 @@ export function InteractiveBody({ body, contentType, onAssert }: Props) {
   const isJson = contentType.includes('json');
   const isXml  = !isJson && (contentType.includes('xml') || contentType.includes('html'));
 
+  let parsedJson: unknown = null;
+  if (isJson) {
+    try { parsedJson = JSON.parse(body); } catch { /* handled below */ }
+  }
+
   function handleJsonLeaf(e: React.MouseEvent, path: JsonPath, value: unknown) {
     e.stopPropagation();
-    setPopover({ type: 'json', path, value, x: e.clientX + 10, y: e.clientY + 10 });
+    setPopover({ type: 'json', path, value, root: parsedJson, x: e.clientX + 10, y: e.clientY + 10 });
   }
 
   function handleXmlLeaf(e: React.MouseEvent, selector: string, value: string) {
@@ -346,11 +550,10 @@ export function InteractiveBody({ body, contentType, onAssert }: Props) {
   }
 
   const treeContent = isJson ? (() => {
-    let parsed: unknown;
-    try { parsed = JSON.parse(body); } catch {
+    if (parsedJson === null) {
       return <div className="p-4 text-xs text-surface-600">Unable to parse JSON response body</div>;
     }
-    return <JsonNode nodeKey={null} value={parsed} path={[]} depth={0} onLeaf={handleJsonLeaf} />;
+    return <JsonNode nodeKey={null} value={parsedJson} path={[]} depth={0} onLeaf={handleJsonLeaf} />;
   })() : isXml ? (() => {
     const doc = new DOMParser().parseFromString(body, 'text/xml');
     const root = doc.documentElement;

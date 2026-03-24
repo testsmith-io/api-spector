@@ -11,6 +11,7 @@
     "url": "https://github.com/testsmith-io/api-spector/issues"
   },
   "homepage": "https://github.com/testsmith-io/api-spector",
+  "license": "GPL-3.0-only",
   "main": "out/main/index.js",
   "bin": {
     "api-spector": "bin/cli.js"
@@ -67,11 +68,13 @@
     "@codemirror/theme-one-dark": "^6.1.2",
     "@faker-js/faker": "^10.3.0",
     "@uiw/react-codemirror": "^4.23.0",
+    "@xmldom/xmldom": "^0.8.11",
     "ajv": "^8.17.1",
     "dayjs": "^1.11.20",
     "electron": "^31.0.0",
     "immer": "^10.1.1",
     "js-yaml": "^4.1.1",
+    "jsonpath-plus": "^10.4.0",
     "jszip": "^3.10.1",
     "node-soap": "^1.0.0",
     "react": "^18.3.1",

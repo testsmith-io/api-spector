@@ -1,3 +1,19 @@
+// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
+//
+// This file is part of api Spector.
+//
+// api Spector is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 3.
+//
+// api Spector is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+
 import React, { useState, useEffect } from 'react';
 import { useStore } from './store';
 import { useAutoSave } from './hooks/useAutoSave';
@@ -117,6 +133,7 @@ export default function App () {
   const sidebarTab = useStore( s => s.sidebarTab );
   const setSidebarTab = useStore( s => s.setSidebarTab );
   const historyCount = useStore( s => s.history.length );
+  const addCollection = useStore( s => s.addCollection );
   const addMockHit = useStore( s => s.addMockHit );
   const activeMockId = useStore( s => s.activeMockId );
   const theme = useStore( s => s.theme );
@@ -190,13 +207,15 @@ export default function App () {
       <RunnerModal />
       <CommandPalette />
       {docsModalOpen && <DocsGeneratorModal onClose={() => setDocsModalOpen( false )} />}
-      {/* macOS drag region with centered title */}
-      <div className="drag-region flex-shrink-0 bg-surface-950 flex items-center justify-center">
-        <span className="no-drag text-[11px] font-medium tracking-widest select-none" style={{ color: 'var(--text-muted)' }}>
-          api <span style={{ color: '#6aa3c8' }}>Spector</span>
-          {__APP_VERSION__ && <span className="ml-2 text-[10px] font-normal opacity-50">v{__APP_VERSION__}</span>}
-        </span>
-      </div>
+      {/* macOS drag region with centered title — hidden on Windows (native title bar used instead) */}
+      {window.electron.platform !== 'win32' && (
+        <div className="drag-region flex-shrink-0 bg-surface-950 flex items-center justify-center">
+          <span className="no-drag text-[11px] font-medium tracking-widest select-none" style={{ color: 'var(--text-muted)' }}>
+            api <span style={{ color: '#6aa3c8' }}>Spector</span>
+            {__APP_VERSION__ && <span className="ml-2 text-[10px] font-normal opacity-50">v{__APP_VERSION__}</span>}
+          </span>
+        </div>
+      )}
 
       {/* Header */}
       <Toolbar onOpenDocs={() => setDocsModalOpen( true )} />
@@ -248,6 +267,13 @@ export default function App () {
                     <span className="text-[10px] bg-surface-700 text-surface-400 rounded px-1.5 py-0.5">
                       {historyCount}
                     </span>
+                  )}
+                  {sidebarTab === 'collections' && (
+                    <button
+                      onClick={() => addCollection( 'New Collection' )}
+                      title="New collection"
+                      className="text-surface-600 hover:text-surface-300 transition-colors text-sm leading-none px-0.5"
+                    >+</button>
                   )}
                   <button
                     onClick={() => setSidebarOpen( false )}

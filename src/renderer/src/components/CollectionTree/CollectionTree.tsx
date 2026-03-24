@@ -1,3 +1,19 @@
+// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
+//
+// This file is part of api Spector.
+//
+// api Spector is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 3.
+//
+// api Spector is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../../store';
 import type { Folder, Collection } from '../../../../shared/types';
@@ -102,6 +118,42 @@ function TagChips({
   );
 }
 
+// ─── Confirm dialog ───────────────────────────────────────────────────────────
+
+function ConfirmDialog({ message, onConfirm, onCancel }: {
+  message: string
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 z-[300] flex items-center justify-center"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-surface-900 border border-surface-700 rounded-lg shadow-2xl p-4 w-72 flex flex-col gap-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <p className="text-sm text-white">{message}</p>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="px-3 py-1.5 text-xs text-surface-400 hover:text-white transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-3 py-1.5 text-xs bg-red-700 hover:bg-red-600 rounded transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Icon button ──────────────────────────────────────────────────────────────
 
 function IconBtn({
@@ -123,7 +175,7 @@ function IconBtn({
       >
         {children}
       </button>
-      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 hidden group-hover/tip:block">
+      <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1 z-50 hidden group-hover/tip:block">
         <span className="whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] bg-[#1e1b2e] text-gray-300 border border-white/10 shadow-lg">
           {title}
         </span>
@@ -137,7 +189,7 @@ function RunBtn({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
     <button
       title="Run"
       onClick={e => { e.stopPropagation(); onClick(e); }}
-      className="opacity-0 group-hover:opacity-100 px-1 py-0.5 rounded text-emerald-500 hover:text-emerald-400 transition-all"
+      className="px-1 py-0.5 rounded text-emerald-500 hover:text-emerald-400 transition-all"
     >
       <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"/>
@@ -173,18 +225,21 @@ export function CollectionTree() {
   const openRunner        = useStore(s => s.openRunner);
 
   const colList = Object.values(collections);
+  const [pendingConfirm, setPendingConfirm] = useState<{ message: string; onConfirm: () => void } | null>(null);
+
+  function confirmThen(message: string, action: () => void) {
+    setPendingConfirm({ message, onConfirm: () => { action(); setPendingConfirm(null); } });
+  }
 
   return (
     <div className="flex flex-col flex-1 min-h-0 select-none">
-      <div className="px-3 py-2 text-xs font-semibold text-surface-400 uppercase tracking-wider flex items-center justify-between flex-shrink-0">
-        <span>Collections</span>
-        <button
-          onClick={() => addCollection('New Collection')}
-          title="New collection"
-          className="text-surface-400 hover:text-blue-400 transition-colors px-1"
-        >+</button>
-      </div>
-
+      {pendingConfirm && (
+        <ConfirmDialog
+          message={pendingConfirm.message}
+          onConfirm={pendingConfirm.onConfirm}
+          onCancel={() => setPendingConfirm(null)}
+        />
+      )}
       <div className="flex-1 overflow-y-auto">
         {colList.map(({ data: col }) => (
           <CollectionNode
@@ -198,9 +253,9 @@ export function CollectionTree() {
             onAddRequest={folderId => addRequest(col.id, folderId)}
             onAddFolder={(parentId, name) => addFolder(col.id, parentId, name)}
             onRenameCollection={name => renameCollection(col.id, name)}
-            onDeleteCollection={() => { if (confirm(`Delete collection "${col.name}"?`)) deleteCollection(col.id); }}
+            onDeleteCollection={() => confirmThen(`Delete collection "${col.name}"?`, () => deleteCollection(col.id))}
             onRenameFolder={(folderId, name) => renameFolder(col.id, folderId, name)}
-            onDeleteFolder={folderId => { if (confirm('Delete this folder and all its requests?')) deleteFolder(col.id, folderId); }}
+            onDeleteFolder={folderId => confirmThen('Delete this folder and all its requests?', () => deleteFolder(col.id, folderId))}
             onRenameRequest={renameRequest}
             onDeleteRequest={reqId => deleteRequest(col.id, reqId)}
             onDuplicateRequest={reqId => duplicateRequest(col.id, reqId)}
@@ -292,15 +347,15 @@ function CollectionNode({
           )}
         </div>
 
-        <div className="flex items-center shrink-0 gap-0">
+        <div className="hidden group-hover:flex items-center shrink-0 gap-0">
           <RunBtn onClick={onRunCollection} />
-          <IconBtn title="Expand all folders" onClick={expandAll}><ExpandAllIcon /></IconBtn>
-          <IconBtn title="Collapse all folders" onClick={collapseAll}><CollapseAllIcon /></IconBtn>
-          <IconBtn title="Collection data (iterations)" onClick={onSelectCollection}><TableIcon /></IconBtn>
-          <IconBtn title="Add request" onClick={() => onAddRequest(col.rootFolder.id)}><span className="text-xs">+</span></IconBtn>
-          <IconBtn title="Add folder" onClick={() => onAddFolder(col.rootFolder.id, 'New Folder')}><FolderIcon /></IconBtn>
-          <IconBtn title="Rename" onClick={() => setRenaming(true)}><PencilIcon /></IconBtn>
-          <IconBtn title="Delete collection" onClick={onDeleteCollection} danger><TrashIcon /></IconBtn>
+          <IconBtn title="Expand all folders" onClick={expandAll} alwaysVisible><ExpandAllIcon /></IconBtn>
+          <IconBtn title="Collapse all folders" onClick={collapseAll} alwaysVisible><CollapseAllIcon /></IconBtn>
+          <IconBtn title="Collection data (iterations)" onClick={onSelectCollection} alwaysVisible><TableIcon /></IconBtn>
+          <IconBtn title="Add request" onClick={() => onAddRequest(col.rootFolder.id)} alwaysVisible><span className="text-xs">+</span></IconBtn>
+          <IconBtn title="Add folder" onClick={() => onAddFolder(col.rootFolder.id, 'New Folder')} alwaysVisible><FolderIcon /></IconBtn>
+          <IconBtn title="Rename" onClick={() => setRenaming(true)} alwaysVisible><PencilIcon /></IconBtn>
+          <IconBtn title="Delete collection" onClick={onDeleteCollection} danger alwaysVisible><TrashIcon /></IconBtn>
         </div>
       </div>
 
@@ -391,18 +446,18 @@ function FolderRow({
           )}
         </div>
 
-        <div className="flex items-center shrink-0 gap-0">
+        <div className="hidden group-hover:flex items-center shrink-0 gap-0">
           <RunBtn onClick={onRun} />
-          <IconBtn title="Add request" onClick={onAddRequest}><span className="text-xs">+</span></IconBtn>
-          <IconBtn title="Add sub-folder" onClick={onAddFolder}><FolderIcon /></IconBtn>
-          <IconBtn title="Folder auth &amp; headers" onClick={() => setShowSettings(true)}>
+          <IconBtn title="Add request" onClick={onAddRequest} alwaysVisible><span className="text-xs">+</span></IconBtn>
+          <IconBtn title="Add sub-folder" onClick={onAddFolder} alwaysVisible><FolderIcon /></IconBtn>
+          <IconBtn title="Folder auth &amp; headers" onClick={() => setShowSettings(true)} alwaysVisible>
             <KeyIcon />
           </IconBtn>
-          <IconBtn title="Add tag" onClick={() => {}} alwaysVisible={false}>
+          <IconBtn title="Add tag" onClick={() => {}} alwaysVisible>
             <TagChips tags={[]} onRemove={() => {}} onAdd={tag => onUpdateTags([...tags, tag])} />
           </IconBtn>
-          <IconBtn title="Rename" onClick={() => setRenaming(true)}><PencilIcon /></IconBtn>
-          <IconBtn title="Delete folder" onClick={onDelete} danger><TrashIcon /></IconBtn>
+          <IconBtn title="Rename" onClick={() => setRenaming(true)} alwaysVisible><PencilIcon /></IconBtn>
+          <IconBtn title="Delete folder" onClick={onDelete} danger alwaysVisible><TrashIcon /></IconBtn>
         </div>
       </div>
 

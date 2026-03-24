@@ -1,3 +1,19 @@
+// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
+//
+// This file is part of api Spector.
+//
+// api Spector is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 3.
+//
+// api Spector is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type {
@@ -255,6 +271,7 @@ interface AppActions {
   // Environment CRUD
   updateEnvironment: (id: string, data: Environment) => void
   addEnvironment: () => void
+  deleteEnvironment: (id: string) => void
 
   // Collection dataset
   updateCollectionDataSet: (id: string, ds: DataSet) => void
@@ -696,6 +713,15 @@ export const useStore = create<AppState & AppActions>()(
       s.environments[env.id] = { relPath, data: env };
       s.activeEnvironmentId = env.id;
       if (s.workspace) s.workspace.environments.push(relPath);
+    }),
+
+    deleteEnvironment: (id) => set(s => {
+      const relPath = s.environments[id]?.relPath;
+      delete s.environments[id];
+      if (s.activeEnvironmentId === id) s.activeEnvironmentId = null;
+      if (relPath && s.workspace) {
+        s.workspace.environments = s.workspace.environments.filter(p => p !== relPath);
+      }
     }),
 
     // ── Globals ───────────────────────────────────────────────────────────────

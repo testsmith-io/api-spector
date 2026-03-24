@@ -1,7 +1,24 @@
+// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
+//
+// This file is part of api Spector.
+//
+// api Spector is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 3.
+//
+// api Spector is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+
 import { useState } from 'react';
 import { useStore } from '../../store';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
+import { xml } from '@codemirror/lang-xml';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { v4 as uuidv4 } from 'uuid';
 import type { ResponsePayload, MockRoute, ScriptExecutionMeta, SentRequest } from '../../../../shared/types';
@@ -15,6 +32,33 @@ type RespTab = 'body' | 'headers' | 'tests' | 'console' | 'request'
 function prettyJson ( raw: string ): string {
   try {
     return JSON.stringify( JSON.parse( raw ), null, 2 );
+  } catch {
+    return raw;
+  }
+}
+
+function prettyXml ( raw: string ): string {
+  try {
+    const indent = '  ';
+    let result = '';
+    let depth = 0;
+    const tokens = raw.match(/<[^>]+>|[^<]+/g) ?? [];
+    for ( const token of tokens ) {
+      const text = token.trim();
+      if ( !text ) continue;
+      if ( text.startsWith( '<?' ) || text.startsWith( '<!' ) ) {
+        result += indent.repeat( depth ) + text + '\n';
+      } else if ( token.startsWith( '</' ) ) {
+        depth = Math.max( 0, depth - 1 );
+        result += indent.repeat( depth ) + text + '\n';
+      } else if ( token.startsWith( '<' ) && !token.endsWith( '/>' ) && !token.includes( '</' ) ) {
+        result += indent.repeat( depth ) + text + '\n';
+        depth++;
+      } else {
+        result += indent.repeat( depth ) + text + '\n';
+      }
+    }
+    return result.trimEnd();
   } catch {
     return raw;
   }
@@ -382,7 +426,7 @@ export function ResponseViewer () {
   const isJson = contentType.includes( 'json' );
   const isXml = !isJson && ( contentType.includes( 'xml' ) || contentType.includes( 'html' ) );
   const supportsTree = isJson || isXml;
-  const displayBody = isJson ? prettyJson( response.body ) : response.body;
+  const displayBody = isJson ? prettyJson( response.body ) : isXml ? prettyXml( response.body ) : response.body;
 
   const passedCount = scriptResult?.testResults.filter( t => t.passed ).length ?? 0;
   const totalCount = scriptResult?.testResults.length ?? 0;
@@ -517,16 +561,13 @@ export function ResponseViewer () {
             onAssert={handleAssert}
           />
         ) : tab === 'body' ? (
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <CodeMirror
-              value={displayBody}
-              height="100%"
-              theme={oneDark}
-              extensions={isJson ? [json()] : []}
-              readOnly
-              basicSetup={{ lineNumbers: true, foldGutter: true }}
-            />
-          </div>
+          <CodeMirror
+            value={displayBody}
+            theme={oneDark}
+            extensions={isJson ? [json()] : isXml ? [xml()] : []}
+            readOnly
+            basicSetup={{ lineNumbers: true, foldGutter: true }}
+          />
         ) : tab === 'headers' ? (
           <div className="flex-1 min-h-0 overflow-y-auto">
             <table className="w-full text-xs px-4 py-2">

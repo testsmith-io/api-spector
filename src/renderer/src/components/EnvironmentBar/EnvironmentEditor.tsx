@@ -1,3 +1,19 @@
+// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
+//
+// This file is part of api Spector.
+//
+// api Spector is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 3.
+//
+// api Spector is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+
 import React, { useState } from 'react';
 import { useStore } from '../../store';
 import type { EnvVariable } from '../../../../shared/types';
@@ -79,8 +95,16 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
   const [pendingEncryptIdx, setPendingEncryptIdx] = useState<number | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
 
+  const deleteEnvironment = useStore(s => s.deleteEnvironment);
+
   const envList = Object.values(environments);
   const env = selectedId ? environments[selectedId]?.data ?? null : null;
+
+  function handleDelete(id: string) {
+    deleteEnvironment(id);
+    const remaining = Object.keys(environments).filter(k => k !== id);
+    setSelectedId(remaining[0] ?? '');
+  }
 
   function updateVar(idx: number, patch: Partial<EnvVariable>) {
     if (!env) return;
@@ -206,17 +230,26 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
             </div>
             <div className="flex-1 overflow-y-auto py-1">
               {envList.map(({ data: e }) => (
-                <button
+                <div
                   key={e.id}
-                  onClick={() => selectEnv(e.id)}
-                  className={`w-full text-left px-3 py-1.5 text-xs truncate transition-colors ${
-                    selectedId === e.id
-                      ? 'bg-surface-800 text-white'
-                      : 'text-surface-200 hover:bg-surface-800'
+                  className={`group flex items-center pr-1 transition-colors ${
+                    selectedId === e.id ? 'bg-surface-800' : 'hover:bg-surface-800'
                   }`}
                 >
-                  {e.name}
-                </button>
+                  <button
+                    onClick={() => selectEnv(e.id)}
+                    className={`flex-1 text-left px-3 py-1.5 text-xs truncate ${
+                      selectedId === e.id ? 'text-white' : 'text-surface-200'
+                    }`}
+                  >
+                    {e.name}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(e.id)}
+                    className="opacity-0 group-hover:opacity-100 text-surface-400 hover:text-red-400 transition-all px-1 text-sm leading-none shrink-0"
+                    title="Delete environment"
+                  >×</button>
+                </div>
               ))}
             </div>
             <button

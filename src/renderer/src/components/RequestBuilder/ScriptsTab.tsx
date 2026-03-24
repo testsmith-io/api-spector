@@ -1,3 +1,19 @@
+// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
+//
+// This file is part of api Spector.
+//
+// api Spector is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 3.
+//
+// api Spector is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+
 import React, { useMemo, useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
@@ -23,6 +39,7 @@ export function ScriptsTab({ request, onChange }: Props) {
   const scriptType      = activeAppTab?.scriptTab ?? 'pre';
   const setScriptType   = (t: ScriptType) => { if (activeTabId) setTabScriptTab(activeTabId, t); };
   const [expandedGroup, setExpandedGroup] = useState<string | null>(SNIPPET_GROUPS[0].group);
+  const [snippetsOpen, setSnippetsOpen] = useState(true);
 
   const varNames   = useVarNames();
   const varValues  = useVarValues();
@@ -86,9 +103,27 @@ export function ScriptsTab({ request, onChange }: Props) {
       </div>
 
       {/* Snippets panel */}
-      <div className="w-52 flex-shrink-0 flex flex-col overflow-y-auto border-l border-surface-700 pl-2">
-        <div className="text-[10px] font-semibold text-surface-400 uppercase tracking-wider mb-2">Snippets</div>
-        {SNIPPET_GROUPS.map(group => (
+      <div className={`flex-shrink-0 flex flex-col border-l border-surface-700 transition-all ${snippetsOpen ? 'w-52 pl-2 overflow-y-auto' : 'w-7'}`}>
+        {snippetsOpen ? (
+          <button
+            onClick={() => setSnippetsOpen(false)}
+            className="flex items-center gap-1 text-[10px] font-semibold text-surface-400 uppercase tracking-wider mb-2 hover:text-white transition-colors w-full"
+          >
+            <span>▾</span>
+            <span>Quick inserts</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => setSnippetsOpen(true)}
+            className="flex-1 flex items-center justify-center hover:bg-surface-800 transition-colors rounded-sm"
+            title="Expand quick inserts"
+          >
+            <span className="text-[10px] font-semibold text-surface-400 uppercase tracking-wider [writing-mode:vertical-rl] rotate-180">
+              Quick inserts
+            </span>
+          </button>
+        )}
+        {snippetsOpen && SNIPPET_GROUPS.map(group => (
           <div key={group.group} className="mb-1">
             <button
               onClick={() => setExpandedGroup(prev => prev === group.group ? null : group.group)}
@@ -116,3 +151,4 @@ export function ScriptsTab({ request, onChange }: Props) {
     </div>
   );
 }
+
