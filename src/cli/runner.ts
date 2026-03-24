@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // Copyright (C) 2026  Testsmith.io <https://testsmith.io>
 //
 // This file is part of api Spector.
@@ -14,7 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
 
-#!/usr/bin/env node
 /**
  * API Tester CLI Runner
  *
