@@ -38,12 +38,13 @@ import { join, dirname, resolve, extname } from 'path';
 import { fetch, Headers } from 'undici';
 import type {
   Workspace, Collection, Environment, ApiRequest,
-  RunRequestResult, RunSummary,
+  RunRequestResult, RunSummary, TlsSettings,
 } from '../shared/types';
 import { buildEnvVars, buildUrl, mergeVars, interpolate } from '../main/interpolation';
 import { runScript } from '../main/script-runner';
 import { loadGlobals, getGlobals, patchGlobals, persistGlobals } from '../main/globals-store';
 import { getSecret } from '../main/ipc/secret-handler';
+import { buildDispatcher } from '../main/ipc/request-handler';
 import { buildJsonReport, buildJUnitReport } from '../shared/report';
 import { collectTagged } from '../shared/request-collection';
 
@@ -126,6 +127,7 @@ async function executeRequest(
   envVars: Record<string, string>,
   globals: Record<string, string>,
   verbose: boolean,
+  tls?: TlsSettings,
 ): Promise<RunRequestResult> {
   const base: RunRequestResult = {
     requestId:   req.id,
@@ -197,11 +199,13 @@ async function executeRequest(
       if (!headers.has('content-type')) headers.set('Content-Type', 'application/json');
     }
 
+    const dispatcher = await buildDispatcher(undefined, tls);
     const fetchResp   = await fetch(resolvedUrl, {
       method:  req.method,
       headers,
       body:    ['GET', 'HEAD'].includes(req.method) ? undefined : body,
-    });
+      ...(dispatcher ? { dispatcher } : {}),
+    } as Parameters<typeof fetch>[1]);
     const responseBody = await fetchResp.text();
     const durationMs   = Date.now() - start;
     const respHeaders: Record<string, string> = {};
@@ -351,9 +355,14 @@ async function main() {
 
     console.log(color(`  ┌ ${col.name}`, C.bold, C.white));
 
+    const workspaceTls = workspace.settings?.tls;
+    const effectiveTls = col.tls
+      ? { ...workspaceTls, ...col.tls }
+      : workspaceTls;
+
     let bailed = false;
     for (const item of items) {
-      const result = await executeRequest(item.request, item.collectionVars, envVars, globals, verbose);
+      const result = await executeRequest(item.request, item.collectionVars, envVars, globals, verbose, effectiveTls);
       printResult(result, verbose);
       allResults.push(result);
 

@@ -89,7 +89,7 @@ export function maskHeaders(headers: Record<string, string>, patterns: string[])
 
 // ─── Build undici dispatcher (proxy + TLS) ────────────────────────────────────
 
-async function buildDispatcher(
+export async function buildDispatcher(
   proxy?: SendRequestPayload['proxy'],
   tls?: SendRequestPayload['tls'],
 ): Promise<ProxyAgent | Agent | undefined> {

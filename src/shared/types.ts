@@ -187,6 +187,13 @@ export interface Folder {
   headers?: KeyValuePair[]
 }
 
+export interface TlsSettings {
+  caCertPath?: string
+  clientCertPath?: string
+  clientKeyPath?: string
+  rejectUnauthorized?: boolean
+}
+
 export interface Collection {
   version: '1.0'
   id: string
@@ -197,6 +204,8 @@ export interface Collection {
   collectionVariables?: Record<string, string>
   /** Data-driven dataset: each row runs the full collection once with those variables injected. */
   dataSet?: DataSet
+  /** TLS overrides applied to every request in this collection (takes priority over workspace TLS). */
+  tls?: TlsSettings
 }
 
 // ─── Environment / Variables ──────────────────────────────────────────────────
@@ -252,12 +261,7 @@ export interface Workspace {
       url: string
       auth?: { username: string; password: string }
     }
-    tls?: {
-      caCertPath?: string
-      clientCertPath?: string
-      clientKeyPath?: string
-      rejectUnauthorized?: boolean
-    }
+    tls?: TlsSettings
     piiMaskPatterns?: string[]
   }
 }
@@ -292,12 +296,7 @@ export interface SendRequestPayload {
     url: string
     auth?: { username: string; password: string }
   }
-  tls?: {
-    caCertPath?: string
-    clientCertPath?: string
-    clientKeyPath?: string
-    rejectUnauthorized?: boolean
-  }
+  tls?: TlsSettings
   piiMaskPatterns?: string[]
 }
 

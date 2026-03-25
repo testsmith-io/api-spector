@@ -1,6 +1,28 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  /* Surface palette — values resolved from CSS custom properties at runtime */
+  --color-surface-50:  var(--surface-50);
+  --color-surface-100: var(--surface-100);
+  --color-surface-200: var(--surface-200);
+  --color-surface-400: var(--surface-400);
+  --color-surface-500: var(--surface-500);
+  --color-surface-700: var(--surface-700);
+  --color-surface-800: var(--surface-800);
+  --color-surface-900: var(--surface-900);
+  --color-surface-950: var(--surface-950);
+
+  /* Testsmith blue (#205d96 scale) */
+  --color-blue-400: var(--ts-blue-400);
+  --color-blue-500: var(--ts-blue-500);
+  --color-blue-600: var(--ts-blue-600);
+  --color-blue-700: var(--ts-blue-700);
+
+  /* Testsmith emerald (#9fc93c scale) */
+  --color-emerald-400: var(--ts-green-400);
+  --color-emerald-800: var(--ts-green-800);
+  --color-emerald-900: var(--ts-green-900);
+}
 
 /* ─── Testsmith brand tokens ────────────────────────────────────────────────── */
 :root {

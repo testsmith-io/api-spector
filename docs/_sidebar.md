@@ -8,6 +8,7 @@
   - [Environments, Variables & Secrets](gui/environments.md)
   - [Mock Servers](gui/mock-servers.md)
   - [Export to Code](gui/code-generation.md)
+  - [TLS & Certificates](gui/tls-certificates.md)
   - [Import OpenAPI](gui/import-openapi.md)
   - [Contract Testing](gui/contract-testing.md)
 

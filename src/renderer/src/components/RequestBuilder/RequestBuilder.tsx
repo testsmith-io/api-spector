@@ -59,6 +59,7 @@ export function RequestBuilder({ request }: Props) {
   const addHistoryEntry     = useStore(s => s.addHistoryEntry);
   const applyScriptUpdates  = useStore(s => s.applyScriptUpdates);
   const workspaceSettings   = useStore(s => s.workspace?.settings);
+  const collectionTls       = useStore(s => activeCollectionId ? s.collections[activeCollectionId]?.data.tls : undefined);
 
   // Read per-tab state
   const activeAppTab = useStore(s => s.tabs.find(t => t.id === s.activeTabId));
@@ -105,7 +106,9 @@ export function RequestBuilder({ request }: Props) {
         collectionVars,
         globals,
         proxy:           workspaceSettings?.proxy,
-        tls:             workspaceSettings?.tls,
+        tls:             collectionTls
+          ? { ...workspaceSettings?.tls, ...collectionTls }
+          : workspaceSettings?.tls,
         piiMaskPatterns: workspaceSettings?.piiMaskPatterns,
       });
 

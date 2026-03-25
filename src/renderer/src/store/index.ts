@@ -25,6 +25,7 @@ import type {
   AuthConfig,
   KeyValuePair,
   DataSet,
+  TlsSettings,
   ResponsePayload,
   SentRequest,
   HistoryEntry,
@@ -275,6 +276,9 @@ interface AppActions {
 
   // Collection dataset
   updateCollectionDataSet: (id: string, ds: DataSet) => void
+
+  // Collection TLS
+  updateCollectionTls: (id: string, tls: TlsSettings | undefined) => void
 
   // Globals
   setGlobals: (globals: Record<string, string>) => void
@@ -536,6 +540,12 @@ export const useStore = create<AppState & AppActions>()(
     updateCollectionDataSet: (id, ds) => set(s => {
       if (!s.collections[id]) return;
       s.collections[id].data.dataSet = ds;
+      s.collections[id].dirty = true;
+    }),
+
+    updateCollectionTls: (id, tls) => set(s => {
+      if (!s.collections[id]) return;
+      s.collections[id].data.tls = tls;
       s.collections[id].dirty = true;
     }),
 
