@@ -579,16 +579,19 @@ function generateCiContent(
     'api-spector run --workspace .',
     envName ? `--environment "${envName}"` : '',
     tags    ? `--tags "${tags}"` : '',
-    '--output results.json',
+    '--output results.html',
   ].filter(Boolean).join(' ');
 
+  // Always include API_SPECTOR_MASTER_KEY when there are encrypted secrets
+  const allSecretVars = secretVars.length ? ['API_SPECTOR_MASTER_KEY', ...secretVars] : [];
+
   if (platform === 'github') {
-    const secretHint = secretVars.length
+    const secretHint = allSecretVars.length
       ? `      # ⚠ Add these secrets in: Settings → Secrets and variables → Actions\n` +
-        secretVars.map(v => `      #   ${v}`).join('\n') + '\n'
+        allSecretVars.map(v => `      #   ${v}`).join('\n') + '\n'
       : '';
-    const envBlock = secretVars.length
-      ? '\n        env:\n' + secretVars.map(v => `          ${v}: \${{ secrets.${v} }}`).join('\n')
+    const envBlock = allSecretVars.length
+      ? '\n        env:\n' + allSecretVars.map(v => `          ${v}: \${{ secrets.${v} }}`).join('\n')
       : '';
     return `name: API Tests
 
@@ -613,17 +616,17 @@ ${secretHint}      - name: Run API tests
         uses: actions/upload-artifact@v4
         with:
           name: api-test-results
-          path: results.json
+          path: results.html
 `;
   }
 
   if (platform === 'gitlab') {
-    const secretHint = secretVars.length
+    const secretHint = allSecretVars.length
       ? `  # ⚠ Add these in: Settings → CI/CD → Variables\n` +
-        secretVars.map(v => `  #   ${v}`).join('\n') + '\n'
+        allSecretVars.map(v => `  #   ${v}`).join('\n') + '\n'
       : '';
-    const envBlock = secretVars.length
-      ? '\n  variables:\n' + secretVars.map(v => `    ${v}: $${v}`).join('\n')
+    const envBlock = allSecretVars.length
+      ? '\n  variables:\n' + allSecretVars.map(v => `    ${v}: $${v}`).join('\n')
       : '';
     return `api-tests:
   image: node:${NODE_LTS}
@@ -635,18 +638,18 @@ ${secretHint}  script:
   artifacts:
     when: always
     paths:
-      - results.json
+      - results.html
     expire_in: 30 days
 `;
   }
 
   if (platform === 'azure') {
-    const secretHint = secretVars.length
+    const secretHint = allSecretVars.length
       ? `  # ⚠ Add these in: Pipelines → Library → Variable groups (mark as secret)\n` +
-        secretVars.map(v => `  #   ${v}`).join('\n') + '\n'
+        allSecretVars.map(v => `  #   ${v}`).join('\n') + '\n'
       : '';
-    const envBlock = secretVars.length
-      ? '\n    env:\n' + secretVars.map(v => `      ${v}: $(${v})`).join('\n')
+    const envBlock = allSecretVars.length
+      ? '\n    env:\n' + allSecretVars.map(v => `      ${v}: $(${v})`).join('\n')
       : '';
     return `trigger:
   - main
@@ -663,7 +666,7 @@ steps:
     displayName: 'Install api Spector'
 ${secretHint}  - script: ${runCmd}
     displayName: 'Run API tests'${envBlock}
-  - publish: results.json
+  - publish: results.html
     artifact: api-test-results
     displayName: 'Upload test results'
     condition: always()
