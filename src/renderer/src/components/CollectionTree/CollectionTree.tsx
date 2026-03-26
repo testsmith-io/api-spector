@@ -218,9 +218,11 @@ export function CollectionTree() {
   const deleteCollection  = useStore(s => s.deleteCollection);
   const renameFolder      = useStore(s => s.renameFolder);
   const deleteFolder      = useStore(s => s.deleteFolder);
-  const renameRequest     = useStore(s => s.renameRequest);
-  const deleteRequest     = useStore(s => s.deleteRequest);
-  const duplicateRequest  = useStore(s => s.duplicateRequest);
+  const renameRequest       = useStore(s => s.renameRequest);
+  const deleteRequest       = useStore(s => s.deleteRequest);
+  const duplicateRequest    = useStore(s => s.duplicateRequest);
+  const duplicateCollection = useStore(s => s.duplicateCollection);
+  const duplicateFolder     = useStore(s => s.duplicateFolder);
   const updateFolderTags  = useStore(s => s.updateFolderTags);
   const updateRequestTags = useStore(s => s.updateRequestTags);
   const openRunner        = useStore(s => s.openRunner);
@@ -255,8 +257,10 @@ export function CollectionTree() {
             onAddFolder={(parentId, name) => addFolder(col.id, parentId, name)}
             onRenameCollection={name => renameCollection(col.id, name)}
             onDeleteCollection={() => confirmThen(`Delete collection "${col.name}"?`, () => deleteCollection(col.id))}
+            onDuplicateCollection={() => duplicateCollection(col.id)}
             onRenameFolder={(folderId, name) => renameFolder(col.id, folderId, name)}
             onDeleteFolder={folderId => confirmThen('Delete this folder and all its requests?', () => deleteFolder(col.id, folderId))}
+            onDuplicateFolder={folderId => duplicateFolder(col.id, folderId)}
             onRenameRequest={renameRequest}
             onDeleteRequest={reqId => deleteRequest(col.id, reqId)}
             onDuplicateRequest={reqId => duplicateRequest(col.id, reqId)}
@@ -290,8 +294,8 @@ function CollectionNode({
   existingCollectionNames,
   onSelectCollection, onSelectRequest,
   onAddRequest, onAddFolder,
-  onRenameCollection, onDeleteCollection,
-  onRenameFolder, onDeleteFolder,
+  onRenameCollection, onDeleteCollection, onDuplicateCollection,
+  onRenameFolder, onDeleteFolder, onDuplicateFolder,
   onRenameRequest, onDeleteRequest, onDuplicateRequest,
   onUpdateFolderTags, onUpdateRequestTags,
   onRunCollection, onRunFolder,
@@ -306,8 +310,10 @@ function CollectionNode({
   onAddFolder: (parentId: string, name: string) => void
   onRenameCollection: (name: string) => void
   onDeleteCollection: () => void
+  onDuplicateCollection: () => void
   onRenameFolder: (folderId: string, name: string) => void
   onDeleteFolder: (folderId: string) => void
+  onDuplicateFolder: (folderId: string) => void
   onRenameRequest: (id: string, name: string) => void
   onDeleteRequest: (id: string) => void
   onDuplicateRequest: (id: string) => void
@@ -358,6 +364,7 @@ function CollectionNode({
           <IconBtn title="Add request" onClick={() => onAddRequest(col.rootFolder.id)} alwaysVisible><span className="text-xs">+</span></IconBtn>
           <IconBtn title="Add folder" onClick={() => onAddFolder(col.rootFolder.id, 'New Folder')} alwaysVisible><FolderIcon /></IconBtn>
           <IconBtn title="Rename" onClick={() => setRenaming(true)} alwaysVisible><PencilIcon /></IconBtn>
+          <IconBtn title="Duplicate collection" onClick={onDuplicateCollection} alwaysVisible><CopyIcon /></IconBtn>
           <IconBtn title="Delete collection" onClick={onDeleteCollection} danger alwaysVisible><TrashIcon /></IconBtn>
         </div>
       </div>
@@ -375,6 +382,7 @@ function CollectionNode({
           onAddFolder={onAddFolder}
           onRenameFolder={onRenameFolder}
           onDeleteFolder={onDeleteFolder}
+          onDuplicateFolder={onDuplicateFolder}
           onRenameRequest={onRenameRequest}
           onDeleteRequest={onDeleteRequest}
           onDuplicateRequest={onDuplicateRequest}
@@ -396,7 +404,7 @@ function FolderRow({
   folder, collectionId, depth,
   expandCtrl,
   onAddRequest, onAddFolder,
-  onRename, onDelete,
+  onRename, onDelete, onDuplicate,
   onUpdateTags, onRun,
   children,
 }: {
@@ -408,6 +416,7 @@ function FolderRow({
   onAddFolder: () => void
   onRename: (name: string) => void
   onDelete: () => void
+  onDuplicate: () => void
   onUpdateTags: (tags: string[]) => void
   onRun: () => void
   children: React.ReactNode
@@ -463,6 +472,7 @@ function FolderRow({
             <TagChips tags={[]} onRemove={() => {}} onAdd={tag => onUpdateTags([...tags, tag])} />
           </IconBtn>
           <IconBtn title="Rename" onClick={() => setRenaming(true)} alwaysVisible><PencilIcon /></IconBtn>
+          <IconBtn title="Duplicate folder" onClick={onDuplicate} alwaysVisible><CopyIcon /></IconBtn>
           <IconBtn title="Delete folder" onClick={onDelete} danger alwaysVisible><TrashIcon /></IconBtn>
         </div>
       </div>
@@ -486,7 +496,7 @@ function FolderContents({
   folder, collectionId, requests, activeRequestId, depth,
   expandCtrl,
   onSelectRequest, onAddRequest, onAddFolder,
-  onRenameFolder, onDeleteFolder,
+  onRenameFolder, onDeleteFolder, onDuplicateFolder,
   onRenameRequest, onDeleteRequest, onDuplicateRequest,
   onUpdateFolderTags, onUpdateRequestTags, onRunFolder,
 }: {
@@ -501,6 +511,7 @@ function FolderContents({
   onAddFolder: (parentId: string, name: string) => void
   onRenameFolder: (folderId: string, name: string) => void
   onDeleteFolder: (folderId: string) => void
+  onDuplicateFolder: (folderId: string) => void
   onRenameRequest: (id: string, name: string) => void
   onDeleteRequest: (id: string) => void
   onDuplicateRequest: (id: string) => void
@@ -521,6 +532,7 @@ function FolderContents({
           onAddFolder={() => onAddFolder(sub.id, 'New Folder')}
           onRename={name => onRenameFolder(sub.id, name)}
           onDelete={() => onDeleteFolder(sub.id)}
+          onDuplicate={() => onDuplicateFolder(sub.id)}
           onUpdateTags={tags => onUpdateFolderTags(sub.id, tags)}
           onRun={() => onRunFolder(sub.id)}
         >
@@ -536,6 +548,7 @@ function FolderContents({
             onAddFolder={onAddFolder}
             onRenameFolder={onRenameFolder}
             onDeleteFolder={onDeleteFolder}
+            onDuplicateFolder={onDuplicateFolder}
             onRenameRequest={onRenameRequest}
             onDeleteRequest={onDeleteRequest}
             onDuplicateRequest={onDuplicateRequest}

@@ -23,8 +23,9 @@ export function MockPanel() {
   const mocks         = useStore(s => s.mocks);
   const activeMockId  = useStore(s => s.activeMockId);
   const setActiveMock = useStore(s => s.setActiveMockId);
-  const addMock       = useStore(s => s.addMock);
-  const setRunning    = useStore(s => s.setMockRunning);
+  const addMock    = useStore(s => s.addMock);
+  const deleteMock = useStore(s => s.deleteMock);
+  const setRunning     = useStore(s => s.setMockRunning);
 
   const mockList = Object.values(mocks);
 
@@ -39,6 +40,16 @@ export function MockPanel() {
       await electron.saveMock(entry.relPath, entry.data);
       setActiveMock(newId);
     }
+  }
+
+  async function handleDelete(e: React.MouseEvent, mockId: string) {
+    e.stopPropagation();
+    const entry = useStore.getState().mocks[mockId];
+    if (!entry) return;
+    if (entry.running) await electron.mockStop(mockId);
+    deleteMock(mockId);
+    const ws = useStore.getState().workspace;
+    if (ws) await electron.saveWorkspace(ws);
   }
 
   async function toggleRunning(e: React.MouseEvent, mockId: string) {
@@ -107,17 +118,26 @@ export function MockPanel() {
                   </div>
                 </div>
 
-                <button
-                  onClick={e => toggleRunning(e, mock.id)}
-                  className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 transition-colors ${
-                    entry.running
-                      ? 'text-emerald-400 hover:text-red-400'
-                      : 'text-surface-400 hover:text-emerald-400 opacity-0 group-hover:opacity-100'
-                  }`}
-                  title={entry.running ? 'Stop' : 'Start'}
-                >
-                  {entry.running ? '■' : '▶'}
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={e => toggleRunning(e, mock.id)}
+                    className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+                      entry.running
+                        ? 'text-emerald-400 hover:text-red-400'
+                        : 'text-surface-400 hover:text-emerald-400 opacity-0 group-hover:opacity-100'
+                    }`}
+                    title={entry.running ? 'Stop' : 'Start'}
+                  >
+                    {entry.running ? '■' : '▶'}
+                  </button>
+                  <button
+                    onClick={e => handleDelete(e, mock.id)}
+                    className="text-[10px] px-1 py-0.5 rounded text-surface-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-colors"
+                    title="Delete"
+                  >
+                    ✕
+                  </button>
+                </div>
               </button>
             );
           })

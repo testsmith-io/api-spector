@@ -147,6 +147,33 @@ const FAKER_SUB: Record<string, Completion[]> = {
     { label: 'sentence',  type: 'function', detail: '()',      info: 'Lorem sentence' },
     { label: 'paragraph', type: 'function', detail: '()',      info: 'Lorem paragraph' },
   ],
+  location: [
+    { label: 'city',          type: 'function', detail: '()', info: 'Random city name' },
+    { label: 'country',       type: 'function', detail: '()', info: 'Random country name' },
+    { label: 'countryCode',   type: 'function', detail: '()', info: 'Two-letter country code' },
+    { label: 'state',         type: 'function', detail: '()', info: 'US state name' },
+    { label: 'streetAddress', type: 'function', detail: '()', info: 'Street address' },
+    { label: 'zipCode',       type: 'function', detail: '()', info: 'ZIP / postal code' },
+    { label: 'latitude',      type: 'function', detail: '()', info: 'Random latitude' },
+    { label: 'longitude',     type: 'function', detail: '()', info: 'Random longitude' },
+  ],
+  finance: [
+    { label: 'iban',             type: 'function', detail: '()',          info: 'IBAN number' },
+    { label: 'bic',              type: 'function', detail: '()',          info: 'BIC / SWIFT code' },
+    { label: 'accountNumber',    type: 'function', detail: '()',          info: 'Bank account number' },
+    { label: 'amount',           type: 'function', detail: '({ min, max })', info: 'Random monetary amount' },
+    { label: 'currencyCode',     type: 'function', detail: '()',          info: 'Currency code (USD, EUR, …)' },
+    { label: 'currencyName',     type: 'function', detail: '()',          info: 'Currency name' },
+    { label: 'creditCardNumber', type: 'function', detail: '()',          info: 'Credit card number' },
+    { label: 'pin',              type: 'function', detail: '()',          info: 'Numeric PIN' },
+    { label: 'bitcoinAddress',   type: 'function', detail: '()',          info: 'Bitcoin address' },
+  ],
+  color: [
+    { label: 'human', type: 'function', detail: '()', info: 'Human-readable color name (e.g. "red")' },
+    { label: 'hex',   type: 'function', detail: '()', info: 'Hex color string (e.g. #a3f1c2)' },
+    { label: 'rgb',   type: 'function', detail: '()', info: 'CSS rgb() string' },
+    { label: 'hsl',   type: 'function', detail: '()', info: 'CSS hsl() string' },
+  ],
 };
 
 // ─── Completion source factory ────────────────────────────────────────────────
