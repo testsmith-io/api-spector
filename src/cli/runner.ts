@@ -33,7 +33,7 @@
  *   --help                   Show this message
  */
 
-import { readFile, writeFile } from 'fs/promises';
+import { readFile, writeFile, stat, readdir } from 'fs/promises';
 import { join, dirname, resolve, extname } from 'path';
 import { fetch, Headers } from 'undici';
 import type {
@@ -88,9 +88,19 @@ function parseArgs(argv: string[]): Record<string, string | boolean> {
 
 // ─── File loading ─────────────────────────────────────────────────────────────
 
+async function resolveWorkspacePath(wsPath: string): Promise<string> {
+  const s = await stat(wsPath);
+  if (!s.isDirectory()) return wsPath;
+  const entries = await readdir(wsPath);
+  const spector = entries.find(e => e.endsWith('.spector'));
+  if (!spector) throw new Error(`No .spector workspace file found in directory: ${wsPath}`);
+  return join(wsPath, spector);
+}
+
 async function loadWorkspace(wsPath: string): Promise<{ workspace: Workspace; dir: string }> {
-  const raw = await readFile(wsPath, 'utf8');
-  return { workspace: JSON.parse(raw), dir: dirname(resolve(wsPath)) };
+  const resolved = await resolveWorkspacePath(wsPath);
+  const raw = await readFile(resolved, 'utf8');
+  return { workspace: JSON.parse(raw), dir: dirname(resolve(resolved)) };
 }
 
 async function loadCollections(workspace: Workspace, dir: string): Promise<Collection[]> {

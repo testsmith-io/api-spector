@@ -477,3 +477,44 @@ export interface MockHit {
   responseBody?: string
   responseHeaders?: Record<string, string>
 }
+
+// ─── Git ──────────────────────────────────────────────────────────────────────
+
+export type GitFileStatus = 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked'
+
+export interface GitFile {
+  path: string
+  status: GitFileStatus
+}
+
+export interface GitStatus {
+  staged:    GitFile[]
+  unstaged:  GitFile[]
+  untracked: GitFile[]
+  branch:    string
+  ahead:     number
+  behind:    number
+  remote:    string | null
+}
+
+export interface GitCommit {
+  hash:    string
+  short:   string
+  message: string
+  author:  string
+  email:   string
+  date:    string
+}
+
+export interface GitBranch {
+  name:    string
+  current: boolean
+  remote:  boolean
+}
+
+export interface GitRemote {
+  name: string
+  url:  string
+}
+
+export type CiPlatform = 'github' | 'gitlab' | 'azure' | 'unknown'

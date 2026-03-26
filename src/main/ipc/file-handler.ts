@@ -75,7 +75,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     await mkdir(join(workspaceDir, 'environments'), { recursive: true });
 
     // Write .gitignore
-    const gitignore = '# api Spector — never commit secrets\n*.secrets\n.env.local\n';
+    const gitignore = '# api Spector — never commit secrets\n*.secrets\n.env.local\n\n# Dependencies\nnode_modules/\n';
     await atomicWrite(join(workspaceDir, '.gitignore'), gitignore);
 
     const ws: Workspace = {

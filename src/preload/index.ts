@@ -35,6 +35,10 @@ import type {
   ApiRequest,
   ContractRunPayload,
   ContractReport,
+  GitStatus,
+  GitCommit,
+  GitBranch,
+  GitRemote,
 } from '../shared/types';
 
 
@@ -204,6 +208,46 @@ const api = {
     consoleOutput:         string[]
     error?:                string
   }> => ipcRenderer.invoke('script:run-hook', payload),
+
+  // ─── Git ──────────────────────────────────────────────────────────────────
+  gitIsRepo:     (): Promise<boolean> =>
+    ipcRenderer.invoke('git:isRepo'),
+  gitInit:       (): Promise<void> =>
+    ipcRenderer.invoke('git:init'),
+  gitStatus:     (): Promise<GitStatus> =>
+    ipcRenderer.invoke('git:status'),
+  gitDiff:       (filePath?: string): Promise<string> =>
+    ipcRenderer.invoke('git:diff', filePath),
+  gitDiffStaged: (filePath?: string): Promise<string> =>
+    ipcRenderer.invoke('git:diffStaged', filePath),
+  gitStage:      (paths: string[]): Promise<void> =>
+    ipcRenderer.invoke('git:stage', paths),
+  gitUnstage:    (paths: string[]): Promise<void> =>
+    ipcRenderer.invoke('git:unstage', paths),
+  gitStageAll:   (): Promise<void> =>
+    ipcRenderer.invoke('git:stageAll'),
+  gitCommit:     (message: string): Promise<void> =>
+    ipcRenderer.invoke('git:commit', message),
+  gitLog:        (limit?: number): Promise<GitCommit[]> =>
+    ipcRenderer.invoke('git:log', limit),
+  gitBranches:   (): Promise<GitBranch[]> =>
+    ipcRenderer.invoke('git:branches'),
+  gitCheckout:   (branch: string, create: boolean): Promise<void> =>
+    ipcRenderer.invoke('git:checkout', branch, create),
+  gitPull:       (): Promise<void> =>
+    ipcRenderer.invoke('git:pull'),
+  gitPush:       (setUpstream: boolean): Promise<void> =>
+    ipcRenderer.invoke('git:push', setUpstream),
+  gitRemotes:      (): Promise<GitRemote[]> =>
+    ipcRenderer.invoke('git:remotes'),
+  gitAddRemote:    (name: string, url: string): Promise<void> =>
+    ipcRenderer.invoke('git:addRemote', name, url),
+  gitSetRemoteUrl: (name: string, url: string): Promise<void> =>
+    ipcRenderer.invoke('git:setRemoteUrl', name, url),
+  gitRemoveRemote: (name: string): Promise<void> =>
+    ipcRenderer.invoke('git:removeRemote', name),
+  gitWriteCiFile:  (relPath: string, content: string): Promise<void> =>
+    ipcRenderer.invoke('git:writeCiFile', relPath, content),
 
   // ─── Zoom ─────────────────────────────────────────────────────────────────
   setZoomFactor: (factor: number): void => webFrame.setZoomFactor(factor),
