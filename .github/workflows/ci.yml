@@ -6,14 +6,28 @@ on:
   pull_request:
 
 jobs:
+  # ── Node compatibility matrix ───────────────────────────────────────────────
+  # Tests the CLI runner/mock commands (which run on the host Node) and the
+  # built output across the 5 latest Node versions.
+  # Electron binary download is skipped — the UI always uses Electron's
+  # bundled Node regardless of the host version.
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 21, 22, 23, 24]
+
+    name: Node ${{ matrix.node-version }}
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
       - name: Install dependencies
@@ -22,5 +36,41 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Test
+      - name: Unit tests
         run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Smoke — CLI help
+        run: node bin/cli.js --help
+
+      - name: Smoke — runner help
+        run: node bin/cli.js run --help
+
+      - name: Smoke — mock help
+        run: node bin/cli.js mock --help
+
+  # ── UI smoke test (Electron) ────────────────────────────────────────────────
+  # Electron bundles its own Node, so this only needs to run once.
+  # Uses xvfb for a virtual display.
+  ui:
+    runs-on: ubuntu-latest
+    name: Electron UI (smoke)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Launch UI (5 s smoke test)
+        run: xvfb-run --auto-servernum node bin/cli.js ui &
+             sleep 5 && kill %1 || true

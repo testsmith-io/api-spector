@@ -20,6 +20,10 @@ function printHelp() {
   console.log('    api-spector run  --help                   Show run options')
   console.log('    api-spector mock --help                   Show mock options')
   console.log('')
+  console.log('  Environment:')
+  console.log('    ELECTRON_NO_SANDBOX=1                     Disable Chromium sandbox')
+  console.log('                                              (needed on locked-down Linux)')
+  console.log('')
 }
 
 if (cmd === '--help' || cmd === '-h') {
@@ -27,7 +31,7 @@ if (cmd === '--help' || cmd === '-h') {
   process.exit(0)
 } else if (cmd === 'ui') {
   const appDir = path.join(__dirname, '..')
-  const proc = spawn(String(electron), [appDir], {
+  const proc = spawn(String(electron), [appDir, ...rest], {
     stdio: 'inherit',
     env: process.env,
   })

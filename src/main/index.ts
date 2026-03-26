@@ -15,6 +15,18 @@
 // along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
 
 import { app, BrowserWindow, ipcMain, nativeImage } from 'electron';
+
+// Managed / locked-down machines (corporate Windows with EDR software, or
+// Linux with user-namespaces disabled) can hit "permission denied" with
+// Electron 33+ due to tightened Chromium sandbox defaults:
+//   - Windows: RendererCodeIntegrity blocks unsigned EDR DLL injection;
+//              GPU-process job-object changes conflict with some EDR products.
+//   - Linux:   user-namespace restrictions break the sandbox from Electron 36+.
+// Setting ELECTRON_NO_SANDBOX=1 opts out of the sandbox for these environments.
+if (process.env.ELECTRON_NO_SANDBOX === '1') {
+  app.commandLine.appendSwitch('no-sandbox');
+  app.commandLine.appendSwitch('disable-features', 'RendererCodeIntegrity');
+}
 import { join } from 'path';
 import { existsSync, readFileSync } from 'fs';
 import { registerFileHandlers } from './ipc/file-handler';

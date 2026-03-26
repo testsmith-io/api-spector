@@ -29,10 +29,10 @@
  *   --help               Show this message
  */
 
-import { readFile } from 'fs/promises';
+import { readFile, stat, readdir } from 'fs/promises';
 import { join, dirname, resolve } from 'path';
-import type { Workspace, MockServer } from '../shared/types';
-import { startMock, stopAll } from '../main/mock-server';
+import type { Workspace, MockServer, MockHit } from '../shared/types';
+import { startMock, stopAll, setHitCallback } from '../main/mock-server';
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
 
@@ -78,9 +78,19 @@ function parseArgs(argv: string[]): Record<string, string | boolean | string[]> 
 
 // ─── File loading ─────────────────────────────────────────────────────────────
 
+async function resolveWorkspacePath(wsPath: string): Promise<string> {
+  const s = await stat(wsPath);
+  if (!s.isDirectory()) return wsPath;
+  const entries = await readdir(wsPath);
+  const spector = entries.find(e => e.endsWith('.spector'));
+  if (!spector) throw new Error(`No .spector workspace file found in directory: ${wsPath}`);
+  return join(wsPath, spector);
+}
+
 async function loadWorkspace(wsPath: string): Promise<{ workspace: Workspace; dir: string }> {
-  const raw = await readFile(wsPath, 'utf8');
-  return { workspace: JSON.parse(raw), dir: dirname(resolve(wsPath)) };
+  const resolved = await resolveWorkspacePath(wsPath);
+  const raw = await readFile(resolved, 'utf8');
+  return { workspace: JSON.parse(raw), dir: dirname(resolve(resolved)) };
 }
 
 async function loadMocks(workspace: Workspace, dir: string): Promise<MockServer[]> {
@@ -103,10 +113,11 @@ async function main() {
 
   if (args.help) {
     console.log(
-      '\nUsage:\n  api-spector mock --workspace <path> [--name <server-name>]\n\n' +
+      '\nUsage:\n  api-spector mock --workspace <path> [--name <server-name>] [--log]\n\n' +
       'Options:\n' +
       '  --workspace <path>   Path to workspace.json (required)\n' +
       '  --name <name>        Start only the named server (repeat for multiple)\n' +
+      '  --log                Print each incoming request (matched and unmatched)\n' +
       '  --help               Show this message\n'
     );
     process.exit(0);
@@ -183,6 +194,44 @@ async function main() {
 
   if (started === 0) {
     process.exit(1);
+  }
+
+  if (args.log) {
+    // Build a lookup: serverId → mock name, routeId → route path
+    const serverNames: Record<string, string> = {};
+    const routePaths: Record<string, string> = {};
+    for (const mock of toStart) {
+      serverNames[mock.id] = mock.name;
+      for (const route of mock.routes) {
+        routePaths[route.id] = `${route.method} ${route.path}`;
+      }
+    }
+
+    setHitCallback((hit: MockHit) => {
+      const ts      = new Date(hit.timestamp).toISOString().slice(11, 23);
+      const server  = color(serverNames[hit.serverId] ?? hit.serverId, C.white);
+      const method  = hit.method.padEnd(7);
+      const matched = hit.matchedRouteId !== null;
+      const status  = color(String(hit.status), hit.status < 400 ? C.green : C.red);
+      const dur     = color(`${hit.durationMs}ms`, C.gray);
+
+      if (matched) {
+        const route = color(routePaths[hit.matchedRouteId!] ?? hit.matchedRouteId!, C.gray);
+        console.log(
+          color(`  ${ts}`, C.gray) + `  ${server}  ` +
+          color(method, C.cyan) + color(hit.path, C.white) +
+          `  ${status}  ${dur}` +
+          color(`  → ${route}`, C.gray)
+        );
+      } else {
+        console.log(
+          color(`  ${ts}`, C.gray) + `  ${server}  ` +
+          color(method, C.yellow) + color(hit.path, C.yellow) +
+          `  ${status}  ${dur}` +
+          color('  (no match)', C.yellow)
+        );
+      }
+    });
   }
 
   console.log('');

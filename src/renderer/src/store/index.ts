@@ -101,6 +101,16 @@ function removeFolderById(parent: Folder, folderId: string): boolean {
   return false;
 }
 
+/** Returns the direct parent folder that contains the given folderId as a child. */
+function findFolderParent(root: Folder, folderId: string): Folder | null {
+  for (const sub of root.folders) {
+    if (sub.id === folderId) return root;
+    const found = findFolderParent(sub, folderId);
+    if (found) return found;
+  }
+  return null;
+}
+
 // ─── Folder path helper (exported for use in components) ─────────────────────
 
 /** Returns the path of folders from root to the folder containing requestId, inclusive of the containing folder. */
@@ -243,6 +253,7 @@ interface AppActions {
   addFolder: (collectionId: string, parentFolderId: string, name: string) => void
   renameFolder: (collectionId: string, folderId: string, name: string) => void
   deleteFolder: (collectionId: string, folderId: string) => void
+  duplicateFolder: (collectionId: string, folderId: string) => void
 
   // Request CRUD
   addRequest: (collectionId: string, folderId: string) => void
@@ -250,6 +261,8 @@ interface AppActions {
   renameRequest: (id: string, name: string) => void
   deleteRequest: (collectionId: string, id: string) => void
   duplicateRequest: (collectionId: string, id: string) => void
+
+  duplicateCollection: (id: string) => void
 
   // Tags
   updateFolderTags: (collectionId: string, folderId: string, tags: string[]) => void
@@ -526,6 +539,39 @@ export const useStore = create<AppState & AppActions>()(
       }
     }),
 
+    duplicateCollection: (id) => set(s => {
+      const entry = s.collections[id];
+      if (!entry) return;
+      const orig = entry.data;
+      const existingNames = Object.values(s.collections).map(c => c.data.name);
+      const newName = uniqueName(orig.name + ' (copy)', existingNames);
+      const newId   = uuidv4();
+
+      // Deep-clone, then re-ID all requests and folders
+      const copy: Collection = JSON.parse(JSON.stringify(orig));
+      copy.id   = newId;
+      copy.name = newName;
+
+      const reqIdMap: Record<string, string> = {};
+      Object.keys(copy.requests).forEach(oldReqId => {
+        const newReqId = uuidv4();
+        reqIdMap[oldReqId] = newReqId;
+        copy.requests[newReqId] = { ...copy.requests[oldReqId], id: newReqId };
+        delete copy.requests[oldReqId];
+      });
+      function remapFolder(f: Folder) {
+        f.id         = uuidv4();
+        f.requestIds = f.requestIds.map(rid => reqIdMap[rid] ?? rid);
+        f.folders.forEach(remapFolder);
+      }
+      remapFolder(copy.rootFolder);
+
+      const relPath = colRelPath(newName, newId);
+      s.collections[newId] = { relPath, data: copy, dirty: true };
+      s.activeCollectionId  = newId;
+      if (s.workspace) s.workspace.collections.push(relPath);
+    }),
+
     deleteCollection: (id) => set(s => {
       const relPath = s.collections[id]?.relPath;
       delete s.collections[id];
@@ -574,6 +620,37 @@ export const useStore = create<AppState & AppActions>()(
       if (!col) return;
       const folder = findFolder(col.rootFolder, folderId);
       if (folder) { folder.name = name; s.collections[collectionId].dirty = true; }
+    }),
+
+    duplicateFolder: (collectionId, folderId) => set(s => {
+      const col = s.collections[collectionId]?.data;
+      if (!col) return;
+      const orig = findFolder(col.rootFolder, folderId);
+      if (!orig) return;
+
+      const copy: Folder = JSON.parse(JSON.stringify(orig));
+      copy.name = orig.name + ' (copy)';
+
+      // Re-ID all requests inside the copied folder tree, adding them to the collection
+      function remapRequests(f: Folder) {
+        f.requestIds = f.requestIds.map(oldId => {
+          const newId = uuidv4();
+          col.requests[newId] = { ...JSON.parse(JSON.stringify(col.requests[oldId])), id: newId };
+          return newId;
+        });
+        f.folders.forEach(remapRequests);
+      }
+      remapRequests(copy);
+
+      // Re-ID all folders
+      function reIdFolders(f: Folder) { f.id = uuidv4(); f.folders.forEach(reIdFolders); }
+      reIdFolders(copy);
+
+      // Insert after the original in its parent
+      const parent = findFolderParent(col.rootFolder, folderId) ?? col.rootFolder;
+      const idx = parent.folders.findIndex(f => f.id === folderId);
+      parent.folders.splice(idx + 1, 0, copy);
+      s.collections[collectionId].dirty = true;
     }),
 
     deleteFolder: (collectionId, folderId) => set(s => {

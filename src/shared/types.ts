@@ -474,4 +474,6 @@ export interface MockHit {
   matchedRouteId: string | null   // null = no match (404)
   status: number
   durationMs: number
+  responseBody?: string
+  responseHeaders?: Record<string, string>
 }

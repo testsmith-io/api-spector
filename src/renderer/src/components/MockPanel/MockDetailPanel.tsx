@@ -20,7 +20,7 @@ import { json } from '@codemirror/lang-json';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { useStore } from '../../store';
-import type { MockRoute, MockServer } from '../../../../shared/types';
+import type { MockRoute, MockServer, MockHit } from '../../../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
 import { getMethodColor } from '../../../../shared/colors';
 import {
@@ -38,11 +38,13 @@ function RouteRow({
   route,
   onSave,
   onDelete,
+  onDuplicate,
   initialEditing = false,
 }: {
   route: MockRoute
   onSave: (r: MockRoute) => void
   onDelete: () => void
+  onDuplicate: () => void
   initialEditing?: boolean
 }) {
   const [editing,      setEditing]      = useState(initialEditing);
@@ -90,6 +92,13 @@ function RouteRow({
           className="opacity-0 group-hover:opacity-100 text-xs text-surface-600 hover:text-surface-200 transition-opacity px-1"
         >
           Edit
+        </button>
+        <button
+          onClick={onDuplicate}
+          className="opacity-0 group-hover:opacity-100 text-xs text-surface-600 hover:text-blue-400 transition-opacity"
+          title="Duplicate route"
+        >
+          ⧉
         </button>
         <button
           onClick={onDelete}
@@ -151,9 +160,14 @@ function RouteRow({
         <div className="flex items-center justify-between mb-1">
           <label className="text-[11px] text-surface-400 uppercase tracking-wider">Response body</label>
           <span className="text-[10px] text-surface-600">
-            Use <code className="text-surface-400">{'{{faker.person.firstName()}}'}</code>,{' '}
-            <code className="text-surface-400">{'{{request.params.id}}'}</code>,{' '}
-            <code className="text-surface-400">{'{{request.query.search}}'}</code>
+            Use <code className="text-surface-400">{'{{faker.person.firstName()}}'}</code>
+            {pathParamNames.map(p => (
+              <span key={p}>, <code className="text-blue-400/80">{`{{request.params.${p}}}`}</code></span>
+            ))}
+            {pathParamNames.length === 0 && (
+              <span>, <code className="text-surface-400">{'{{request.params.id}}'}</code> <span className="text-surface-700">(add :id to path)</span></span>
+            )}
+            , <code className="text-surface-400">{'{{request.query.search}}'}</code>
           </span>
         </div>
         <div className="rounded overflow-hidden border border-surface-700">
@@ -268,6 +282,79 @@ function timeAgo(ts: number): string {
   return `${Math.floor(s / 3600)}h ago`;
 }
 
+function HitRow({ hit, matched }: { hit: MockHit; matched: MockRoute | undefined | null }) {
+  const [open, setOpen] = useState(false);
+  const unmatched = !hit.matchedRouteId;
+
+  // Pretty-print JSON response body if possible
+  const prettyBody = useMemo(() => {
+    if (!hit.responseBody) return null;
+    try { return JSON.stringify(JSON.parse(hit.responseBody), null, 2); }
+    catch { return hit.responseBody; }
+  }, [hit.responseBody]);
+
+  return (
+    <div className={`border-b border-surface-800/40 ${unmatched ? 'bg-red-950/20' : ''}`}>
+      {/* Summary row */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`w-full flex items-center gap-3 px-4 py-2 text-sm font-mono text-left ${
+          unmatched ? '' : 'hover:bg-surface-800/20'
+        } transition-colors`}
+      >
+        <span className="text-surface-600 text-[10px] w-3 shrink-0">{open ? '▾' : '▸'}</span>
+        <span className={`font-bold w-16 shrink-0 text-xs ${getMethodColor(hit.method)}`}>
+          {hit.method}
+        </span>
+        <span className="flex-1 truncate text-surface-200" title={hit.path}>
+          {hit.path}
+        </span>
+        <span className="w-32 shrink-0 truncate text-surface-600 text-xs font-sans" title={matched?.description ?? matched?.path ?? ''}>
+          {unmatched
+            ? <span className="text-red-400">no match</span>
+            : (matched?.description || matched?.path || '—')}
+        </span>
+        <span className={`w-12 text-right shrink-0 text-xs ${
+          hit.status < 300 ? 'text-emerald-400' :
+          hit.status < 400 ? 'text-amber-400' : 'text-red-400'
+        }`}>{hit.status}</span>
+        <span className="w-14 text-right shrink-0 text-surface-600 text-xs">{hit.durationMs}ms</span>
+        <span className="w-20 text-right shrink-0 text-surface-400 text-xs">
+          {timeAgo(hit.timestamp)}
+        </span>
+      </button>
+
+      {/* Expanded response detail */}
+      {open && (
+        <div className="px-4 pb-3 bg-surface-900/60 border-t border-surface-800/40">
+          {/* Response headers */}
+          {hit.responseHeaders && Object.keys(hit.responseHeaders).length > 0 && (
+            <div className="mt-2">
+              <p className="text-[10px] uppercase tracking-wider text-surface-600 mb-1">Response headers</p>
+              <div className="font-mono text-xs space-y-0.5">
+                {Object.entries(hit.responseHeaders).map(([k, v]) => (
+                  <div key={k} className="flex gap-2">
+                    <span className="text-surface-400 shrink-0">{k}:</span>
+                    <span className="text-surface-300 break-all">{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Response body */}
+          <div className="mt-2">
+            <p className="text-[10px] uppercase tracking-wider text-surface-600 mb-1">Response body</p>
+            {prettyBody
+              ? <pre className="font-mono text-xs text-surface-300 bg-surface-950 rounded p-2 overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap break-all">{prettyBody}</pre>
+              : <span className="text-xs text-surface-600 italic">empty</span>
+            }
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RequestLog({ serverId, routes, running }: { serverId: string; routes: MockRoute[]; running: boolean }) {
   const hits      = useStore(s => s.mockLogs[serverId]) ?? [];
   const clearLogs = useStore(s => s.clearMockLogs);
@@ -307,6 +394,7 @@ function RequestLog({ serverId, routes, running }: { serverId: string; routes: M
         <div className="flex-1 overflow-y-auto">
           {/* Column headers */}
           <div className="flex items-center gap-3 px-4 py-1.5 border-b border-surface-800 text-[10px] uppercase tracking-wider text-surface-400 sticky top-0 bg-surface-950">
+            <span className="w-3 shrink-0" />
             <span className="w-16 shrink-0">Method</span>
             <span className="flex-1">Path</span>
             <span className="w-32 shrink-0">Matched route</span>
@@ -315,38 +403,13 @@ function RequestLog({ serverId, routes, running }: { serverId: string; routes: M
             <span className="w-20 text-right shrink-0">Time</span>
           </div>
 
-          {hits.map(hit => {
-            const matched   = hit.matchedRouteId ? routeMap.get(hit.matchedRouteId) : null;
-            const unmatched = !hit.matchedRouteId;
-            return (
-              <div
-                key={hit.id}
-                className={`flex items-center gap-3 px-4 py-2 border-b border-surface-800/40 text-sm font-mono ${
-                  unmatched ? 'bg-red-950/30' : 'hover:bg-surface-800/20'
-                }`}
-              >
-                <span className={`font-bold w-16 shrink-0 text-xs ${getMethodColor(hit.method)}`}>
-                  {hit.method}
-                </span>
-                <span className="flex-1 truncate text-surface-200" title={hit.path}>
-                  {hit.path}
-                </span>
-                <span className="w-32 shrink-0 truncate text-surface-600 text-xs font-sans" title={matched?.description ?? matched?.path ?? ''}>
-                  {unmatched
-                    ? <span className="text-red-400">no match</span>
-                    : (matched?.description || matched?.path || '—')}
-                </span>
-                <span className={`w-12 text-right shrink-0 text-xs ${
-                  hit.status < 300 ? 'text-emerald-400' :
-                  hit.status < 400 ? 'text-amber-400' : 'text-red-400'
-                }`}>{hit.status}</span>
-                <span className="w-14 text-right shrink-0 text-surface-600 text-xs">{hit.durationMs}ms</span>
-                <span className="w-20 text-right shrink-0 text-surface-400 text-xs" title={String(hit.timestamp)}>
-                  {timeAgo(hit.timestamp)}
-                </span>
-              </div>
-            );
-          })}
+          {hits.map(hit => (
+            <HitRow
+              key={hit.id}
+              hit={hit}
+              matched={hit.matchedRouteId ? routeMap.get(hit.matchedRouteId) : null}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -469,16 +532,26 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
           {error && (
             <span className="text-xs text-red-400 max-w-xs truncate" title={error}>⚠ {error}</span>
           )}
-          <button
-            onClick={toggleRunning}
-            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-              running
-                ? 'bg-emerald-900/40 text-emerald-400 hover:bg-red-900/40 hover:text-red-400 border border-emerald-800/50'
-                : 'bg-surface-800 hover:bg-surface-700 text-surface-300 border border-surface-700'
-            }`}
-          >
-            {running ? '● Running' : '▶ Start'}
-          </button>
+          <div className="relative group/cli flex items-center">
+            <button
+              onClick={toggleRunning}
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                running
+                  ? 'bg-emerald-900/40 text-emerald-400 hover:bg-red-900/40 hover:text-red-400 border border-emerald-800/50'
+                  : 'bg-surface-800 hover:bg-surface-700 text-surface-300 border border-surface-700'
+              }`}
+            >
+              {running ? '● Running' : '▶ Start'}
+            </button>
+            {!running && (
+              <div className="pointer-events-none absolute bottom-full right-0 mb-2 hidden group-hover/cli:block z-50">
+                <div className="bg-[#1e1b2e] border border-white/10 rounded px-2.5 py-1.5 shadow-xl text-[11px] text-surface-300 whitespace-nowrap">
+                  <span className="text-surface-500 mr-1">or run from CLI:</span>
+                  <code className="text-blue-300">npx api-spector mock --workspace &lt;path&gt;</code>
+                </div>
+              </div>
+            )}
+          </div>
           <button
             onClick={() => {
               if (running) electron.mockStop(mock.id);
@@ -540,6 +613,12 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
                       setNewRouteId(null);
                     }}
                     onDelete={() => save({ ...mock, routes: routes.filter(r => r.id !== route.id) })}
+                    onDuplicate={() => {
+                      const copy = { ...route, id: uuidv4() };
+                      const idx = routes.indexOf(route);
+                      const next = [...routes.slice(0, idx + 1), copy, ...routes.slice(idx + 1)];
+                      save({ ...mock, routes: next });
+                    }}
                     initialEditing={route.id === newRouteId}
                   />
                 ))

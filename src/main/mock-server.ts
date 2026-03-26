@@ -156,12 +156,15 @@ async function handleRequest(
   const route  = findRoute(routes, method, urlPath);
 
   if (!route) {
+    const notFoundBody = JSON.stringify({ error: 'No matching mock route', method, path: urlPath });
     res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'No matching mock route', method, path: urlPath }));
+    res.end(notFoundBody);
     hitCallback?.({
       id: randomUUID(), serverId, timestamp: reqStart,
       method, path: urlPath, matchedRouteId: null,
       status: 404, durationMs: Date.now() - reqStart,
+      responseBody: notFoundBody,
+      responseHeaders: { 'Content-Type': 'application/json' },
     });
     return;
   }
@@ -217,6 +220,8 @@ async function handleRequest(
       id: randomUUID(), serverId, timestamp: reqStart,
       method, path: urlPath, matchedRouteId: route.id,
       status: responseDraft.statusCode, durationMs: Date.now() - reqStart,
+      responseBody: finalBody,
+      responseHeaders: responseDraft.headers,
     });
   };
 
