@@ -111,8 +111,17 @@ export async function buildEnvVars(environment: Environment | null): Promise<Rec
         try {
           vars[v.key] = decryptSecret(v.secretEncrypted, v.secretSalt, v.secretIv, masterKey);
         } catch {
-          // Wrong password or corrupted — skip
+          // Wrong password or corrupted — fall through to env fallback
         }
+      }
+      // CLI / CI context: secret injected as environment variable (e.g. from GitHub Secrets)
+      if (vars[v.key] === undefined && process.env[v.key] !== undefined) {
+        vars[v.key] = process.env[v.key]!;
+      }
+    } else if (v.secret) {
+      // Secret with no stored ciphertext — check process.env (CI / CLI context)
+      if (process.env[v.key] !== undefined) {
+        vars[v.key] = process.env[v.key]!;
       }
     } else {
       vars[v.key] = v.value;

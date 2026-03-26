@@ -23,7 +23,7 @@
  *
  * Options:
  *   --workspace  <path>      Path to workspace.json (required)
- *   --env        <name>      Environment name to activate (optional)
+ *   --environment <name>     Environment name to activate (also accepted: --env)
  *   --tags       <a,b>       Comma-separated tag filter
  *   --collection <name>      Limit to a specific collection by name (optional)
  *   --output     <path>      Write results to a file (e.g. results.json or results.xml)
@@ -45,7 +45,7 @@ import { runScript } from '../main/script-runner';
 import { loadGlobals, getGlobals, patchGlobals, persistGlobals } from '../main/globals-store';
 import { getSecret } from '../main/ipc/secret-handler';
 import { buildDispatcher } from '../main/ipc/request-handler';
-import { buildJsonReport, buildJUnitReport } from '../shared/report';
+import { buildJsonReport, buildJUnitReport, buildHtmlReport } from '../shared/report';
 import { collectTagged } from '../shared/request-collection';
 
 // ─── ANSI colour helpers ──────────────────────────────────────────────────────
@@ -246,11 +246,27 @@ async function executeRequest(
     }
 
     const allPassed = testResults.every(t => t.passed);
+    const httpOk    = fetchResp.status < 400;
     const status: RunRequestResult['status'] = postScriptError
       ? 'error'
-      : testResults.length > 0 ? (allPassed ? 'passed' : 'failed') : 'passed';
+      : testResults.length > 0 ? (allPassed ? 'passed' : 'failed')
+      : httpOk ? 'passed' : 'failed';
 
-    return { ...base, status, httpStatus: fetchResp.status, durationMs, testResults, consoleOutput, preScriptError, postScriptError };
+    const reqHeaders: Record<string, string> = {};
+    headers.forEach((v, k) => { reqHeaders[k] = v; });
+
+    return {
+      ...base,
+      status,
+      httpStatus: fetchResp.status,
+      durationMs,
+      testResults,
+      consoleOutput,
+      preScriptError,
+      postScriptError,
+      sentRequest:      { headers: reqHeaders, body },
+      receivedResponse: response,
+    };
   } catch (err) {
     return {
       ...base,
@@ -292,7 +308,7 @@ async function main() {
 
   if (args.help) {
     console.log(
-      '\nUsage:\n  api-spector run --workspace <path> [--env <name>] [--tags <a,b>]\n' +
+      '\nUsage:\n  api-spector run --workspace <path> [--environment <name>] [--tags <a,b>]\n' +
       '                  [--collection <name>] [--output <path>] [--format json|junit]\n' +
       '                  [--verbose] [--bail]\n'
     );
@@ -306,15 +322,20 @@ async function main() {
   }
 
   const filterTags   = args.tags    ? (args.tags as string).split(',').map(t => t.trim()).filter(Boolean) : [];
-  const envName      = args.env     as string | undefined;
+  const envName      = (args.environment ?? args.env) as string | undefined;
   const colName      = args.collection as string | undefined;
   const verbose      = Boolean(args.verbose);
   const bail         = Boolean(args.bail);
   const outputPath   = args.output  as string | undefined;
 
   // Infer format from file extension if --format not given
-  const inferredFormat = outputPath && extname(outputPath).toLowerCase() === '.xml' ? 'junit' : 'json';
-  const outputFormat   = (args.format as string | undefined)?.toLowerCase() === 'junit' ? 'junit' : inferredFormat;
+  const inferredFormat = outputPath
+    ? extname(outputPath).toLowerCase() === '.xml'  ? 'junit'
+    : extname(outputPath).toLowerCase() === '.html' ? 'html'
+    : 'json'
+    : 'json';
+  const explicitFormat = (args.format as string | undefined)?.toLowerCase();
+  const outputFormat   = (explicitFormat === 'junit' || explicitFormat === 'html') ? explicitFormat : inferredFormat;
 
   // Load workspace
   let workspace: Workspace, wsDir: string;
@@ -346,6 +367,33 @@ async function main() {
   console.log(color(`  Environment: ${env?.name ?? '(none)'}`, C.gray));
   if (filterTags.length) console.log(color(`  Tags:        ${filterTags.join(', ')}`, C.gray));
   console.log('');
+
+  // Collect resolved secret values so we can redact them from reports
+  const envVarsSnapshot    = await buildEnvVars(env);
+  const secretValuesToMask = (env?.variables ?? [])
+    .filter(v => v.secret && v.enabled)
+    .map(v => envVarsSnapshot[v.key])
+    .filter((v): v is string => typeof v === 'string' && v.length > 0);
+
+  function redact(s: string): string {
+    let out = s;
+    for (const secret of secretValuesToMask) out = out.split(secret).join('***');
+    return out;
+  }
+
+  function maskResult(r: RunRequestResult): RunRequestResult {
+    return {
+      ...r,
+      sentRequest: r.sentRequest ? {
+        headers: Object.fromEntries(Object.entries(r.sentRequest.headers).map(([k, v]) => [k, redact(v)])),
+        body:    r.sentRequest.body != null ? redact(r.sentRequest.body) : undefined,
+      } : undefined,
+      receivedResponse: r.receivedResponse ? {
+        ...r.receivedResponse,
+        body: redact(r.receivedResponse.body),
+      } : undefined,
+    };
+  }
 
   const summary: RunSummary = { total: 0, passed: 0, failed: 0, errors: 0, durationMs: 0 };
   const allResults: RunRequestResult[] = [];
@@ -406,9 +454,10 @@ async function main() {
   // Write report file if --output was given
   if (outputPath) {
     const meta = { workspace: wsPath, environment: env?.name ?? null, collection: firstColName, timestamp };
-    const report = outputFormat === 'junit'
-      ? buildJUnitReport(allResults, summary, meta)
-      : buildJsonReport(allResults, summary, meta);
+    const maskedResults = allResults.map(maskResult);
+    const report = outputFormat === 'junit' ? buildJUnitReport(maskedResults, summary, meta)
+                 : outputFormat === 'html'  ? buildHtmlReport(maskedResults, summary, meta)
+                 : buildJsonReport(maskedResults, summary, meta);
     await writeFile(resolve(outputPath), report, 'utf8');
     console.log(color(`  Report written: ${outputPath} (${outputFormat})\n`, C.gray));
   }
