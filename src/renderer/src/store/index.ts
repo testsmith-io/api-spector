@@ -173,7 +173,7 @@ interface AppState {
   theme: 'dark' | 'light' | 'system'
   zoom: number
   history: HistoryEntry[]           // newest first, capped at 200
-  sidebarTab: 'collections' | 'history' | 'mocks' | 'contracts'
+  sidebarTab: 'collections' | 'history' | 'mocks' | 'contracts' | 'git'
 
   workspaceSettingsOpen: boolean
 
