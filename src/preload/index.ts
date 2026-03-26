@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
 
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webFrame } from 'electron';
 import type {
   Collection,
   Environment,
@@ -190,6 +190,23 @@ const api = {
     ipcRenderer.invoke('contract:run', payload),
   inferContractSchema: (jsonBody: string): Promise<string | null> =>
     ipcRenderer.invoke('contract:inferSchema', jsonBody),
+
+  // ─── Script hooks ─────────────────────────────────────────────────────────
+  runScriptHook: (payload: {
+    script:         string
+    envVars:        Record<string, string>
+    collectionVars: Record<string, string>
+    globals:        Record<string, string>
+  }): Promise<{
+    updatedEnvVars:        Record<string, string>
+    updatedCollectionVars: Record<string, string>
+    updatedGlobals:        Record<string, string>
+    consoleOutput:         string[]
+    error?:                string
+  }> => ipcRenderer.invoke('script:run-hook', payload),
+
+  // ─── Zoom ─────────────────────────────────────────────────────────────────
+  setZoomFactor: (factor: number): void => webFrame.setZoomFactor(factor),
 
   // ─── Platform ─────────────────────────────────────────────────────────────
   platform: process.platform as string,

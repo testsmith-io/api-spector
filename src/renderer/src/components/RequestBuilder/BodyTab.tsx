@@ -72,7 +72,7 @@ export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: 
             theme={oneDark}
             extensions={[json(), varExt]}
             onChange={val => onChange({ body: { ...body, json: val } })}
-            basicSetup={{ lineNumbers: true, foldGutter: false }}
+            basicSetup={{ lineNumbers: true, foldGutter: false, autocompletion: false }}
           />
         </div>
       )}
@@ -101,7 +101,7 @@ export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: 
               theme={oneDark}
               extensions={[varExt]}
               onChange={val => onChange({ body: { ...body, raw: val } })}
-              basicSetup={{ lineNumbers: true, foldGutter: false }}
+              basicSetup={{ lineNumbers: true, foldGutter: false, autocompletion: false }}
             />
           </div>
         </div>

@@ -30,7 +30,7 @@ interface Props {
   onChange: (patch: Partial<ApiRequest>) => void
 }
 
-type ScriptType = 'pre' | 'post'
+type ScriptType = 'pre' | 'post' | 'gql'
 
 export function ScriptsTab({ request, onChange }: Props) {
   const activeTabId     = useStore(s => s.activeTabId);
@@ -48,13 +48,16 @@ export function ScriptsTab({ request, onChange }: Props) {
     [varNames, varValues],
   );
 
-  const value = scriptType === 'pre'
-    ? (request.preRequestScript ?? '')
-    : (request.postRequestScript ?? '');
+  const isGraphQL = request.body.mode === 'graphql';
+
+  const value = scriptType === 'pre'  ? (request.preRequestScript        ?? '')
+              : scriptType === 'post' ? (request.postRequestScript        ?? '')
+              :                         (request.graphqlIntrospectionScript ?? '');
 
   function handleChange(code: string) {
-    if (scriptType === 'pre') onChange({ preRequestScript: code });
-    else onChange({ postRequestScript: code });
+    if (scriptType === 'pre')  onChange({ preRequestScript:         code });
+    else if (scriptType === 'post') onChange({ postRequestScript:   code });
+    else                            onChange({ graphqlIntrospectionScript: code });
   }
 
   function insertSnippet(code: string) {
@@ -69,7 +72,7 @@ export function ScriptsTab({ request, onChange }: Props) {
       <div className="flex flex-col flex-1 min-w-0 gap-2">
         {/* Sub-tabs */}
         <div className="flex gap-0 border-b border-surface-700">
-          {(['pre', 'post'] as ScriptType[]).map(t => (
+          {(['pre', 'post', ...(isGraphQL ? ['gql' as ScriptType] : [])] as ScriptType[]).map(t => (
             <button
               key={t}
               onClick={() => setScriptType(t)}
@@ -79,15 +82,15 @@ export function ScriptsTab({ request, onChange }: Props) {
                   : 'border-transparent text-surface-400 hover:text-white'
               }`}
             >
-              {t === 'pre' ? 'Pre-request' : 'Post-response'}
+              {t === 'pre' ? 'Pre-request' : t === 'post' ? 'Post-response' : 'GQL Introspect'}
             </button>
           ))}
         </div>
 
         <div className="text-[10px] text-surface-400">
-          {scriptType === 'pre'
-            ? 'Runs before the request is sent. Use at.variables.set() to generate dynamic data.'
-            : 'Runs after the response is received. Use at.test() to assert and at.environment.set() to extract values.'}
+          {scriptType === 'pre'  && 'Runs before the request is sent. Use sp.variables.set() to generate dynamic data.'}
+          {scriptType === 'post' && 'Runs after the response is received. Use sp.test() to assert and sp.environment.set() to extract values.'}
+          {scriptType === 'gql'  && 'Runs before GraphQL schema introspection. Use sp.environment.set() or sp.collectionVariables.set() to inject auth headers or tokens.'}
         </div>
 
         <div className="flex-1 rounded overflow-hidden border border-surface-700" style={{ minHeight: 160 }}>
@@ -97,7 +100,7 @@ export function ScriptsTab({ request, onChange }: Props) {
             theme={oneDark}
             extensions={extensions}
             onChange={handleChange}
-            basicSetup={{ lineNumbers: true, foldGutter: false }}
+            basicSetup={{ lineNumbers: true, foldGutter: false, autocompletion: false }}
           />
         </div>
       </div>
