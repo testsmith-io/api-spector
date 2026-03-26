@@ -3,7 +3,6 @@
 
 const path = require('path')
 const { spawn } = require('child_process')
-const electron = require('electron')
 
 const [, , cmd = 'ui', ...rest] = process.argv
 
@@ -30,6 +29,7 @@ if (cmd === '--help' || cmd === '-h') {
   printHelp()
   process.exit(0)
 } else if (cmd === 'ui') {
+  const electron = require('electron')
   const appDir = path.join(__dirname, '..')
   const proc = spawn(String(electron), [appDir, ...rest], {
     stdio: 'inherit',
