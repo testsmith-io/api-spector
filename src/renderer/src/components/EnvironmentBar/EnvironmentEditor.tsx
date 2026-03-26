@@ -291,6 +291,7 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                       <th className="px-3 py-2 w-8">On</th>
                       <th className="px-2 py-2 w-36">Variable</th>
                       <th className="px-2 py-2">Value / Encrypted / Env var</th>
+                      <th className="px-2 py-2 w-44">Description</th>
                       <th className="px-2 py-2 w-20 text-center">Source</th>
                       <th className="px-2 py-2 w-6"></th>
                     </tr>
@@ -379,6 +380,16 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                                 </span>
                               </div>
                             )}
+                          </td>
+
+                          {/* Description */}
+                          <td className="px-2 py-1.5">
+                            <input
+                              value={v.description ?? ''}
+                              onChange={e => updateVar(idx, { description: e.target.value })}
+                              placeholder="Optional description…"
+                              className="w-full bg-surface-800/50 rounded px-2 py-1 text-[10px] text-surface-300 placeholder-surface-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                            />
                           </td>
 
                           {/* Source cycle button */}

@@ -14,11 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import CodeMirror from '@uiw/react-codemirror';
+import { json } from '@codemirror/lang-json';
+import { javascript } from '@codemirror/lang-javascript';
+import { oneDark } from '@codemirror/theme-one-dark';
 import { useStore } from '../../store';
 import type { MockRoute, MockServer } from '../../../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
 import { getMethodColor } from '../../../../shared/colors';
+import {
+  mockBodyCompletionExtension,
+  mockScriptCompletionExtension,
+} from '../RequestBuilder/atCompletions';
 
 const { electron } = window;
 
@@ -37,8 +45,25 @@ function RouteRow({
   onDelete: () => void
   initialEditing?: boolean
 }) {
-  const [editing, setEditing] = useState(initialEditing);
-  const [draft,   setDraft]   = useState(route);
+  const [editing,      setEditing]      = useState(initialEditing);
+  const [draft,        setDraft]        = useState(route);
+  const [scriptOpen,   setScriptOpen]   = useState(!!(route.script?.trim()));
+
+  // Derive path param names (e.g. /users/:id → ['id'])
+  const pathParamNames = useMemo(
+    () => draft.path.split('/').filter(p => p.startsWith(':')).map(p => p.slice(1)),
+    [draft.path],
+  );
+
+  const bodyExt = useMemo(
+    () => [json(), mockBodyCompletionExtension(pathParamNames)],
+    [pathParamNames],
+  );
+
+  const scriptExt = useMemo(
+    () => [javascript(), mockScriptCompletionExtension()],
+    [],
+  );
 
   if (!editing) {
     return (
@@ -49,6 +74,9 @@ function RouteRow({
         <span className="font-mono text-surface-200 flex-1 truncate">{draft.path}</span>
         {draft.description && (
           <span className="text-surface-600 text-xs truncate max-w-[200px]">{draft.description}</span>
+        )}
+        {draft.script?.trim() && (
+          <span className="text-[10px] text-purple-400/70 shrink-0">⚡ script</span>
         )}
         <span className={`text-xs font-mono w-10 text-right shrink-0 ${
           draft.statusCode < 300 ? 'text-emerald-400' :
@@ -120,14 +148,24 @@ function RouteRow({
 
       {/* Response body */}
       <div>
-        <label className="text-[11px] text-surface-400 uppercase tracking-wider block mb-1">Response body</label>
-        <textarea
-          value={draft.body}
-          onChange={e => setDraft(d => ({ ...d, body: e.target.value }))}
-          placeholder='{"message": "ok"}'
-          rows={6}
-          className="w-full bg-surface-800 border border-surface-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-500 resize-y placeholder-surface-700"
-        />
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-[11px] text-surface-400 uppercase tracking-wider">Response body</label>
+          <span className="text-[10px] text-surface-600">
+            Use <code className="text-surface-400">{'{{faker.person.firstName()}}'}</code>,{' '}
+            <code className="text-surface-400">{'{{request.params.id}}'}</code>,{' '}
+            <code className="text-surface-400">{'{{request.query.search}}'}</code>
+          </span>
+        </div>
+        <div className="rounded overflow-hidden border border-surface-700">
+          <CodeMirror
+            value={draft.body}
+            height="140px"
+            theme={oneDark}
+            extensions={bodyExt}
+            onChange={v => setDraft(d => ({ ...d, body: v }))}
+            basicSetup={{ lineNumbers: true, foldGutter: false, autocompletion: false }}
+          />
+        </div>
       </div>
 
       {/* Response headers */}
@@ -162,6 +200,44 @@ function RouteRow({
         >+ Add header</button>
       </div>
 
+      {/* Pre-response script */}
+      <div>
+        <button
+          onClick={() => setScriptOpen(o => !o)}
+          className="flex items-center gap-1.5 text-[11px] text-surface-400 uppercase tracking-wider hover:text-white transition-colors"
+        >
+          <span>{scriptOpen ? '▾' : '▸'}</span>
+          <span>Pre-response script</span>
+          {draft.script?.trim() && <span className="text-purple-400 normal-case font-normal tracking-normal ml-1">⚡ active</span>}
+        </button>
+
+        {scriptOpen && (
+          <div className="mt-2 flex flex-col gap-1.5">
+            <p className="text-[10px] text-surface-600">
+              Runs before the response is sent.
+              Mutate <code className="text-surface-400">response.statusCode</code>,{' '}
+              <code className="text-surface-400">response.body</code>,{' '}
+              <code className="text-surface-400">response.headers</code>.
+              Access <code className="text-surface-400">request.params</code>,{' '}
+              <code className="text-surface-400">request.query</code>,{' '}
+              <code className="text-surface-400">request.body</code>,{' '}
+              <code className="text-surface-400">faker</code>, <code className="text-surface-400">dayjs</code>.
+            </p>
+            <div className="rounded overflow-hidden border border-surface-700">
+              <CodeMirror
+                value={draft.script ?? ''}
+                height="140px"
+                theme={oneDark}
+                extensions={scriptExt}
+                onChange={v => setDraft(d => ({ ...d, script: v }))}
+                basicSetup={{ lineNumbers: true, foldGutter: false, autocompletion: false }}
+                placeholder={`// Example:\n// if (request.params.id === '0') {\n//   response.statusCode = 404;\n//   response.body = JSON.stringify({ error: 'Not found' });\n// }`}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="flex gap-2 pt-1 border-t border-surface-800">
         <button
           onClick={() => { onSave(draft); setEditing(false); }}
@@ -185,7 +261,6 @@ function RouteRow({
 
 // ─── Request log ──────────────────────────────────────────────────────────────
 
-
 function timeAgo(ts: number): string {
   const s = Math.floor((Date.now() - ts) / 1000);
   if (s < 60)   return `${s}s ago`;
@@ -193,10 +268,10 @@ function timeAgo(ts: number): string {
   return `${Math.floor(s / 3600)}h ago`;
 }
 
-function RequestLog({ serverId, routes }: { serverId: string; routes: MockRoute[] }) {
-  const hits      = useStore(s => s.mockLogs[serverId] ?? []);
+function RequestLog({ serverId, routes, running }: { serverId: string; routes: MockRoute[]; running: boolean }) {
+  const hits      = useStore(s => s.mockLogs[serverId]) ?? [];
   const clearLogs = useStore(s => s.clearMockLogs);
-  const routeMap  = new Map(routes.map(r => [r.id, r]));
+  const routeMap  = useMemo(() => new Map((routes ?? []).map(r => [r.id, r])), [routes]);
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -216,10 +291,17 @@ function RequestLog({ serverId, routes }: { serverId: string; routes: MockRoute[
 
       {hits.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-sm text-surface-400 text-center">
-            No requests yet.<br />
-            <span className="text-xs">Start the server and send a request.</span>
-          </p>
+          {!running ? (
+            <div className="text-center">
+              <p className="text-sm text-surface-400">Server is not running.</p>
+              <p className="text-xs text-surface-600 mt-1">Start the server to begin capturing requests.</p>
+            </div>
+          ) : (
+            <div className="text-center">
+              <p className="text-sm text-surface-400">No requests yet.</p>
+              <p className="text-xs text-surface-600 mt-1">Waiting for incoming requests…</p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto">
@@ -290,11 +372,12 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
 
   if (!entry) return null;
   const { data: mock, running } = entry;
+  const routes = mock.routes ?? [];
 
   async function save(updated: MockServer) {
     updateMock(mock.id, updated);
     await electron.saveMock(entry.relPath, updated);
-    if (running) await electron.mockUpdateRoutes(mock.id, updated.routes);
+    if (running) await electron.mockUpdateRoutes(mock.id, updated.routes ?? []);
     if (workspace) await electron.saveWorkspace(workspace);
   }
 
@@ -326,7 +409,7 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
     };
     setNewRouteId(route.id);
     setActiveTab('routes');
-    save({ ...mock, routes: [...mock.routes, route] });
+    save({ ...mock, routes: [...routes, route] });
   }
 
   function saveMeta() {
@@ -423,9 +506,9 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
             }`}
           >
             {tab}
-            {tab === 'routes' && mock.routes.length > 0 && (
+            {tab === 'routes' && routes.length > 0 && (
               <span className="ml-1.5 bg-surface-700 text-surface-300 rounded px-1.5 py-0.5 text-[10px]">
-                {mock.routes.length}
+                {routes.length}
               </span>
             )}
           </button>
@@ -437,7 +520,7 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
         {activeTab === 'routes' && (
           <div className="flex flex-col h-full min-h-0">
             <div className="flex-1 overflow-y-auto">
-              {mock.routes.length === 0 ? (
+              {routes.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full gap-3">
                   <p className="text-surface-400 text-sm">No routes defined.</p>
                   <button
@@ -448,21 +531,21 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
                   </button>
                 </div>
               ) : (
-                mock.routes.map(route => (
+                routes.map(route => (
                   <RouteRow
                     key={route.id}
                     route={route}
                     onSave={updated => {
-                      save({ ...mock, routes: mock.routes.map(r => r.id === route.id ? updated : r) });
+                      save({ ...mock, routes: routes.map(r => r.id === route.id ? updated : r) });
                       setNewRouteId(null);
                     }}
-                    onDelete={() => save({ ...mock, routes: mock.routes.filter(r => r.id !== route.id) })}
+                    onDelete={() => save({ ...mock, routes: routes.filter(r => r.id !== route.id) })}
                     initialEditing={route.id === newRouteId}
                   />
                 ))
               )}
             </div>
-            {mock.routes.length > 0 && (
+            {routes.length > 0 && (
               <div className="px-4 py-3 border-t border-surface-800 flex-shrink-0">
                 <button
                   onClick={addRoute}
@@ -476,7 +559,7 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
         )}
 
         {activeTab === 'requests' && (
-          <RequestLog serverId={mock.id} routes={mock.routes} />
+          <RequestLog serverId={mock.id} routes={routes} running={running} />
         )}
       </div>
     </div>

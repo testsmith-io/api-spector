@@ -16,6 +16,7 @@
 
 import { useMemo } from 'react';
 import { useStore } from '../store';
+import { DYNAMIC_VAR_NAMES } from '../components/RequestBuilder/atCompletions';
 
 /** Returns all variable names visible in the current request scope (env + collection + globals). */
 export function useVarNames(): string[] {
@@ -43,7 +44,7 @@ export function useVarNames(): string[] {
       envVars.filter(v => v.enabled && v.key).forEach(v => names.add(v.key));
     }
 
-    return Array.from(names).sort();
+    return [...DYNAMIC_VAR_NAMES, ...Array.from(names).sort()];
   }, [
     activeEnvironmentId, activeCollectionId,
     environments, collections, globals,

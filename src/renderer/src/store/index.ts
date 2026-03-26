@@ -26,6 +26,7 @@ import type {
   KeyValuePair,
   DataSet,
   TlsSettings,
+  CollectionHooks,
   ResponsePayload,
   SentRequest,
   HistoryEntry,
@@ -279,6 +280,9 @@ interface AppActions {
 
   // Collection TLS
   updateCollectionTls: (id: string, tls: TlsSettings | undefined) => void
+
+  // Collection hooks
+  updateCollectionHooks: (id: string, hooks: CollectionHooks | undefined) => void
 
   // Globals
   setGlobals: (globals: Record<string, string>) => void
@@ -549,6 +553,12 @@ export const useStore = create<AppState & AppActions>()(
       s.collections[id].dirty = true;
     }),
 
+    updateCollectionHooks: (id, hooks) => set(s => {
+      if (!s.collections[id]) return;
+      s.collections[id].data.hooks = hooks;
+      s.collections[id].dirty = true;
+    }),
+
     // ── Folder CRUD ───────────────────────────────────────────────────────────
     addFolder: (collectionId, parentFolderId, name) => set(s => {
       const col = s.collections[collectionId]?.data;
@@ -778,7 +788,7 @@ export const useStore = create<AppState & AppActions>()(
     setZoom: (z) => set(s => {
       s.zoom = z;
       localStorage.setItem('zoom', String(z));
-      document.documentElement.style.zoom = String(z);
+      window.electron.setZoomFactor(z);
     }),
 
     // ── Runner modal ──────────────────────────────────────────────────────────

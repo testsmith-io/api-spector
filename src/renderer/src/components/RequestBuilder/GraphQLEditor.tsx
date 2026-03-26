@@ -19,6 +19,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
 import type { ApiRequest, GraphQLBody } from '../../../../shared/types';
+import { useStore } from '../../store';
 
 // ─── Introspection types ──────────────────────────────────────────────────────
 
@@ -333,6 +334,21 @@ interface Props {
 export function GraphQLEditor({ request, onChange }: Props) {
   const gql = request.body.graphql ?? { query: '', variables: '' };
 
+  // For introspection hook: build plain env/collection/globals maps (renderer-side, no secret decryption)
+  const hookVars = useStore(s => {
+    const envId = s.activeEnvironmentId;
+    const colId = s.activeCollectionId;
+    const envVars: Record<string, string> = {};
+    if (envId) {
+      for (const v of s.environments[envId]?.data.variables ?? []) {
+        if (v.enabled && v.key && !v.secret && !v.envRef) envVars[v.key] = v.value;
+      }
+    }
+    const collectionVars: Record<string, string> =
+      colId ? { ...(s.collections[colId]?.data.collectionVariables ?? {}) } : {};
+    return { envVars, collectionVars, globals: { ...s.globals } };
+  });
+
   const [schema,      setSchema]      = useState<ParsedSchema | null>(null);
   const [schemaState, setSchemaState] = useState<'idle' | 'loading' | 'error'>('idle');
   const [schemaError, setSchemaError] = useState<string | null>(null);
@@ -353,10 +369,34 @@ export function GraphQLEditor({ request, onChange }: Props) {
     setSchemaState('loading');
     setSchemaError(null);
     try {
-      // Include any enabled request headers for auth
+      // Run introspection hook if defined — can inject auth headers via sp.environment.set()
+      let resolvedVars = { ...hookVars.envVars, ...hookVars.collectionVars, ...hookVars.globals };
+      if (request.graphqlIntrospectionScript?.trim()) {
+        try {
+          const hookResult = await window.electron.runScriptHook({
+            script:         request.graphqlIntrospectionScript,
+            envVars:        hookVars.envVars,
+            collectionVars: hookVars.collectionVars,
+            globals:        hookVars.globals,
+          });
+          resolvedVars = {
+            ...hookResult.updatedEnvVars,
+            ...hookResult.updatedCollectionVars,
+            ...hookResult.updatedGlobals,
+          };
+        } catch {
+          // Hook errors are non-fatal — introspection continues with original vars
+        }
+      }
+
+      // Include any enabled request headers, interpolating {{vars}}
       const extraHeaders: Record<string, string> = {};
       for (const h of request.headers) {
-        if (h.enabled && h.key) extraHeaders[h.key] = h.value;
+        if (h.enabled && h.key) {
+          const key = h.key.replace(/\{\{([^}]+)\}\}/g, (_, k) => resolvedVars[k.trim()] ?? '');
+          const val = h.value.replace(/\{\{([^}]+)\}\}/g, (_, k) => resolvedVars[k.trim()] ?? '');
+          extraHeaders[key] = val;
+        }
       }
       const parsed = await fetchSchema(url, extraHeaders);
       setSchema(parsed);

@@ -18,6 +18,48 @@ import type { CompletionContext, CompletionResult, Completion } from '@codemirro
 import { autocompletion } from '@codemirror/autocomplete';
 import { hoverTooltip } from '@codemirror/view';
 
+// ─── Built-in dynamic variables ──────────────────────────────────────────────
+
+export const DYNAMIC_VAR_NAMES: string[] = [
+  '$uuid',
+  '$timestamp',
+  '$isoTimestamp',
+  '$randomInt',
+  '$randomFloat',
+  '$randomBoolean',
+  '$randomEmail',
+  '$randomUsername',
+  '$randomPassword',
+  '$randomFullName',
+  '$randomFirstName',
+  '$randomLastName',
+  '$randomWord',
+  '$randomPhrase',
+  '$randomUrl',
+  '$randomIp',
+  '$randomHexColor',
+];
+
+const DYNAMIC_VAR_INFO: Record<string, string> = {
+  $uuid:            'Random UUID v4 — generated fresh each send',
+  $timestamp:       'Current Unix timestamp in milliseconds',
+  $isoTimestamp:    'Current date/time as ISO 8601 string',
+  $randomInt:       'Random integer between 0 and 1000',
+  $randomFloat:     'Random float between 0 and 1000',
+  $randomBoolean:   'Random true or false',
+  $randomEmail:     'Random email address',
+  $randomUsername:  'Random username',
+  $randomPassword:  'Random password string',
+  $randomFullName:  'Random full name',
+  $randomFirstName: 'Random first name',
+  $randomLastName:  'Random last name',
+  $randomWord:      'Random lorem word',
+  $randomPhrase:    'Random lorem sentence',
+  $randomUrl:       'Random URL',
+  $randomIp:        'Random IPv4 address',
+  $randomHexColor:  'Random hex color (e.g. #a3f1c2)',
+};
+
 // ─── sp API ──────────────────────────────────────────────────────────────────
 
 const AT_TOP: Completion[] = [
@@ -38,7 +80,7 @@ const SCOPE_METHODS: Completion[] = [
   { label: 'toObject', type: 'function', detail: '()',            info: 'Return all variables as a plain object' },
 ];
 
-const RESPONSE_MEMBERS: Completion[] = [
+const SP_RESPONSE_MEMBERS: Completion[] = [
   { label: 'code',         type: 'property', detail: 'number', info: 'HTTP status code (e.g. 200)' },
   { label: 'status',       type: 'property', detail: 'string', info: 'Status code + text (e.g. "200 OK")' },
   { label: 'statusText',   type: 'property', detail: 'string', info: 'Status text only' },
@@ -141,7 +183,7 @@ export function makeAtCompletionSource(varNames: string[]) {
     // at.response.xxx
     const responseMatch = /\bsp\.response\.(\w*)$/.exec(textBefore);
     if (responseMatch) {
-      return { from: context.pos - responseMatch[1].length, options: RESPONSE_MEMBERS, validFor: /^\w*$/ };
+      return { from: context.pos - responseMatch[1].length, options: SP_RESPONSE_MEMBERS, validFor: /^\w*$/ };
     }
 
     // at.variables.xxx | at.environment.xxx | at.collectionVariables.xxx | at.globals.xxx
@@ -221,6 +263,10 @@ export function varHoverTooltipExtension(varValues: Record<string, string>) {
             if (resolved !== undefined) {
               valEl.style.color = '#34d399';
               valEl.textContent = resolved.length > 60 ? resolved.slice(0, 60) + '…' : resolved;
+            } else if (DYNAMIC_VAR_INFO[name]) {
+              valEl.style.color = '#a78bfa';
+              valEl.style.fontStyle = 'italic';
+              valEl.textContent = DYNAMIC_VAR_INFO[name];
             } else {
               valEl.style.color = '#f97316';
               valEl.style.fontStyle = 'italic';
@@ -241,21 +287,283 @@ export function varHoverTooltipExtension(varValues: Record<string, string>) {
 
 /** CodeMirror extension: only {{varname}} completions, for body/raw editors. */
 export function varCompletionExtension(varNames: string[]) {
+  const allNames = [...DYNAMIC_VAR_NAMES, ...varNames];
   return autocompletion({
     override: [
       (context: CompletionContext): CompletionResult | null => {
         const line       = context.state.doc.lineAt(context.pos);
         const textBefore = line.text.slice(0, context.pos - line.from);
-        const varMatch   = /\{\{(\w*)$/.exec(textBefore);
+
+        // {{faker.namespace.method( — show faker sub-methods
+        const fakerSubMatch = /\{\{faker\.(\w+)\.(\w*)$/.exec(textBefore);
+        if (fakerSubMatch) {
+          const subs = FAKER_SUB[fakerSubMatch[1]] ?? [];
+          const q = fakerSubMatch[2].toLowerCase();
+          return {
+            from:     context.pos - fakerSubMatch[2].length,
+            options:  subs
+              .filter(c => c.label.toLowerCase().includes(q))
+              .map(c => ({ ...c, apply: c.label + '()}}' })),
+            validFor: /^\w*$/,
+          };
+        }
+
+        // {{faker.namespace — show faker namespaces
+        const fakerNsMatch = /\{\{faker\.(\w*)$/.exec(textBefore);
+        if (fakerNsMatch) {
+          const q = fakerNsMatch[1].toLowerCase();
+          return {
+            from:     context.pos - fakerNsMatch[1].length,
+            options:  FAKER_NAMESPACES
+              .filter(c => c.label.toLowerCase().includes(q))
+              .map(c => ({ ...c, apply: c.label + '.', boost: 1 })),
+            validFor: /^\w*$/,
+          };
+        }
+
+        // {{dayjs — suggest dayjs expression starter
+        const dayjsMatch = /\{\{(dayjs\b[^}]*)$/.exec(textBefore);
+        if (dayjsMatch) {
+          const partial = dayjsMatch[1];
+          return {
+            from:     context.pos - partial.length,
+            options:  [
+              { label: "dayjs().format('YYYY-MM-DD')",          type: 'function', apply: "dayjs().format('YYYY-MM-DD')}}", info: 'Current date as YYYY-MM-DD' },
+              { label: "dayjs().toISOString()",                 type: 'function', apply: "dayjs().toISOString()}}",        info: 'Current datetime as ISO 8601' },
+              { label: "dayjs().valueOf()",                      type: 'function', apply: "dayjs().valueOf()}}",            info: 'Current Unix timestamp (ms)' },
+              { label: "dayjs().subtract(1,'day').format(...)",  type: 'function', apply: "dayjs().subtract(1,'day').format('YYYY-MM-DD')}}", info: 'Yesterday as YYYY-MM-DD' },
+              { label: "dayjs().add(1,'day').format(...)",       type: 'function', apply: "dayjs().add(1,'day').format('YYYY-MM-DD')}}", info: 'Tomorrow as YYYY-MM-DD' },
+            ],
+            validFor: /^dayjs[\w().,'"-]*/,
+          };
+        }
+
+        // {{varname or {{$dynamicVar or {{faker/dayjs starters
+        const varMatch = /\{\{(\$?\w*)$/.exec(textBefore);
         if (!varMatch) return null;
         const q = varMatch[1].toLowerCase();
+
+        const varOptions = allNames
+          .filter(n => n.toLowerCase().includes(q))
+          .map(n => ({
+            label:  n,
+            type:   'variable' as const,
+            apply:  n + '}}',
+            info:   DYNAMIC_VAR_INFO[n],
+            boost:  n.startsWith('$') ? 1 : 0,
+          }));
+
+        // Also offer faker/dayjs as expression starters
+        const exprStarters: Completion[] = [
+          { label: 'faker',  type: 'property', apply: 'faker.',  info: 'Faker expression (e.g. faker.internet.email())',  boost: 0 },
+          { label: 'dayjs',  type: 'function', apply: 'dayjs().', info: 'Day.js expression (e.g. dayjs().format(...))', boost: 0 },
+        ].filter(c => c.label.includes(q));
+
         return {
-          from:    context.pos - varMatch[1].length,
-          options: varNames
-            .filter(n => n.toLowerCase().includes(q))
-            .map(n => ({ label: n, type: 'variable', apply: n + '}}' })),
-          validFor: /^\w*$/,
+          from:     context.pos - varMatch[1].length,
+          options:  [...varOptions, ...exprStarters],
+          validFor: /^\$?\w*$/,
         };
+      },
+    ],
+  });
+}
+
+// ─── Mock body completions ────────────────────────────────────────────────────
+
+const REQUEST_SUB: Completion[] = [
+  { label: 'params',  type: 'property', apply: 'params.',   info: 'URL path params (e.g. :id → request.params.id)' },
+  { label: 'query',   type: 'property', apply: 'query.',    info: 'Query string params' },
+  { label: 'body',    type: 'property', apply: 'body.',     info: 'Parsed request body fields (JSON)' },
+  { label: 'bodyRaw', type: 'property', apply: 'bodyRaw}}', info: 'Raw request body as string' },
+  { label: 'method',  type: 'property', apply: 'method}}',  info: 'HTTP method (GET, POST, …)' },
+  { label: 'path',    type: 'property', apply: 'path}}',    info: 'Request URL path' },
+  { label: 'headers', type: 'property', apply: 'headers.',  info: 'Request headers object' },
+];
+
+/**
+ * CodeMirror extension for mock response body editors.
+ * Provides {{request.params.xxx}}, {{request.query.xxx}}, {{faker.xxx()}}, {{dayjs()…}}.
+ * @param pathParamNames  param names extracted from the route pattern (e.g. ['id', 'slug'])
+ * @param varNames        environment / collection variable names
+ */
+export function mockBodyCompletionExtension(pathParamNames: string[] = [], varNames: string[] = []) {
+  const allVarNames = [...DYNAMIC_VAR_NAMES, ...varNames];
+
+  return autocompletion({
+    override: [
+      (context: CompletionContext): CompletionResult | null => {
+        const line       = context.state.doc.lineAt(context.pos);
+        const textBefore = line.text.slice(0, context.pos - line.from);
+
+        // {{request.params.xxx — suggest path param names
+        const paramsMatch = /\{\{request\.params\.(\w*)$/.exec(textBefore);
+        if (paramsMatch) {
+          const q = paramsMatch[1].toLowerCase();
+          return {
+            from:    context.pos - paramsMatch[1].length,
+            options: pathParamNames
+              .filter(n => n.toLowerCase().includes(q))
+              .map(n => ({ label: n, type: 'variable' as const, apply: n + '}}', info: `Path param :${n}`, boost: 2 })),
+            validFor: /^\w*$/,
+          };
+        }
+
+        // {{request.query.xxx / {{request.body.xxx / {{request.headers.xxx — generic key hints
+        const reqSubMatch = /\{\{request\.(query|body|headers)\.(\w*)$/.exec(textBefore);
+        if (reqSubMatch) {
+          const q = reqSubMatch[2].toLowerCase();
+          const generic: Completion[] = [
+            { label: 'id',    type: 'variable', apply: 'id}}'    },
+            { label: 'name',  type: 'variable', apply: 'name}}'  },
+            { label: 'value', type: 'variable', apply: 'value}}' },
+          ].filter(c => c.label.includes(q));
+          return { from: context.pos - reqSubMatch[2].length, options: generic, validFor: /^\w*$/ };
+        }
+
+        // {{request.xxx — suggest sub-properties
+        const requestMatch = /\{\{request\.(\w*)$/.exec(textBefore);
+        if (requestMatch) {
+          const q = requestMatch[1].toLowerCase();
+          return {
+            from:    context.pos - requestMatch[1].length,
+            options: REQUEST_SUB.filter(o => o.label.toLowerCase().includes(q)),
+            validFor: /^\w*$/,
+          };
+        }
+
+        // {{faker.namespace.method
+        const fakerSubMatch = /\{\{faker\.(\w+)\.(\w*)$/.exec(textBefore);
+        if (fakerSubMatch) {
+          const subs = FAKER_SUB[fakerSubMatch[1]] ?? [];
+          const q    = fakerSubMatch[2].toLowerCase();
+          return {
+            from:    context.pos - fakerSubMatch[2].length,
+            options: subs
+              .filter(c => c.label.toLowerCase().includes(q))
+              .map(c => ({ ...c, apply: c.label + '()}}' })),
+            validFor: /^\w*$/,
+          };
+        }
+
+        // {{faker.namespace
+        const fakerNsMatch = /\{\{faker\.(\w*)$/.exec(textBefore);
+        if (fakerNsMatch) {
+          const q = fakerNsMatch[1].toLowerCase();
+          return {
+            from:    context.pos - fakerNsMatch[1].length,
+            options: FAKER_NAMESPACES
+              .filter(c => c.label.toLowerCase().includes(q))
+              .map(c => ({ ...c, apply: c.label + '.', boost: 1 })),
+            validFor: /^\w*$/,
+          };
+        }
+
+        // {{dayjs
+        const dayjsMatch = /\{\{(dayjs\b[^}]*)$/.exec(textBefore);
+        if (dayjsMatch) {
+          return {
+            from:    context.pos - dayjsMatch[1].length,
+            options: [
+              { label: "dayjs().format('YYYY-MM-DD')", type: 'function' as const, apply: "dayjs().format('YYYY-MM-DD')}}", info: 'Current date' },
+              { label: "dayjs().toISOString()",         type: 'function' as const, apply: "dayjs().toISOString()}}",        info: 'ISO datetime' },
+              { label: "dayjs().valueOf()",              type: 'function' as const, apply: "dayjs().valueOf()}}",            info: 'Unix timestamp ms' },
+            ],
+            validFor: /^dayjs[\w().,'"-]*/,
+          };
+        }
+
+        // {{varname / {{$dynamic / starters (request, faker, dayjs)
+        const varMatch = /\{\{(\$?\w*)$/.exec(textBefore);
+        if (!varMatch) return null;
+        const q = varMatch[1].toLowerCase();
+
+        const varOptions = allVarNames
+          .filter(n => n.toLowerCase().includes(q))
+          .map(n => ({ label: n, type: 'variable' as const, apply: n + '}}', info: DYNAMIC_VAR_INFO[n], boost: n.startsWith('$') ? 1 : 0 }));
+
+        const starters: Completion[] = [
+          { label: 'request', type: 'property', apply: 'request.', info: 'Incoming request context', boost: 2 },
+          { label: 'faker',   type: 'property', apply: 'faker.',   info: 'Faker.js data generators', boost: 0 },
+          { label: 'dayjs',   type: 'function', apply: 'dayjs().',  info: 'Day.js date expressions',  boost: 0 },
+        ].filter(c => c.label.toLowerCase().includes(q));
+
+        return {
+          from:     context.pos - varMatch[1].length,
+          options:  [...varOptions, ...starters],
+          validFor: /^\$?\w*$/,
+        };
+      },
+    ],
+  });
+}
+
+// ─── Mock script completions ──────────────────────────────────────────────────
+
+const RESPONSE_MEMBERS: Completion[] = [
+  { label: 'statusCode', type: 'property', detail: 'number', info: 'HTTP status code to send' },
+  { label: 'body',       type: 'property', detail: 'string', info: 'Response body string (overrides template)' },
+  { label: 'headers',    type: 'property', detail: 'object', info: 'Response headers — modify with response.headers["X-Foo"] = "bar"' },
+];
+
+const REQUEST_SCRIPT_MEMBERS: Completion[] = [
+  { label: 'params',  type: 'property', info: 'URL path params { id, slug, … }' },
+  { label: 'query',   type: 'property', info: 'Query string params { search, page, … }' },
+  { label: 'body',    type: 'property', info: 'Parsed JSON request body' },
+  { label: 'bodyRaw', type: 'property', info: 'Raw request body string' },
+  { label: 'method',  type: 'property', info: 'HTTP method' },
+  { label: 'path',    type: 'property', info: 'Request URL path' },
+  { label: 'headers', type: 'property', info: 'Request headers object' },
+];
+
+/**
+ * CodeMirror extension for mock pre-response script editors.
+ * Provides completions for request.xxx, response.xxx, faker.xxx, dayjs().
+ */
+export function mockScriptCompletionExtension() {
+  return autocompletion({
+    override: [
+      (context: CompletionContext): CompletionResult | null => {
+        const line       = context.state.doc.lineAt(context.pos);
+        const textBefore = line.text.slice(0, context.pos - line.from);
+
+        // response.xxx
+        const responseMatch = /\bresponse\.(\w*)$/.exec(textBefore);
+        if (responseMatch) {
+          return { from: context.pos - responseMatch[1].length, options: RESPONSE_MEMBERS, validFor: /^\w*$/ };
+        }
+
+        // request.params.xxx / request.query.xxx etc — just hint at generic keys
+        if (/\brequest\.(params|query|body|headers)\.(\w*)$/.test(textBefore)) {
+          return null; // let the user type freely
+        }
+
+        // request.xxx
+        const requestScriptMatch = /\brequest\.(\w*)$/.exec(textBefore);
+        if (requestScriptMatch) {
+          return { from: context.pos - requestScriptMatch[1].length, options: REQUEST_SCRIPT_MEMBERS, validFor: /^\w*$/ };
+        }
+
+        // faker.namespace.method
+        const fakerSubMatch = /\bfaker\.(\w+)\.(\w*)$/.exec(textBefore);
+        if (fakerSubMatch) {
+          const subs = FAKER_SUB[fakerSubMatch[1]] ?? [];
+          const q    = fakerSubMatch[2].toLowerCase();
+          return { from: context.pos - fakerSubMatch[2].length, options: subs.filter(c => c.label.toLowerCase().includes(q)), validFor: /^\w*$/ };
+        }
+
+        // faker.namespace
+        const fakerNsMatch = /\bfaker\.(\w*)$/.exec(textBefore);
+        if (fakerNsMatch) {
+          const q = fakerNsMatch[1].toLowerCase();
+          return {
+            from:    context.pos - fakerNsMatch[1].length,
+            options: FAKER_NAMESPACES.filter(c => c.label.toLowerCase().includes(q)),
+            validFor: /^\w*$/,
+          };
+        }
+
+        return null;
       },
     ],
   });

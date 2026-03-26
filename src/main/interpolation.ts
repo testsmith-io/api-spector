@@ -16,10 +16,66 @@
 
 import type { Environment, KeyValuePair } from '../shared/types';
 import { decryptSecret } from './ipc/secret-handler';
+import type { faker as FakerType } from '@faker-js/faker';
+import dayjs from 'dayjs';
+import * as vm from 'vm';
 
-/** Replace {{var}} placeholders with values from the merged vars map. */
+let _fakerCache: { faker: typeof FakerType } | null = null;
+async function getFaker(): Promise<typeof FakerType> {
+  if (!_fakerCache) _fakerCache = await import('@faker-js/faker');
+  return _fakerCache.faker;
+}
+
+/** Populated after first buildDynamicVars() call; used by interpolate() for inline expressions. */
+let _exprContext: Record<string, unknown> | null = null;
+
+/**
+ * Built-in dynamic variables resolved fresh on every request send.
+ * Available as {{$uuid}}, {{$isoTimestamp}}, {{$randomEmail}}, etc.
+ */
+export async function buildDynamicVars(): Promise<Record<string, string>> {
+  const faker = await getFaker();
+  const now   = dayjs();
+  _exprContext = { faker, dayjs };
+  return {
+    $uuid:            faker.string.uuid(),
+    $timestamp:       String(Date.now()),
+    $isoTimestamp:    now.toISOString(),
+    $randomInt:       String(faker.number.int({ min: 0, max: 1000 })),
+    $randomFloat:     String(faker.number.float({ min: 0, max: 1000, fractionDigits: 2 })),
+    $randomBoolean:   String(faker.datatype.boolean()),
+    $randomEmail:     faker.internet.email(),
+    $randomUsername:  faker.internet.username(),
+    $randomPassword:  faker.internet.password(),
+    $randomFullName:  faker.person.fullName(),
+    $randomFirstName: faker.person.firstName(),
+    $randomLastName:  faker.person.lastName(),
+    $randomWord:      faker.lorem.word(),
+    $randomPhrase:    faker.lorem.sentence(),
+    $randomUrl:       faker.internet.url(),
+    $randomIp:        faker.internet.ip(),
+    $randomHexColor:  faker.color.rgb({ format: 'hex', casing: 'lower' }),
+  };
+}
+
+/** Replace {{var}} placeholders with values from the merged vars map.
+ *  Tokens that don't match a variable and look like expressions (contain `.` or `(`)
+ *  are evaluated with faker and dayjs in scope when available. */
 export function interpolate(str: string, vars: Record<string, string>): string {
-  return str.replace(/\{\{([^}]+)\}\}/g, (_, key) => vars[key.trim()] ?? `{{${key}}}`);
+  return str.replace(/\{\{([^}]+)\}\}/g, (match, key) => {
+    const trimmed = key.trim();
+    if (trimmed in vars) return vars[trimmed];
+    // Try evaluating as an expression (e.g. faker.internet.email(), dayjs().format(...))
+    if (_exprContext && (trimmed.includes('.') || trimmed.includes('('))) {
+      try {
+        const result = vm.runInNewContext(trimmed, _exprContext);
+        if (result !== undefined && result !== null) return String(result);
+      } catch {
+        // Not a valid expression — fall through to unresolved
+      }
+    }
+    return match;
+  });
 }
 
 /** Build a URL with resolved query params appended. */
@@ -65,12 +121,13 @@ export async function buildEnvVars(environment: Environment | null): Promise<Rec
   return vars;
 }
 
-/** Merge all variable scopes. Local vars win everything. */
+/** Merge all variable scopes. Local vars win everything; dynamic vars are the base layer. */
 export function mergeVars(
   envVars: Record<string, string>,
   collectionVars: Record<string, string>,
   globals: Record<string, string>,
-  localVars: Record<string, string> = {}
+  localVars: Record<string, string> = {},
+  dynamicVars: Record<string, string> = {}
 ): Record<string, string> {
-  return { ...globals, ...collectionVars, ...envVars, ...localVars };
+  return { ...dynamicVars, ...globals, ...collectionVars, ...envVars, ...localVars };
 }

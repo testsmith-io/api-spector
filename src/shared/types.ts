@@ -170,10 +170,22 @@ export interface ApiRequest {
   description?: string
   preRequestScript?: string
   postRequestScript?: string
+  /** Runs in the sandbox before GraphQL schema introspection. Use sp.environment.set() to inject auth headers. */
+  graphqlIntrospectionScript?: string
   schema?: string
   contract?: ContractExpectation
   meta?: { tags?: string[]; createdAt?: string; [key: string]: unknown }
   protocol?: 'http' | 'websocket'  // default 'http'
+}
+
+// ─── Hooks ────────────────────────────────────────────────────────────────────
+
+/** Scripts that execute once before/after a collection or folder run. */
+export interface CollectionHooks {
+  /** Runs once before any request in the scope executes. Use to authenticate, seed data, etc. */
+  setup?: string
+  /** Runs once after all requests in the scope have executed. Use to clean up created resources. */
+  teardown?: string
 }
 
 export interface Folder {
@@ -185,6 +197,7 @@ export interface Folder {
   tags?: string[]
   auth?: AuthConfig
   headers?: KeyValuePair[]
+  hooks?: CollectionHooks
 }
 
 export interface TlsSettings {
@@ -206,6 +219,8 @@ export interface Collection {
   dataSet?: DataSet
   /** TLS overrides applied to every request in this collection (takes priority over workspace TLS). */
   tls?: TlsSettings
+  /** Collection-level lifecycle hooks executed once per run. */
+  hooks?: CollectionHooks
 }
 
 // ─── Environment / Variables ──────────────────────────────────────────────────
@@ -214,6 +229,7 @@ export interface EnvVariable {
   key: string
   value: string
   enabled: boolean
+  description?: string
   /**
    * true  → value is AES-256-GCM encrypted, fields below are set.
    * false / absent → plain text value (or envRef if set)
@@ -435,6 +451,10 @@ export interface MockRoute {
   body: string
   delay?: number           // ms before responding
   description?: string
+  /** JavaScript that runs before the response is sent.
+   *  Context: { request, response, faker, dayjs, console }
+   *  Mutate `response.statusCode`, `response.body`, `response.headers` to customise output. */
+  script?: string
 }
 
 export interface MockServer {

@@ -25,7 +25,7 @@ import type {
   SentRequest,
   TestResult,
 } from '../../shared/types';
-import { interpolate, buildUrl, buildEnvVars, mergeVars } from '../interpolation';
+import { interpolate, buildUrl, buildEnvVars, mergeVars, buildDynamicVars } from '../interpolation';
 import { runScript } from '../script-runner';
 import { getGlobals, patchGlobals, persistGlobals } from '../globals-store';
 import {
@@ -169,8 +169,11 @@ export function registerRequestHandler(ipc: IpcMain): void {
       }
     }
 
+    // Dynamic built-in vars ($uuid, $randomEmail, etc.) — generated once per send
+    const dynamicVars = await buildDynamicVars();
+
     // Merge for pre-script
-    let vars = mergeVars(envVars, collectionVars, mergedGlobals, localVars);
+    let vars = mergeVars(envVars, collectionVars, mergedGlobals, localVars, dynamicVars);
 
     // ── Pre-request script ────────────────────────────────────────────────────
     let preScriptMeta: { error?: string; consoleOutput: string[] } = { consoleOutput: [] };
@@ -194,7 +197,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
       patchGlobals(result.updatedGlobals);
       await persistGlobals();
 
-      vars = mergeVars(updatedEnvVars, updatedCollectionVars, updatedGlobals, localVars);
+      vars = mergeVars(updatedEnvVars, updatedCollectionVars, updatedGlobals, localVars, dynamicVars);
     }
 
     // ── Build & send HTTP request ─────────────────────────────────────────────
@@ -419,5 +422,30 @@ export function registerRequestHandler(ipc: IpcMain): void {
     };
 
     return { response, scriptResult, sentRequest: redactSentRequest(sentRequest) };
+  });
+
+  // ── Hook script runner ─────────────────────────────────────────────────────
+  // Runs an arbitrary script with caller-supplied variable context and returns
+  // the updated variable scopes. Used by the GraphQL introspection hook.
+  ipc.handle('script:run-hook', async (
+    _e,
+    payload: {
+      script:         string
+      envVars:        Record<string, string>
+      collectionVars: Record<string, string>
+      globals:        Record<string, string>
+    },
+  ) => {
+    const { script, envVars, collectionVars, globals } = payload;
+    const result = await runScript(script, { envVars, collectionVars, globals, localVars: {} });
+    patchGlobals(result.updatedGlobals);
+    await persistGlobals();
+    return {
+      updatedEnvVars:        result.updatedEnvVars,
+      updatedCollectionVars: result.updatedCollectionVars,
+      updatedGlobals:        result.updatedGlobals,
+      consoleOutput:         result.consoleOutput,
+      error:                 result.error,
+    };
   });
 }

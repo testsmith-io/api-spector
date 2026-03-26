@@ -40,7 +40,7 @@ import type {
   Workspace, Collection, Environment, ApiRequest,
   RunRequestResult, RunSummary, TlsSettings,
 } from '../shared/types';
-import { buildEnvVars, buildUrl, mergeVars, interpolate } from '../main/interpolation';
+import { buildEnvVars, buildUrl, mergeVars, interpolate, buildDynamicVars } from '../main/interpolation';
 import { runScript } from '../main/script-runner';
 import { loadGlobals, getGlobals, patchGlobals, persistGlobals } from '../main/globals-store';
 import { getSecret } from '../main/ipc/secret-handler';
@@ -159,7 +159,8 @@ async function executeRequest(
     if (r.error) console.error(color(`    [pre-script error] ${r.error}`, C.red));
   }
 
-  const vars        = mergeVars(updatedEnvVars, updatedCollectionVars, updatedGlobals, localVars);
+  const dynamicVars = await buildDynamicVars();
+  const vars        = mergeVars(updatedEnvVars, updatedCollectionVars, updatedGlobals, localVars, dynamicVars);
   const resolvedUrl = buildUrl(req.url, req.params, vars);
   base.resolvedUrl  = resolvedUrl;
 

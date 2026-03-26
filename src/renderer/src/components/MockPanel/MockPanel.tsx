@@ -103,7 +103,7 @@ export function MockPanel() {
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium truncate">{mock.name}</div>
                   <div className="text-[10px] text-surface-400 font-mono">
-                    :{mock.port} · {mock.routes.length} route{mock.routes.length !== 1 ? 's' : ''}
+                    :{mock.port} · {(mock.routes ?? []).length} route{(mock.routes ?? []).length !== 1 ? 's' : ''}
                   </div>
                 </div>
 
