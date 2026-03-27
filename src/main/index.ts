@@ -41,7 +41,8 @@ import { registerWsHandlers, closeAllWsConnections } from './ipc/ws-handler';
 import { registerSoapHandlers } from './ipc/soap-handler';
 import { registerDocsHandlers }     from './ipc/docs-handler';
 import { registerContractHandlers } from './ipc/contract-handler';
-import { registerGitHandlers } from './ipc/git-handler';
+import { registerGitHandlers }    from './ipc/git-handler';
+import { registerRecordHandlers }  from './ipc/record-handler';
 import { stopAll } from './mock-server';
 
 function createSplashWindow(): BrowserWindow {
@@ -163,6 +164,7 @@ app.whenReady().then(async () => {
   registerDocsHandlers(ipcMain);
   registerContractHandlers(ipcMain);
   registerGitHandlers(ipcMain);
+  registerRecordHandlers(ipcMain, () => BrowserWindow.getAllWindows()[0]?.webContents ?? null);
 
   createWindow();
 

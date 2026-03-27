@@ -45,16 +45,33 @@ export function registerGitHandlers(ipc: IpcMain): void {
   ipc.handle('git:status', async (): Promise<GitStatus> => {
     const result = await git().status();
     return {
-      staged:    result.staged.map(f => ({ path: f, status: resolveStatus(result, f, true) })),
-      unstaged:  result.modified.filter(f => !result.staged.includes(f))
-                   .concat(result.deleted.filter(f => !result.staged.includes(f)))
-                   .map(f => ({ path: f, status: resolveStatus(result, f, false) })),
-      untracked: result.not_added.map(f => ({ path: f, status: 'untracked' as const })),
-      branch:    result.current ?? '',
-      ahead:     result.ahead,
-      behind:    result.behind,
-      remote:    result.tracking ?? null,
+      staged:     result.staged.map(f => ({ path: f, status: resolveStatus(result, f, true) })),
+      unstaged:   result.modified.filter(f => !result.staged.includes(f))
+                    .concat(result.deleted.filter(f => !result.staged.includes(f)))
+                    .map(f => ({ path: f, status: resolveStatus(result, f, false) })),
+      untracked:  result.not_added.map(f => ({ path: f, status: 'untracked' as const })),
+      conflicted: result.conflicted,
+      branch:     result.current ?? '',
+      ahead:      result.ahead,
+      behind:     result.behind,
+      remote:     result.tracking ?? null,
     };
+  });
+
+  ipc.handle('git:resolveOurs', async (_e, filePath: string) => {
+    const g = git();
+    await g.checkout(['--ours', '--', filePath]);
+    await g.add([filePath]);
+  });
+
+  ipc.handle('git:resolveTheirs', async (_e, filePath: string) => {
+    const g = git();
+    await g.checkout(['--theirs', '--', filePath]);
+    await g.add([filePath]);
+  });
+
+  ipc.handle('git:markResolved', async (_e, filePath: string) => {
+    await git().add([filePath]);
   });
 
   ipc.handle('git:diff', async (_e, filePath?: string): Promise<string> => {

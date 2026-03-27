@@ -181,6 +181,13 @@ interface AppState {
   activeMockId: string | null
   mockLogs: Record<string, MockHit[]>    // serverId → hits, newest first, capped at 100
 
+  // Recorder
+  recorderOpen:           boolean
+  recorderRunning:        boolean
+  recorderUpstream:       string
+  recorderPort:           number
+  recorderTargetMockId:   string   // '' = create new mock server
+
   // Command palette
   commandPaletteOpen: boolean
 
@@ -330,6 +337,13 @@ interface AppActions {
   addMockHit: (hit: MockHit) => void
   clearMockLogs: (serverId: string) => void
 
+  // Recorder
+  setRecorderOpen:           (open: boolean) => void
+  setRecorderRunning:        (running: boolean) => void
+  setRecorderUpstream:       (url: string) => void
+  setRecorderPort:           (port: number) => void
+  setRecorderTargetMockId:   (id: string) => void
+
   // WebSocket actions
   setWsStatus: (requestId: string, status: 'disconnected' | 'connecting' | 'connected' | 'error', error?: string) => void
   addWsMessage: (requestId: string, message: WsMessage) => void
@@ -358,6 +372,11 @@ export const useStore = create<AppState & AppActions>()(
     mocks: {},
     activeMockId: null,
     mockLogs: {},
+    recorderOpen:         false,
+    recorderRunning:      false,
+    recorderUpstream:     '',
+    recorderPort:         4001,
+    recorderTargetMockId: '',
     runnerModal: { open: false, collectionId: null, folderId: null, filterTags: [] },
     runnerResults: [],
     runnerRunning: false,
@@ -936,6 +955,13 @@ export const useStore = create<AppState & AppActions>()(
     }),
 
     clearMockLogs: (serverId) => set(s => { s.mockLogs[serverId] = []; }),
+
+    // ── Recorder ──────────────────────────────────────────────────────────────
+    setRecorderOpen:           (open)    => set(s => { s.recorderOpen          = open;    }),
+    setRecorderRunning:        (running) => set(s => { s.recorderRunning       = running; }),
+    setRecorderUpstream:       (url)     => set(s => { s.recorderUpstream      = url;     }),
+    setRecorderPort:           (port)    => set(s => { s.recorderPort          = port;    }),
+    setRecorderTargetMockId:   (id)      => set(s => { s.recorderTargetMockId  = id;      }),
 
     // ── WebSocket ─────────────────────────────────────────────────────────────
     setWsStatus: (requestId, status, error) => set(s => {

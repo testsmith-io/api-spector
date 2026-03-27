@@ -69,6 +69,9 @@ function DiffViewer({ diff }: { diff: string }) {
     <pre className="text-[11px] font-mono overflow-auto p-3 leading-relaxed">
       {diff.split('\n').map((line, i) => {
         const cls =
+          line.startsWith('<<<<<<<') ? 'text-red-400 font-bold bg-red-900/20' :
+          line.startsWith('=======') ? 'text-amber-400 font-bold bg-amber-900/20' :
+          line.startsWith('>>>>>>>') ? 'text-blue-400 font-bold bg-blue-900/20' :
           line.startsWith('+') && !line.startsWith('+++') ? 'text-emerald-400' :
           line.startsWith('-') && !line.startsWith('---') ? 'text-red-400' :
           line.startsWith('@@') ? 'text-blue-400' :
@@ -144,6 +147,16 @@ function ChangesTab({ status, onRefresh }: { status: GitStatus; onRefresh: () =>
     finally { setPushing(false); }
   }
 
+  async function resolveConflict(path: string, mode: 'ours' | 'theirs' | 'mark') {
+    try {
+      if (mode === 'ours')   await electron.gitResolveOurs(path);
+      else if (mode === 'theirs') await electron.gitResolveTheirs(path);
+      else                   await electron.gitMarkResolved(path);
+      if (diffFile === path) setDiffFile(null);
+      onRefresh();
+    } catch (e) { setError(String(e)); }
+  }
+
   const allUnstaged = [...status.unstaged, ...status.untracked];
   const hasStaged   = status.staged.length > 0;
   const needsPush   = status.ahead > 0;
@@ -196,6 +209,12 @@ function ChangesTab({ status, onRefresh }: { status: GitStatus; onRefresh: () =>
             ✓ Nothing to push
           </div>
         )
+      )}
+
+      {status.conflicted.length > 0 && (
+        <div className="mx-3 mt-2 px-2 py-1.5 rounded text-[11px] bg-red-900/20 text-red-300 border border-red-800/40 flex-shrink-0">
+          ⚠ {status.conflicted.length} merge conflict{status.conflicted.length !== 1 ? 's' : ''} — resolve below before committing
+        </div>
       )}
 
       <Toast toast={toast} />
@@ -261,7 +280,45 @@ function ChangesTab({ status, onRefresh }: { status: GitStatus; onRefresh: () =>
           </section>
         )}
 
-        {status.staged.length === 0 && allUnstaged.length === 0 && (
+        {/* Conflicts */}
+        {status.conflicted.length > 0 && (
+          <section>
+            <div className="px-3 py-1.5">
+              <span className="text-[10px] uppercase tracking-widest text-red-400 font-semibold">
+                Conflicts ({status.conflicted.length})
+              </span>
+            </div>
+            {status.conflicted.map(path => (
+              <div
+                key={path}
+                className={`flex items-center gap-2 px-3 py-1 hover:bg-surface-800/50 cursor-pointer group text-xs ${diffFile === path && !diffStaged ? 'bg-surface-800' : ''}`}
+                onClick={() => showDiff({ path, status: 'modified' }, false)}
+              >
+                <span className="font-mono text-[11px] font-bold w-4 shrink-0 text-red-400">!</span>
+                <span className="flex-1 truncate text-red-300">{path}</span>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                  <button
+                    onClick={e => { e.stopPropagation(); resolveConflict(path, 'ours'); }}
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-surface-300 hover:bg-emerald-900/50 hover:text-emerald-300 transition-colors"
+                    title="Accept ours (current branch)"
+                  >Ours</button>
+                  <button
+                    onClick={e => { e.stopPropagation(); resolveConflict(path, 'theirs'); }}
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-surface-300 hover:bg-blue-900/50 hover:text-blue-300 transition-colors"
+                    title="Accept theirs (incoming)"
+                  >Theirs</button>
+                  <button
+                    onClick={e => { e.stopPropagation(); resolveConflict(path, 'mark'); }}
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-surface-300 hover:bg-surface-600 transition-colors"
+                    title="Mark as resolved (manual edit)"
+                  >✓</button>
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
+
+        {status.staged.length === 0 && allUnstaged.length === 0 && status.conflicted.length === 0 && (
           <p className="text-xs text-surface-500 px-3 py-4">Working tree clean.</p>
         )}
       </div>

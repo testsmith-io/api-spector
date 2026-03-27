@@ -179,6 +179,45 @@ response.body = JSON.stringify(items)
 
 ---
 
+## Traffic recorder
+
+The recorder sits between your application and a real API, captures every request/response pair, and turns them into mock routes — so you can replay them offline without hitting the real service.
+
+### Start recording
+
+1. In the **Mocks** sidebar, expand the **Recorder** section
+2. Enter the **Upstream URL** (the real API your app talks to, e.g. `https://api.example.com`)
+3. Set a **Local port** (default 8787) — point your app at `http://localhost:<port>` instead of the real API
+4. Click **⏺ Start recording**
+
+The recorder proxies every request to the upstream and stores the full request/response pair.
+
+> `/favicon.ico` requests are silently ignored and never recorded.
+
+### Stop and import
+
+1. Click **■ Stop** in the recorder panel header
+2. Review the captured requests in the list — click any row to inspect headers and bodies
+3. Choose a destination from the **Import to** dropdown:
+   - **New mock server** — creates a fresh server pre-populated with the recorded routes
+   - An existing mock server — appends the new routes to it
+4. Click **⧉ Import**
+
+### Deduplication
+
+When the same endpoint (`METHOD + path`) appears multiple times in a recording, only one route is created:
+
+- The **first successful (2xx) response** is used
+- If no 2xx response was recorded for that endpoint, the last recorded response is used
+
+When importing into an **existing** mock server, routes whose `METHOD + path` already exist are **skipped** — existing routes are never overwritten.
+
+### CLI recorder
+
+See [Mock Servers CLI](../cli/mock.md) for running the recorder headlessly and saving `.recording.json` / `.mock.json` files directly from the terminal.
+
+---
+
 ## Save a response as a mock route
 
 After sending a real request, capture the response as a mock route from the **Response Viewer**:
