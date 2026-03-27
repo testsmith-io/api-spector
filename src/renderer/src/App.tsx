@@ -159,7 +159,6 @@ export default function App () {
   const recorderRunning       = useStore( s => s.recorderRunning );
   const recorderTargetMockId  = useStore( s => s.recorderTargetMockId );
   const setRecorderRunning    = useStore( s => s.setRecorderRunning );
-  const addMock            = useStore( s => s.addMock );
   const loadMock           = useStore( s => s.loadMock );
   const setActiveMockId    = useStore( s => s.setActiveMockId );
   const updateMock         = useStore( s => s.updateMock );

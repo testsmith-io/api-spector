@@ -46,7 +46,7 @@ let activeConfig:   RecorderConfig | null = null;
 let activeEntries:  RecordedEntry[] = [];
 let activeStarted:  string = '';
 let activeMaskSet:  Set<string> = new Set();
-let activeIgnoreSet: Set<string> = new Set();
+let _activeIgnoreSet: Set<string> = new Set();
 let hitCallback: ((entry: RecordedEntry) => void) | null = null;
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -80,7 +80,7 @@ export async function startRecorder(config: RecorderConfig): Promise<void> {
   activeEntries   = [];
   activeStarted   = new Date().toISOString();
   activeMaskSet   = maskSet;
-  activeIgnoreSet = ignoreSet;
+  _activeIgnoreSet = ignoreSet;
 
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const id        = randomUUID();
