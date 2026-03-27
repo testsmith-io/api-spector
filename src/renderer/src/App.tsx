@@ -29,6 +29,7 @@ import { RunnerModal } from './components/Runner/RunnerModal';
 import { CollectionPanel } from './components/CollectionPanel/CollectionPanel';
 import { MockPanel } from './components/MockPanel/MockPanel';
 import { MockDetailPanel } from './components/MockPanel/MockDetailPanel';
+import { RecorderPanel } from './components/MockPanel/RecorderPanel';
 import { ContractPanel } from './components/ContractPanel/ContractPanel';
 import { ContractResultsPanel } from './components/ContractPanel/ContractResultsPanel';
 import { GitPanel } from './components/GitPanel/GitPanel';
@@ -154,7 +155,14 @@ export default function App () {
   const historyCount = useStore( s => s.history.length );
   const addCollection = useStore( s => s.addCollection );
   const addMockHit = useStore( s => s.addMockHit );
-  const activeMockId = useStore( s => s.activeMockId );
+  const activeMockId       = useStore( s => s.activeMockId );
+  const recorderRunning       = useStore( s => s.recorderRunning );
+  const recorderTargetMockId  = useStore( s => s.recorderTargetMockId );
+  const setRecorderRunning    = useStore( s => s.setRecorderRunning );
+  const addMock            = useStore( s => s.addMock );
+  const loadMock           = useStore( s => s.loadMock );
+  const setActiveMockId    = useStore( s => s.setActiveMockId );
+  const updateMock         = useStore( s => s.updateMock );
   const theme = useStore( s => s.theme );
   const setCommandPaletteOpen = useStore( s => s.setCommandPaletteOpen );
   const setWsStatus = useStore( s => s.setWsStatus );
@@ -367,6 +375,44 @@ export default function App () {
             {sidebarTab === 'contracts' ? (
               <div className="flex-1 min-h-0">
                 <ContractResultsPanel />
+              </div>
+            ) : sidebarTab === 'mocks' && recorderRunning ? (
+              <div className="flex-1 min-h-0">
+                <RecorderPanel
+                  defaultTargetMockId={recorderTargetMockId}
+                  onClose={() => setRecorderRunning(false)}
+                  onImportMock={async (session, targetMockId) => {
+                    const name = `Recorded — ${new URL(session.upstream).hostname}`;
+                    const newRoutes = await electron.recordToMock(session.entries, session.upstream, name, session.port);
+
+                    if (targetMockId) {
+                      // Append routes to existing mock server, skipping duplicates
+                      const existing = useStore.getState().mocks[targetMockId];
+                      if (existing) {
+                        const existingKeys = new Set(existing.data.routes.map(r => `${r.method}:${r.path}`));
+                        const toAdd = newRoutes.routes.filter((r: { method: string; path: string }) => !existingKeys.has(`${r.method}:${r.path}`));
+                        const updated = { ...existing.data, routes: [...existing.data.routes, ...toAdd] };
+                        updateMock(targetMockId, updated);
+                        await electron.saveMock(existing.relPath, updated);
+                        setActiveMockId(targetMockId);
+                        setRecorderRunning(false);
+                      }
+                    } else {
+                      // Create new mock server, register in workspace
+                      const relPath = `mocks/${newRoutes.id}.mock.json`;
+                      loadMock(relPath, newRoutes);
+                      await electron.saveMock(relPath, newRoutes);
+                      const ws = useStore.getState().workspace;
+                      if (ws) {
+                        if (!ws.mocks) ws.mocks = [];
+                        ws.mocks.push(relPath);
+                        await electron.saveWorkspace(ws);
+                      }
+                      setActiveMockId(newRoutes.id);
+                      setRecorderRunning(false);
+                    }
+                  }}
+                />
               </div>
             ) : sidebarTab === 'mocks' && activeMockId ? (
               <div className="flex-1 min-h-0">

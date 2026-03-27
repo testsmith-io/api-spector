@@ -478,6 +478,49 @@ export interface MockHit {
   responseHeaders?: Record<string, string>
 }
 
+// ─── Recorder ─────────────────────────────────────────────────────────────────
+
+export interface RecorderConfig {
+  upstream:       string
+  port:           number
+  maskHeaders?:   string[]
+  ignoreHeaders?: string[]
+}
+
+export interface RecordedRequest {
+  method:  string
+  path:    string
+  query:   Record<string, string>
+  headers: Record<string, string>
+  body:    string | null
+}
+
+export interface RecordedResponse {
+  status:     number
+  statusText: string
+  headers:    Record<string, string>
+  body:       string | null
+  binary:     boolean
+  bodySize:   number
+}
+
+export interface RecordedEntry {
+  id:         string
+  timestamp:  string
+  durationMs: number
+  request:    RecordedRequest
+  response:   RecordedResponse
+}
+
+export interface RecordingSession {
+  version:       '1.0'
+  upstream:      string
+  port:          number
+  startedAt:     string
+  maskedHeaders: string[]
+  entries:       RecordedEntry[]
+}
+
 // ─── Git ──────────────────────────────────────────────────────────────────────
 
 export type GitFileStatus = 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked'
@@ -488,11 +531,12 @@ export interface GitFile {
 }
 
 export interface GitStatus {
-  staged:    GitFile[]
-  unstaged:  GitFile[]
-  untracked: GitFile[]
-  branch:    string
-  ahead:     number
+  staged:     GitFile[]
+  unstaged:   GitFile[]
+  untracked:  GitFile[]
+  conflicted: string[]   // paths with merge conflicts
+  branch:     string
+  ahead:      number
   behind:    number
   remote:    string | null
 }

@@ -39,6 +39,9 @@ import type {
   GitCommit,
   GitBranch,
   GitRemote,
+  RecorderConfig,
+  RecordedEntry,
+  RecordingSession,
 } from '../shared/types';
 
 
@@ -248,6 +251,30 @@ const api = {
     ipcRenderer.invoke('git:removeRemote', name),
   gitWriteCiFile:  (relPath: string, content: string): Promise<void> =>
     ipcRenderer.invoke('git:writeCiFile', relPath, content),
+  gitResolveOurs:   (filePath: string): Promise<void> =>
+    ipcRenderer.invoke('git:resolveOurs', filePath),
+  gitResolveTheirs: (filePath: string): Promise<void> =>
+    ipcRenderer.invoke('git:resolveTheirs', filePath),
+  gitMarkResolved:  (filePath: string): Promise<void> =>
+    ipcRenderer.invoke('git:markResolved', filePath),
+
+  // ─── Recorder ─────────────────────────────────────────────────────────────
+  recordStart:    (config: RecorderConfig): Promise<void> =>
+    ipcRenderer.invoke('record:start', config),
+  recordStop:     (): Promise<RecordingSession> =>
+    ipcRenderer.invoke('record:stop'),
+  recordIsRunning: (): Promise<boolean> =>
+    ipcRenderer.invoke('record:isRunning'),
+  recordEntries:  (): Promise<RecordedEntry[]> =>
+    ipcRenderer.invoke('record:entries'),
+  recordToMock:   (entries: RecordedEntry[], upstream: string, name: string, port: number): Promise<MockServer> =>
+    ipcRenderer.invoke('record:toMock', entries, upstream, name, port),
+  onRecordHit:    (cb: (entry: RecordedEntry) => void): void => {
+    ipcRenderer.on('record:hit', (_e, entry) => cb(entry));
+  },
+  offRecordHit:   (): void => {
+    ipcRenderer.removeAllListeners('record:hit');
+  },
 
   // ─── Zoom ─────────────────────────────────────────────────────────────────
   setZoomFactor: (factor: number): void => webFrame.setZoomFactor(factor),

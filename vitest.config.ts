@@ -8,10 +8,14 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: [
+        'src/main/auth-builder.ts',
         'src/main/interpolation.ts',
         'src/main/ipc/request-handler.ts',
         'src/main/ipc/secret-handler.ts',
+        'src/main/mock-server.ts',
+        'src/main/recorder.ts',
         'src/main/script-runner.ts',
+        'src/shared/ci-generators.ts',
         'src/shared/report.ts',
         'src/renderer/src/store/index.ts',
       ],

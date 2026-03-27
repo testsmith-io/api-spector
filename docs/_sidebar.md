@@ -11,6 +11,7 @@
   - [TLS & Certificates](gui/tls-certificates.md)
   - [Import OpenAPI](gui/import-openapi.md)
   - [Contract Testing](gui/contract-testing.md)
+  - [Git Integration](gui/git.md)
 
 - **CLI**
   - [Run Tests](cli/run.md)

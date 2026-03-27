@@ -10,7 +10,8 @@ export default defineConfig( {
         input: {
           index: resolve( __dirname, 'src/main/index.ts' ),
           runner: resolve( __dirname, 'src/cli/runner.ts' ),
-          mock: resolve( __dirname, 'src/cli/mock.ts' ),
+          mock:   resolve( __dirname, 'src/cli/mock.ts' ),
+          record: resolve( __dirname, 'src/cli/record.ts' ),
         }
       }
     }

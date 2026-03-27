@@ -12,12 +12,14 @@ function printHelp() {
   console.log('')
   console.log('  Usage:')
   console.log('    api-spector ui                            Launch the app')
-  console.log('    api-spector run  --workspace <path>       Run tests from CLI')
-  console.log('    api-spector mock --workspace <path>       Start mock servers from CLI')
+  console.log('    api-spector run    --workspace <path>     Run tests from CLI')
+  console.log('    api-spector mock   --workspace <path>     Start mock servers from CLI')
+  console.log('    api-spector record --upstream <url>       Record API traffic as mock stubs')
   console.log('')
   console.log('  Options:')
-  console.log('    api-spector run  --help                   Show run options')
-  console.log('    api-spector mock --help                   Show mock options')
+  console.log('    api-spector run    --help                 Show run options')
+  console.log('    api-spector mock   --help                 Show mock options')
+  console.log('    api-spector record --help                 Show record options')
   console.log('')
   console.log('  Environment:')
   console.log('    ELECTRON_NO_SANDBOX=1                     Disable Chromium sandbox')
@@ -46,6 +48,13 @@ if (cmd === '--help' || cmd === '-h') {
 } else if (cmd === 'mock') {
   const mockPath = path.join(__dirname, '..', 'out', 'main', 'mock.js')
   const proc = spawn(process.execPath, [mockPath, ...rest], {
+    stdio: 'inherit',
+    env: process.env,
+  })
+  proc.on('close', code => process.exit(code ?? 0))
+} else if (cmd === 'record') {
+  const recordPath = path.join(__dirname, '..', 'out', 'main', 'record.js')
+  const proc = spawn(process.execPath, [recordPath, ...rest], {
     stdio: 'inherit',
     env: process.env,
   })

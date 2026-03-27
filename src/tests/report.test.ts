@@ -15,7 +15,7 @@
 // along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from 'vitest';
-import { buildJsonReport, buildJUnitReport } from '../shared/report';
+import { buildJsonReport, buildJUnitReport, buildHtmlReport } from '../shared/report';
 import type { RunRequestResult, RunSummary } from '../shared/types';
 
 function makeResult(overrides: Partial<RunRequestResult> = {}): RunRequestResult {
@@ -127,5 +127,131 @@ describe('buildJUnitReport', () => {
     expect(xml).toContain('&lt;special&gt;');
     expect(xml).toContain('&amp;');
     expect(xml).toContain('&quot;');
+  });
+});
+
+// ─── buildHtmlReport ─────────────────────────────────────────────────────────
+
+describe('buildHtmlReport', () => {
+  it('returns a valid HTML document', () => {
+    const html = buildHtmlReport([], summary, meta);
+    expect(html).toContain('<!DOCTYPE html>');
+    expect(html).toContain('</html>');
+  });
+
+  it('includes the collection name in the title and heading', () => {
+    const html = buildHtmlReport([], summary, meta);
+    expect(html).toContain('<title>User API');
+    expect(html).toContain('<h1>User API</h1>');
+  });
+
+  it('shows the environment name', () => {
+    expect(buildHtmlReport([], summary, meta)).toContain('staging');
+  });
+
+  it('shows all summary stat values', () => {
+    const html = buildHtmlReport([], summary, meta);
+    expect(html).toContain(`>${summary.total}<`);
+    expect(html).toContain(`>${summary.passed}<`);
+    expect(html).toContain(`>${summary.durationMs} ms<`);
+  });
+
+  it('calculates and shows pass rate percentage', () => {
+    const s = { total: 4, passed: 3, failed: 1, errors: 0, durationMs: 100 };
+    expect(buildHtmlReport([], s, meta)).toContain('>75%<');
+  });
+
+  it('shows 0% pass rate when total is 0', () => {
+    const s = { total: 0, passed: 0, failed: 0, errors: 0, durationMs: 0 };
+    expect(buildHtmlReport([], s, meta)).toContain('>0%<');
+  });
+
+  it('renders a card for each result', () => {
+    const results = [makeResult(), makeResult({ name: 'Post order', method: 'POST' })];
+    const html = buildHtmlReport(results, { ...summary, total: 2, passed: 2 }, meta);
+    expect(html).toContain('Get users');
+    expect(html).toContain('Post order');
+  });
+
+  it('marks a passed result with badge-pass class', () => {
+    const html = buildHtmlReport([makeResult({ status: 'passed' })], summary, meta);
+    expect(html).toContain('badge-pass');
+  });
+
+  it('marks a failed result with badge-fail class', () => {
+    const html = buildHtmlReport([makeResult({ status: 'failed' })], { ...summary, passed: 0, failed: 1 }, meta);
+    expect(html).toContain('badge-fail');
+  });
+
+  it('marks an error result with badge-err class', () => {
+    const html = buildHtmlReport([makeResult({ status: 'error' })], { ...summary, passed: 0, errors: 1 }, meta);
+    expect(html).toContain('badge-err');
+  });
+
+  it('renders test results with pass/fail indicators', () => {
+    const result = makeResult({
+      testResults: [
+        { name: 'status is 200', passed: true },
+        { name: 'body has id',   passed: false, error: 'Expected id to exist' },
+      ],
+    });
+    const html = buildHtmlReport([result], summary, meta);
+    expect(html).toContain('status is 200');
+    expect(html).toContain('body has id');
+    expect(html).toContain('Expected id to exist');
+  });
+
+  it('renders the resolved URL in the card', () => {
+    const html = buildHtmlReport([makeResult()], summary, meta);
+    expect(html).toContain('https://api.example.com/users');
+  });
+
+  it('renders the duration', () => {
+    const html = buildHtmlReport([makeResult({ durationMs: 123 })], summary, meta);
+    expect(html).toContain('123 ms');
+  });
+
+  it('renders the iteration label when present', () => {
+    const html = buildHtmlReport([makeResult({ iterationLabel: '2/5' })], summary, meta);
+    expect(html).toContain('2/5');
+  });
+
+  it('escapes HTML special characters in result names', () => {
+    const html = buildHtmlReport([makeResult({ name: '<script>alert(1)</script>' })], summary, meta);
+    expect(html).toContain('&lt;script&gt;');
+    expect(html).not.toContain('<script>alert(1)</script>');
+  });
+
+  it('escapes HTML special characters in error messages', () => {
+    const html = buildHtmlReport([makeResult({ error: 'failed & <reason>' })], summary, meta);
+    expect(html).toContain('failed &amp; &lt;reason&gt;');
+  });
+
+  it('renders request headers when sentRequest is present', () => {
+    const result = makeResult({
+      sentRequest: { headers: { 'authorization': 'Bearer tok', 'content-type': 'application/json' } },
+    });
+    const html = buildHtmlReport([result], summary, meta);
+    expect(html).toContain('authorization');
+    expect(html).toContain('Bearer tok');
+  });
+
+  it('renders response body when receivedResponse is present', () => {
+    const result = makeResult({
+      receivedResponse: {
+        status: 200, statusText: 'OK',
+        headers: { 'content-type': 'application/json' },
+        body: '{"hello":"world"}',
+      },
+    });
+    const html = buildHtmlReport([result], summary, meta);
+    // body is HTML-escaped, so " becomes &quot;
+    expect(html).toContain('&quot;hello&quot;');
+    expect(html).toContain('&quot;world&quot;');
+  });
+
+  it('includes the toggle script for collapsible cards', () => {
+    const html = buildHtmlReport([], summary, meta);
+    expect(html).toContain('function toggle(');
   });
 });

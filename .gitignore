@@ -31,3 +31,4 @@ npm-debug.log*
 
 # Claude
 .claude
+coverage
