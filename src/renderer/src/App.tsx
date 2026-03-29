@@ -1,20 +1,8 @@
-// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
-//
-// This file is part of api Spector.
-//
-// api Spector is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, version 3.
-//
-// api Spector is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+// Copyright (c) 2024-2026 Testsmith.io. All rights reserved.
+// Licensed for private, internal, non-commercial use only.
+// See LICENSE for full terms.
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from './store';
 import { useAutoSave } from './hooks/useAutoSave';
 import { useWorkspaceLoader } from './hooks/useWorkspaceLoader';
@@ -118,7 +106,7 @@ function ActivityBarBtn ( {
         )}
       </button>
       <div className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 hidden group-hover/ab:block">
-        <span className="whitespace-nowrap rounded px-2 py-1 text-[11px] bg-[#1e1b2e] text-gray-200 border border-white/10 shadow-lg">
+        <span className="whitespace-nowrap rounded px-2 py-1 text-[11px] bg-surface-900 text-[var(--text-primary)] border border-surface-700 shadow-lg">
           {title}
         </span>
       </div>
@@ -170,6 +158,35 @@ export default function App () {
   const [sidebarOpen, setSidebarOpen] = useState( true );
   const [responseOpen, setResponseOpen] = useState( true );
   const [docsModalOpen, setDocsModalOpen] = useState( false );
+  const [sidebarWidth, setSidebarWidth] = useState( 256 );
+  const [requestPaneWidth, setRequestPaneWidth] = useState<number | null>( null );
+  const dragging = useRef<'sidebar' | 'request' | null>( null );
+  const dragStart = useRef( { x: 0, w: 0 } );
+  const leftPaneRef = useRef<HTMLDivElement>( null );
+
+  useEffect( () => {
+    function onMouseMove ( e: MouseEvent ) {
+      if ( !dragging.current ) return;
+      const delta = e.clientX - dragStart.current.x;
+      if ( dragging.current === 'sidebar' ) {
+        setSidebarWidth( Math.max( 160, Math.min( 520, dragStart.current.w + delta ) ) );
+      } else {
+        setRequestPaneWidth( Math.max( 200, Math.min( window.innerWidth - 300, dragStart.current.w + delta ) ) );
+      }
+    }
+    function onMouseUp () {
+      if ( !dragging.current ) return;
+      dragging.current = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+    window.addEventListener( 'mousemove', onMouseMove );
+    window.addEventListener( 'mouseup', onMouseUp );
+    return () => {
+      window.removeEventListener( 'mousemove', onMouseMove );
+      window.removeEventListener( 'mouseup', onMouseUp );
+    };
+  }, [] );
 
   // Auto-load last opened workspace on startup
   useEffect( () => {
@@ -239,6 +256,14 @@ export default function App () {
           <span className="no-drag text-[11px] font-medium tracking-widest select-none" style={{ color: 'var(--text-muted)' }}>
             api <span style={{ color: '#6aa3c8' }}>Spector</span>
             {__APP_VERSION__ && <span className="ml-2 text-[10px] font-normal opacity-50">v{__APP_VERSION__}</span>}
+            <span className="mx-2 opacity-30">·</span>
+            <button
+              onClick={() => window.electron.openExternal('https://testsmith.io')}
+              className="no-drag text-[10px] font-normal opacity-60 hover:opacity-100 hover:underline focus:outline-none transition-opacity"
+              style={{ color: '#6aa3c8' }}
+            >
+              testsmith.io
+            </button>
           </span>
         </div>
       )}
@@ -290,37 +315,50 @@ export default function App () {
 
           {/* Side panel */}
           {sidebarOpen ? (
-            <aside className="w-64 flex-shrink-0 border-r border-surface-800 flex flex-col overflow-hidden">
-              <div className="px-3 py-2 flex items-center justify-between border-b border-surface-800 flex-shrink-0">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-600">
-                  {sidebarTab === 'collections' ? 'Collections' : sidebarTab === 'history' ? 'History' : sidebarTab === 'mocks' ? 'Mocks' : sidebarTab === 'git' ? 'Git' : 'Contracts'}
-                </span>
-                <div className="flex items-center gap-1.5">
-                  {sidebarTab === 'history' && historyCount > 0 && (
-                    <span className="text-[10px] bg-surface-700 text-surface-400 rounded px-1.5 py-0.5">
-                      {historyCount}
-                    </span>
-                  )}
-                  {sidebarTab === 'collections' && (
+            <>
+              <aside style={{ width: sidebarWidth }} className="flex-shrink-0 flex flex-col overflow-hidden">
+                <div className="px-3 py-2 flex items-center justify-between border-b border-surface-800 flex-shrink-0">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-600">
+                    {sidebarTab === 'collections' ? 'Collections' : sidebarTab === 'history' ? 'History' : sidebarTab === 'mocks' ? 'Mocks' : sidebarTab === 'git' ? 'Git' : 'Contracts'}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {sidebarTab === 'history' && historyCount > 0 && (
+                      <span className="text-[10px] bg-surface-700 text-surface-400 rounded px-1.5 py-0.5">
+                        {historyCount}
+                      </span>
+                    )}
+                    {sidebarTab === 'collections' && (
+                      <button
+                        onClick={() => addCollection( 'New Collection' )}
+                        title="New collection"
+                        className="text-surface-600 hover:text-surface-300 transition-colors text-sm leading-none px-0.5"
+                      >+</button>
+                    )}
                     <button
-                      onClick={() => addCollection( 'New Collection' )}
-                      title="New collection"
+                      onClick={() => setSidebarOpen( false )}
+                      title="Collapse sidebar"
                       className="text-surface-600 hover:text-surface-300 transition-colors text-sm leading-none px-0.5"
-                    >+</button>
-                  )}
-                  <button
-                    onClick={() => setSidebarOpen( false )}
-                    title="Collapse sidebar"
-                    className="text-surface-600 hover:text-surface-300 transition-colors text-sm leading-none px-0.5"
-                  >‹</button>
+                    >‹</button>
+                  </div>
                 </div>
-              </div>
-              {sidebarTab === 'collections' ? <CollectionTree /> :
-                sidebarTab === 'history' ? <HistoryPanel /> :
-                  sidebarTab === 'mocks' ? <MockPanel /> :
-                    sidebarTab === 'git' ? <GitPanel /> :
-                      <ContractPanel />}
-            </aside>
+                {sidebarTab === 'collections' ? <CollectionTree /> :
+                  sidebarTab === 'history' ? <HistoryPanel /> :
+                    sidebarTab === 'mocks' ? <MockPanel /> :
+                      sidebarTab === 'git' ? <GitPanel /> :
+                        <ContractPanel />}
+              </aside>
+              {/* Sidebar resize handle */}
+              <div
+                className="flex-shrink-0 w-1 cursor-col-resize border-r border-surface-800 hover:border-blue-500 transition-colors"
+                onMouseDown={e => {
+                  dragging.current = 'sidebar';
+                  dragStart.current = { x: e.clientX, w: sidebarWidth };
+                  document.body.style.cursor = 'col-resize';
+                  document.body.style.userSelect = 'none';
+                  e.preventDefault();
+                }}
+              />
+            </>
           ) : (
             <button
               onClick={() => setSidebarOpen( true )}
@@ -420,17 +458,32 @@ export default function App () {
             ) : activeRequest ? (
               <div className="flex-1 flex min-h-0">
                 {/* Left pane: request builder */}
-                <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+                <div
+                  ref={leftPaneRef}
+                  className="min-w-0 flex flex-col overflow-hidden"
+                  style={!responseOpen || requestPaneWidth === null ? { flex: '1 1 0%' } : { width: requestPaneWidth, flexShrink: 0 }}
+                >
                   <RequestBuilder request={activeRequest} />
                 </div>
-                {/* Response panel toggle strip */}
-                <button
-                  onClick={() => setResponseOpen( v => !v )}
-                  title={responseOpen ? 'Collapse response' : 'Expand response'}
-                  className="flex-shrink-0 w-5 flex items-center justify-center border-x border-surface-800 bg-surface-950 hover:bg-surface-800 text-surface-700 hover:text-surface-300 transition-colors"
+                {/* Resize + collapse handle */}
+                <div
+                  className="flex-shrink-0 w-1 relative cursor-col-resize border-x border-surface-800 hover:border-blue-500 transition-colors group"
+                  onMouseDown={e => {
+                    dragging.current = 'request';
+                    dragStart.current = { x: e.clientX, w: leftPaneRef.current?.offsetWidth ?? requestPaneWidth ?? 400 };
+                    document.body.style.cursor = 'col-resize';
+                    document.body.style.userSelect = 'none';
+                    e.preventDefault();
+                  }}
                 >
-                  <span className="text-xs">{responseOpen ? '›' : '‹'}</span>
-                </button>
+                  <button
+                    onClick={() => setResponseOpen( v => !v )}
+                    title={responseOpen ? 'Collapse response' : 'Expand response'}
+                    className="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 w-4 h-8 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 bg-surface-800 text-surface-400 hover:text-white transition-all text-xs z-10"
+                  >
+                    {responseOpen ? '›' : '‹'}
+                  </button>
+                </div>
                 {/* Right pane: response viewer */}
                 {responseOpen && (
                   <div className="flex-1 min-w-0 flex flex-col overflow-hidden">

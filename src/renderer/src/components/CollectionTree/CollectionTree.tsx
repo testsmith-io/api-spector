@@ -1,22 +1,11 @@
-// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
-//
-// This file is part of api Spector.
-//
-// api Spector is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, version 3.
-//
-// api Spector is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+// Copyright (c) 2024-2026 Testsmith.io. All rights reserved.
+// Licensed for private, internal, non-commercial use only.
+// See LICENSE for full terms.
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../../store';
-import type { Folder, Collection } from '../../../../shared/types';
+import type { Folder, Collection, ApiRequest } from '../../../../shared/types';
 import { MethodBadge } from '../common/MethodBadge';
 import { FolderSettingsModal } from './FolderSettingsModal';
 import { CollectionSettingsModal } from './CollectionSettingsModal';
@@ -66,22 +55,26 @@ function InlineEdit({
 // ─── Tag chips ────────────────────────────────────────────────────────────────
 
 function TagChips({
-  tags, onRemove, onAdd,
+  tags, onRemove, onAdd, forceAdding = false, onDoneAdding,
 }: {
   tags: string[]
   onRemove: (tag: string) => void
   onAdd: (tag: string) => void
+  forceAdding?: boolean
+  onDoneAdding?: () => void
 }) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft]   = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { if (adding) inputRef.current?.focus(); }, [adding]);
+  useEffect(() => { if (forceAdding) setAdding(true); }, [forceAdding]);
 
   function commit() {
     const t = draft.trim().toLowerCase();
     if (t && !tags.includes(t)) onAdd(t);
     setDraft('');
     setAdding(false);
+    onDoneAdding?.();
   }
 
   return (
@@ -103,18 +96,12 @@ function TagChips({
           ref={inputRef}
           value={draft}
           onChange={e => setDraft(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setAdding(false); setDraft(''); } e.stopPropagation(); }}
+          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setAdding(false); setDraft(''); onDoneAdding?.(); } e.stopPropagation(); }}
           onBlur={commit}
           className="w-16 text-[9px] bg-surface-700 rounded px-1 py-px focus:outline-none focus:ring-1 focus:ring-blue-500"
           placeholder="tag…"
         />
-      ) : (
-        <button
-          onClick={() => setAdding(true)}
-          className="text-[9px] text-surface-400 hover:text-blue-400 px-0.5 opacity-0 group-hover:opacity-100 transition-all"
-          title="Add tag"
-        >+tag</button>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -155,47 +142,95 @@ function ConfirmDialog({ message, onConfirm, onCancel }: {
   );
 }
 
-// ─── Icon button ──────────────────────────────────────────────────────────────
+// ─── Context menu ─────────────────────────────────────────────────────────────
 
-function IconBtn({
-  title, onClick, children, danger = false, alwaysVisible = false,
-}: {
-  title: string
-  onClick: (e: React.MouseEvent) => void
-  children: React.ReactNode
-  danger?: boolean
-  alwaysVisible?: boolean
+type MenuItem =
+  | { type: 'item'; label: string; icon?: React.ReactNode; danger?: boolean; onClick: () => void }
+  | { type: 'separator' }
+  | { type: 'header'; label: string }
+
+function ContextMenu({ items, x, y, onClose }: {
+  items: MenuItem[]
+  x: number
+  y: number
+  onClose: () => void
 }) {
-  return (
-    <div className="relative group/tip">
-      <button
-        onClick={e => { e.stopPropagation(); onClick(e); }}
-        className={`px-1 py-0.5 rounded transition-all ${
-          alwaysVisible ? '' : 'opacity-0 group-hover:opacity-100'
-        } ${danger ? 'hover:text-red-400' : 'hover:text-blue-400'} text-surface-400 hover:scale-150`}
-      >
-        {children}
-      </button>
-      <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1 z-50 hidden group-hover/tip:block">
-        <span className="whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] bg-[#1e1b2e] text-gray-300 border border-white/10 shadow-lg">
-          {title}
-        </span>
-      </div>
-    </div>
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    }
+    document.addEventListener('mousedown', handle, true);
+    return () => document.removeEventListener('mousedown', handle, true);
+  }, [onClose]);
+
+  const [pos, setPos] = useState({ top: y, left: x });
+  useEffect(() => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    let left = x;
+    let top = y;
+    if (left + rect.width > window.innerWidth) left = x - rect.width;
+    if (top + rect.height > window.innerHeight) top = y - rect.height;
+    setPos({ top, left });
+  }, [x, y]);
+
+  return createPortal(
+    <div
+      ref={ref}
+      style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
+      className="bg-surface-900 border border-surface-700 rounded-lg shadow-2xl py-1 min-w-[170px]"
+      onMouseDown={e => e.stopPropagation()}
+    >
+      {items.map((item, i) =>
+        item.type === 'separator' ? (
+          <div key={i} className="border-t border-surface-700 my-1" />
+        ) : item.type === 'header' ? (
+          <div key={i} className="px-3 pt-2 pb-0.5 text-[10px] uppercase tracking-wider font-semibold text-surface-500 select-none">
+            {item.label}
+          </div>
+        ) : (
+          <button
+            key={i}
+            onClick={e => { e.stopPropagation(); item.onClick(); onClose(); }}
+            className={`w-full text-left flex items-center gap-2 px-3 py-1.5 text-xs transition-colors ${
+              item.danger
+                ? 'text-red-400 hover:bg-surface-800 hover:text-red-300'
+                : 'text-[var(--text-primary)] hover:bg-surface-800'
+            }`}
+          >
+            {item.icon && <span className="w-3 h-3 shrink-0 flex items-center justify-center">{item.icon}</span>}
+            {item.label}
+          </button>
+        )
+      )}
+    </div>,
+    document.body
   );
 }
 
-function RunBtn({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
+function DotsBtn({ items }: { items: MenuItem[] }) {
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+
   return (
-    <button
-      title="Run"
-      onClick={e => { e.stopPropagation(); onClick(e); }}
-      className="px-1 py-0.5 rounded text-emerald-500 hover:text-emerald-400 transition-all"
-    >
-      <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"/>
-      </svg>
-    </button>
+    <div className="relative">
+      <button
+        onClick={e => {
+          e.stopPropagation();
+          if (menu) { setMenu(null); return; }
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          setMenu({ x: rect.right + 4, y: rect.top });
+        }}
+        className="opacity-0 group-hover:opacity-100 px-1 py-0.5 rounded text-surface-400 hover:text-white hover:bg-surface-700 transition-all"
+        title="Options"
+      >
+        <DotsHorizontalIcon />
+      </button>
+      {menu && (
+        <ContextMenu items={items} x={menu.x} y={menu.y} onClose={() => setMenu(null)} />
+      )}
+    </div>
   );
 }
 
@@ -225,10 +260,12 @@ export function CollectionTree() {
   const duplicateFolder     = useStore(s => s.duplicateFolder);
   const updateFolderTags  = useStore(s => s.updateFolderTags);
   const updateRequestTags = useStore(s => s.updateRequestTags);
+  const updateRequest     = useStore(s => s.updateRequest);
   const openRunner        = useStore(s => s.openRunner);
 
   const colList = Object.values(collections);
   const [pendingConfirm, setPendingConfirm] = useState<{ message: string; onConfirm: () => void } | null>(null);
+  const [newRequestId, setNewRequestId] = useState<string | null>(null);
 
   function confirmThen(message: string, action: () => void) {
     setPendingConfirm({ message, onConfirm: () => { action(); setPendingConfirm(null); } });
@@ -253,7 +290,8 @@ export function CollectionTree() {
             existingCollectionNames={colList.map(c => c.data.name)}
             onSelectCollection={() => setActiveCollection(col.id)}
             onSelectRequest={(reqId) => openInTab(reqId, col.id)}
-            onAddRequest={folderId => addRequest(col.id, folderId)}
+            newRequestId={newRequestId}
+            onAddRequest={folderId => setNewRequestId(addRequest(col.id, folderId))}
             onAddFolder={(parentId, name) => addFolder(col.id, parentId, name)}
             onRenameCollection={name => renameCollection(col.id, name)}
             onDeleteCollection={() => confirmThen(`Delete collection "${col.name}"?`, () => deleteCollection(col.id))}
@@ -266,6 +304,7 @@ export function CollectionTree() {
             onDuplicateRequest={reqId => duplicateRequest(col.id, reqId)}
             onUpdateFolderTags={(folderId, tags) => updateFolderTags(col.id, folderId, tags)}
             onUpdateRequestTags={updateRequestTags}
+            onSetRequestHookType={(reqId, hookType) => updateRequest(reqId, { hookType })}
             onRunCollection={() => openRunner(col.id)}
             onRunFolder={folderId => openRunner(col.id, folderId)}
           />
@@ -292,18 +331,20 @@ type ExpandCtrl = { value: boolean; seq: number };
 function CollectionNode({
   col, isActive, activeRequestId,
   existingCollectionNames,
+  newRequestId,
   onSelectCollection, onSelectRequest,
   onAddRequest, onAddFolder,
   onRenameCollection, onDeleteCollection, onDuplicateCollection,
   onRenameFolder, onDeleteFolder, onDuplicateFolder,
   onRenameRequest, onDeleteRequest, onDuplicateRequest,
-  onUpdateFolderTags, onUpdateRequestTags,
+  onUpdateFolderTags, onUpdateRequestTags, onSetRequestHookType,
   onRunCollection, onRunFolder,
 }: {
   col: Collection
   isActive: boolean
   activeRequestId: string | null
   existingCollectionNames: string[]
+  newRequestId: string | null
   onSelectCollection: () => void
   onSelectRequest: (id: string) => void
   onAddRequest: (folderId: string) => void
@@ -319,6 +360,7 @@ function CollectionNode({
   onDuplicateRequest: (id: string) => void
   onUpdateFolderTags: (folderId: string, tags: string[]) => void
   onUpdateRequestTags: (requestId: string, tags: string[]) => void
+  onSetRequestHookType: (requestId: string, hookType: ApiRequest['hookType']) => void
   onRunCollection: () => void
   onRunFolder: (folderId: string) => void
 }) {
@@ -355,17 +397,23 @@ function CollectionNode({
           )}
         </div>
 
-        <div className="hidden group-hover:flex items-center shrink-0 gap-0">
-          <RunBtn onClick={onRunCollection} />
-          <IconBtn title="Expand all folders" onClick={expandAll} alwaysVisible><ExpandAllIcon /></IconBtn>
-          <IconBtn title="Collapse all folders" onClick={collapseAll} alwaysVisible><CollapseAllIcon /></IconBtn>
-          <IconBtn title="Collection data (iterations)" onClick={onSelectCollection} alwaysVisible><TableIcon /></IconBtn>
-          <IconBtn title="Collection settings (TLS)" onClick={e => { e.stopPropagation(); setShowSettings(true); }} alwaysVisible><GearIcon /></IconBtn>
-          <IconBtn title="Add request" onClick={() => onAddRequest(col.rootFolder.id)} alwaysVisible><span className="text-xs">+</span></IconBtn>
-          <IconBtn title="Add folder" onClick={() => onAddFolder(col.rootFolder.id, 'New Folder')} alwaysVisible><FolderIcon /></IconBtn>
-          <IconBtn title="Rename" onClick={() => setRenaming(true)} alwaysVisible><PencilIcon /></IconBtn>
-          <IconBtn title="Duplicate collection" onClick={onDuplicateCollection} alwaysVisible><CopyIcon /></IconBtn>
-          <IconBtn title="Delete collection" onClick={onDeleteCollection} danger alwaysVisible><TrashIcon /></IconBtn>
+        <div className="shrink-0">
+          <DotsBtn items={[
+            { type: 'item', label: 'Run collection', icon: <PlayIcon />, onClick: onRunCollection },
+            { type: 'separator' },
+            { type: 'item', label: 'Add request', icon: <PlusIcon />, onClick: () => onAddRequest(col.rootFolder.id) },
+            { type: 'item', label: 'Add folder', icon: <FolderIcon />, onClick: () => onAddFolder(col.rootFolder.id, 'New Folder') },
+            { type: 'separator' },
+            { type: 'item', label: 'Expand all', icon: <ExpandAllIcon />, onClick: expandAll },
+            { type: 'item', label: 'Collapse all', icon: <CollapseAllIcon />, onClick: collapseAll },
+            { type: 'separator' },
+            { type: 'item', label: 'Collection data', icon: <TableIcon />, onClick: onSelectCollection },
+            { type: 'item', label: 'Settings (TLS)', icon: <GearIcon />, onClick: () => setShowSettings(true) },
+            { type: 'item', label: 'Rename', icon: <PencilIcon />, onClick: () => setRenaming(true) },
+            { type: 'item', label: 'Duplicate', icon: <CopyIcon />, onClick: onDuplicateCollection },
+            { type: 'separator' },
+            { type: 'item', label: 'Delete collection', icon: <TrashIcon />, danger: true, onClick: onDeleteCollection },
+          ]} />
         </div>
       </div>
 
@@ -383,11 +431,13 @@ function CollectionNode({
           onRenameFolder={onRenameFolder}
           onDeleteFolder={onDeleteFolder}
           onDuplicateFolder={onDuplicateFolder}
+          newRequestId={newRequestId}
           onRenameRequest={onRenameRequest}
           onDeleteRequest={onDeleteRequest}
           onDuplicateRequest={onDuplicateRequest}
           onUpdateFolderTags={onUpdateFolderTags}
           onUpdateRequestTags={onUpdateRequestTags}
+          onSetRequestHookType={onSetRequestHookType}
           onRunFolder={onRunFolder}
         />
       )}
@@ -427,6 +477,7 @@ function FolderRow({
   }, [expandCtrl.seq]); // eslint-disable-line react-hooks/exhaustive-deps
   const [renaming, setRenaming] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [addingTag, setAddingTag] = useState(false);
   const tags = folder.tags ?? [];
   const indent = depth * 12 + 8;
   const hasInheritedConfig = (folder.auth && folder.auth.type !== 'none') || (folder.headers && folder.headers.length > 0);
@@ -452,28 +503,31 @@ function FolderRow({
           ) : (
             <span className="text-xs truncate block">{folder.name}</span>
           )}
-          {tags.length > 0 && (
+          {(tags.length > 0 || addingTag) && (
             <TagChips
               tags={tags}
               onRemove={tag => onUpdateTags(tags.filter(t => t !== tag))}
               onAdd={tag => onUpdateTags([...tags, tag])}
+              forceAdding={addingTag}
+              onDoneAdding={() => setAddingTag(false)}
             />
           )}
         </div>
 
-        <div className="hidden group-hover:flex items-center shrink-0 gap-0">
-          <RunBtn onClick={onRun} />
-          <IconBtn title="Add request" onClick={onAddRequest} alwaysVisible><span className="text-xs">+</span></IconBtn>
-          <IconBtn title="Add sub-folder" onClick={onAddFolder} alwaysVisible><FolderIcon /></IconBtn>
-          <IconBtn title="Folder auth &amp; headers" onClick={() => setShowSettings(true)} alwaysVisible>
-            <KeyIcon />
-          </IconBtn>
-          <IconBtn title="Add tag" onClick={() => {}} alwaysVisible>
-            <TagChips tags={[]} onRemove={() => {}} onAdd={tag => onUpdateTags([...tags, tag])} />
-          </IconBtn>
-          <IconBtn title="Rename" onClick={() => setRenaming(true)} alwaysVisible><PencilIcon /></IconBtn>
-          <IconBtn title="Duplicate folder" onClick={onDuplicate} alwaysVisible><CopyIcon /></IconBtn>
-          <IconBtn title="Delete folder" onClick={onDelete} danger alwaysVisible><TrashIcon /></IconBtn>
+        <div className="shrink-0">
+          <DotsBtn items={[
+            { type: 'item', label: 'Run folder', icon: <PlayIcon />, onClick: onRun },
+            { type: 'separator' },
+            { type: 'item', label: 'Add request', icon: <PlusIcon />, onClick: onAddRequest },
+            { type: 'item', label: 'Add sub-folder', icon: <FolderIcon />, onClick: onAddFolder },
+            { type: 'separator' },
+            { type: 'item', label: 'Auth & headers', icon: <KeyIcon />, onClick: () => setShowSettings(true) },
+            { type: 'item', label: 'Add tag', icon: <TagIcon />, onClick: () => setAddingTag(true) },
+            { type: 'item', label: 'Rename', icon: <PencilIcon />, onClick: () => setRenaming(true) },
+            { type: 'item', label: 'Duplicate', icon: <CopyIcon />, onClick: onDuplicate },
+            { type: 'separator' },
+            { type: 'item', label: 'Delete folder', icon: <TrashIcon />, danger: true, onClick: onDelete },
+          ]} />
         </div>
       </div>
 
@@ -494,11 +548,11 @@ function FolderRow({
 
 function FolderContents({
   folder, collectionId, requests, activeRequestId, depth,
-  expandCtrl,
+  expandCtrl, newRequestId,
   onSelectRequest, onAddRequest, onAddFolder,
   onRenameFolder, onDeleteFolder, onDuplicateFolder,
   onRenameRequest, onDeleteRequest, onDuplicateRequest,
-  onUpdateFolderTags, onUpdateRequestTags, onRunFolder,
+  onUpdateFolderTags, onUpdateRequestTags, onSetRequestHookType, onRunFolder,
 }: {
   folder: Folder
   collectionId: string
@@ -506,6 +560,7 @@ function FolderContents({
   activeRequestId: string | null
   depth: number
   expandCtrl: ExpandCtrl
+  newRequestId: string | null
   onSelectRequest: (id: string) => void
   onAddRequest: (folderId: string) => void
   onAddFolder: (parentId: string, name: string) => void
@@ -517,6 +572,7 @@ function FolderContents({
   onDuplicateRequest: (id: string) => void
   onUpdateFolderTags: (folderId: string, tags: string[]) => void
   onUpdateRequestTags: (requestId: string, tags: string[]) => void
+  onSetRequestHookType: (requestId: string, hookType: ApiRequest['hookType']) => void
   onRunFolder: (folderId: string) => void
 }) {
   return (
@@ -543,6 +599,7 @@ function FolderContents({
             activeRequestId={activeRequestId}
             depth={depth + 1}
             expandCtrl={expandCtrl}
+            newRequestId={newRequestId}
             onSelectRequest={onSelectRequest}
             onAddRequest={onAddRequest}
             onAddFolder={onAddFolder}
@@ -554,6 +611,7 @@ function FolderContents({
             onDuplicateRequest={onDuplicateRequest}
             onUpdateFolderTags={onUpdateFolderTags}
             onUpdateRequestTags={onUpdateRequestTags}
+            onSetRequestHookType={onSetRequestHookType}
             onRunFolder={onRunFolder}
           />
         </FolderRow>
@@ -568,14 +626,17 @@ function FolderContents({
             reqId={req.id}
             name={req.name}
             method={req.method}
+            hookType={req.hookType}
             tags={req.meta?.tags ?? []}
             isActive={req.id === activeRequestId}
+            autoRename={req.id === newRequestId}
             indent={(depth + 1) * 12 + 8}
             onSelect={() => onSelectRequest(req.id)}
             onRename={name => onRenameRequest(req.id, name)}
             onDelete={() => onDeleteRequest(req.id)}
             onDuplicate={() => onDuplicateRequest(req.id)}
             onUpdateTags={tags => onUpdateRequestTags(req.id, tags)}
+            onSetHookType={ht => onSetRequestHookType(req.id, ht)}
           />
         );
       })}
@@ -585,23 +646,49 @@ function FolderContents({
 
 // ─── Request row ──────────────────────────────────────────────────────────────
 
+const HOOK_LABELS: Record<NonNullable<ApiRequest['hookType']>, string> = {
+  beforeAll: 'Before All',
+  before:    'Before',
+  after:     'After',
+  afterAll:  'After All',
+};
+
+const HOOK_COLORS: Record<NonNullable<ApiRequest['hookType']>, string> = {
+  beforeAll: 'bg-violet-700 text-white',
+  before:    'bg-violet-600 text-white',
+  after:     'bg-cyan-700 text-white',
+  afterAll:  'bg-cyan-800 text-white',
+};
+
 function RequestRow({
-  reqId: _reqId, name, method, tags, isActive, indent,
-  onSelect, onRename, onDelete, onDuplicate, onUpdateTags,
+  reqId: _reqId, name, method, hookType, tags, isActive, indent, autoRename = false,
+  onSelect, onRename, onDelete, onDuplicate, onUpdateTags, onSetHookType,
 }: {
   reqId: string
   name: string
   method: string
+  hookType?: ApiRequest['hookType']
   tags: string[]
   isActive: boolean
   indent: number
+  autoRename?: boolean
   onSelect: () => void
   onRename: (name: string) => void
   onDelete: () => void
   onDuplicate: () => void
   onUpdateTags: (tags: string[]) => void
+  onSetHookType: (ht: ApiRequest['hookType']) => void
 }) {
-  const [renaming, setRenaming] = useState(false);
+  const [renaming, setRenaming] = useState(autoRename);
+  const [addingTag, setAddingTag] = useState(false);
+
+  const hookMenuItems: MenuItem[] = [
+    ...((['beforeAll', 'before', 'after', 'afterAll'] as const).map(ht => ({
+      type: 'item' as const,
+      label: (hookType === ht ? '✓ ' : '    ') + HOOK_LABELS[ht],
+      onClick: () => onSetHookType(hookType === ht ? undefined : ht),
+    }))),
+  ];
 
   return (
     <div
@@ -623,26 +710,37 @@ function RequestRow({
             className="w-full text-xs"
           />
         ) : (
-          <span className="text-xs truncate block">{name}</span>
+          <div className="flex items-center gap-1 min-w-0">
+            <span className="text-xs truncate">{name}</span>
+            {hookType && (
+              <span className={`shrink-0 text-[9px] font-bold px-1 py-px rounded ${HOOK_COLORS[hookType]}`}>
+                {HOOK_LABELS[hookType].toUpperCase()}
+              </span>
+            )}
+          </div>
         )}
-        {tags.length > 0 && (
+        {(tags.length > 0 || addingTag) && (
           <TagChips
             tags={tags}
             onRemove={tag => onUpdateTags(tags.filter(t => t !== tag))}
             onAdd={tag => onUpdateTags([...tags, tag])}
+            forceAdding={addingTag}
+            onDoneAdding={() => setAddingTag(false)}
           />
         )}
       </div>
 
-      <div className="flex items-center shrink-0 gap-0">
-        {tags.length === 0 && (
-          <span className="opacity-0 group-hover:opacity-100 transition-all" onClick={e => e.stopPropagation()}>
-            <TagChips tags={[]} onRemove={() => {}} onAdd={tag => onUpdateTags([tag])} />
-          </span>
-        )}
-        <IconBtn title="Rename" onClick={() => setRenaming(true)}><PencilIcon /></IconBtn>
-        <IconBtn title="Duplicate" onClick={onDuplicate}><CopyIcon /></IconBtn>
-        <IconBtn title="Delete" onClick={onDelete} danger><TrashIcon /></IconBtn>
+      <div className="shrink-0">
+        <DotsBtn items={[
+          { type: 'item', label: 'Rename', icon: <PencilIcon />, onClick: () => setRenaming(true) },
+          { type: 'item', label: 'Duplicate', icon: <CopyIcon />, onClick: onDuplicate },
+          { type: 'item', label: 'Add tag', icon: <TagIcon />, onClick: () => setAddingTag(true) },
+          { type: 'separator' },
+          { type: 'header', label: 'Hook type' },
+          ...hookMenuItems,
+          { type: 'separator' },
+          { type: 'item', label: 'Delete', icon: <TrashIcon />, danger: true, onClick: onDelete },
+        ]} />
       </div>
     </div>
   );
@@ -650,6 +748,34 @@ function RequestRow({
 
 // ─── Micro icons ──────────────────────────────────────────────────────────────
 
+function DotsHorizontalIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+      <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zm6 0a2 2 0 11-4 0 2 2 0 014 0zm6 0a2 2 0 11-4 0 2 2 0 014 0z" />
+    </svg>
+  );
+}
+function PlayIcon() {
+  return (
+    <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+    </svg>
+  );
+}
+function PlusIcon() {
+  return (
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+    </svg>
+  );
+}
+function TagIcon() {
+  return (
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A2 2 0 013 10V5a2 2 0 012-2z" />
+    </svg>
+  );
+}
 function FolderIcon({ className = '' }: { className?: string }) {
   return (
     <svg className={`w-3 h-3 ${className}`} fill="currentColor" viewBox="0 0 20 20">

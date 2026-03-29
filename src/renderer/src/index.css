@@ -120,7 +120,11 @@ body {
 :root.light .bg-emerald-600,
 :root.light .bg-red-600,
 :root.light .bg-amber-600,
-:root.light .bg-orange-600 {
+:root.light .bg-orange-600,
+:root.light .bg-cyan-700,
+:root.light .bg-cyan-800,
+:root.light .bg-violet-600,
+:root.light .bg-violet-700 {
   color: #ffffff !important;
 }
 /* Inputs & textareas need dark placeholder text in light mode */
@@ -160,3 +164,6 @@ body {
 /* Amber — warnings */
 :root.light .text-amber-300 { color: #b45309 !important; }  /* amber-700 */
 :root.light .text-amber-400 { color: #d97706 !important; }  /* amber-500 */
+
+/* Cyan — console [set] output, WS badge */
+:root.light .text-cyan-400 { color: #0e7490 !important; }   /* cyan-700  */

@@ -1,21 +1,10 @@
-// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
-//
-// This file is part of api Spector.
-//
-// api Spector is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, version 3.
-//
-// api Spector is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+// Copyright (c) 2024-2026 Testsmith.io. All rights reserved.
+// Licensed for private, internal, non-commercial use only.
+// See LICENSE for full terms.
 
 import { useState } from 'react';
 import { useStore } from '../../store';
+import { useEffect } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
 import { xml } from '@codemirror/lang-xml';
@@ -353,6 +342,13 @@ export function ResponseViewer () {
   const sentRequest = activeTab?.lastSentRequest ?? null;
   const requestId = activeTab?.requestId ?? null;
   const [tab, setTab] = useState<RespTab>( 'body' );
+
+  // Auto-switch to Console when a script error occurs
+  useEffect( () => {
+    if ( scriptResult?.preScriptError || scriptResult?.postScriptError ) {
+      setTab( 'console' );
+    }
+  }, [scriptResult?.preScriptError, scriptResult?.postScriptError] );
   const [diffMode, setDiffMode] = useState( false );
   const [showMockModal, setShowMockModal] = useState( false );
   const [bodyView, setBodyView] = useState<'tree' | 'raw'>( 'raw' );
@@ -431,13 +427,14 @@ export function ResponseViewer () {
   const passedCount = scriptResult?.testResults.filter( t => t.passed ).length ?? 0;
   const totalCount = scriptResult?.testResults.length ?? 0;
   const consoleCount = scriptResult?.consoleOutput.length ?? 0;
+  const hasScriptError = !!( scriptResult?.preScriptError || scriptResult?.postScriptError );
 
-  const tabList: { id: RespTab; label: string; badge?: number | string }[] = [
+  const tabList: { id: RespTab; label: string; badge?: number | string; error?: boolean }[] = [
     { id: 'request', label: 'Request' },
     { id: 'body', label: 'Body' },
     { id: 'headers', label: 'Headers' },
     { id: 'tests', label: 'Tests', badge: totalCount > 0 ? `${passedCount}/${totalCount}` : undefined },
-    { id: 'console', label: 'Console', badge: consoleCount > 0 ? consoleCount : undefined },
+    { id: 'console', label: 'Console', badge: hasScriptError ? '!' : consoleCount > 0 ? consoleCount : undefined, error: hasScriptError },
   ];
 
   return (
@@ -460,10 +457,11 @@ export function ResponseViewer () {
             >
               {t.label}
               {t.badge !== undefined && (
-                <span className={`text-[10px] px-1 rounded ${t.id === 'tests' && passedCount < totalCount
-                  ? 'bg-red-800 text-red-200'
+                <span className={`text-[10px] px-1 rounded ${
+                  t.error ? 'bg-red-800 text-red-200'
+                  : t.id === 'tests' && passedCount < totalCount ? 'bg-red-800 text-red-200'
                   : 'bg-surface-700 text-white'
-                  }`}>
+                }`}>
                   {t.badge}
                 </span>
               )}
@@ -471,10 +469,6 @@ export function ResponseViewer () {
           ) )}
         </div>
 
-        {/* Script errors */}
-        {( scriptResult?.preScriptError || scriptResult?.postScriptError ) && (
-          <span className="text-[10px] text-red-400 font-medium shrink-0">Script error</span>
-        )}
 
         <div className="ml-auto flex items-center gap-1 shrink-0">
           {/* Toasts */}
@@ -698,8 +692,10 @@ function RequestPanel ( { sentRequest }: { sentRequest: SentRequest | null } ) {
 
 function ConsolePanel ( { scriptResult }: { scriptResult: ScriptExecutionMeta | null } ) {
   const sr = scriptResult as ScriptExecutionMeta | null;
+  const hasErrors = !!( sr?.preScriptError || sr?.postScriptError );
+  const hasOutput = !!( sr && sr.consoleOutput.length > 0 );
 
-  if ( !sr || sr.consoleOutput.length === 0 ) {
+  if ( !sr || ( !hasErrors && !hasOutput ) ) {
     return (
       <div className="flex items-center justify-center h-full text-surface-400 text-xs">
         No console output. Use <code className="mx-1 bg-surface-800 px-1 rounded">console.log()</code> in your scripts.
@@ -708,19 +704,36 @@ function ConsolePanel ( { scriptResult }: { scriptResult: ScriptExecutionMeta | 
   }
 
   return (
-    <div className="p-4 flex flex-col gap-1">
-      {sr.consoleOutput.map( ( line, i ) => (
-        <div
-          key={i}
-          className={`text-xs font-mono py-0.5 border-b border-surface-800/50 last:border-0 ${line.startsWith( '[error]' ) ? 'text-red-300' :
-            line.startsWith( '[warn]' ) ? 'text-amber-300' :
-              line.startsWith( '[set]' ) ? 'text-cyan-400' :
-                'text-surface-400'
-            }`}
-        >
-          {line}
+    <div className="p-4 flex flex-col gap-2">
+      {sr.preScriptError && (
+        <div className="flex items-start gap-2 p-2 rounded bg-red-900/30 border border-red-700">
+          <span className="text-red-400 text-xs font-bold shrink-0">PRE-SCRIPT ERROR</span>
+          <span className="text-red-300 text-xs font-mono">{sr.preScriptError}</span>
         </div>
-      ) )}
+      )}
+      {sr.postScriptError && (
+        <div className="flex items-start gap-2 p-2 rounded bg-red-900/30 border border-red-700">
+          <span className="text-red-400 text-xs font-bold shrink-0">POST-SCRIPT ERROR</span>
+          <span className="text-red-300 text-xs font-mono">{sr.postScriptError}</span>
+        </div>
+      )}
+      {hasOutput && (
+        <div className="flex flex-col gap-0">
+          {sr.consoleOutput.map( ( line, i ) => (
+            <div
+              key={i}
+              className={`text-xs font-mono py-0.5 border-b border-surface-800/50 last:border-0 ${
+                line.startsWith( '[error]' ) ? 'text-red-300' :
+                line.startsWith( '[warn]' )  ? 'text-amber-300' :
+                line.startsWith( '[set]' )   ? 'text-cyan-400' :
+                'text-surface-400'
+              }`}
+            >
+              {line}
+            </div>
+          ) )}
+        </div>
+      )}
     </div>
   );
 }

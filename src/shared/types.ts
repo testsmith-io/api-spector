@@ -1,18 +1,6 @@
-// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
-//
-// This file is part of api Spector.
-//
-// api Spector is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, version 3.
-//
-// api Spector is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+// Copyright (c) 2024-2026 Testsmith.io. All rights reserved.
+// Licensed for private, internal, non-commercial use only.
+// See LICENSE for full terms.
 
 // ─── Core data model ─────────────────────────────────────────────────────────
 
@@ -176,16 +164,8 @@ export interface ApiRequest {
   contract?: ContractExpectation
   meta?: { tags?: string[]; createdAt?: string; [key: string]: unknown }
   protocol?: 'http' | 'websocket'  // default 'http'
-}
-
-// ─── Hooks ────────────────────────────────────────────────────────────────────
-
-/** Scripts that execute once before/after a collection or folder run. */
-export interface CollectionHooks {
-  /** Runs once before any request in the scope executes. Use to authenticate, seed data, etc. */
-  setup?: string
-  /** Runs once after all requests in the scope have executed. Use to clean up created resources. */
-  teardown?: string
+  /** When set, this request acts as a lifecycle hook within its folder/collection scope. */
+  hookType?: 'beforeAll' | 'before' | 'after' | 'afterAll'
 }
 
 export interface Folder {
@@ -197,7 +177,6 @@ export interface Folder {
   tags?: string[]
   auth?: AuthConfig
   headers?: KeyValuePair[]
-  hooks?: CollectionHooks
 }
 
 export interface TlsSettings {
@@ -219,8 +198,6 @@ export interface Collection {
   dataSet?: DataSet
   /** TLS overrides applied to every request in this collection (takes priority over workspace TLS). */
   tls?: TlsSettings
-  /** Collection-level lifecycle hooks executed once per run. */
-  hooks?: CollectionHooks
 }
 
 // ─── Environment / Variables ──────────────────────────────────────────────────
@@ -380,6 +357,15 @@ export interface RunnerItem {
   dataRow?: Record<string, string>
   /** Human-readable label, e.g. "2/5" when data-driven. */
   iterationLabel?: string
+  // ── Hook metadata ─────────────────────────────────────────────────────────
+  isHook?: boolean
+  hookType?: 'beforeAll' | 'before' | 'afterAll' | 'after'
+  /** The folder/collection this hook belongs to. */
+  scopeId?: string
+  /** Ancestor scope IDs from root outward (not including scopeId). */
+  scopeAncestors?: string[]
+  /** For before/after hooks: the main request this hook wraps. */
+  mainRequestId?: string
 }
 
 export interface RunnerPayload {
@@ -418,6 +404,9 @@ export interface RunRequestResult {
   postScriptError?: string
   /** Set when this result belongs to a data-driven iteration, e.g. "2/5". */
   iterationLabel?: string
+  isHook?: boolean
+  hookType?: 'beforeAll' | 'before' | 'afterAll' | 'after'
+  scopeId?: string
   /** Actual request sent over the wire */
   sentRequest?: {
     headers: Record<string, string>
