@@ -1,30 +1,27 @@
-// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
-//
-// This file is part of api Spector.
-//
-// api Spector is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, version 3.
-//
-// api Spector is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+// Copyright (c) 2024-2026 Testsmith.io. All rights reserved.
+// Licensed for private, internal, non-commercial use only.
+// See LICENSE for full terms.
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useStore } from '../../store';
 import type { RunRequestResult, RunSummary, RunnerItem } from '../../../../shared/types';
 import { findFolder } from '../../store';
 import { buildJsonReport, buildJUnitReport, buildHtmlReport } from '../../../../shared/report';
-import { collectTagged, collectAllTags } from '../../../../shared/request-collection';
+import { collectAllTags, buildRunPlan } from '../../../../shared/request-collection';
 import { buildCliArgs, generateGitHub, generateAzure, generateGitLab } from '../../../../shared/ci-generators';
 import { getMethodColor } from '../../../../shared/colors';
 import { EmptyState } from '../common/EmptyState';
 
 const { electron } = window;
+
+// ─── Hook badge ──────────────────────────────────────────────────────────────
+
+const HOOK_BADGE: Record<string, { label: string; cls: string }> = {
+  beforeAll: { label: 'BEFORE ALL', cls: 'bg-violet-700 text-white' },
+  before:    { label: 'BEFORE',     cls: 'bg-violet-600 text-white' },
+  after:     { label: 'AFTER',      cls: 'bg-cyan-700   text-white' },
+  afterAll:  { label: 'AFTER ALL',  cls: 'bg-cyan-800   text-white' },
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -36,11 +33,7 @@ function collectRequests(
   const state = useStore.getState();
   const col   = state.collections[collectionId]?.data;
   if (!col) return [];
-  const collectionVars = col.collectionVariables ?? {};
-  const rootFolder     = folderId
-    ? findFolder(col.rootFolder, folderId) ?? col.rootFolder
-    : col.rootFolder;
-  return collectTagged(rootFolder, col.requests, collectionVars, filterTags);
+  return buildRunPlan(col, folderId, filterTags);
 }
 
 function allTagsIn(collectionId: string, folderId: string | null): string[] {
@@ -151,6 +144,9 @@ export function RunnerModal() {
       resolvedUrl:    item.request.url,
       status:         'pending',
       iterationLabel: item.iterationLabel,
+      isHook:         item.isHook,
+      hookType:       item.hookType,
+      scopeId:        item.scopeId,
     })));
     setSummary(null);
     setRunnerRunning(true);
@@ -326,21 +322,30 @@ export function RunnerModal() {
             <table className="w-full text-xs">
               <tbody>
                 {runnerResults.map((r, idx) => (
-                  <tr key={idx} className="border-b border-surface-800/50 hover:bg-surface-800/30">
+                  <tr
+                    key={idx}
+                    className={`border-b border-surface-800/50 hover:bg-surface-800/30 ${r.isHook ? 'opacity-80' : ''}`}
+                  >
                     <td className="px-4 py-2 w-6">
                       <StatusDot status={r.status} />
                     </td>
-                    <td className="py-2 pr-2 w-12">
-                      <span className={`text-[10px] font-bold ${getMethodColor(r.method)}`}>{r.method}</span>
+                    <td className="py-2 pr-2 w-20">
+                      {r.isHook && r.hookType ? (
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide whitespace-nowrap ${HOOK_BADGE[r.hookType]?.cls ?? ''}`}>
+                          {HOOK_BADGE[r.hookType]?.label}
+                        </span>
+                      ) : (
+                        <span className={`text-[10px] font-bold ${getMethodColor(r.method)}`}>{r.method}</span>
+                      )}
                     </td>
                     <td className="py-2 pr-2">
-                      <div className="text-[var(--text-primary)] truncate max-w-[260px]">
+                      <div className={`truncate max-w-[260px] ${r.isHook ? 'text-surface-400 italic' : 'text-[var(--text-primary)]'}`}>
                         {r.name}
                         {r.iterationLabel && (
                           <span className="ml-1.5 text-[10px] text-surface-500 font-mono">#{r.iterationLabel}</span>
                         )}
                       </div>
-                      <div className="text-[10px] text-surface-400 font-mono truncate max-w-[260px]">{r.resolvedUrl}</div>
+                      <div className="text-[10px] text-surface-500 font-mono truncate max-w-[260px]">{r.resolvedUrl}</div>
                     </td>
                     <td className="py-2 pr-2 text-right text-surface-400 w-20">
                       {r.httpStatus ? (
@@ -362,8 +367,11 @@ export function RunnerModal() {
                           {r.testResults.filter(t => t.passed).length}/{r.testResults.length} tests
                         </span>
                       )}
-                      {r.error && (
+                      {r.error && !r.error.startsWith('Skipped') && (
                         <span className="text-[10px] text-orange-400" title={r.error}>⚠ {r.error.slice(0, 30)}</span>
+                      )}
+                      {r.error?.startsWith('Skipped') && (
+                        <span className="text-[10px] text-surface-500 italic">skipped</span>
                       )}
                     </td>
                   </tr>

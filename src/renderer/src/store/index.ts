@@ -1,18 +1,6 @@
-// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
-//
-// This file is part of api Spector.
-//
-// api Spector is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, version 3.
-//
-// api Spector is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+// Copyright (c) 2024-2026 Testsmith.io. All rights reserved.
+// Licensed for private, internal, non-commercial use only.
+// See LICENSE for full terms.
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
@@ -26,7 +14,6 @@ import type {
   KeyValuePair,
   DataSet,
   TlsSettings,
-  CollectionHooks,
   ResponsePayload,
   SentRequest,
   HistoryEntry,
@@ -263,7 +250,7 @@ interface AppActions {
   duplicateFolder: (collectionId: string, folderId: string) => void
 
   // Request CRUD
-  addRequest: (collectionId: string, folderId: string) => void
+  addRequest: (collectionId: string, folderId: string) => string
   updateRequest: (id: string, patch: Partial<ApiRequest>) => void
   renameRequest: (id: string, name: string) => void
   deleteRequest: (collectionId: string, id: string) => void
@@ -300,9 +287,6 @@ interface AppActions {
 
   // Collection TLS
   updateCollectionTls: (id: string, tls: TlsSettings | undefined) => void
-
-  // Collection hooks
-  updateCollectionHooks: (id: string, hooks: CollectionHooks | undefined) => void
 
   // Globals
   setGlobals: (globals: Record<string, string>) => void
@@ -618,12 +602,6 @@ export const useStore = create<AppState & AppActions>()(
       s.collections[id].dirty = true;
     }),
 
-    updateCollectionHooks: (id, hooks) => set(s => {
-      if (!s.collections[id]) return;
-      s.collections[id].data.hooks = hooks;
-      s.collections[id].dirty = true;
-    }),
-
     // ── Folder CRUD ───────────────────────────────────────────────────────────
     addFolder: (collectionId, parentFolderId, name) => set(s => {
       const col = s.collections[collectionId]?.data;
@@ -687,20 +665,22 @@ export const useStore = create<AppState & AppActions>()(
     }),
 
     // ── Request CRUD ──────────────────────────────────────────────────────────
-    addRequest: (collectionId, folderId) => set(s => {
-      const col = s.collections[collectionId]?.data;
-      if (!col) return;
+    addRequest: (collectionId, folderId) => {
       const req = makeRequest();
-      col.requests[req.id] = req;
-      const folder = findFolder(col.rootFolder, folderId) ?? col.rootFolder;
-      folder.requestIds.push(req.id);
-      s.activeCollectionId = collectionId;
-      s.collections[collectionId].dirty = true;
-      // Open in a new tab
-      const tab = makeTab(req.id, collectionId);
-      s.tabs.push(tab);
-      s.activeTabId = tab.id;
-    }),
+      set(s => {
+        const col = s.collections[collectionId]?.data;
+        if (!col) return;
+        col.requests[req.id] = req;
+        const folder = findFolder(col.rootFolder, folderId) ?? col.rootFolder;
+        folder.requestIds.push(req.id);
+        s.activeCollectionId = collectionId;
+        s.collections[collectionId].dirty = true;
+        const tab = makeTab(req.id, collectionId);
+        s.tabs.push(tab);
+        s.activeTabId = tab.id;
+      });
+      return req.id;
+    },
 
     updateRequest: (id, patch) => set(s => {
       const entry = Object.values(s.collections).find(c => c.data.requests[id]);

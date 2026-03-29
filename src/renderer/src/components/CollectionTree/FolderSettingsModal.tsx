@@ -1,30 +1,13 @@
-// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
-//
-// This file is part of api Spector.
-//
-// api Spector is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, version 3.
-//
-// api Spector is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+// Copyright (c) 2024-2026 Testsmith.io. All rights reserved.
+// Licensed for private, internal, non-commercial use only.
+// See LICENSE for full terms.
 
-import React, { useMemo, useState } from 'react';
-import CodeMirror from '@uiw/react-codemirror';
-import { javascript } from '@codemirror/lang-javascript';
-import { oneDark } from '@codemirror/theme-one-dark';
+import React, { useState } from 'react';
 import type { Folder, AuthConfig, KeyValuePair } from '../../../../shared/types';
 import { useStore } from '../../store';
 import { KVTable } from '../RequestBuilder/KVTable';
-import { atCompletionExtension } from '../RequestBuilder/atCompletions';
-import { useVarNames } from '../../hooks/useVarNames';
 
-type ModalTab = 'auth' | 'headers' | 'hooks'
+type ModalTab = 'auth' | 'headers'
 
 const AUTH_TYPES: AuthConfig['type'][] = ['none', 'bearer', 'basic', 'digest', 'ntlm', 'apikey'];
 
@@ -36,33 +19,17 @@ interface Props {
 
 export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
   const updateFolder = useStore(s => s.updateFolder);
-  const varNames     = useVarNames();
 
   const [activeTab, setActiveTab] = useState<ModalTab>('auth');
   const [auth, setAuth]           = useState<AuthConfig>(folder.auth ?? { type: 'none' });
   const [headers, setHeaders]     = useState<KeyValuePair[]>(folder.headers ?? []);
-  const [setupScript,    setSetupScript]    = useState(folder.hooks?.setup    ?? '');
-  const [teardownScript, setTeardownScript] = useState(folder.hooks?.teardown ?? '');
-
-  const scriptExt = useMemo(
-    () => [javascript(), atCompletionExtension(varNames)],
-    [varNames],
-  );
 
   function patchAuth(patch: Partial<AuthConfig>) {
     setAuth(prev => ({ ...prev, ...patch }));
   }
 
   function save() {
-    const hasHooks = setupScript.trim() || teardownScript.trim();
-    updateFolder(collectionId, folder.id, {
-      auth,
-      headers,
-      hooks: hasHooks ? {
-        setup:    setupScript.trim()    || undefined,
-        teardown: teardownScript.trim() || undefined,
-      } : undefined,
-    });
+    updateFolder(collectionId, folder.id, { auth, headers });
     onClose();
   }
 
@@ -86,7 +53,7 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
 
         {/* Tabs */}
         <div className="flex border-b border-surface-800 px-4 shrink-0">
-          {(['auth', 'headers', 'hooks'] as ModalTab[]).map(t => (
+          {(['auth', 'headers'] as ModalTab[]).map(t => (
             <button
               key={t}
               onClick={() => setActiveTab(t)}
@@ -113,49 +80,6 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
               keyPlaceholder="Header-Name"
               valuePlaceholder="value"
             />
-          )}
-          {activeTab === 'hooks' && (
-            <div className="flex flex-col gap-4">
-              <p className="text-surface-500">
-                Hooks run once per folder run. Use <code className="text-surface-300">sp.collectionVariables.set()</code> to share state across requests within this folder.
-              </p>
-
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Setup</span>
-                  <span className="text-[10px] text-surface-600">runs once before any request in this folder</span>
-                </div>
-                <div className="rounded overflow-hidden border border-surface-700">
-                  <CodeMirror
-                    value={setupScript}
-                    height="140px"
-                    theme={oneDark}
-                    extensions={scriptExt}
-                    onChange={setSetupScript}
-                    basicSetup={{ lineNumbers: true, foldGutter: false, autocompletion: false }}
-                    placeholder="// sp.collectionVariables.set('folderId', faker.string.uuid());"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Teardown</span>
-                  <span className="text-[10px] text-surface-600">runs once after all requests in this folder complete</span>
-                </div>
-                <div className="rounded overflow-hidden border border-surface-700">
-                  <CodeMirror
-                    value={teardownScript}
-                    height="140px"
-                    theme={oneDark}
-                    extensions={scriptExt}
-                    onChange={setTeardownScript}
-                    basicSetup={{ lineNumbers: true, foldGutter: false, autocompletion: false }}
-                    placeholder="// cleanup logic here"
-                  />
-                </div>
-              </div>
-            </div>
           )}
         </div>
 
@@ -188,7 +112,6 @@ function FolderAuthPanel({ auth, onChange }: { auth: AuthConfig; onChange: (p: P
         Auth configured here is inherited by all requests in this folder unless the request overrides it with its own non-none auth type.
       </p>
 
-      {/* Type selector */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-surface-400">Type:</span>
         {AUTH_TYPES.map(t => (
@@ -205,7 +128,6 @@ function FolderAuthPanel({ auth, onChange }: { auth: AuthConfig; onChange: (p: P
         ))}
       </div>
 
-      {/* Bearer */}
       {auth.type === 'bearer' && (
         <div className="flex flex-col gap-1">
           <label className="text-surface-400">Token</label>
@@ -218,7 +140,6 @@ function FolderAuthPanel({ auth, onChange }: { auth: AuthConfig; onChange: (p: P
         </div>
       )}
 
-      {/* Basic / Digest */}
       {(auth.type === 'basic' || auth.type === 'digest') && (
         <div className="flex gap-2">
           <div className="flex-1">
@@ -241,7 +162,6 @@ function FolderAuthPanel({ auth, onChange }: { auth: AuthConfig; onChange: (p: P
         </div>
       )}
 
-      {/* NTLM */}
       {auth.type === 'ntlm' && (
         <div className="flex flex-col gap-2">
           <div className="flex gap-2">
@@ -286,7 +206,6 @@ function FolderAuthPanel({ auth, onChange }: { auth: AuthConfig; onChange: (p: P
         </div>
       )}
 
-      {/* API Key */}
       {auth.type === 'apikey' && (
         <div className="flex flex-col gap-1.5">
           <div className="flex gap-2">

@@ -1,18 +1,6 @@
-// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
-//
-// This file is part of api Spector.
-//
-// api Spector is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, version 3.
-//
-// api Spector is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+// Copyright (c) 2024-2026 Testsmith.io. All rights reserved.
+// Licensed for private, internal, non-commercial use only.
+// See LICENSE for full terms.
 
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../../store';
@@ -231,9 +219,18 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { onOpenDocs?: () => void }
               <ellipse cx="194" cy="254" rx="6" ry="7" fill="white" opacity="0.55"/>
               <ellipse cx="310" cy="254" rx="6" ry="7" fill="white" opacity="0.55"/>
             </svg>
-            <span className="text-xs font-semibold tracking-wide text-surface-300">
-              api <span style={{ color: '#6aa3c8' }}>Spector</span>
-            </span>
+            <div className="flex flex-col leading-tight">
+              <span className="text-xs font-semibold tracking-wide text-surface-300">
+                api <span style={{ color: '#6aa3c8' }}>Spector</span>
+              </span>
+              <button
+                onClick={() => window.electron.openExternal('https://testsmith.io')}
+                className="text-[9px] tracking-wide hover:underline focus:outline-none text-left"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                by Testsmith
+              </button>
+            </div>
           </div>
 
           {/* Import */}

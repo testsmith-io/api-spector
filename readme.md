@@ -118,4 +118,8 @@ npm run package
 
 ## License
 
-MIT
+Copyright (c) 2024-2026 Testsmith.io. All rights reserved.
+
+This repository is publicly viewable for reference purposes only.
+
+Commercial use, public hosting, redistribution, and use for third-party services are not permitted without prior written permission. See [LICENSE](LICENSE) for full terms.

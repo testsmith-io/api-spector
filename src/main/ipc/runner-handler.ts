@@ -1,18 +1,6 @@
-// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
-//
-// This file is part of api Spector.
-//
-// api Spector is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, version 3.
-//
-// api Spector is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+// Copyright (c) 2024-2026 Testsmith.io. All rights reserved.
+// Licensed for private, internal, non-commercial use only.
+// See LICENSE for full terms.
 
 import { type IpcMain, type IpcMainInvokeEvent } from 'electron';
 import { fetch, Headers, ProxyAgent, Agent } from 'undici';
@@ -275,8 +263,65 @@ export function registerRunnerHandler(ipc: IpcMain): void {
     let runCollectionVars: Record<string, string> = {};
     let runGlobals        = { ...globals };
 
+    /** Scopes whose beforeAll hook failed — all their requests are skipped. */
+    const failedScopes  = new Set<string>();
+    /** Main request IDs whose before hook failed — that request is skipped. */
+    const skipRequests  = new Set<string>();
+
     for (const item of items) {
-      const runningUpdate: Partial<RunRequestResult> = { status: 'running', iterationLabel: item.iterationLabel };
+      const { isHook, hookType, scopeId, scopeAncestors, mainRequestId } = item;
+
+      // ── Determine whether to skip this item ─────────────────────────────
+      let skipReason: string | undefined;
+      if (isHook) {
+        if (hookType === 'beforeAll') {
+          // Skip if an ancestor scope's beforeAll already failed
+          if ((scopeAncestors ?? []).some(id => failedScopes.has(id))) {
+            skipReason = 'Skipped — outer scope hook failed';
+          }
+        } else if (hookType === 'before') {
+          // Skip if any scope (ancestor or own) failed, or this request's before already failed
+          const allScopes = [...(scopeAncestors ?? []), scopeId].filter(Boolean) as string[];
+          if (allScopes.some(id => failedScopes.has(id))) {
+            skipReason = 'Skipped — scope hook failed';
+          } else if (mainRequestId && skipRequests.has(mainRequestId)) {
+            skipReason = 'Skipped — before hook failed';
+          }
+        }
+        // after / afterAll: never skip
+      } else {
+        // Main request
+        const allScopes = [...(item.scopeAncestors ?? []), item.scopeId].filter(Boolean) as string[];
+        if (allScopes.some(id => failedScopes.has(id))) {
+          skipReason = 'Skipped — beforeAll hook failed';
+        } else if (skipRequests.has(item.request.id)) {
+          skipReason = 'Skipped — before hook failed';
+        }
+      }
+
+      if (skipReason) {
+        const skipped: RunRequestResult = {
+          requestId:  item.request.id,
+          name:       item.request.name,
+          method:     item.request.method,
+          resolvedUrl: item.request.url,
+          status:     'failed',
+          error:      skipReason,
+          isHook:     item.isHook,
+          hookType:   item.hookType,
+          scopeId:    item.scopeId,
+          iterationLabel: item.iterationLabel,
+        };
+        summary.failed++;
+        event.sender.send('runner:progress', skipped);
+        continue;
+      }
+
+      // ── Run the item ────────────────────────────────────────────────────
+      const runningUpdate: Partial<RunRequestResult> = {
+        status: 'running', iterationLabel: item.iterationLabel,
+        isHook: item.isHook, hookType: item.hookType, scopeId: item.scopeId,
+      };
       event.sender.send('runner:progress', { requestId: item.request.id, ...runningUpdate });
 
       const { result, updatedEnvVars, updatedCollectionVars, updatedGlobals } = await executeOne(
@@ -293,11 +338,23 @@ export function registerRunnerHandler(ipc: IpcMain): void {
       runCollectionVars = updatedCollectionVars;
       runGlobals        = updatedGlobals;
 
+      // ── Post-run: propagate failures ────────────────────────────────────
+      if (isHook && result.status !== 'passed') {
+        if (hookType === 'beforeAll' && scopeId) {
+          failedScopes.add(scopeId);
+        } else if (hookType === 'before' && mainRequestId) {
+          skipRequests.add(mainRequestId);
+        }
+      }
+
       if (result.status === 'passed')      summary.passed++;
       else if (result.status === 'failed') summary.failed++;
       else                                  summary.errors++;
 
-      event.sender.send('runner:progress', { ...result, iterationLabel: item.iterationLabel });
+      event.sender.send('runner:progress', {
+        ...result, iterationLabel: item.iterationLabel,
+        isHook: item.isHook, hookType: item.hookType, scopeId: item.scopeId,
+      });
 
       if (requestDelay > 0 && item !== items[items.length - 1]) {
         await sleep(requestDelay);

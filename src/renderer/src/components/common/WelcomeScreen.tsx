@@ -1,18 +1,6 @@
-// Copyright (C) 2026  Testsmith.io <https://testsmith.io>
-//
-// This file is part of api Spector.
-//
-// api Spector is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, version 3.
-//
-// api Spector is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with api Spector.  If not, see <https://www.gnu.org/licenses/>.
+// Copyright (c) 2024-2026 Testsmith.io. All rights reserved.
+// Licensed for private, internal, non-commercial use only.
+// See LICENSE for full terms.
 
 import { useWorkspaceLoader } from '../../hooks/useWorkspaceLoader';
 
@@ -36,7 +24,17 @@ export function WelcomeScreen() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-6 text-center p-8">
       <div>
-        <h1 className="text-2xl font-semibold text-white mb-2">api Spector</h1>
+        <h1 className="text-2xl font-semibold text-white mb-1">api Spector</h1>
+        <p className="text-[11px] mb-3" style={{ color: 'var(--text-muted)' }}>
+          by{' '}
+          <button
+            onClick={() => window.electron.openExternal('https://testsmith.io')}
+            className="hover:underline focus:outline-none"
+            style={{ color: '#6aa3c8' }}
+          >
+            Testsmith
+          </button>
+        </p>
         <p className="text-surface-400 text-sm max-w-sm">
           Local-first API testing with Robot Framework &amp; Playwright code generation.
           Secrets stay on your machine.
