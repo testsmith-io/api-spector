@@ -273,6 +273,7 @@ export interface ScriptExecutionMeta {
   updatedEnvVars: Record<string, string>
   updatedCollectionVars: Record<string, string>
   updatedGlobals: Record<string, string>
+  updatedLocalVars: Record<string, string>
   resolvedUrl: string
   preScriptError?: string
   postScriptError?: string

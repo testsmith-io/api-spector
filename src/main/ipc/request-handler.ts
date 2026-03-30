@@ -393,6 +393,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
       updatedEnvVars        = result.updatedEnvVars;
       updatedCollectionVars = result.updatedCollectionVars;
       updatedGlobals        = result.updatedGlobals;
+      localVars             = result.updatedLocalVars;
 
       patchGlobals(result.updatedGlobals);
       await persistGlobals();
@@ -404,6 +405,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
       updatedEnvVars,
       updatedCollectionVars,
       updatedGlobals,
+      updatedLocalVars:     localVars,
       resolvedUrl,
       preScriptError:  preScriptMeta.error,
       postScriptError: postError,

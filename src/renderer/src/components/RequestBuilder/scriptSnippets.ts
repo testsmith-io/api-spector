@@ -71,16 +71,20 @@ export const SNIPPET_GROUPS: SnippetGroup[] = [
     group: 'Variables — Set',
     items: [
       {
-        label: 'Set variable',
-        code: `sp.variables.set("variable_name", "value");`,
+        label: 'Save token from response (use in next requests)',
+        code: `// Use collectionVariables so the value persists across requests\nconst json = sp.response.json();\nsp.collectionVariables.set("token", json.access_token);`,
       },
       {
-        label: 'Set environment variable',
+        label: 'Set collection variable (persists across requests)',
+        code: `sp.collectionVariables.set("variable_name", "value");`,
+      },
+      {
+        label: 'Set environment variable (key must exist in env)',
         code: `sp.environment.set("variable_name", "value");`,
       },
       {
-        label: 'Set collection variable',
-        code: `sp.collectionVariables.set("variable_name", "value");`,
+        label: 'Set variable (request-local only)',
+        code: `sp.variables.set("variable_name", "value");`,
       },
       {
         label: 'Set global variable',
