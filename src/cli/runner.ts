@@ -119,14 +119,23 @@ async function loadEnvironments(workspace: Workspace, dir: string): Promise<Envi
 
 // ─── Execute one request ──────────────────────────────────────────────────────
 
+interface ExecuteRequestResult {
+  result:               RunRequestResult;
+  updatedEnvVars:       Record<string, string>;
+  updatedCollectionVars: Record<string, string>;
+  updatedGlobals:       Record<string, string>;
+  updatedLocalVars:     Record<string, string>;
+}
+
 async function executeRequest(
   req: ApiRequest,
   collectionVars: Record<string, string>,
   envVars: Record<string, string>,
   globals: Record<string, string>,
+  localVars: Record<string, string>,
   verbose: boolean,
   tls?: TlsSettings,
-): Promise<RunRequestResult> {
+): Promise<ExecuteRequestResult> {
   const base: RunRequestResult = {
     requestId:   req.id,
     name:        req.name,
@@ -135,7 +144,6 @@ async function executeRequest(
     status:      'running',
   };
 
-  let localVars:            Record<string, string> = {};
   let updatedEnvVars        = { ...envVars };
   let updatedCollectionVars = { ...collectionVars };
   let updatedGlobals        = { ...globals };
@@ -144,7 +152,7 @@ async function executeRequest(
   if (req.preRequestScript?.trim()) {
     const r = await runScript(req.preRequestScript, {
       envVars: { ...envVars }, collectionVars: { ...collectionVars },
-      globals: { ...globals }, localVars: {},
+      globals: { ...globals }, localVars: { ...localVars },
     });
     preScriptError        = r.error;
     localVars             = r.updatedLocalVars;
@@ -225,9 +233,13 @@ async function executeRequest(
         envVars: updatedEnvVars, collectionVars: updatedCollectionVars,
         globals: updatedGlobals, localVars, response,
       });
-      testResults      = r.testResults;
-      consoleOutput    = r.consoleOutput;
-      postScriptError  = r.error;
+      testResults           = r.testResults;
+      consoleOutput         = r.consoleOutput;
+      postScriptError       = r.error;
+      updatedEnvVars        = r.updatedEnvVars;
+      updatedCollectionVars = r.updatedCollectionVars;
+      updatedGlobals        = r.updatedGlobals;
+      localVars             = r.updatedLocalVars;
       patchGlobals(r.updatedGlobals);
       await persistGlobals();
       if (verbose && r.consoleOutput.length) r.consoleOutput.forEach(l => console.log(color(`    [post] ${l}`, C.gray)));
@@ -244,24 +256,36 @@ async function executeRequest(
     headers.forEach((v, k) => { reqHeaders[k] = v; });
 
     return {
-      ...base,
-      status,
-      httpStatus: fetchResp.status,
-      durationMs,
-      testResults,
-      consoleOutput,
-      preScriptError,
-      postScriptError,
-      sentRequest:      { headers: reqHeaders, body },
-      receivedResponse: response,
+      result: {
+        ...base,
+        status,
+        httpStatus: fetchResp.status,
+        durationMs,
+        testResults,
+        consoleOutput,
+        preScriptError,
+        postScriptError,
+        sentRequest:      { headers: reqHeaders, body },
+        receivedResponse: response,
+      },
+      updatedEnvVars,
+      updatedCollectionVars,
+      updatedGlobals,
+      updatedLocalVars: localVars,
     };
   } catch (err) {
     return {
-      ...base,
-      status:     'error',
-      durationMs: Date.now() - start,
-      error:      err instanceof Error ? err.message : String(err),
-      preScriptError,
+      result: {
+        ...base,
+        status:     'error',
+        durationMs: Date.now() - start,
+        error:      err instanceof Error ? err.message : String(err),
+        preScriptError,
+      },
+      updatedEnvVars,
+      updatedCollectionVars,
+      updatedGlobals,
+      updatedLocalVars: localVars,
     };
   }
 }
@@ -397,8 +421,10 @@ async function main() {
 
     if (!firstColName) firstColName = col.name;
 
-    const envVars = await buildEnvVars(env);
-    const globals = getGlobals();
+    let runEnvVars        = await buildEnvVars(env);
+    let runGlobals        = getGlobals();
+    let runCollectionVars: Record<string, string> = { ...col.collectionVariables ?? {} };
+    let runLocalVars:     Record<string, string> = {};
 
     console.log(color(`  ┌ ${col.name}`, C.bold, C.white));
 
@@ -409,7 +435,22 @@ async function main() {
 
     let bailed = false;
     for (const item of items) {
-      const result = await executeRequest(item.request, item.collectionVars, envVars, globals, verbose, effectiveTls);
+      const { result, updatedEnvVars, updatedCollectionVars, updatedGlobals, updatedLocalVars } =
+        await executeRequest(
+          item.request,
+          { ...item.collectionVars, ...runCollectionVars },
+          runEnvVars,
+          runGlobals,
+          { ...runLocalVars },
+          verbose,
+          effectiveTls,
+        );
+
+      runEnvVars        = updatedEnvVars;
+      runCollectionVars = updatedCollectionVars;
+      runGlobals        = updatedGlobals;
+      runLocalVars      = updatedLocalVars;
+
       printResult(result, verbose);
       allResults.push(result);
 

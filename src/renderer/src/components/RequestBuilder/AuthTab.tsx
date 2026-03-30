@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react';
 import type { ApiRequest, AuthConfig } from '../../../../shared/types';
+import { VarInput } from '../common/VarInput';
 
 const { electron } = window;
 
@@ -120,33 +121,14 @@ export function AuthTab({ request, onChange }: { request: ApiRequest; onChange: 
 
       {/* ── Bearer ── */}
       {auth.type === 'bearer' && (
-        <div className="flex flex-col gap-1.5">
-          <label className="text-surface-400">Token</label>
-          <div className="flex gap-2">
-            <input
-              type="password"
-              value={secretValue}
-              onChange={e => setSecretValue(e.target.value)}
-              placeholder={auth.tokenSecretRef ? `Keychain ref: "${auth.tokenSecretRef}"` : 'Paste token to store in keychain'}
-              className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
-            />
-            <input
-              value={auth.tokenSecretRef ?? 'API_TOKEN'}
-              onChange={e => setAuth({ tokenSecretRef: e.target.value })}
-              placeholder="Keychain key name"
-              className="w-36 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-            />
-            <button
-              onClick={() => saveSecret(auth.tokenSecretRef ?? 'API_TOKEN')}
-              className="px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded transition-colors"
-            >
-              {saved ? '✓' : 'Save'}
-            </button>
-          </div>
-          <p className="text-surface-400 text-[10px]">
-            Token is stored in your OS keychain — never written to disk.
-          </p>
-        </div>
+        <BearerPanel
+          auth={auth}
+          secretValue={secretValue}
+          setSecretValue={setSecretValue}
+          saved={saved}
+          setAuth={setAuth}
+          saveSecret={saveSecret}
+        />
       )}
 
       {/* ── Basic ── */}
@@ -508,6 +490,74 @@ function BasicCredentialsFields({
       </p>
       {note && (
         <p className="text-surface-600 text-[10px]">{note}</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Bearer panel ─────────────────────────────────────────────────────────────
+
+function BearerPanel({
+  auth, secretValue, setSecretValue, saved, setAuth, saveSecret,
+}: {
+  auth: AuthConfig
+  secretValue: string
+  setSecretValue: (v: string) => void
+  saved: boolean
+  setAuth: (p: Partial<AuthConfig>) => void
+  saveSecret: (ref: string) => Promise<void>
+}) {
+  const [keychainOpen, setKeychainOpen] = useState(!!auth.tokenSecretRef);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1">
+        <label className="text-surface-400">
+          Token{' '}
+          <span className="text-surface-500 text-[10px]">— supports {'{{variables}}'}</span>
+        </label>
+        <VarInput
+          value={auth.token ?? ''}
+          onChange={v => setAuth({ token: v })}
+          placeholder="{{token}}  or paste a raw token"
+          className="bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono text-xs"
+        />
+      </div>
+
+      <button
+        onClick={() => setKeychainOpen(o => !o)}
+        className="text-[10px] text-surface-500 hover:text-surface-300 text-left transition-colors w-fit"
+      >
+        {keychainOpen ? '▾' : '▸'} Store in OS keychain instead
+      </button>
+
+      {keychainOpen && (
+        <div className="flex flex-col gap-1 pl-3 border-l border-surface-800">
+          <p className="text-surface-500 text-[10px]">
+            Paste a raw token here to encrypt it in your OS keychain. Useful for static long-lived API tokens. Leave the value field above empty to use the keychain.
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={secretValue}
+              onChange={e => setSecretValue(e.target.value)}
+              placeholder={auth.tokenSecretRef ? `Stored as "${auth.tokenSecretRef}"` : 'Paste token'}
+              className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
+            />
+            <input
+              value={auth.tokenSecretRef ?? 'API_TOKEN'}
+              onChange={e => setAuth({ tokenSecretRef: e.target.value })}
+              placeholder="Keychain key"
+              className="w-32 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
+            />
+            <button
+              onClick={() => saveSecret(auth.tokenSecretRef ?? 'API_TOKEN')}
+              className="px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded transition-colors"
+            >
+              {saved ? '✓' : 'Save'}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

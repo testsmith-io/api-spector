@@ -156,6 +156,9 @@ interface AppState {
 
   globals: Record<string, string>
 
+  /** Variables set via sp.variables.set() — in-memory session, never saved to disk */
+  sessionVars: Record<string, string>
+
   showGeneratorPanel: boolean
   theme: 'dark' | 'light' | 'system'
   zoom: number
@@ -347,6 +350,7 @@ export const useStore = create<AppState & AppActions>()(
     activeCollectionId: null,
     activeEnvironmentId: localStorage.getItem('activeEnvironmentId') ?? null,
     globals: {},
+    sessionVars: {},
     showGeneratorPanel: false,
     theme: (localStorage.getItem('theme') as 'dark' | 'light' | 'system') ?? 'dark',
     zoom: Number(localStorage.getItem('zoom') ?? '1'),
@@ -382,6 +386,7 @@ export const useStore = create<AppState & AppActions>()(
       s.activeTabId         = null;
       s.activeCollectionId  = null;
       s.globals             = {};
+      s.sessionVars         = {};
       s.runnerResults       = [];
       s.runnerRunning       = false;
       s.runnerModal         = { open: false, collectionId: null, folderId: null, filterTags: [] };
@@ -847,6 +852,8 @@ export const useStore = create<AppState & AppActions>()(
       }
       // Patch globals
       s.globals = { ...s.globals, ...result.updatedGlobals };
+      // Persist local vars (sp.variables.set) in session — in-memory only
+      s.sessionVars = { ...s.sessionVars, ...result.updatedLocalVars };
     }),
 
     // ── Theme & zoom ──────────────────────────────────────────────────────────

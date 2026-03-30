@@ -59,6 +59,7 @@ interface ExecuteOneResult {
   updatedEnvVars:        Record<string, string>
   updatedCollectionVars: Record<string, string>
   updatedGlobals:        Record<string, string>
+  updatedLocalVars:      Record<string, string>
 }
 
 async function executeOne(
@@ -192,6 +193,7 @@ async function executeOne(
       updatedEnvVars        = r.updatedEnvVars;
       updatedCollectionVars = r.updatedCollectionVars;
       updatedGlobals        = r.updatedGlobals;
+      localVars             = r.updatedLocalVars;
       patchGlobals(r.updatedGlobals);
       await persistGlobals();
     }
@@ -225,6 +227,7 @@ async function executeOne(
       updatedEnvVars,
       updatedCollectionVars,
       updatedGlobals,
+      updatedLocalVars: localVars,
     };
   } catch (err) {
     return {
@@ -238,6 +241,7 @@ async function executeOne(
       updatedEnvVars,
       updatedCollectionVars,
       updatedGlobals,
+      updatedLocalVars: localVars,
     };
   }
 }
@@ -262,6 +266,7 @@ export function registerRunnerHandler(ipc: IpcMain): void {
     let runEnvVars        = { ...envVars };
     let runCollectionVars: Record<string, string> = {};
     let runGlobals        = { ...globals };
+    let runLocalVars:     Record<string, string> = {};
 
     /** Scopes whose beforeAll hook failed — all their requests are skipped. */
     const failedScopes  = new Set<string>();
@@ -324,12 +329,12 @@ export function registerRunnerHandler(ipc: IpcMain): void {
       };
       event.sender.send('runner:progress', { requestId: item.request.id, ...runningUpdate });
 
-      const { result, updatedEnvVars, updatedCollectionVars, updatedGlobals } = await executeOne(
+      const { result, updatedEnvVars, updatedCollectionVars, updatedGlobals, updatedLocalVars } = await executeOne(
         item.request,
         { ...item.collectionVars, ...runCollectionVars },
         runEnvVars,
         runGlobals,
-        item.dataRow ?? {},
+        { ...runLocalVars, ...(item.dataRow ?? {}) },
         dispatcher,
         piiMaskPatterns,
       );
@@ -337,6 +342,7 @@ export function registerRunnerHandler(ipc: IpcMain): void {
       runEnvVars        = updatedEnvVars;
       runCollectionVars = updatedCollectionVars;
       runGlobals        = updatedGlobals;
+      runLocalVars      = updatedLocalVars;
 
       // ── Post-run: propagate failures ────────────────────────────────────
       if (isHook && result.status !== 'passed') {

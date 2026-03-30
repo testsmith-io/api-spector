@@ -70,9 +70,11 @@ export function RequestBuilder({ request }: Props) {
     setTabResponse(activeTabId, null, null);
     try {
       const activeEnv = activeEnvironmentId ? environments[activeEnvironmentId]?.data ?? null : null;
-      const collectionVars = activeCollectionId
-        ? (collections[activeCollectionId]?.data.collectionVariables ?? {})
-        : {};
+      const sessionVars    = useStore.getState().sessionVars;
+      const collectionVars = {
+        ...(activeCollectionId ? (collections[activeCollectionId]?.data.collectionVariables ?? {}) : {}),
+        ...sessionVars,
+      };
 
       // Merge folder-level auth and headers (request-level overrides if not 'none')
       const inherited = useStore.getState().getInheritedAuthAndHeaders(request.id);
