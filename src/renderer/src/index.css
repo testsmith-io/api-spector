@@ -118,6 +118,8 @@ body {
 :root.light .hover\:bg-blue-500:hover,
 :root.light .hover\:bg-blue-600:hover,
 :root.light .bg-emerald-600,
+:root.light .bg-emerald-700,
+:root.light .hover\:bg-emerald-600:hover,
 :root.light .bg-red-600,
 :root.light .bg-amber-600,
 :root.light .bg-orange-600,
@@ -127,6 +129,10 @@ body {
 :root.light .bg-violet-700 {
   color: #ffffff !important;
 }
+
+/* Orange — errors */
+:root.light .text-orange-400 { color: #c2410c !important; }  /* orange-700 */
+:root.light .text-orange-500 { color: #9a3412 !important; }  /* orange-800 */
 /* Inputs & textareas need dark placeholder text in light mode */
 :root.light input::placeholder,
 :root.light textarea::placeholder {

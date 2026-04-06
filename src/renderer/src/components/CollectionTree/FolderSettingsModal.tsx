@@ -79,6 +79,7 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
               onChange={setHeaders}
               keyPlaceholder="Header-Name"
               valuePlaceholder="value"
+              headerMode
             />
           )}
         </div>

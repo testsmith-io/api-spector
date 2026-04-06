@@ -2,7 +2,7 @@
 // Licensed for private, internal, non-commercial use only.
 // See LICENSE for full terms.
 
-import { create } from 'zustand';
+import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type {
   Collection,
@@ -258,6 +258,7 @@ interface AppActions {
   renameRequest: (id: string, name: string) => void
   deleteRequest: (collectionId: string, id: string) => void
   duplicateRequest: (collectionId: string, id: string) => void
+  moveRequest: (srcCollectionId: string, requestId: string, destCollectionId: string, destFolderId: string, destIndex?: number) => void
 
   duplicateCollection: (id: string) => void
 
@@ -290,6 +291,7 @@ interface AppActions {
 
   // Collection TLS
   updateCollectionTls: (id: string, tls: TlsSettings | undefined) => void
+  updateCollectionAuthAndHeaders: (id: string, auth: AuthConfig, headers: KeyValuePair[]) => void
 
   // Globals
   setGlobals: (globals: Record<string, string>) => void
@@ -339,7 +341,7 @@ interface AppActions {
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
-export const useStore = create<AppState & AppActions>()(
+export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<AppState & AppActions>()(
   immer((set) => ({
     workspace: null,
     workspacePath: null,
@@ -353,9 +355,9 @@ export const useStore = create<AppState & AppActions>()(
     sessionVars: {},
     showGeneratorPanel: false,
     theme: (localStorage.getItem('theme') as 'dark' | 'light' | 'system') ?? 'dark',
-    zoom: Number(localStorage.getItem('zoom') ?? '1'),
+    zoom: Number(localStorage.getItem('zoom') ?? '1.1'),
     history: [],
-    sidebarTab: 'collections',
+    sidebarTab: 'collections' as AppState['sidebarTab'],
     workspaceSettingsOpen: false,
     mocks: {},
     activeMockId: null,
@@ -607,6 +609,13 @@ export const useStore = create<AppState & AppActions>()(
       s.collections[id].dirty = true;
     }),
 
+    updateCollectionAuthAndHeaders: (id, auth, headers) => set(s => {
+      if (!s.collections[id]) return;
+      s.collections[id].data.auth    = auth;
+      s.collections[id].data.headers = headers;
+      s.collections[id].dirty = true;
+    }),
+
     // ── Folder CRUD ───────────────────────────────────────────────────────────
     addFolder: (collectionId, parentFolderId, name) => set(s => {
       const col = s.collections[collectionId]?.data;
@@ -738,6 +747,47 @@ export const useStore = create<AppState & AppActions>()(
       s.activeTabId = tab.id;
     }),
 
+    moveRequest: (srcCollectionId, requestId, destCollectionId, destFolderId, destIndex?) => set(s => {
+      const srcCol  = s.collections[srcCollectionId]?.data;
+      const destCol = s.collections[destCollectionId]?.data;
+      if (!srcCol || !destCol) return;
+      const req = srcCol.requests[requestId];
+      if (!req) return;
+
+      // Remember source folder + index before removal (to adjust destIndex for same-folder moves)
+      const srcFolder = findFolderContaining(srcCol.rootFolder, requestId);
+      const srcIdx    = srcFolder ? srcFolder.requestIds.indexOf(requestId) : -1;
+
+      // Remove from source folder
+      removeFromFolder(srcCol.rootFolder, requestId);
+      s.collections[srcCollectionId].dirty = true;
+
+      if (srcCollectionId !== destCollectionId) {
+        // Move request data to destination collection
+        delete srcCol.requests[requestId];
+        destCol.requests[requestId] = req;
+        // Update any open tab's collectionId
+        const tab = s.tabs.find(t => t.requestId === requestId);
+        if (tab) tab.collectionId = destCollectionId;
+      }
+
+      const destFolder = findFolder(destCol.rootFolder, destFolderId);
+      if (destFolder) {
+        if (destIndex !== undefined) {
+          // Adjust index when moving within the same folder: removal shifted everything down by 1
+          let adjusted = destIndex;
+          if (srcCollectionId === destCollectionId && srcFolder?.id === destFolder.id && srcIdx < destIndex) {
+            adjusted--;
+          }
+          adjusted = Math.max(0, Math.min(adjusted, destFolder.requestIds.length));
+          destFolder.requestIds.splice(adjusted, 0, requestId);
+        } else {
+          destFolder.requestIds.push(requestId);
+        }
+      }
+      s.collections[destCollectionId].dirty = true;
+    }),
+
     // ── Tags ──────────────────────────────────────────────────────────────────
     updateFolderTags: (collectionId, folderId, tags) => set(s => {
       const col = s.collections[collectionId]?.data;
@@ -777,21 +827,20 @@ export const useStore = create<AppState & AppActions>()(
     // ── Inherited auth/headers ────────────────────────────────────────────────
     getInheritedAuthAndHeaders: (requestId) => {
       const state = useStore.getState();
-      // Find which collection owns this request
       const colEntry = Object.values(state.collections).find(c => c.data.requests[requestId]);
       if (!colEntry) return { auth: null, headers: [] };
+
+      // Start with collection-level settings
+      let inheritedAuth: AuthConfig | null =
+        colEntry.data.auth && colEntry.data.auth.type !== 'none' ? colEntry.data.auth : null;
+      let inheritedHeaders: KeyValuePair[] =
+        colEntry.data.headers?.filter(h => h.enabled && h.key) ?? [];
+
+      // Walk folder path (root → immediate folder); each level overrides the previous
       const path = findFolderPath(colEntry.data.rootFolder, requestId);
-      // Remove the root folder from the path since it has no auth/headers by convention
-      // Walk from root to deepest, collecting auth and headers
-      let inheritedAuth: AuthConfig | null = null;
-      let inheritedHeaders: KeyValuePair[] = [];
       for (const folder of path) {
-        if (folder.auth && folder.auth.type !== 'none') {
-          inheritedAuth = folder.auth;
-        }
-        if (folder.headers && folder.headers.length > 0) {
-          inheritedHeaders = [...inheritedHeaders, ...folder.headers];
-        }
+        if (folder.auth && folder.auth.type !== 'none') inheritedAuth = folder.auth;
+        if (folder.headers?.length) inheritedHeaders = [...inheritedHeaders, ...folder.headers];
       }
       return { auth: inheritedAuth, headers: inheritedHeaders };
     },

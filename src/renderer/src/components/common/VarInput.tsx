@@ -2,7 +2,8 @@
 // Licensed for private, internal, non-commercial use only.
 // See LICENSE for full terms.
 
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { useVarNames } from '../../hooks/useVarNames';
 import { useVarValues } from '../../hooks/useVarValues';
 
@@ -19,35 +20,118 @@ function parseVarTokens(str: string): string[] {
   return found;
 }
 
+// ─── Dropdown rendered in a portal (escapes overflow:hidden parents) ──────────
+
+interface DropdownPos { top: number; left: number; minWidth: number }
+
+function PortalDropdown({
+  pos,
+  items,
+  activeIndex,
+  mode,
+  onPick,
+}: {
+  pos: DropdownPos
+  items: string[]
+  activeIndex: number
+  mode: 'var' | 'static'
+  onPick: (s: string) => void
+}) {
+  return ReactDOM.createPortal(
+    <ul
+      style={{ position: 'fixed', top: pos.top, left: pos.left, minWidth: pos.minWidth, zIndex: 9999 }}
+      className="max-h-52 overflow-y-auto bg-surface-800 border border-surface-600 rounded shadow-xl text-xs"
+    >
+      {items.map((s, i) => (
+        <li key={s}>
+          <button
+            onMouseDown={e => { e.preventDefault(); onPick(s); }}
+            className={`w-full text-left px-3 py-1.5 font-mono transition-colors ${
+              i === activeIndex ? 'bg-blue-600 text-white' : 'hover:bg-surface-700'
+            }`}
+          >
+            {mode === 'var' ? (
+              <>
+                <span className="text-surface-500">{'{{'}</span>
+                <span>{s}</span>
+                <span className="text-surface-500">{'}}'}</span>
+              </>
+            ) : s}
+          </button>
+        </li>
+      ))}
+    </ul>,
+    document.body,
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
+
+type SuggestionMode = 'var' | 'static'
 
 interface Props extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
   value: string
   onChange: (value: string) => void
   /** Classes for the outer wrapper div (layout: flex-1, w-full, etc.) */
   wrapperClassName?: string
+  /**
+   * Optional static suggestions (e.g. HTTP header names or common values).
+   * Shown when the field is focused and the user has not opened a {{var}} query.
+   * The user can always ignore the list and type a custom value.
+   */
+  staticSuggestions?: string[]
 }
 
-export function VarInput({ value, onChange, className, wrapperClassName, ...rest }: Props) {
+export function VarInput({ value, onChange, className, wrapperClassName, staticSuggestions, ...rest }: Props) {
   const varNames  = useVarNames();
   const varValues = useVarValues();
   const inputRef  = useRef<HTMLInputElement>(null);
 
-  const [suggestions,  setSuggestions]  = useState<string[]>([]);
-  const [activeIndex,  setActiveIndex]  = useState(-1);
-  const [showPreview,  setShowPreview]  = useState(false);
+  const [suggestions,    setSuggestions]    = useState<string[]>([]);
+  const [suggestionMode, setSuggestionMode] = useState<SuggestionMode>('var');
+  const [activeIndex,    setActiveIndex]    = useState(-1);
+  const [dropPos,        setDropPos]        = useState<DropdownPos | null>(null);
+  const [showPreview,    setShowPreview]    = useState(false);
+
+  // Recalculate portal position whenever suggestions appear or window resizes
+  useEffect(() => {
+    if (suggestions.length === 0) { setDropPos(null); return; }
+    const el = inputRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setDropPos({ top: r.bottom + 2, left: r.left, minWidth: r.width });
+  }, [suggestions.length]);
 
   // ── Autocomplete ───────────────────────────────────────────────────────────
 
   function detectQuery(val: string, cursor: number) {
-    const before = val.slice(0, cursor);
-    const match  = /\{\{(\w*)$/.exec(before);
-    if (!match) { setSuggestions([]); return; }
+    const before   = val.slice(0, cursor);
+    const varMatch = /\{\{(\w*)$/.exec(before);
 
-    const q        = match[1].toLowerCase();
-    const filtered = varNames.filter(n => n.toLowerCase().includes(q));
-    setSuggestions(filtered);
-    setActiveIndex(-1);
+    if (varMatch) {
+      const q        = varMatch[1].toLowerCase();
+      const filtered = varNames.filter(n => n.toLowerCase().includes(q));
+      setSuggestions(filtered);
+      setSuggestionMode('var');
+      setActiveIndex(-1);
+    } else if (staticSuggestions) {
+      const q        = val.toLowerCase();
+      const filtered = q
+        ? staticSuggestions
+            .filter(s => s.toLowerCase().includes(q))
+            .sort((a, b) => {
+              const aP = a.toLowerCase().startsWith(q) ? 0 : 1;
+              const bP = b.toLowerCase().startsWith(q) ? 0 : 1;
+              return aP - bP;
+            })
+            .slice(0, 20)
+        : staticSuggestions.slice(0, 20);
+      setSuggestions(filtered);
+      setSuggestionMode('static');
+      setActiveIndex(-1);
+    } else {
+      setSuggestions([]);
+    }
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -55,6 +139,11 @@ export function VarInput({ value, onChange, className, wrapperClassName, ...rest
     const cursor = e.target.selectionStart ?? newVal.length;
     onChange(newVal);
     detectQuery(newVal, cursor);
+  }
+
+  function handleFocus(e: React.FocusEvent<HTMLInputElement>) {
+    detectQuery(value, e.target.selectionStart ?? value.length);
+    rest.onFocus?.(e);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -74,7 +163,14 @@ export function VarInput({ value, onChange, className, wrapperClassName, ...rest
     }
   }
 
-  const apply = useCallback((name: string) => {
+  const apply = useCallback((suggestion: string) => {
+    if (suggestionMode === 'static') {
+      onChange(suggestion);
+      setSuggestions([]);
+      return;
+    }
+
+    // var mode: splice {{name}} at cursor position
     const el     = inputRef.current;
     const cursor = el?.selectionStart ?? value.length;
     const before = value.slice(0, cursor);
@@ -82,27 +178,31 @@ export function VarInput({ value, onChange, className, wrapperClassName, ...rest
     const match  = /\{\{(\w*)$/.exec(before);
     if (!match) return;
 
-    const newVal    = before.slice(0, match.index) + `{{${name}}}` + after;
-    const newCursor = match.index + name.length + 4;
+    const newVal    = before.slice(0, match.index) + `{{${suggestion}}}` + after;
+    const newCursor = match.index + suggestion.length + 4;
     onChange(newVal);
     setSuggestions([]);
     requestAnimationFrame(() => el?.setSelectionRange(newCursor, newCursor));
-  }, [value, onChange]);
+  }, [suggestionMode, value, onChange]);
 
-  function handleBlur() {
+  function handleBlur(e: React.FocusEvent<HTMLInputElement>) {
     setTimeout(() => setSuggestions([]), 150);
+    setShowPreview(false);
+    rest.onBlur?.(e);
   }
 
   // ── Hover preview ──────────────────────────────────────────────────────────
 
-  const tokens        = parseVarTokens(value);
-  const hasVars       = tokens.length > 0;
-  const previewItems  = tokens.map(name => ({
+  const tokens       = parseVarTokens(value);
+  const hasVars      = tokens.length > 0;
+  const previewItems = tokens.map(name => ({
     name,
     resolved: varValues[name] ?? null,
   }));
 
   // ── Render ─────────────────────────────────────────────────────────────────
+
+  const { onFocus: _f, onBlur: _b, ...inputRest } = rest;
 
   return (
     <div
@@ -115,31 +215,21 @@ export function VarInput({ value, onChange, className, wrapperClassName, ...rest
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
+        onFocus={handleFocus}
         onBlur={handleBlur}
         className={`w-full ${className ?? ''}`}
-        {...rest}
+        {...inputRest}
       />
 
-      {/* {{var}} autocomplete dropdown */}
-      {suggestions.length > 0 && (
-        <ul className="absolute left-0 top-full mt-0.5 z-50 min-w-[160px] max-h-44 overflow-y-auto bg-surface-800 border border-surface-600 rounded shadow-xl text-xs">
-          {suggestions.map((name, i) => (
-            <li key={name}>
-              <button
-                onMouseDown={e => { e.preventDefault(); apply(name); }}
-                className={`w-full text-left px-3 py-1.5 font-mono transition-colors ${
-                  i === activeIndex
-                    ? 'bg-blue-600 text-white'
-                    : 'hover:bg-surface-700'
-                }`}
-              >
-                <span className="text-surface-500">{'{{'}</span>
-                <span>{name}</span>
-                <span className="text-surface-500">{'}}'}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+      {/* Autocomplete dropdown — rendered in a portal to escape overflow:hidden parents */}
+      {suggestions.length > 0 && dropPos && (
+        <PortalDropdown
+          pos={dropPos}
+          items={suggestions}
+          activeIndex={activeIndex}
+          mode={suggestionMode}
+          onPick={apply}
+        />
       )}
 
       {/* Variable hover preview */}
