@@ -13,6 +13,7 @@ export function HeadersTab({ request, onChange }: { request: ApiRequest; onChang
       onChange={rows => onChange({ headers: rows })}
       keyPlaceholder="Header-Name"
       valuePlaceholder="value"
+      headerMode
     />
   );
 }

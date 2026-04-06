@@ -2,13 +2,23 @@
 // Licensed for private, internal, non-commercial use only.
 // See LICENSE for full terms.
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext, createContext } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '../../store';
 import type { Folder, Collection, ApiRequest } from '../../../../shared/types';
 import { MethodBadge } from '../common/MethodBadge';
 import { FolderSettingsModal } from './FolderSettingsModal';
 import { CollectionSettingsModal } from './CollectionSettingsModal';
+
+// ─── Drag-and-drop context ────────────────────────────────────────────────────
+
+interface DragState { requestId: string; collectionId: string }
+
+const DragCtx = createContext<{
+  dragging:   DragState | null
+  setDragging: (d: DragState | null) => void
+  onDrop:     (destCollectionId: string, destFolderId: string, destIndex?: number) => void
+}>({ dragging: null, setDragging: () => {}, onDrop: () => {} });
 
 // ─── Inline rename ────────────────────────────────────────────────────────────
 
@@ -263,15 +273,25 @@ export function CollectionTree() {
   const updateRequest     = useStore(s => s.updateRequest);
   const openRunner        = useStore(s => s.openRunner);
 
+  const moveRequest = useStore(s => s.moveRequest);
+
   const colList = Object.values(collections);
   const [pendingConfirm, setPendingConfirm] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [newRequestId, setNewRequestId] = useState<string | null>(null);
+  const [dragging, setDragging] = useState<DragState | null>(null);
 
   function confirmThen(message: string, action: () => void) {
     setPendingConfirm({ message, onConfirm: () => { action(); setPendingConfirm(null); } });
   }
 
+  function onDrop(destCollectionId: string, destFolderId: string, destIndex?: number) {
+    if (!dragging) return;
+    moveRequest(dragging.collectionId, dragging.requestId, destCollectionId, destFolderId, destIndex);
+    setDragging(null);
+  }
+
   return (
+    <DragCtx.Provider value={{ dragging, setDragging, onDrop }}>
     <div className="flex flex-col flex-1 min-h-0 select-none">
       {pendingConfirm && (
         <ConfirmDialog
@@ -321,6 +341,7 @@ export function CollectionTree() {
         )}
       </div>
     </div>
+    </DragCtx.Provider>
   );
 }
 
@@ -368,6 +389,8 @@ function CollectionNode({
   const [renaming, setRenaming] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [expandCtrl, setExpandCtrl] = useState<ExpandCtrl>({ value: true, seq: 0 });
+  const [dropOver, setDropOver] = useState(false);
+  const dragCtx = useContext(DragCtx);
 
   function expandAll()   { setExpandCtrl(c => ({ value: true,  seq: c.seq + 1 })); }
   function collapseAll() { setExpandCtrl(c => ({ value: false, seq: c.seq + 1 })); }
@@ -377,8 +400,11 @@ function CollectionNode({
       <div
         className={`group flex items-start gap-1 px-2 py-1.5 cursor-pointer hover:bg-surface-800 transition-colors ${
           isActive ? 'text-[var(--text-primary)]' : 'text-surface-400'
-        }`}
+        } ${dropOver ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
         onClick={() => { onSelectCollection(); setExpanded(e => !e); }}
+        onDragOver={dragCtx.dragging ? e => { e.preventDefault(); setDropOver(true); } : undefined}
+        onDragLeave={() => setDropOver(false)}
+        onDrop={e => { e.preventDefault(); setDropOver(false); dragCtx.onDrop(col.id, col.rootFolder.id); }}
       >
         <span className="text-[10px] w-3 text-center shrink-0 mt-0.5">{expanded ? '▾' : '▸'}</span>
 
@@ -478,6 +504,8 @@ function FolderRow({
   const [renaming, setRenaming] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [addingTag, setAddingTag] = useState(false);
+  const [dropOver, setDropOver] = useState(false);
+  const dragCtx = useContext(DragCtx);
   const tags = folder.tags ?? [];
   const indent = depth * 12 + 8;
   const hasInheritedConfig = (folder.auth && folder.auth.type !== 'none') || (folder.headers && folder.headers.length > 0);
@@ -485,9 +513,12 @@ function FolderRow({
   return (
     <div>
       <div
-        className="group flex items-start gap-1 py-1 hover:bg-surface-800 transition-colors cursor-pointer text-surface-400"
+        className={`group flex items-start gap-1 py-1 hover:bg-surface-800 transition-colors cursor-pointer text-surface-400 ${dropOver ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
         style={{ paddingLeft: indent }}
         onClick={() => setExpanded(e => !e)}
+        onDragOver={dragCtx.dragging ? e => { e.preventDefault(); setDropOver(true); } : undefined}
+        onDragLeave={() => setDropOver(false)}
+        onDrop={e => { e.preventDefault(); setDropOver(false); dragCtx.onDrop(collectionId, folder.id); }}
       >
         <span className="text-[10px] w-3 text-center shrink-0 mt-0.5">{expanded ? '▾' : '▸'}</span>
         <FolderIcon className={`shrink-0 mt-0.5 ${hasInheritedConfig ? 'text-blue-500' : 'text-amber-600'}`} />
@@ -617,13 +648,16 @@ function FolderContents({
         </FolderRow>
       ))}
 
-      {folder.requestIds.map(reqId => {
+      {folder.requestIds.map((reqId, reqIndex) => {
         const req = requests[reqId];
         if (!req) return null;
         return (
           <RequestRow
             key={req.id}
             reqId={req.id}
+            collectionId={collectionId}
+            folderId={folder.id}
+            reqIndex={reqIndex}
             name={req.name}
             method={req.method}
             hookType={req.hookType}
@@ -661,10 +695,13 @@ const HOOK_COLORS: Record<NonNullable<ApiRequest['hookType']>, string> = {
 };
 
 function RequestRow({
-  reqId: _reqId, name, method, hookType, tags, isActive, indent, autoRename = false,
+  reqId, collectionId, folderId, reqIndex, name, method, hookType, tags, isActive, indent, autoRename = false,
   onSelect, onRename, onDelete, onDuplicate, onUpdateTags, onSetHookType,
 }: {
   reqId: string
+  collectionId: string
+  folderId: string
+  reqIndex: number
   name: string
   method: string
   hookType?: ApiRequest['hookType']
@@ -681,6 +718,8 @@ function RequestRow({
 }) {
   const [renaming, setRenaming] = useState(autoRename);
   const [addingTag, setAddingTag] = useState(false);
+  const [dropPos, setDropPos] = useState<'before' | 'after' | null>(null);
+  const dragCtx = useContext(DragCtx);
 
   const hookMenuItems: MenuItem[] = [
     ...((['beforeAll', 'before', 'after', 'afterAll'] as const).map(ht => ({
@@ -690,15 +729,38 @@ function RequestRow({
     }))),
   ];
 
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
+    if (!dragCtx.dragging || dragCtx.dragging.requestId === reqId) return;
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setDropPos(e.clientY < rect.top + rect.height / 2 ? 'before' : 'after');
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    const insertIndex = dropPos === 'before' ? reqIndex : reqIndex + 1;
+    dragCtx.onDrop(collectionId, folderId, insertIndex);
+    setDropPos(null);
+  }
+
   return (
-    <div
-      className={`group flex items-start gap-1.5 py-1 pr-1 rounded-sm cursor-pointer transition-colors ${
-        isActive ? 'bg-surface-800 text-[var(--text-primary)]' : 'text-surface-300 hover:bg-surface-800'
-      }`}
-      style={{ paddingLeft: indent }}
-      onClick={onSelect}
-      onDoubleClick={() => setRenaming(true)}
-    >
+    <div className="relative">
+      {dropPos === 'before' && <div className="absolute top-0 inset-x-0 h-0.5 bg-blue-500 z-10 pointer-events-none" />}
+      <div
+        draggable
+        className={`group flex items-start gap-1.5 py-1 pr-1 rounded-sm cursor-pointer transition-colors ${
+          isActive ? 'bg-surface-800 text-[var(--text-primary)]' : 'text-surface-300 hover:bg-surface-800'
+        }`}
+        style={{ paddingLeft: indent }}
+        onClick={onSelect}
+        onDoubleClick={() => setRenaming(true)}
+        onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; dragCtx.setDragging({ requestId: reqId, collectionId }); }}
+        onDragEnd={() => { dragCtx.setDragging(null); setDropPos(null); }}
+        onDragOver={handleDragOver}
+        onDragLeave={() => setDropPos(null)}
+        onDrop={handleDrop}
+      >
       <MethodBadge method={method} size="xs" />
 
       <div className="flex-1 min-w-0">
@@ -742,6 +804,8 @@ function RequestRow({
           { type: 'item', label: 'Delete', icon: <TrashIcon />, danger: true, onClick: onDelete },
         ]} />
       </div>
+      {dropPos === 'after' && <div className="absolute bottom-0 inset-x-0 h-0.5 bg-blue-500 z-10 pointer-events-none" />}
+    </div>
     </div>
   );
 }

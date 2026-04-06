@@ -5,15 +5,18 @@
 import React, { useState } from 'react';
 import type { KeyValuePair } from '../../../../shared/types';
 import { VarInput } from '../common/VarInput';
+import { HEADER_NAMES, getValueSuggestions } from './header-suggestions';
 
 interface Props {
   rows: KeyValuePair[]
   onChange: (rows: KeyValuePair[]) => void
   keyPlaceholder?: string
   valuePlaceholder?: string
+  /** When true, provides autocomplete for HTTP header names and common values. */
+  headerMode?: boolean
 }
 
-export function KVTable({ rows, onChange, keyPlaceholder = 'Key', valuePlaceholder = 'Value' }: Props) {
+export function KVTable({ rows, onChange, keyPlaceholder = 'Key', valuePlaceholder = 'Value', headerMode }: Props) {
   // Track which rows have their description input visible.
   // Initialise with indices of rows that already have a description.
   const [descVisible, setDescVisible] = useState<Set<number>>(
@@ -70,6 +73,7 @@ export function KVTable({ rows, onChange, keyPlaceholder = 'Key', valuePlacehold
               placeholder={keyPlaceholder}
               wrapperClassName="flex-1"
               className="bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
+              staticSuggestions={headerMode ? HEADER_NAMES : undefined}
             />
             <VarInput
               value={row.value}
@@ -77,6 +81,7 @@ export function KVTable({ rows, onChange, keyPlaceholder = 'Key', valuePlacehold
               placeholder={valuePlaceholder}
               wrapperClassName="flex-1"
               className="bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
+              staticSuggestions={headerMode ? (getValueSuggestions(row.key) ?? undefined) : undefined}
             />
             {/* Description toggle */}
             <button

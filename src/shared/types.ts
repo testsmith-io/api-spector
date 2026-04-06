@@ -198,6 +198,10 @@ export interface Collection {
   dataSet?: DataSet
   /** TLS overrides applied to every request in this collection (takes priority over workspace TLS). */
   tls?: TlsSettings
+  /** Auth inherited by all requests in this collection (can be overridden at folder or request level). */
+  auth?: AuthConfig
+  /** Headers inherited by all requests in this collection (can be overridden at folder or request level). */
+  headers?: KeyValuePair[]
 }
 
 // ─── Environment / Variables ──────────────────────────────────────────────────

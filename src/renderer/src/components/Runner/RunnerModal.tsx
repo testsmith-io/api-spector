@@ -241,7 +241,7 @@ export function RunnerModal() {
             <button
               onClick={run}
               disabled={runnerRunning}
-              className="px-4 py-1.5 text-xs bg-emerald-700 hover:bg-emerald-600 disabled:bg-surface-800 disabled:text-surface-400 rounded font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap"
+              className="px-4 py-1.5 text-xs text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-surface-800 disabled:text-surface-400 rounded font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"/>
@@ -383,7 +383,7 @@ export function RunnerModal() {
 
         {/* Summary bar */}
         {summary && (
-          <div className="flex items-center gap-3 px-4 py-2 border-t border-surface-800 bg-surface-950/50 flex-shrink-0 text-xs">
+          <div className="flex items-center gap-3 px-4 py-2 border-t border-surface-800 bg-surface-800/30 flex-shrink-0 text-xs">
             <span className="text-emerald-400 font-medium">{summary.passed} passed</span>
             {summary.failed > 0 && <span className="text-red-400 font-medium">{summary.failed} failed</span>}
             {summary.errors > 0 && <span className="text-orange-400 font-medium">{summary.errors} errors</span>}
