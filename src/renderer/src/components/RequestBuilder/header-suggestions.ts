@@ -41,7 +41,7 @@ export const HEADER_NAMES: string[] = [
   'Upgrade',
   'Via',
   'Warning',
-]
+];
 
 /** Common values for headers that have well-known value sets. */
 export const HEADER_VALUE_SUGGESTIONS: Record<string, string[]> = {
@@ -107,9 +107,9 @@ export const HEADER_VALUE_SUGGESTIONS: Record<string, string[]> = {
     'websocket',
     'HTTP/2.0',
   ],
-}
+};
 
 /** Returns value suggestions for a given header name, or undefined if none. */
-export function getValueSuggestions(headerName: string): string[] | undefined {
-  return HEADER_VALUE_SUGGESTIONS[headerName.toLowerCase()]
+export function getValueSuggestions ( headerName: string ): string[] | undefined {
+  return HEADER_VALUE_SUGGESTIONS[headerName.toLowerCase()];
 }
