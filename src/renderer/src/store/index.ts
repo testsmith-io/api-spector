@@ -120,6 +120,7 @@ export interface AppTab {
   lastResponse: ResponsePayload | null
   lastScriptResult: ScriptExecutionMeta | null
   lastSentRequest: SentRequest | null
+  lastHookResults: RunRequestResult[] | null
   isSending: boolean
   requestTab: 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'schema' | 'contract'
 }
@@ -132,6 +133,7 @@ function makeTab(requestId: string, collectionId: string): AppTab {
     lastResponse: null,
     lastScriptResult: null,
     lastSentRequest: null,
+    lastHookResults: null,
     isSending: false,
     requestTab: 'params',
     scriptTab: 'pre',
@@ -222,6 +224,7 @@ interface AppActions {
   closeTab: (tabId: string) => void
   setActiveTabId: (id: string) => void
   setTabResponse: (tabId: string, response: ResponsePayload | null, scriptResult: ScriptExecutionMeta | null, sentRequest?: SentRequest | null) => void
+  setTabHookResults: (tabId: string, results: RunRequestResult[] | null) => void
   setTabSending: (tabId: string, sending: boolean) => void
   setTabRequestTab: (tabId: string, tab: AppTab['requestTab']) => void
   setTabScriptTab: (tabId: string, scriptTab: 'pre' | 'post') => void
@@ -456,6 +459,11 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
         tab.lastScriptResult = scriptResult;
         if (sentRequest !== undefined) tab.lastSentRequest = sentRequest ?? null;
       }
+    }),
+
+    setTabHookResults: (tabId, results) => set(s => {
+      const tab = s.tabs.find(t => t.id === tabId);
+      if (tab) tab.lastHookResults = results;
     }),
 
     setTabSending: (tabId, sending) => set(s => {

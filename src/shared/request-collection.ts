@@ -169,6 +169,46 @@ export function collectAllTags(folder: Folder, requests: Collection['requests'])
 }
 
 /**
+ * Find the path of folders from the root to (and including) the folder that
+ * directly contains requestId. Returns [] if not found.
+ */
+function folderPathTo(root: Folder, requestId: string): Folder[] {
+  if (root.requestIds.includes(requestId)) return [root];
+  for (const sub of root.folders) {
+    const path = folderPathTo(sub, requestId);
+    if (path.length > 0) return [root, ...path];
+  }
+  return [];
+}
+
+/**
+ * Return the hooks that should wrap a single request execution.
+ * before: [outermost scope → innermost scope], beforeAll then before within each scope.
+ * after:  [innermost scope → outermost scope], after then afterAll within each scope.
+ */
+export function getHooksForRequest(
+  requestId: string,
+  collection: Collection,
+): { before: ApiRequest[]; after: ApiRequest[] } {
+  const path = folderPathTo(collection.rootFolder, requestId);
+
+  const before: ApiRequest[] = [];
+  const afterReversed: ApiRequest[] = [];
+
+  for (const folder of path) {
+    const reqs     = folder.requestIds.map(id => collection.requests[id]).filter(Boolean) as ApiRequest[];
+    const bAll     = reqs.filter(r => r.hookType === 'beforeAll');
+    const bEach    = reqs.filter(r => r.hookType === 'before');
+    const aEach    = reqs.filter(r => r.hookType === 'after');
+    const aAll     = reqs.filter(r => r.hookType === 'afterAll');
+    before.push(...bAll, ...bEach);
+    afterReversed.push(...aEach, ...aAll);
+  }
+
+  return { before, after: afterReversed.reverse() };
+}
+
+/**
  * Build a flat RunnerItem list with hooks interleaved in the correct order.
  * Hooks are requests that have request.hookType set, scoped to their folder.
  */
