@@ -4,7 +4,8 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../../store';
-import type { ApiRequest, HttpMethod, KeyValuePair } from '../../../../shared/types';
+import type { ApiRequest, HttpMethod, KeyValuePair, RunRequestResult } from '../../../../shared/types';
+import { getHooksForRequest } from '../../../../shared/request-collection';
 import { ParamsTab } from './ParamsTab';
 import { VarInput } from '../common/VarInput';
 import { HeadersTab } from './HeadersTab';
@@ -42,6 +43,7 @@ export function RequestBuilder({ request }: Props) {
   const globals             = useStore(s => s.globals);
   const activeTabId         = useStore(s => s.activeTabId);
   const setTabResponse      = useStore(s => s.setTabResponse);
+  const setTabHookResults   = useStore(s => s.setTabHookResults);
   const setTabSending       = useStore(s => s.setTabSending);
   const setTabRequestTab    = useStore(s => s.setTabRequestTab);
   const addHistoryEntry     = useStore(s => s.addHistoryEntry);
@@ -59,6 +61,15 @@ export function RequestBuilder({ request }: Props) {
   }
 
   const [editingName, setEditingName] = useState(false);
+  const [runHooks, setRunHooks] = useState(() => localStorage.getItem('runHooks') !== 'false');
+
+  function toggleRunHooks() {
+    setRunHooks(prev => {
+      const next = !prev;
+      localStorage.setItem('runHooks', String(next));
+      return next;
+    });
+  }
 
   function update(patch: Partial<ApiRequest>) {
     updateRequest(request.id, patch);
@@ -68,15 +79,28 @@ export function RequestBuilder({ request }: Props) {
     if (!activeTabId) return;
     setTabSending(activeTabId, true);
     setTabResponse(activeTabId, null, null);
+    setTabHookResults(activeTabId, null);
+    const collectedHookResults: RunRequestResult[] = [];
     try {
       const activeEnv = activeEnvironmentId ? environments[activeEnvironmentId]?.data ?? null : null;
-      const sessionVars    = useStore.getState().sessionVars;
-      const collectionVars = {
+      const sessionVars = useStore.getState().sessionVars;
+      const tls = collectionTls
+        ? { ...workspaceSettings?.tls, ...collectionTls }
+        : workspaceSettings?.tls;
+      const basePayload = {
+        environment:     activeEnv,
+        proxy:           workspaceSettings?.proxy,
+        tls,
+        piiMaskPatterns: workspaceSettings?.piiMaskPatterns,
+      };
+
+      let collectionVars: Record<string, string> = {
         ...(activeCollectionId ? (collections[activeCollectionId]?.data.collectionVariables ?? {}) : {}),
         ...sessionVars,
       };
+      let liveGlobals = { ...globals };
 
-      // Merge folder-level auth and headers (request-level overrides if not 'none')
+      // Merge folder/collection-level auth and headers for the main request
       const inherited = useStore.getState().getInheritedAuthAndHeaders(request.id);
       const mergedAuth: typeof request.auth =
         request.auth.type !== 'none' ? request.auth : (inherited.auth ?? request.auth);
@@ -84,26 +108,59 @@ export function RequestBuilder({ request }: Props) {
         ...inherited.headers.filter(h => h.enabled),
         ...request.headers,
       ];
-      const mergedRequest = {
-        ...request,
-        auth: mergedAuth,
-        headers: mergedHeaders,
-      };
+      const mergedRequest = { ...request, auth: mergedAuth, headers: mergedHeaders };
 
+      // ── Resolve applicable hooks ────────────────────────────────────────────
+      const collection = activeCollectionId ? collections[activeCollectionId]?.data : null;
+      const hooks = (runHooks && collection)
+        ? getHooksForRequest(request.id, collection)
+        : { before: [], after: [] };
+
+      // ── Run before hooks ────────────────────────────────────────────────────
+      for (const hook of hooks.before) {
+        const start = Date.now();
+        try {
+          const r = await electron.sendRequest({ ...basePayload, request: hook, collectionVars, globals: liveGlobals });
+          applyScriptUpdates(r.scriptResult);
+          collectionVars = { ...collectionVars, ...r.scriptResult.updatedCollectionVars };
+          liveGlobals    = { ...liveGlobals,    ...r.scriptResult.updatedGlobals };
+          const allPassed = r.scriptResult.testResults.every((t: { passed: boolean }) => t.passed);
+          collectedHookResults.push({
+            requestId:   hook.id,
+            name:        hook.name,
+            method:      hook.method,
+            resolvedUrl: r.scriptResult.resolvedUrl,
+            status:      r.scriptResult.postScriptError ? 'error' : (r.scriptResult.testResults.length > 0 ? (allPassed ? 'passed' : 'failed') : 'passed'),
+            httpStatus:  r.response.status,
+            durationMs:  Date.now() - start,
+            isHook:      true,
+            hookType:    hook.hookType,
+            testResults: r.scriptResult.testResults,
+            consoleOutput: r.scriptResult.consoleOutput,
+            preScriptError:  r.scriptResult.preScriptError,
+            postScriptError: r.scriptResult.postScriptError,
+          });
+        } catch (err) {
+          collectedHookResults.push({
+            requestId: hook.id, name: hook.name, method: hook.method, resolvedUrl: hook.url,
+            status: 'error', durationMs: Date.now() - start, isHook: true, hookType: hook.hookType,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      // ── Run main request ────────────────────────────────────────────────────
       const result = await electron.sendRequest({
+        ...basePayload,
         request: mergedRequest,
-        environment: activeEnv,
         collectionVars,
-        globals,
-        proxy:           workspaceSettings?.proxy,
-        tls:             collectionTls
-          ? { ...workspaceSettings?.tls, ...collectionTls }
-          : workspaceSettings?.tls,
-        piiMaskPatterns: workspaceSettings?.piiMaskPatterns,
+        globals: liveGlobals,
       });
 
       setTabResponse(activeTabId, result.response, result.scriptResult, result.sentRequest);
       applyScriptUpdates(result.scriptResult);
+      collectionVars = { ...collectionVars, ...result.scriptResult.updatedCollectionVars };
+      liveGlobals    = { ...liveGlobals,    ...result.scriptResult.updatedGlobals };
 
       addHistoryEntry({
         id: crypto.randomUUID(),
@@ -114,6 +171,43 @@ export function RequestBuilder({ request }: Props) {
         environmentName: activeEnv?.name ?? null,
         scriptResult: result.scriptResult,
       });
+
+      // ── Run after hooks ─────────────────────────────────────────────────────
+      for (const hook of hooks.after) {
+        const start = Date.now();
+        try {
+          const r = await electron.sendRequest({ ...basePayload, request: hook, collectionVars, globals: liveGlobals });
+          applyScriptUpdates(r.scriptResult);
+          collectionVars = { ...collectionVars, ...r.scriptResult.updatedCollectionVars };
+          liveGlobals    = { ...liveGlobals,    ...r.scriptResult.updatedGlobals };
+          const allPassed = r.scriptResult.testResults.every((t: { passed: boolean }) => t.passed);
+          collectedHookResults.push({
+            requestId:   hook.id,
+            name:        hook.name,
+            method:      hook.method,
+            resolvedUrl: r.scriptResult.resolvedUrl,
+            status:      r.scriptResult.postScriptError ? 'error' : (r.scriptResult.testResults.length > 0 ? (allPassed ? 'passed' : 'failed') : 'passed'),
+            httpStatus:  r.response.status,
+            durationMs:  Date.now() - start,
+            isHook:      true,
+            hookType:    hook.hookType,
+            testResults: r.scriptResult.testResults,
+            consoleOutput: r.scriptResult.consoleOutput,
+            preScriptError:  r.scriptResult.preScriptError,
+            postScriptError: r.scriptResult.postScriptError,
+          });
+        } catch (err) {
+          collectedHookResults.push({
+            requestId: hook.id, name: hook.name, method: hook.method, resolvedUrl: hook.url,
+            status: 'error', durationMs: Date.now() - start, isHook: true, hookType: hook.hookType,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      if (collectedHookResults.length > 0) {
+        setTabHookResults(activeTabId, collectedHookResults);
+      }
     } finally {
       setTabSending(activeTabId, false);
     }
@@ -199,15 +293,28 @@ export function RequestBuilder({ request }: Props) {
           className="bg-surface-800 border border-surface-700 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 font-mono placeholder-surface-700"
         />
 
-        {/* Send button (HTTP only) */}
+        {/* Hooks toggle + Send button (HTTP only) */}
         {!isWs && (
-          <button
-            onClick={sendRequest}
-            disabled={isSending || !request.url}
-            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-surface-800 disabled:text-surface-400 rounded text-sm font-medium transition-colors min-w-[72px]"
-          >
-            {isSending ? '...' : 'Send'}
-          </button>
+          <>
+            <button
+              onClick={toggleRunHooks}
+              title={runHooks ? 'Hooks enabled — click to disable' : 'Hooks disabled — click to enable'}
+              className={`px-2 py-1.5 rounded text-xs font-medium transition-colors border ${
+                runHooks
+                  ? 'border-violet-500 text-violet-400 hover:bg-violet-500/10'
+                  : 'border-surface-700 text-surface-500 hover:text-surface-300'
+              }`}
+            >
+              hooks
+            </button>
+            <button
+              onClick={sendRequest}
+              disabled={isSending || !request.url}
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-surface-800 disabled:text-surface-400 rounded text-sm font-medium transition-colors min-w-[72px]"
+            >
+              {isSending ? '...' : 'Send'}
+            </button>
+          </>
         )}
       </div>
 
