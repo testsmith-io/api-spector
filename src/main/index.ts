@@ -2,7 +2,7 @@
 // Licensed for private, internal, non-commercial use only.
 // See LICENSE for full terms.
 
-import { app, BrowserWindow, ipcMain, nativeImage, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell } from 'electron';
 
 // Managed / locked-down machines (corporate Windows with EDR software, or
 // Linux with user-namespaces disabled) can hit "permission denied" with
@@ -138,6 +138,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(async () => {
+  if (process.platform !== 'darwin') Menu.setApplicationMenu(null);
   await initSecretStore(app.getPath('userData'));
   registerFileHandlers(ipcMain);
   registerRequestHandler(ipcMain);
