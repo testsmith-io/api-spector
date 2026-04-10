@@ -21,7 +21,6 @@ import {
   fetchOAuth2Token,
 } from '../auth-builder';
 import { maskPii, maskHeaders } from './request-handler';
-import { buildProxyUri } from '../proxy-utils';
 
 // ─── Build undici dispatcher (proxy + TLS) ────────────────────────────────────
 
