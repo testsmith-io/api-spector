@@ -174,8 +174,9 @@ export async function buildDispatcher(
 
   if (proxy?.url) {
     return new ProxyAgent({
-      uri: buildProxyUri(proxy),
-      ...(hasTls ? { requestTls: connectOpts, proxyTls: connectOpts } : {}),
+      uri: proxyUri,
+      requestTls: proxyConnect,
+      proxyTls: proxyConnect,
     } as ConstructorParameters<typeof ProxyAgent>[0]);
   }
 

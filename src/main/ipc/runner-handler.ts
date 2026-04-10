@@ -21,7 +21,6 @@ import {
   fetchOAuth2Token,
 } from '../auth-builder';
 import { maskPii, maskHeaders } from './request-handler';
-import { buildProxyUri } from '../proxy-utils';
 
 // ─── Build undici dispatcher (proxy + TLS) ────────────────────────────────────
 
@@ -42,8 +41,9 @@ async function buildDispatcher(
 
   if (proxy?.url) {
     return new ProxyAgent({
-      uri: buildProxyUri(proxy),
-      ...(hasTls ? { requestTls: connectOpts, proxyTls: connectOpts } : {}),
+      uri: proxyUri,
+      requestTls: proxyConnect,
+      proxyTls: proxyConnect,
     } as ConstructorParameters<typeof ProxyAgent>[0]);
   }
   if (hasTls) return new Agent({ connect: connectOpts } as ConstructorParameters<typeof Agent>[0]);
