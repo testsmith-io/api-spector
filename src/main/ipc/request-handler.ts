@@ -110,7 +110,8 @@ export async function buildDispatcher(
     const proxyConnect = { rejectUnauthorized: false, ...connectOpts };
     return new ProxyAgent({
       uri: proxyUri,
-      connect: proxyConnect,
+      requestTls: proxyConnect,
+      proxyTls: proxyConnect,
     } as ConstructorParameters<typeof ProxyAgent>[0]);
   }
 

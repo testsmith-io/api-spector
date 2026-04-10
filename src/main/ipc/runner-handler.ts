@@ -49,7 +49,8 @@ async function buildDispatcher(
     const proxyConnect = { rejectUnauthorized: false, ...connectOpts };
     return new ProxyAgent({
       uri: proxyUri,
-      connect: proxyConnect,
+      requestTls: proxyConnect,
+      proxyTls: proxyConnect,
     } as ConstructorParameters<typeof ProxyAgent>[0]);
   }
   if (hasTls) return new Agent({ connect: connectOpts } as ConstructorParameters<typeof Agent>[0]);
