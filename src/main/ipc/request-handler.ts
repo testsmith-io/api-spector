@@ -104,9 +104,13 @@ export async function buildDispatcher(
     const proxyUri = proxy.auth
       ? proxy.url.replace('://', `://${encodeURIComponent(proxy.auth.username)}:${encodeURIComponent(proxy.auth.password)}@`)
       : proxy.url;
+    // Intercepting proxies (ZAP, Burp, Charles) present their own CA cert, so
+    // rejectUnauthorized defaults to false for proxy connections unless the user
+    // explicitly set it via workspace TLS settings.
+    const proxyConnect = { rejectUnauthorized: false, ...connectOpts };
     return new ProxyAgent({
       uri: proxyUri,
-      ...(hasTls ? { connect: connectOpts } : {}),
+      connect: proxyConnect,
     } as ConstructorParameters<typeof ProxyAgent>[0]);
   }
 
@@ -370,7 +374,9 @@ export function registerRequestHandler(ipc: IpcMain): void {
         body:       '',
         bodySize:   0,
         durationMs: Date.now() - start,
-        error:      err instanceof Error ? err.message : String(err),
+        error:      err instanceof Error
+          ? (err.cause instanceof Error ? `${err.message}: ${err.cause.message}` : err.message)
+          : String(err),
       };
     }
 
