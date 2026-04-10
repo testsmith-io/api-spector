@@ -21,6 +21,7 @@ import {
   fetchOAuth2Token,
 } from '../auth-builder';
 import { maskPii, maskHeaders } from './request-handler';
+import { buildProxyUri } from '../proxy-utils';
 
 // ─── Build undici dispatcher (proxy + TLS) ────────────────────────────────────
 
@@ -40,16 +41,9 @@ async function buildDispatcher(
   }
 
   if (proxy?.url) {
-    const proxyUri = proxy.auth
-      ? proxy.url.replace('://', `://${encodeURIComponent(proxy.auth.username)}:${encodeURIComponent(proxy.auth.password)}@`)
-      : proxy.url;
-    // Intercepting proxies (ZAP, Burp, Charles) present their own CA cert, so
-    // rejectUnauthorized defaults to false for proxy connections unless the user
-    // explicitly set it via workspace TLS settings.
-    const proxyConnect = { rejectUnauthorized: false, ...connectOpts };
     return new ProxyAgent({
-      uri: proxyUri,
-      connect: proxyConnect,
+      uri: buildProxyUri(proxy),
+      ...(hasTls ? { requestTls: connectOpts, proxyTls: connectOpts } : {}),
     } as ConstructorParameters<typeof ProxyAgent>[0]);
   }
   if (hasTls) return new Agent({ connect: connectOpts } as ConstructorParameters<typeof Agent>[0]);
