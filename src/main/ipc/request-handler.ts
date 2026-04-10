@@ -23,6 +23,7 @@ import {
   performNtlmRequest,
   fetchOAuth2Token,
 } from '../auth-builder';
+import { buildProxyUri } from '../proxy-utils';
 
 // ─── PII masking ──────────────────────────────────────────────────────────────
 
@@ -75,6 +76,77 @@ export function maskHeaders(headers: Record<string, string>, patterns: string[])
   return result;
 }
 
+function asObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : null;
+}
+
+function readStringField(obj: Record<string, unknown> | null, key: string): string | undefined {
+  const value = obj?.[key];
+  return typeof value === 'string' && value ? value : undefined;
+}
+
+function safeProxySummary(proxy?: SendRequestPayload['proxy']): string {
+  if (!proxy?.url?.trim()) return 'off';
+  try {
+    const normalized = buildProxyUri({ url: proxy.url });
+    const parsed = new URL(normalized);
+    const host = parsed.port ? `${parsed.hostname}:${parsed.port}` : parsed.hostname;
+    const auth = proxy.auth ? 'yes' : 'no';
+    return `${parsed.protocol}//${host} auth=${auth}`;
+  } catch {
+    return `invalid input "${proxy.url}"`;
+  }
+}
+
+function safeTlsSummary(tls?: SendRequestPayload['tls']): string {
+  if (!tls) return 'off';
+  const parts: string[] = [];
+  if (tls.rejectUnauthorized !== undefined) parts.push(`rejectUnauthorized=${String(tls.rejectUnauthorized)}`);
+  if (tls.caCertPath) parts.push(`ca=${tls.caCertPath}`);
+  if (tls.clientCertPath) parts.push(`cert=${tls.clientCertPath}`);
+  if (tls.clientKeyPath) parts.push(`key=${tls.clientKeyPath}`);
+  return parts.length ? parts.join(', ') : 'on';
+}
+
+function formatRequestError(
+  err: unknown,
+  context: {
+    requestId: string
+    method: string
+    resolvedUrl: string
+    proxy?: SendRequestPayload['proxy']
+    tls?: SendRequestPayload['tls']
+  },
+): string {
+  const obj = asObject(err);
+  const message = err instanceof Error ? err.message : String(err);
+  const code = readStringField(obj, 'code');
+  const stack = err instanceof Error ? err.stack : undefined;
+  const causeObj = obj ? asObject(obj['cause']) : null;
+  const causeMessage = readStringField(causeObj, 'message');
+  const causeCode = readStringField(causeObj, 'code');
+
+  const lines: string[] = [
+    `[request:send] ${context.method} ${context.resolvedUrl}`,
+    `[request:send] requestId=${context.requestId}`,
+    `[request:send] proxy=${safeProxySummary(context.proxy)}`,
+    `[request:send] tls=${safeTlsSummary(context.tls)}`,
+    `[request:send] error=${message}${code ? ` (code=${code})` : ''}`,
+  ];
+
+  if (causeMessage) {
+    lines.push(`[request:send] cause=${causeMessage}${causeCode ? ` (code=${causeCode})` : ''}`);
+  }
+
+  if (stack) {
+    const preview = stack.split('\n').slice(0, 6).join('\n');
+    lines.push('[request:send] stack:');
+    lines.push(preview);
+  }
+
+  return lines.join('\n');
+}
+
 // ─── Build undici dispatcher (proxy + TLS) ────────────────────────────────────
 
 export async function buildDispatcher(
@@ -101,16 +173,9 @@ export async function buildDispatcher(
   }
 
   if (proxy?.url) {
-    const proxyUri = proxy.auth
-      ? proxy.url.replace('://', `://${encodeURIComponent(proxy.auth.username)}:${encodeURIComponent(proxy.auth.password)}@`)
-      : proxy.url;
-    // Intercepting proxies (ZAP, Burp, Charles) present their own CA cert, so
-    // rejectUnauthorized defaults to false for proxy connections unless the user
-    // explicitly set it via workspace TLS settings.
-    const proxyConnect = { rejectUnauthorized: false, ...connectOpts };
     return new ProxyAgent({
-      uri: proxyUri,
-      connect: proxyConnect,
+      uri: buildProxyUri(proxy),
+      ...(hasTls ? { requestTls: connectOpts, proxyTls: connectOpts } : {}),
     } as ConstructorParameters<typeof ProxyAgent>[0]);
   }
 
@@ -367,6 +432,14 @@ export function registerRequestHandler(ipc: IpcMain): void {
         durationMs,
       };
     } catch (err) {
+      const diagnostic = formatRequestError(err, {
+        requestId: req.id,
+        method: req.method,
+        resolvedUrl,
+        proxy,
+        tls,
+      });
+      console.error(diagnostic);
       response = {
         status:     0,
         statusText: 'Error',
@@ -374,9 +447,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
         body:       '',
         bodySize:   0,
         durationMs: Date.now() - start,
-        error:      err instanceof Error
-          ? (err.cause instanceof Error ? `${err.message}: ${err.cause.message}` : err.message)
-          : String(err),
+        error:      diagnostic,
       };
     }
 
