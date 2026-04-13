@@ -69,6 +69,189 @@ describe('importOpenApi', () => {
   it('throws on a non-existent file', async () => {
     await expect(importOpenApi('/nonexistent/file.json')).rejects.toThrow();
   });
+
+  it('rewrites OpenAPI path templates {id} to {{id}}', async () => {
+    const col = await importOpenApi(join(FIXTURES, 'openapi.json'));
+    const getPet = Object.values(col.requests).find(r => r.name === 'Get pet');
+    expect(getPet?.url).toBe('https://api.petstore.com/v1/pets/{{id}}');
+  });
+
+  it('imports path parameters into the request params table with paramType=path', async () => {
+    const col = await importOpenApi(join(FIXTURES, 'openapi.json'));
+    const getPet = Object.values(col.requests).find(r => r.name === 'Get pet');
+    const idRow = getPet?.params.find(p => p.key === 'id');
+    expect(idRow).toBeDefined();
+    expect(idRow!.paramType).toBe('path');
+    expect(idRow!.enabled).toBe(true);
+  });
+
+  it('imports response body schema into request.schema (resolves $refs)', async () => {
+    const col = await importOpenApi(join(FIXTURES, 'openapi-contract.json'));
+    const getPet = Object.values(col.requests).find(r => r.name === 'getPet');
+    expect(getPet?.schema).toBeDefined();
+    const parsed = JSON.parse(getPet!.schema!);
+    // The Pet $ref should have been resolved inline
+    expect(parsed.type).toBe('object');
+    expect(parsed.required).toContain('id');
+    expect(parsed.required).toContain('name');
+    expect(parsed.properties.id.type).toBe('integer');
+    expect(parsed.properties.name.type).toBe('string');
+  });
+
+  it('prefers 200 over other 2xx response schemas', async () => {
+    const col = await importOpenApi(join(FIXTURES, 'openapi-contract.json'));
+    const listPets = Object.values(col.requests).find(r => r.name === 'listPets');
+    expect(listPets?.schema).toBeDefined();
+    const parsed = JSON.parse(listPets!.schema!);
+    expect(parsed.type).toBe('array');
+    expect(parsed.items.type).toBe('object');
+  });
+
+  it('falls back to 201 when no 200 is defined', async () => {
+    const col = await importOpenApi(join(FIXTURES, 'openapi-contract.json'));
+    const createPet = Object.values(col.requests).find(r => r.name === 'createPet');
+    expect(createPet?.schema).toBeDefined();
+    const parsed = JSON.parse(createPet!.schema!);
+    expect(parsed.type).toBe('object');
+    expect(parsed.required).toContain('id');
+  });
+
+  it('omits request.schema when no JSON response schema is defined', async () => {
+    const col = await importOpenApi(join(FIXTURES, 'openapi.json'));
+    // openapi.json has no content schemas on its responses
+    for (const req of Object.values(col.requests)) {
+      expect(req.schema).toBeUndefined();
+    }
+  });
+});
+
+// ─── Inline-spec helper for narrow regression tests ──────────────────────────
+import { writeFileSync, mkdtempSync } from 'fs';
+import { tmpdir } from 'os';
+import { join as pjoin } from 'path';
+
+async function importInlineSpec(spec: object) {
+  const dir = mkdtempSync(pjoin(tmpdir(), 'oapi-'));
+  const path = pjoin(dir, 'spec.json');
+  writeFileSync(path, JSON.stringify(spec));
+  return importOpenApi(path);
+}
+
+describe('importOpenApi response-schema content-type tolerance', () => {
+  it('accepts application/json with a charset suffix', async () => {
+    const col = await importInlineSpec({
+      openapi: '3.0.0',
+      info: { title: 'X', version: '1' },
+      paths: {
+        '/x': {
+          put: {
+            operationId: 'updateX',
+            responses: {
+              '200': {
+                description: 'ok',
+                content: {
+                  'application/json; charset=utf-8': {
+                    schema: { type: 'object', properties: { ok: { type: 'boolean' } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const req = Object.values(col.requests)[0];
+    expect(req.schema).toBeDefined();
+    expect(JSON.parse(req.schema!).properties.ok.type).toBe('boolean');
+  });
+
+  it('accepts application/vnd.api+json', async () => {
+    const col = await importInlineSpec({
+      openapi: '3.0.0',
+      info: { title: 'X', version: '1' },
+      paths: {
+        '/x': {
+          put: {
+            operationId: 'updateX',
+            responses: {
+              '200': {
+                description: 'ok',
+                content: {
+                  'application/vnd.api+json': {
+                    schema: { type: 'object', properties: { id: { type: 'string' } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const req = Object.values(col.requests)[0];
+    expect(req.schema).toBeDefined();
+    expect(JSON.parse(req.schema!).properties.id.type).toBe('string');
+  });
+
+  it('follows a $ref to a shared response object in components.responses', async () => {
+    const col = await importInlineSpec({
+      openapi: '3.0.0',
+      info: { title: 'X', version: '1' },
+      paths: {
+        '/x': {
+          put: {
+            operationId: 'updateX',
+            responses: {
+              '200': { $ref: '#/components/responses/UpdateResponse' },
+            },
+          },
+        },
+      },
+      components: {
+        responses: {
+          UpdateResponse: {
+            description: 'updated',
+            content: {
+              'application/json': {
+                schema: { type: 'object', required: ['updatedAt'], properties: { updatedAt: { type: 'string' } } },
+              },
+            },
+          },
+        },
+      },
+    });
+    const req = Object.values(col.requests)[0];
+    expect(req.schema).toBeDefined();
+    const parsed = JSON.parse(req.schema!);
+    expect(parsed.required).toContain('updatedAt');
+    expect(parsed.properties.updatedAt.type).toBe('string');
+  });
+
+  it('accepts the OpenAPI 2XX range form', async () => {
+    const col = await importInlineSpec({
+      openapi: '3.0.0',
+      info: { title: 'X', version: '1' },
+      paths: {
+        '/x': {
+          put: {
+            operationId: 'updateX',
+            responses: {
+              '2XX': {
+                description: 'ok',
+                content: {
+                  'application/json': {
+                    schema: { type: 'object', properties: { msg: { type: 'string' } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const req = Object.values(col.requests)[0];
+    expect(req.schema).toBeDefined();
+    expect(JSON.parse(req.schema!).properties.msg.type).toBe('string');
+  });
 });
 
 // ─── Postman importer ─────────────────────────────────────────────────────────

@@ -149,8 +149,12 @@ async function executeRequest(
   let updatedGlobals        = { ...globals };
   let preScriptError: string | undefined;
 
+  // Build preliminary vars so {{}} tokens in scripts get interpolated
+  const dynamicVars = await buildDynamicVars();
+  let vars = mergeVars(envVars, collectionVars, globals, localVars, dynamicVars);
+
   if (req.preRequestScript?.trim()) {
-    const r = await runScript(req.preRequestScript, {
+    const r = await runScript(interpolate(req.preRequestScript, vars), {
       envVars: { ...envVars }, collectionVars: { ...collectionVars },
       globals: { ...globals }, localVars: { ...localVars },
     });
@@ -165,8 +169,8 @@ async function executeRequest(
     if (r.error) console.error(color(`    [pre-script error] ${r.error}`, C.red));
   }
 
-  const dynamicVars = await buildDynamicVars();
-  const vars        = mergeVars(updatedEnvVars, updatedCollectionVars, updatedGlobals, localVars, dynamicVars);
+  // Re-merge vars after pre-script may have modified scopes
+  vars = mergeVars(updatedEnvVars, updatedCollectionVars, updatedGlobals, localVars, dynamicVars);
   const resolvedUrl = buildUrl(req.url, req.params, vars);
   base.resolvedUrl  = resolvedUrl;
 
@@ -229,7 +233,7 @@ async function executeRequest(
     let postScriptError: string | undefined;
 
     if (req.postRequestScript?.trim()) {
-      const r = await runScript(req.postRequestScript, {
+      const r = await runScript(interpolate(req.postRequestScript, vars), {
         envVars: updatedEnvVars, collectionVars: updatedCollectionVars,
         globals: updatedGlobals, localVars, response,
       });
@@ -245,12 +249,34 @@ async function executeRequest(
       if (verbose && r.consoleOutput.length) r.consoleOutput.forEach(l => console.log(color(`    [post] ${l}`, C.gray)));
     }
 
-    const allPassed = testResults.every(t => t.passed);
-    const httpOk    = fetchResp.status < 400;
+    // Status determination, in priority order:
+    //   1. post-script crashed → 'error'
+    //   2. HTTP 4xx/5xx        → 'failed' (synthetic test added below)
+    //   3. has assertions      → 'passed' or 'failed'
+    //   4. no assertions       → 'skipped' (request worked, nothing checked)
+    const allPassed  = testResults.every(t => t.passed);
+    const httpFailed = fetchResp.status >= 400;
+    const hasTests   = testResults.length > 0;
     const status: RunRequestResult['status'] = postScriptError
       ? 'error'
-      : testResults.length > 0 ? (allPassed ? 'passed' : 'failed')
-      : httpOk ? 'passed' : 'failed';
+      : httpFailed
+        ? 'failed'
+        : hasTests
+          ? (allPassed ? 'passed' : 'failed')
+          : 'skipped';
+
+    // If HTTP failed and no explicit test caught it, append a synthetic
+    // failed test so the user sees *why* the row is red.
+    if (httpFailed && !testResults.some(t => !t.passed)) {
+      testResults = [
+        ...testResults,
+        {
+          name:   `HTTP status ${fetchResp.status} ${fetchResp.statusText}`.trim(),
+          passed: false,
+          error:  `Request returned ${fetchResp.status} — no assertion was defined to verify the status code.`,
+        },
+      ];
+    }
 
     const reqHeaders: Record<string, string> = {};
     headers.forEach((v, k) => { reqHeaders[k] = v; });
@@ -293,8 +319,9 @@ async function executeRequest(
 // ─── Result printing ──────────────────────────────────────────────────────────
 
 function printResult(r: RunRequestResult, verbose: boolean) {
-  const icon  = r.status === 'passed' ? color('✓', C.green, C.bold)
-              : r.status === 'failed' ? color('✗', C.red, C.bold)
+  const icon  = r.status === 'passed'  ? color('✓', C.green, C.bold)
+              : r.status === 'failed'  ? color('✗', C.red, C.bold)
+              : r.status === 'skipped' ? color('○', C.gray, C.bold)
               : color('⚠', C.yellow, C.bold);
 
   const http = r.httpStatus ? color(` ${r.httpStatus}`, r.httpStatus < 400 ? C.green : C.red) : '';
@@ -407,7 +434,7 @@ async function main() {
     };
   }
 
-  const summary: RunSummary = { total: 0, passed: 0, failed: 0, errors: 0, durationMs: 0 };
+  const summary: RunSummary = { total: 0, passed: 0, failed: 0, errors: 0, skipped: 0, durationMs: 0 };
   const allResults: RunRequestResult[] = [];
   const totalStart = Date.now();
   const timestamp = new Date().toISOString();
@@ -434,6 +461,7 @@ async function main() {
       : workspaceTls;
 
     let bailed = false;
+    let lastPrintedScope: string | null = null;
     for (const item of items) {
       const { result, updatedEnvVars, updatedCollectionVars, updatedGlobals, updatedLocalVars } =
         await executeRequest(
@@ -451,13 +479,24 @@ async function main() {
       runGlobals        = updatedGlobals;
       runLocalVars      = updatedLocalVars;
 
+      // Attach folder path so exported reports show grouped structure.
+      result.scopePath = item.scopePath;
+
+      // Print a folder heading whenever the scope changes
+      const scopeKey = (item.scopePath ?? []).join(' / ');
+      if (scopeKey !== lastPrintedScope) {
+        if (scopeKey) console.log(color(`    ${scopeKey}`, C.gray, C.bold));
+        lastPrintedScope = scopeKey;
+      }
+
       printResult(result, verbose);
       allResults.push(result);
 
       summary.total++;
-      if (result.status === 'passed')      summary.passed++;
-      else if (result.status === 'failed') summary.failed++;
-      else                                  summary.errors++;
+      if (result.status === 'passed')       summary.passed++;
+      else if (result.status === 'failed')  summary.failed++;
+      else if (result.status === 'skipped') summary.skipped++;
+      else                                   summary.errors++;
 
       if (bail && (result.status === 'failed' || result.status === 'error')) {
         console.log(color('\n  Bailing after first failure.', C.yellow));
@@ -474,11 +513,12 @@ async function main() {
 
   // Summary line
   const passStr  = color(`${summary.passed} passed`, C.green, C.bold);
-  const failStr  = summary.failed > 0  ? color(` · ${summary.failed} failed`, C.red, C.bold) : '';
-  const errStr   = summary.errors > 0  ? color(` · ${summary.errors} errors`, C.yellow, C.bold) : '';
+  const failStr  = summary.failed > 0   ? color(` · ${summary.failed} failed`, C.red, C.bold) : '';
+  const errStr   = summary.errors > 0   ? color(` · ${summary.errors} errors`, C.yellow, C.bold) : '';
+  const skipStr  = summary.skipped > 0  ? color(` · ${summary.skipped} skipped`, C.gray, C.bold) : '';
   const totalStr = color(` · ${summary.total} total · ${summary.durationMs}ms`, C.gray);
 
-  console.log(`  ${passStr}${failStr}${errStr}${totalStr}\n`);
+  console.log(`  ${passStr}${failStr}${errStr}${skipStr}${totalStr}\n`);
 
   // Write report file if --output was given
   if (outputPath) {

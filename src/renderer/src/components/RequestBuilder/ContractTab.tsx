@@ -56,7 +56,7 @@ export function ContractTab({ request, onChange }: Props) {
   const hasContract = contract.statusCode !== undefined || contract.bodySchema?.trim() || contract.headers?.some(h => h.key);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 h-full min-h-0">
       {/* Status indicator */}
       <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs border ${
         hasContract
@@ -141,9 +141,11 @@ export function ContractTab({ request, onChange }: Props) {
             {inferring ? 'Inferring…' : '⚡ Infer from response'}
           </button>
         </div>
-        <div className="border border-surface-700 rounded overflow-hidden" style={{ minHeight: 160 }}>
+        <div className="border border-surface-700 rounded overflow-hidden">
           <CodeMirror
             value={contract.bodySchema ?? ''}
+            height="300px"
+            maxHeight="50vh"
             theme={oneDark}
             extensions={[json()]}
             onChange={val => update({ bodySchema: val })}

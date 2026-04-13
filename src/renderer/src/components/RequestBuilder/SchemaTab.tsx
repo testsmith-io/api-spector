@@ -10,7 +10,7 @@ import Ajv from 'ajv';
 import type { ApiRequest } from '../../../../shared/types';
 import { useStore } from '../../store';
 
-const ajv = new Ajv({ allErrors: true });
+const ajv = new Ajv({ allErrors: true, strict: false });
 
 interface ValidationResult {
   valid: boolean
@@ -29,6 +29,17 @@ export function SchemaTab({ request, onChange }: Props) {
   const [error, setError]   = useState<string | null>(null);
 
   const schemaValue = request.schema ?? '';
+  const contractSchema = request.contract?.bodySchema ?? '';
+  const canDerive = Boolean(contractSchema.trim());
+
+  function setSchema(val: string) {
+    onChange({ schema: val });
+  }
+
+  function deriveFromContract() {
+    if (!canDerive) return;
+    setSchema(contractSchema);
+  }
 
   function validate() {
     setError(null);
@@ -75,26 +86,43 @@ export function SchemaTab({ request, onChange }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-3 h-full">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <span className="text-[10px] text-surface-600 uppercase tracking-wider font-medium">
           JSON Schema (draft-07+)
         </span>
-        <button
-          onClick={validate}
-          className="px-3 py-1 text-xs bg-blue-700 hover:bg-blue-600 rounded transition-colors font-medium"
-        >
-          Validate
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={deriveFromContract}
+            disabled={!canDerive}
+            title={canDerive
+              ? "Copy the body schema from this request's contract"
+              : 'No contract body schema defined yet'}
+            className="px-3 py-1 text-xs bg-surface-800 hover:bg-surface-700 disabled:bg-surface-900 disabled:text-surface-600 rounded transition-colors font-medium"
+          >
+            Derive from contract
+          </button>
+          <button
+            onClick={validate}
+            className="px-3 py-1 text-xs bg-blue-700 hover:bg-blue-600 rounded transition-colors font-medium"
+          >
+            Validate
+          </button>
+        </div>
       </div>
+      <p className="text-[10px] text-surface-600">
+        Standalone schema for ad-hoc validation. Independent of the contract — edits here don&apos;t affect it.
+      </p>
 
       {/* Schema editor */}
-      <div className="flex-1 min-h-[160px] border border-surface-700 rounded overflow-hidden">
+      <div className="border border-surface-700 rounded overflow-hidden">
         <CodeMirror
           value={schemaValue}
+          height="300px"
+          maxHeight="50vh"
           theme={oneDark}
           extensions={[json()]}
-          onChange={val => onChange({ schema: val })}
+          onChange={val => setSchema(val)}
           placeholder={'{\n  "type": "object",\n  "properties": {}\n}'}
           basicSetup={{ lineNumbers: true, foldGutter: true }}
         />

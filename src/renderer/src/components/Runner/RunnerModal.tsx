@@ -2,7 +2,7 @@
 // Licensed for private, internal, non-commercial use only.
 // See LICENSE for full terms.
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { Fragment, useEffect, useRef, useState, useCallback } from 'react';
 import { useStore } from '../../store';
 import type { RunRequestResult, RunSummary, RunnerItem } from '../../../../shared/types';
 import { findFolder } from '../../store';
@@ -55,6 +55,7 @@ function StatusDot({ status }: { status: RunRequestResult['status'] }) {
     passed:  'bg-emerald-500',
     failed:  'bg-red-500',
     error:   'bg-orange-500',
+    skipped: 'bg-surface-500',
   };
   return <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${colors[status] ?? 'bg-surface-700'}`} />;
 }
@@ -147,6 +148,7 @@ export function RunnerModal() {
       isHook:         item.isHook,
       hookType:       item.hookType,
       scopeId:        item.scopeId,
+      scopePath:      item.scopePath,
     })));
     setSummary(null);
     setRunnerRunning(true);
@@ -321,9 +323,20 @@ export function RunnerModal() {
           ) : (
             <table className="w-full text-xs">
               <tbody>
-                {runnerResults.map((r, idx) => (
+                {runnerResults.map((r, idx) => {
+                  const scopeKey  = (r.scopePath ?? []).join(' / ');
+                  const prevScope = idx > 0 ? (runnerResults[idx - 1].scopePath ?? []).join(' / ') : null;
+                  const showHeading = scopeKey !== '' && scopeKey !== prevScope;
+                  return (
+                    <Fragment key={idx}>
+                      {showHeading && (
+                        <tr className="bg-surface-800/40">
+                          <td colSpan={6} className="px-4 py-1.5 text-[10px] uppercase tracking-wider font-semibold text-surface-400">
+                            <span className="text-surface-600">▸ </span>{scopeKey}
+                          </td>
+                        </tr>
+                      )}
                   <tr
-                    key={idx}
                     className={`border-b border-surface-800/50 hover:bg-surface-800/30 ${r.isHook ? 'opacity-80' : ''}`}
                   >
                     <td className="px-4 py-2 w-6">
@@ -375,7 +388,9 @@ export function RunnerModal() {
                       )}
                     </td>
                   </tr>
-                ))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           )}
@@ -387,6 +402,11 @@ export function RunnerModal() {
             <span className="text-emerald-400 font-medium">{summary.passed} passed</span>
             {summary.failed > 0 && <span className="text-red-400 font-medium">{summary.failed} failed</span>}
             {summary.errors > 0 && <span className="text-orange-400 font-medium">{summary.errors} errors</span>}
+            {summary.skipped > 0 && (
+              <span className="text-surface-400 font-medium" title="Requests with no assertions to verify">
+                {summary.skipped} no tests
+              </span>
+            )}
             <span className="text-surface-400">{summary.total} total · {summary.durationMs}ms</span>
 
             <div className="ml-auto flex items-center gap-1.5">

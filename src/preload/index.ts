@@ -98,6 +98,12 @@ const api = {
     ipcRenderer.invoke('import:insomnia'),
   importBruno: (): Promise<Collection | null> =>
     ipcRenderer.invoke('import:bruno'),
+  /** Extract response-body schemas from an OpenAPI spec file (no full import). */
+  extractOpenApiSchemas: (): Promise<{ method: string; pathTemplate: string; pathRewritten: string; schema: string; operationId?: string; summary?: string }[] | null> =>
+    ipcRenderer.invoke('import:openapi-schemas'),
+  /** Extract response-body schemas from an OpenAPI spec URL (no full import). */
+  extractOpenApiSchemasFromUrl: (url: string): Promise<{ method: string; pathTemplate: string; pathRewritten: string; schema: string; operationId?: string; summary?: string }[]> =>
+    ipcRenderer.invoke('import:openapi-schemas-url', url),
 
   // ─── Code generation ──────────────────────────────────────────────────────
   generateCode: (opts: GenerateOptions): Promise<GeneratedFile[]> =>

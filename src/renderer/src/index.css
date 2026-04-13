@@ -121,6 +121,8 @@ body {
 :root.light .bg-emerald-700,
 :root.light .hover\:bg-emerald-600:hover,
 :root.light .bg-red-600,
+:root.light .bg-red-700,
+:root.light .hover\:bg-red-600:hover,
 :root.light .bg-amber-600,
 :root.light .bg-orange-600,
 :root.light .bg-cyan-700,
@@ -167,9 +169,22 @@ body {
 :root.light .border-emerald-800 { border-color: #86efac !important; }      /* green-300 */
 :root.light .border-emerald-700 { border-color: #86efac !important; }      /* green-300 */
 
-/* Amber — warnings */
+/* Amber — warnings, auth badges */
 :root.light .text-amber-300 { color: #b45309 !important; }  /* amber-700 */
 :root.light .text-amber-400 { color: #d97706 !important; }  /* amber-500 */
+:root.light .bg-amber-800\/40 { background-color: #fef3c7 !important; }  /* amber-100 */
 
 /* Cyan — console [set] output, WS badge */
 :root.light .text-cyan-400 { color: #0e7490 !important; }   /* cyan-700  */
+
+/* Blue — informational text/badges (tags, "contract defined" banner, selected
+   import card, etc.). The dark-mode tints (blue-200/300, blue-900/50, etc.)
+   wash out completely on a light background, so re-map them to readable hues. */
+:root.light .text-blue-200 { color: #1e3a8a !important; }   /* blue-900  */
+:root.light .text-blue-300 { color: #1d4ed8 !important; }   /* blue-700  */
+:root.light .text-blue-400 { color: #2563eb !important; }   /* blue-600  */
+:root.light .bg-blue-900\/50 { background-color: #dbeafe !important; }  /* blue-100 */
+:root.light .bg-blue-950\/40 { background-color: #eff6ff !important; }  /* blue-50  */
+:root.light .bg-blue-950\/50 { background-color: #dbeafe !important; }  /* blue-100 */
+:root.light .border-blue-700  { border-color: #93c5fd !important; }     /* blue-300 */
+:root.light .border-blue-800\/50 { border-color: #93c5fd !important; }  /* blue-300 */

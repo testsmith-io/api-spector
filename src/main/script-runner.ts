@@ -3,6 +3,7 @@
 // See LICENSE for full terms.
 
 import * as vm from 'vm';
+import * as crypto from 'crypto';
 import dayjs from 'dayjs';
 import tv4 from 'tv4';
 import { JSONPath } from 'jsonpath-plus';
@@ -297,6 +298,56 @@ function buildAt(
     // JSONPath query: sp.jsonPath(data, '$.store.book[?(@.price < 10)].title')
     jsonPath: (data: unknown, expr: string) =>
       JSONPath({ path: expr, json: data as object }),
+
+    /**
+     * Generate a TOTP code from a base32-encoded secret.
+     *
+     * Usage in scripts:
+     *   const code = sp.totp("JBSWY3DPEHPK3PXP");
+     *   sp.environment.set("otp", code);
+     *
+     * Options (all optional):
+     *   digits   — code length (default 6)
+     *   period   — time step in seconds (default 30)
+     *   algorithm — "sha1" | "sha256" | "sha512" (default "sha1")
+     */
+    totp: (secret: string, options?: { digits?: number; period?: number; algorithm?: string }) => {
+      const digits    = options?.digits ?? 6;
+      const period    = options?.period ?? 30;
+      const algorithm = options?.algorithm ?? 'sha1';
+
+      // Decode base32 secret
+      const base32chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+      const cleaned = secret.replace(/[\s=-]/g, '').toUpperCase();
+      let bits = '';
+      for (const c of cleaned) {
+        const val = base32chars.indexOf(c);
+        if (val < 0) throw new Error(`Invalid base32 character: ${c}`);
+        bits += val.toString(2).padStart(5, '0');
+      }
+      const keyBytes = Buffer.alloc(Math.floor(bits.length / 8));
+      for (let i = 0; i < keyBytes.length; i++) {
+        keyBytes[i] = parseInt(bits.slice(i * 8, i * 8 + 8), 2);
+      }
+
+      // Compute HMAC over the time counter
+      const counter = Math.floor(Date.now() / 1000 / period);
+      const counterBuf = Buffer.alloc(8);
+      counterBuf.writeUInt32BE(Math.floor(counter / 0x100000000), 0);
+      counterBuf.writeUInt32BE(counter >>> 0, 4);
+
+      const hmac = crypto.createHmac(algorithm, keyBytes).update(counterBuf).digest();
+
+      // Dynamic truncation (RFC 4226)
+      const offset = hmac[hmac.length - 1] & 0x0f;
+      const binCode =
+        ((hmac[offset] & 0x7f) << 24) |
+        ((hmac[offset + 1] & 0xff) << 16) |
+        ((hmac[offset + 2] & 0xff) << 8) |
+        (hmac[offset + 3] & 0xff);
+
+      return String(binCode % 10 ** digits).padStart(digits, '0');
+    },
   };
 
   // Attach response helpers if available

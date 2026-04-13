@@ -23,6 +23,7 @@ import {
   performNtlmRequest,
   fetchOAuth2Token,
 } from '../auth-builder';
+import Ajv from 'ajv';
 import { buildProxyUri } from '../proxy-utils';
 
 // ─── PII masking ──────────────────────────────────────────────────────────────
@@ -147,6 +148,68 @@ function formatRequestError(
   return lines.join('\n');
 }
 
+// ─── Schema → TestResult adapter ──────────────────────────────────────────────
+
+const schemaAjv = new Ajv({ allErrors: true, strict: false });
+
+/**
+ * Validate the response body against the request's standalone JSON Schema
+ * (if any) and convert the result into TestResults so it shows up next to
+ * post-script tests in the runner output.
+ *
+ * Independent of `request.contract` — this is the field edited in the
+ * Schema tab.
+ */
+export function buildSchemaTestResults(
+  schemaText: string | undefined,
+  body: string,
+): TestResult[] {
+  const trimmed = schemaText?.trim();
+  if (!trimmed) return [];
+
+  let schema: unknown;
+  try {
+    schema = JSON.parse(trimmed);
+  } catch {
+    return [{
+      name:   '[schema] body matches schema',
+      passed: false,
+      error:  'Schema is not valid JSON',
+    }];
+  }
+
+  let data: unknown;
+  try {
+    data = JSON.parse(body);
+  } catch {
+    return [{
+      name:   '[schema] body matches schema',
+      passed: false,
+      error:  'Response body is not valid JSON — cannot validate against schema',
+    }];
+  }
+
+  let validate;
+  try {
+    validate = schemaAjv.compile(schema as object);
+  } catch (e) {
+    return [{
+      name:   '[schema] body matches schema',
+      passed: false,
+      error:  `Schema compile error: ${e instanceof Error ? e.message : String(e)}`,
+    }];
+  }
+
+  if (validate(data)) {
+    return [{ name: '[schema] body matches schema', passed: true }];
+  }
+  return (validate.errors ?? []).map(err => ({
+    name:   `[schema] body${err.instancePath ? ` at ${err.instancePath}` : ''}`,
+    passed: false,
+    error:  err.message ?? 'Schema violation',
+  }));
+}
+
 // ─── Build undici dispatcher (proxy + TLS) ────────────────────────────────────
 
 export async function buildDispatcher(
@@ -240,7 +303,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
     let updatedGlobals        = { ...mergedGlobals };
 
     if (req.preRequestScript?.trim()) {
-      const result = await runScript(req.preRequestScript, {
+      const result = await runScript(interpolate(req.preRequestScript, vars), {
         envVars:        { ...envVars },
         collectionVars: { ...collectionVars },
         globals:        { ...mergedGlobals },
@@ -452,13 +515,22 @@ export function registerRequestHandler(ipc: IpcMain): void {
       };
     }
 
+    // ── Schema validation ─────────────────────────────────────────────────────
+    // If the request has a standalone JSON Schema defined (Schema tab),
+    // validate the response body against it and surface the result as
+    // TestResults so it shows up in the runner output alongside post-script
+    // tests. Independent of `req.contract`.
+    const schemaTestResults = !response.error
+      ? buildSchemaTestResults(req.schema, response.body)
+      : [];
+
     // ── Post-request script ───────────────────────────────────────────────────
     let postTestResults: TestResult[] = [];
     let postConsole: string[] = [];
     let postError: string | undefined;
 
     if (req.postRequestScript?.trim() && !response.error) {
-      const result = await runScript(req.postRequestScript, {
+      const result = await runScript(interpolate(req.postRequestScript, vars), {
         envVars:        { ...updatedEnvVars },
         collectionVars: { ...updatedCollectionVars },
         globals:        { ...updatedGlobals },
@@ -477,8 +549,24 @@ export function registerRequestHandler(ipc: IpcMain): void {
       await persistGlobals();
     }
 
+    // If the HTTP response was a 4xx/5xx and no explicit test caught it,
+    // surface a synthetic failed result so the user notices instead of
+    // assuming silence == success.
+    const combinedTestResults: TestResult[] = [...schemaTestResults, ...postTestResults];
+    if (
+      !response.error &&
+      response.status >= 400 &&
+      !combinedTestResults.some(t => !t.passed)
+    ) {
+      combinedTestResults.push({
+        name:   `HTTP status ${response.status} ${response.statusText}`.trim(),
+        passed: false,
+        error:  `Request returned ${response.status} — no assertion was defined to verify the status code.`,
+      });
+    }
+
     const scriptResult: ScriptExecutionMeta = {
-      testResults:          postTestResults,
+      testResults:          combinedTestResults,
       consoleOutput:        [...decryptionWarnings, ...preScriptMeta.consoleOutput, ...postConsole],
       updatedEnvVars,
       updatedCollectionVars,

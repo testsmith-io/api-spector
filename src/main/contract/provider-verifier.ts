@@ -209,7 +209,8 @@ export async function runProviderVerification(
   const spec  = await loadSpec(specUrl, specPath) as Record<string, unknown>;
   const start = Date.now();
 
-  const results: ContractResult[] = requests.map(req => {
+  const activeRequests = requests.filter(r => !r.disabled);
+  const results: ContractResult[] = activeRequests.map(req => {
     const violations = validateRequestAgainstSpec(spec, req, envVars, requestBaseUrl);
     const url = req.url.replace(/\{\{([^}]+)\}\}/g, (_, k: string) => envVars[k] ?? `{{${k}}}`);
     return {

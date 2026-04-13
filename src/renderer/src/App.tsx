@@ -137,6 +137,9 @@ export default function App () {
   const activeTabId = useStore( s => s.activeTabId );
   const setActiveTabId = useStore( s => s.setActiveTabId );
   const closeTab = useStore( s => s.closeTab );
+  const closeAllTabs = useStore( s => s.closeAllTabs );
+  const closeOtherTabs = useStore( s => s.closeOtherTabs );
+  const [tabContextMenu, setTabContextMenu] = useState<{ x: number; y: number; tabId: string } | null>( null );
   const showGeneratorPanel = useStore( s => s.showGeneratorPanel );
   const sidebarTab = useStore( s => s.sidebarTab );
   const setSidebarTab = useStore( s => s.setSidebarTab );
@@ -156,7 +159,7 @@ export default function App () {
   const addWsMessage = useStore( s => s.addWsMessage );
 
   const [sidebarOpen, setSidebarOpen] = useState( true );
-  const [responseOpen, setResponseOpen] = useState( true );
+  const [responseOpen, setResponseOpen] = useState( false );
   const [docsModalOpen, setDocsModalOpen] = useState( false );
   const [sidebarWidth, setSidebarWidth] = useState( 256 );
   const [requestPaneWidth, setRequestPaneWidth] = useState<number | null>( null );
@@ -235,6 +238,14 @@ export default function App () {
   const activeRequest = activeTab?.requestId
     ? Object.values( collections ).find( c => c.data.requests[activeTab.requestId!] )?.data.requests[activeTab.requestId!]
     : null;
+
+  // The response panel mirrors whether the *active tab* has a response yet.
+  // Open as soon as one arrives (or when switching to a tab that has one),
+  // collapse again when switching to a tab that hasn't been sent. The user
+  // can still toggle manually after the initial state is set.
+  useEffect( () => {
+    setResponseOpen( Boolean( activeTab?.lastResponse ) );
+  }, [activeTabId, activeTab?.lastResponse] );
 
   function selectPanel ( tab: 'collections' | 'history' | 'mocks' | 'contracts' | 'git' ) {
     if ( sidebarTab === tab && sidebarOpen ) {
@@ -373,40 +384,89 @@ export default function App () {
           <main className="flex-1 min-w-0 flex flex-col min-h-0">
             {/* Tab bar */}
             {tabs.length > 0 && (
-              <div className="flex items-center border-b border-surface-800 bg-surface-950 overflow-x-auto flex-shrink-0">
-                {tabs.map( tab => {
-                  const req = tab.requestId
-                    ? Object.values( collections ).find( c => c.data.requests[tab.requestId!] )?.data.requests[tab.requestId!]
-                    : null;
-                  const isActive = tab.id === activeTabId;
-                  return (
-                    <div
-                      key={tab.id}
-                      onClick={() => setActiveTabId( tab.id )}
-                      className={`group flex items-center gap-1.5 px-3 py-1.5 border-r border-surface-800 cursor-pointer min-w-0 max-w-[200px] flex-shrink-0 transition-colors ${isActive
-                        ? 'bg-surface-900 border-b-2 border-b-blue-500 -mb-px'
-                        : 'hover:bg-surface-900/50 text-surface-600'
-                        }`}
-                    >
-                      {req && (
-                        <span className={`text-[10px] font-bold shrink-0 ${TAB_METHOD_COLORS[req.method] ?? 'text-gray-400'}`}>
-                          {req.method}
-                        </span>
-                      )}
-                      <span className={`text-xs truncate ${isActive ? 'text-white' : ''}`}>
-                        {req?.name ?? 'Untitled'}
-                      </span>
-                      <button
-                        onClick={e => { e.stopPropagation(); closeTab( tab.id ); }}
-                        className="ml-auto opacity-0 group-hover:opacity-100 shrink-0 text-surface-600 hover:text-white transition-all leading-none"
-                        title="Close tab"
+              <div className="flex items-center border-b border-surface-800 bg-surface-950 flex-shrink-0">
+                <div className="flex items-center overflow-x-auto flex-1 min-w-0">
+                  {tabs.map( tab => {
+                    const req = tab.requestId
+                      ? Object.values( collections ).find( c => c.data.requests[tab.requestId!] )?.data.requests[tab.requestId!]
+                      : null;
+                    const isActive = tab.id === activeTabId;
+                    return (
+                      <div
+                        key={tab.id}
+                        onClick={() => setActiveTabId( tab.id )}
+                        onContextMenu={e => {
+                          e.preventDefault();
+                          setTabContextMenu( { x: e.clientX, y: e.clientY, tabId: tab.id } );
+                        }}
+                        className={`group flex items-center gap-1.5 px-3 py-1.5 border-r border-surface-800 cursor-pointer min-w-0 max-w-[200px] flex-shrink-0 transition-colors ${isActive
+                          ? 'bg-surface-900 border-b-2 border-b-blue-500 -mb-px'
+                          : 'hover:bg-surface-900/50 text-surface-600'
+                          }`}
                       >
-                        ×
-                      </button>
-                    </div>
-                  );
-                } )}
+                        {req && (
+                          <span className={`text-[10px] font-bold shrink-0 ${TAB_METHOD_COLORS[req.method] ?? 'text-gray-400'}`}>
+                            {req.method}
+                          </span>
+                        )}
+                        <span className={`text-xs truncate ${isActive ? 'text-white' : ''}`}>
+                          {req?.name ?? 'Untitled'}
+                        </span>
+                        <button
+                          onClick={e => { e.stopPropagation(); closeTab( tab.id ); }}
+                          className="ml-auto opacity-0 group-hover:opacity-100 shrink-0 text-surface-600 hover:text-white transition-all leading-none"
+                          title="Close tab"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  } )}
+                </div>
+                {/* Close-all button, always at the far right of the tab strip */}
+                <button
+                  onClick={closeAllTabs}
+                  title="Close all tabs"
+                  className="flex-shrink-0 px-2 py-1.5 text-surface-500 hover:text-white hover:bg-surface-900/50 border-l border-surface-800 text-xs leading-none transition-colors"
+                >
+                  ⨯ all
+                </button>
               </div>
+            )}
+
+            {/* Tab context menu */}
+            {tabContextMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setTabContextMenu( null )}
+                  onContextMenu={e => { e.preventDefault(); setTabContextMenu( null ); }}
+                />
+                <div
+                  className="fixed z-50 bg-surface-900 border border-surface-700 rounded shadow-2xl py-1 text-xs min-w-[160px]"
+                  style={{ left: tabContextMenu.x, top: tabContextMenu.y }}
+                >
+                  <button
+                    onClick={() => { closeTab( tabContextMenu.tabId ); setTabContextMenu( null ); }}
+                    className="w-full text-left px-3 py-1.5 text-surface-300 hover:bg-surface-800 hover:text-white transition-colors"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => { closeOtherTabs( tabContextMenu.tabId ); setTabContextMenu( null ); }}
+                    disabled={tabs.length < 2}
+                    className="w-full text-left px-3 py-1.5 text-surface-300 hover:bg-surface-800 hover:text-white disabled:text-surface-600 disabled:hover:bg-transparent transition-colors"
+                  >
+                    Close others
+                  </button>
+                  <button
+                    onClick={() => { closeAllTabs(); setTabContextMenu( null ); }}
+                    className="w-full text-left px-3 py-1.5 text-surface-300 hover:bg-surface-800 hover:text-white transition-colors"
+                  >
+                    Close all
+                  </button>
+                </div>
+              </>
             )}
 
             {sidebarTab === 'contracts' ? (

@@ -3,10 +3,11 @@
 // See LICENSE for full terms.
 
 import { type IpcMain, dialog } from 'electron';
-import { importPostman }              from '../importers/postman';
-import { importOpenApi, importOpenApiFromUrl } from '../importers/openapi';
-import { importInsomnia }             from '../importers/insomnia';
-import { importBruno }                from '../importers/bruno';
+import { importPostman }                                    from '../importers/postman';
+import { importOpenApi, importOpenApiFromUrl,
+         extractSchemasFromFile, extractSchemasFromUrl }    from '../importers/openapi';
+import { importInsomnia }                                   from '../importers/insomnia';
+import { importBruno }                                      from '../importers/bruno';
 
 export function registerImportHandlers(ipc: IpcMain): void {
   ipc.handle('import:postman', async () => {
@@ -51,5 +52,20 @@ export function registerImportHandlers(ipc: IpcMain): void {
     });
     if (result.canceled || !result.filePaths[0]) return null;
     return importBruno(result.filePaths[0]);
+  });
+
+  // ─── Schema sync (extract schemas without full import) ─────────────────────
+  ipc.handle('import:openapi-schemas', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Load OpenAPI spec for schema sync',
+      filters: [{ name: 'OpenAPI', extensions: ['json', 'yaml', 'yml'] }],
+      properties: ['openFile'],
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    return extractSchemasFromFile(result.filePaths[0]);
+  });
+
+  ipc.handle('import:openapi-schemas-url', async (_event, url: string) => {
+    return extractSchemasFromUrl(url);
   });
 }

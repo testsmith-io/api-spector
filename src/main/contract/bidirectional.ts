@@ -191,9 +191,9 @@ export async function runBidirectional(
   const vars  = { ...envVars, ...collectionVars };
   const start = Date.now();
 
-  // Only requests that have a consumer contract
+  // Only requests that have a consumer contract and are not disabled
   const contractRequests = requests.filter(r =>
-    r.contract && (r.contract.statusCode !== undefined || r.contract.bodySchema || r.contract.headers?.length),
+    !r.disabled && r.contract && (r.contract.statusCode !== undefined || r.contract.bodySchema || r.contract.headers?.length),
   );
 
   const results: ContractResult[] = await Promise.all(contractRequests.map(async req => {
