@@ -222,6 +222,8 @@ interface AppActions {
   // Tab management
   openInTab: (requestId: string, collectionId: string) => void
   closeTab: (tabId: string) => void
+  closeAllTabs: () => void
+  closeOtherTabs: (keepTabId: string) => void
   setActiveTabId: (id: string) => void
   setTabResponse: (tabId: string, response: ResponsePayload | null, scriptResult: ScriptExecutionMeta | null, sentRequest?: SentRequest | null) => void
   setTabHookResults: (tabId: string, results: RunRequestResult[] | null) => void
@@ -262,8 +264,19 @@ interface AppActions {
   deleteRequest: (collectionId: string, id: string) => void
   duplicateRequest: (collectionId: string, id: string) => void
   moveRequest: (srcCollectionId: string, requestId: string, destCollectionId: string, destFolderId: string, destIndex?: number) => void
+  moveFolder: (collectionId: string, folderId: string, destParentFolderId: string, destIndex?: number) => void
 
   duplicateCollection: (id: string) => void
+
+  // Merge a folder tree (with its requests) into an existing collection,
+  // preserving the source folder structure. Used by importers when the user
+  // picks "merge into existing". Each folder and request is re-IDed to avoid
+  // collisions.
+  mergeIntoCollection: (
+    collectionId: string,
+    sourceFolder: Folder,
+    sourceRequests: Record<string, ApiRequest>,
+  ) => void
 
   // Tags
   updateFolderTags: (collectionId: string, folderId: string, tags: string[]) => void
@@ -446,6 +459,19 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
       }
     }),
 
+    closeAllTabs: () => set(s => {
+      s.tabs = [];
+      s.activeTabId = null;
+      // Don't clear activeCollectionId — the sidebar selection should stay put.
+    }),
+
+    closeOtherTabs: (keepTabId) => set(s => {
+      const kept = s.tabs.find(t => t.id === keepTabId);
+      s.tabs = kept ? [kept] : [];
+      s.activeTabId = kept?.id ?? null;
+      if (kept) s.activeCollectionId = kept.collectionId;
+    }),
+
     setActiveTabId: (id) => set(s => {
       s.activeTabId = id;
       const tab = s.tabs.find(t => t.id === id);
@@ -588,6 +614,55 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
       s.collections[newId] = { relPath, data: copy, dirty: true };
       s.activeCollectionId  = newId;
       if (s.workspace) s.workspace.collections.push(relPath);
+    }),
+
+    mergeIntoCollection: (collectionId, sourceFolder, sourceRequests) => set(s => {
+      const entry = s.collections[collectionId];
+      if (!entry) return;
+      const col = entry.data;
+
+      // Deep-clone, then re-ID every folder and request to avoid collisions.
+      const cloned: Folder = JSON.parse(JSON.stringify(sourceFolder));
+      function remapFolder(f: Folder) {
+        f.id = uuidv4();
+        f.requestIds = f.requestIds.map(oldId => {
+          const newId = uuidv4();
+          const srcReq = sourceRequests[oldId];
+          if (srcReq) col.requests[newId] = { ...srcReq, id: newId };
+          return newId;
+        });
+        f.folders.forEach(remapFolder);
+      }
+      remapFolder(cloned);
+
+      // Append each top-level subfolder of the cloned root into the target
+      // collection's root. This preserves the section/tag grouping. If the
+      // source root itself had direct requests (no subfolder), wrap them in
+      // a folder named after the source root.
+      if (cloned.folders.length > 0) {
+        // Has subfolders — merge them individually so we don't create an
+        // unnecessary wrapper.
+        for (const sub of cloned.folders) {
+          col.rootFolder.folders.push(sub);
+        }
+        // Also add any root-level requests (rare, but possible)
+        if (cloned.requestIds.length > 0) {
+          const wrapper: Folder = {
+            id: uuidv4(),
+            name: cloned.name || 'Imported',
+            description: '',
+            folders: [],
+            requestIds: cloned.requestIds,
+          };
+          col.rootFolder.folders.push(wrapper);
+        }
+      } else {
+        // No subfolders — the whole thing is one flat folder
+        col.rootFolder.folders.push(cloned);
+      }
+
+      entry.dirty = true;
+      s.activeCollectionId = collectionId;
     }),
 
     deleteCollection: (id) => set(s => {
@@ -796,6 +871,35 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
       s.collections[destCollectionId].dirty = true;
     }),
 
+    moveFolder: (collectionId, folderId, destParentFolderId, destIndex?) => set(s => {
+      const col = s.collections[collectionId]?.data;
+      if (!col) return;
+      const folder = findFolder(col.rootFolder, folderId);
+      if (!folder) return;
+      // Prevent dropping a folder into itself or one of its own descendants
+      if (folderId === destParentFolderId) return;
+      if (findFolder(folder, destParentFolderId)) return;
+
+      const srcParent = findFolderParent(col.rootFolder, folderId) ?? col.rootFolder;
+      const srcIdx    = srcParent.folders.findIndex(f => f.id === folderId);
+
+      // Remove from source
+      srcParent.folders.splice(srcIdx, 1);
+
+      // Insert into destination
+      const destParent = findFolder(col.rootFolder, destParentFolderId);
+      if (!destParent) return;
+      if (destIndex !== undefined) {
+        let adjusted = destIndex;
+        if (srcParent.id === destParent.id && srcIdx < destIndex) adjusted--;
+        adjusted = Math.max(0, Math.min(adjusted, destParent.folders.length));
+        destParent.folders.splice(adjusted, 0, folder);
+      } else {
+        destParent.folders.push(folder);
+      }
+      s.collections[collectionId].dirty = true;
+    }),
+
     // ── Tags ──────────────────────────────────────────────────────────────────
     updateFolderTags: (collectionId, folderId, tags) => set(s => {
       const col = s.collections[collectionId]?.data;
@@ -898,13 +1002,20 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
         };
         s.collections[activeColId].dirty = true;
       }
-      // Patch env vars back into the active environment
+      // Patch env vars back into the active environment. If the script created
+      // a variable that doesn't exist yet in the environment definition, add it
+      // so subsequent requests (including the main request after a before-hook)
+      // can see it.
       const activeEnvId = s.activeEnvironmentId;
       if (activeEnvId && s.environments[activeEnvId]) {
         const env = s.environments[activeEnvId].data;
         for (const [key, value] of Object.entries(result.updatedEnvVars)) {
-          const v = env.variables.find(v => v.key === key);
-          if (v && !v.secret) v.value = value;
+          const existing = env.variables.find(v => v.key === key);
+          if (existing && !existing.secret) {
+            existing.value = value;
+          } else if (!existing) {
+            env.variables.push({ key, value, enabled: true });
+          }
         }
       }
       // Patch globals

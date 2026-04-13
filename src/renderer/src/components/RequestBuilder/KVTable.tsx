@@ -14,9 +14,11 @@ interface Props {
   valuePlaceholder?: string
   /** When true, provides autocomplete for HTTP header names and common values. */
   headerMode?: boolean
+  /** When true, each row shows a "query/path" type selector. */
+  paramMode?: boolean
 }
 
-export function KVTable({ rows, onChange, keyPlaceholder = 'Key', valuePlaceholder = 'Value', headerMode }: Props) {
+export function KVTable({ rows, onChange, keyPlaceholder = 'Key', valuePlaceholder = 'Value', headerMode, paramMode }: Props) {
   // Track which rows have their description input visible.
   // Initialise with indices of rows that already have a description.
   const [descVisible, setDescVisible] = useState<Set<number>>(
@@ -67,6 +69,21 @@ export function KVTable({ rows, onChange, keyPlaceholder = 'Key', valuePlacehold
               onChange={e => update(idx, { enabled: e.target.checked })}
               className="accent-blue-500 flex-shrink-0"
             />
+            {paramMode && (
+              <select
+                value={row.paramType ?? 'query'}
+                onChange={e => update(idx, { paramType: e.target.value as 'query' | 'path' })}
+                title={(row.paramType ?? 'query') === 'path'
+                  ? 'Path variable — substituted into the URL via {{name}}'
+                  : 'Query string parameter — appended as ?key=value'}
+                className={`flex-shrink-0 text-[10px] bg-surface-800 border border-surface-700 rounded px-1.5 py-1 focus:outline-none focus:border-blue-500 font-mono ${
+                  (row.paramType ?? 'query') === 'path' ? 'text-violet-400' : 'text-surface-400'
+                }`}
+              >
+                <option value="query">query</option>
+                <option value="path">path</option>
+              </select>
+            )}
             <VarInput
               value={row.key}
               onChange={v => update(idx, { key: v })}

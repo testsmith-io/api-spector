@@ -34,6 +34,21 @@ interface Props {
   request: ApiRequest
 }
 
+/**
+ * Mirror of the runner-handler / request-handler status logic, applied to a
+ * single hook execution. Kept in sync with src/main/ipc/runner-handler.ts.
+ */
+function deriveHookStatus(r: {
+  response: { status: number }
+  scriptResult: { postScriptError?: string; testResults: { passed: boolean }[] }
+}): RunRequestResult['status'] {
+  if (r.scriptResult.postScriptError) return 'error';
+  if (r.response.status >= 400) return 'failed';
+  const tests = r.scriptResult.testResults;
+  if (tests.length === 0) return 'skipped';
+  return tests.every(t => t.passed) ? 'passed' : 'failed';
+}
+
 export function RequestBuilder({ request }: Props) {
   const updateRequest       = useStore(s => s.updateRequest);
   const activeEnvironmentId = useStore(s => s.activeEnvironmentId);
@@ -120,17 +135,28 @@ export function RequestBuilder({ request }: Props) {
       for (const hook of hooks.before) {
         const start = Date.now();
         try {
-          const r = await electron.sendRequest({ ...basePayload, request: hook, collectionVars, globals: liveGlobals });
+          // Re-read the environment each iteration — a prior hook may have
+          // updated it via sp.environment.set() or sp.variables.set().
+          const hookEnv = activeEnvironmentId
+            ? useStore.getState().environments[activeEnvironmentId]?.data ?? null
+            : null;
+          const hookSessionVars = useStore.getState().sessionVars;
+          const r = await electron.sendRequest({
+            ...basePayload,
+            environment: hookEnv,
+            request: hook,
+            collectionVars: { ...collectionVars, ...hookSessionVars },
+            globals: liveGlobals,
+          });
           applyScriptUpdates(r.scriptResult);
           collectionVars = { ...collectionVars, ...r.scriptResult.updatedCollectionVars };
           liveGlobals    = { ...liveGlobals,    ...r.scriptResult.updatedGlobals };
-          const allPassed = r.scriptResult.testResults.every((t: { passed: boolean }) => t.passed);
           collectedHookResults.push({
             requestId:   hook.id,
             name:        hook.name,
             method:      hook.method,
             resolvedUrl: r.scriptResult.resolvedUrl,
-            status:      r.scriptResult.postScriptError ? 'error' : (r.scriptResult.testResults.length > 0 ? (allPassed ? 'passed' : 'failed') : 'passed'),
+            status:      deriveHookStatus(r),
             httpStatus:  r.response.status,
             durationMs:  Date.now() - start,
             isHook:      true,
@@ -150,10 +176,18 @@ export function RequestBuilder({ request }: Props) {
       }
 
       // ── Run main request ────────────────────────────────────────────────────
+      // Re-read the environment from the store — before hooks may have updated
+      // it via sp.environment.set() (e.g. extracting a token), and the original
+      // snapshot in basePayload would be stale.
+      const freshEnv = activeEnvironmentId
+        ? useStore.getState().environments[activeEnvironmentId]?.data ?? null
+        : null;
+      const freshSessionVars = useStore.getState().sessionVars;
       const result = await electron.sendRequest({
         ...basePayload,
+        environment: freshEnv,
         request: mergedRequest,
-        collectionVars,
+        collectionVars: { ...collectionVars, ...freshSessionVars },
         globals: liveGlobals,
       });
 
@@ -176,17 +210,26 @@ export function RequestBuilder({ request }: Props) {
       for (const hook of hooks.after) {
         const start = Date.now();
         try {
-          const r = await electron.sendRequest({ ...basePayload, request: hook, collectionVars, globals: liveGlobals });
+          const hookEnv = activeEnvironmentId
+            ? useStore.getState().environments[activeEnvironmentId]?.data ?? null
+            : null;
+          const hookSessionVars = useStore.getState().sessionVars;
+          const r = await electron.sendRequest({
+            ...basePayload,
+            environment: hookEnv,
+            request: hook,
+            collectionVars: { ...collectionVars, ...hookSessionVars },
+            globals: liveGlobals,
+          });
           applyScriptUpdates(r.scriptResult);
           collectionVars = { ...collectionVars, ...r.scriptResult.updatedCollectionVars };
           liveGlobals    = { ...liveGlobals,    ...r.scriptResult.updatedGlobals };
-          const allPassed = r.scriptResult.testResults.every((t: { passed: boolean }) => t.passed);
           collectedHookResults.push({
             requestId:   hook.id,
             name:        hook.name,
             method:      hook.method,
             resolvedUrl: r.scriptResult.resolvedUrl,
-            status:      r.scriptResult.postScriptError ? 'error' : (r.scriptResult.testResults.length > 0 ? (allPassed ? 'passed' : 'failed') : 'passed'),
+            status:      deriveHookStatus(r),
             httpStatus:  r.response.status,
             durationMs:  Date.now() - start,
             isHook:      true,
@@ -346,10 +389,7 @@ export function RequestBuilder({ request }: Props) {
           </div>
 
           {/* Tab content */}
-          <div
-            className="px-4 py-3 flex-1 overflow-y-auto min-h-0"
-            style={{ minHeight: (activeTab === 'body' && (request.body.mode === 'graphql' || request.body.mode === 'soap')) || activeTab === 'schema' ? '400px' : '180px' }}
-          >
+          <div className="px-4 py-3 flex-1 overflow-y-auto min-h-0">
             {activeTab === 'params'  && <ParamsTab  request={request} onChange={update} />}
             {activeTab === 'headers' && <HeadersTab request={request} onChange={update} />}
             {activeTab === 'body'    && <BodyTab    request={request} onChange={update} />}

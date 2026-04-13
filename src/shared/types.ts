@@ -11,6 +11,12 @@ export interface KeyValuePair {
   value: string
   enabled: boolean
   description?: string
+  /**
+   * For request `params` only: distinguishes path variables (substituted into
+   * the URL via `{{name}}` interpolation) from query string parameters
+   * (appended as `?key=value`). Undefined defaults to `'query'`.
+   */
+  paramType?: 'query' | 'path'
 }
 
 export interface AuthConfig {
@@ -160,12 +166,15 @@ export interface ApiRequest {
   postRequestScript?: string
   /** Runs in the sandbox before GraphQL schema introspection. Use sp.environment.set() to inject auth headers. */
   graphqlIntrospectionScript?: string
+  /** Standalone JSON Schema for ad-hoc body validation. Independent of `contract`. */
   schema?: string
   contract?: ContractExpectation
   meta?: { tags?: string[]; createdAt?: string; [key: string]: unknown }
   protocol?: 'http' | 'websocket'  // default 'http'
   /** When set, this request acts as a lifecycle hook within its folder/collection scope. */
   hookType?: 'beforeAll' | 'before' | 'after' | 'afterAll'
+  /** When true, the request is excluded from collection/folder runs. */
+  disabled?: boolean
 }
 
 export interface Folder {
@@ -371,6 +380,12 @@ export interface RunnerItem {
   scopeAncestors?: string[]
   /** For before/after hooks: the main request this hook wraps. */
   mainRequestId?: string
+  /**
+   * Folder names from (just below) the root to the folder that owns this
+   * request/hook. Used for grouped rendering in the runner UI and reports.
+   * Empty array = direct child of the collection root.
+   */
+  scopePath?: string[]
 }
 
 export interface RunnerPayload {
@@ -392,7 +407,19 @@ export interface RunnerPayload {
   requestDelay?: number
 }
 
-export type RunStatus = 'pending' | 'running' | 'passed' | 'failed' | 'error'
+/**
+ * Status of a single request inside a runner pass.
+ *
+ * - `pending`  — queued, not started yet
+ * - `running`  — request in flight
+ * - `passed`   — HTTP 2xx/3xx AND every test passed
+ * - `failed`   — at least one test failed, OR HTTP 4xx/5xx
+ * - `error`    — pre/post script crashed or transport failure
+ * - `skipped`  — request completed (HTTP 2xx/3xx) but had no assertions to
+ *                check; "we ran it, we didn't verify anything." Distinct
+ *                from `passed` so users notice gaps in their test coverage.
+ */
+export type RunStatus = 'pending' | 'running' | 'passed' | 'failed' | 'error' | 'skipped'
 
 export interface RunRequestResult {
   requestId: string
@@ -412,6 +439,9 @@ export interface RunRequestResult {
   isHook?: boolean
   hookType?: 'beforeAll' | 'before' | 'afterAll' | 'after'
   scopeId?: string
+  /** Folder names from (just below) the root to the request's owning folder.
+   *  Mirror of RunnerItem.scopePath, used for grouped rendering. */
+  scopePath?: string[]
   /** Actual request sent over the wire */
   sentRequest?: {
     headers: Record<string, string>
@@ -431,6 +461,8 @@ export interface RunSummary {
   passed: number
   failed: number
   errors: number
+  /** Requests that ran successfully (2xx/3xx) but had no assertions to check. */
+  skipped: number
   durationMs: number
 }
 

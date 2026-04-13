@@ -69,6 +69,9 @@ export function buildHtmlReport(
   const ts         = meta.timestamp ?? new Date().toISOString();
   const collection = meta.collection ?? 'API Tests';
   const env        = meta.environment ?? '—';
+  // Pass rate counts skipped requests against the denominator. A green
+  // "100%" next to "1 no tests" is misleading — an unverified request is
+  // a gap in your coverage, and the pass rate should make that visible.
   const passRate   = summary.total > 0 ? Math.round((summary.passed / summary.total) * 100) : 0;
 
   const HOOK_LABELS: Record<string, string> = {
@@ -78,8 +81,20 @@ export function buildHtmlReport(
     afterAll:  'AFTER ALL',
   };
 
+  let lastScopeKey: string | null = null;
   const cards = results.map((r, idx) => {
-    const statusCls = r.status === 'passed' ? 'badge-pass' : r.status === 'failed' ? 'badge-fail' : 'badge-err';
+    // Folder-group heading: insert whenever the request's folder path changes
+    // from the previous row. Produces the same "folder structure" shown in
+    // the runner modal and the collection tree.
+    const scopeKey = (r.scopePath ?? []).join(' / ');
+    const groupHeading = (scopeKey && scopeKey !== lastScopeKey)
+      ? `    <div class="scope-heading">${esc(scopeKey)}</div>\n`
+      : '';
+    lastScopeKey = scopeKey;
+    const statusCls = r.status === 'passed'  ? 'badge-pass'
+                    : r.status === 'failed'  ? 'badge-fail'
+                    : r.status === 'skipped' ? 'badge-skip'
+                    : 'badge-err';
     const httpCls   = r.httpStatus && r.httpStatus < 300 ? 'http-ok' : r.httpStatus && r.httpStatus < 400 ? 'http-redir' : 'http-err';
     const dur       = r.durationMs != null ? `${r.durationMs} ms` : '—';
     const label     = r.iterationLabel ? ` <span class="muted">#${esc(r.iterationLabel)}</span>` : '';
@@ -131,7 +146,7 @@ export function buildHtmlReport(
 
     const hookCls  = hookLabel ? (r.hookType?.startsWith('before') ? 'card-hook-before' : 'card-hook-after') : '';
 
-    return `
+    return `${groupHeading}
     <div class="card ${hookCls}" id="r${idx}">
       <div class="card-header" onclick="toggle(${idx})">
         <span class="chevron" id="ch${idx}">▶</span>
@@ -173,8 +188,11 @@ export function buildHtmlReport(
   .stat-pass .stat-val { color: #3fb950; }
   .stat-fail .stat-val { color: #f85149; }
   .stat-err  .stat-val { color: #d29922; }
+  .stat-skip .stat-val { color: #8b949e; }
   /* Cards */
   .card { border: 1px solid #21262d; border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+  .scope-heading { margin: 18px 0 6px; padding: 4px 2px; font-size: 11px; font-weight: 600; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #21262d; }
+  .scope-heading::before { content: "▸ "; color: #484f58; }
   .card-header { display: flex; align-items: baseline; gap: 8px; padding: 10px 14px; cursor: pointer; user-select: none; }
   .card-header:hover { background: #161b22; }
   .chevron { font-size: 10px; color: #8b949e; min-width: 10px; transition: transform .15s; }
@@ -186,6 +204,7 @@ export function buildHtmlReport(
   .badge-pass { background: #0d3a1e; color: #3fb950; }
   .badge-fail { background: #3d1014; color: #f85149; }
   .badge-err  { background: #3d2a00; color: #d29922; }
+  .badge-skip { background: #21262d; color: #8b949e; }
   .method { font-family: monospace; font-size: 11px; font-weight: 700; color: #79c0ff; white-space: nowrap; }
   .method-badge { display: inline-block; font-family: monospace; font-size: 11px; font-weight: 700; color: #79c0ff; min-width: 52px; }
   .http-badge { font-family: monospace; font-size: 11px; font-weight: 600; white-space: nowrap; }
@@ -239,6 +258,7 @@ export function buildHtmlReport(
     <div class="stat stat-pass"><div class="stat-val">${summary.passed}</div><div class="stat-lbl">Passed</div></div>
     <div class="stat stat-fail"><div class="stat-val">${summary.failed}</div><div class="stat-lbl">Failed</div></div>
     <div class="stat stat-err"><div class="stat-val">${summary.errors}</div><div class="stat-lbl">Errors</div></div>
+    <div class="stat stat-skip"><div class="stat-val">${summary.skipped ?? 0}</div><div class="stat-lbl">No tests</div></div>
     <div class="stat"><div class="stat-val">${passRate}%</div><div class="stat-lbl">Pass rate</div></div>
     <div class="stat"><div class="stat-val">${summary.durationMs} ms</div><div class="stat-lbl">Duration</div></div>
   </div>
@@ -300,6 +320,10 @@ export function buildJUnitReport(
       failures.push(`      <error message="${esc(r.preScriptError)}" type="PreScriptError" />`);
     } else if (r.postScriptError) {
       failures.push(`      <error message="${esc(r.postScriptError)}" type="PostScriptError" />`);
+    } else if (r.status === 'skipped') {
+      // No assertions defined — emit a JUnit <skipped/> so CI dashboards
+      // surface coverage gaps without flagging the run as failed.
+      failures.push('      <skipped message="No assertions defined for this request" />');
     } else if (r.testResults?.length) {
       for (const t of r.testResults) {
         if (!t.passed) {
@@ -314,10 +338,11 @@ export function buildJUnitReport(
     return `    <testcase name="${name}" classname="${classname}" time="${timeSec}">${inner}</testcase>`;
   });
 
+  const skipped = summary.skipped ?? 0;
   const lines = [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    `<testsuites name="${suiteName}" tests="${summary.total}" failures="${summary.failed}" errors="${summary.errors}" time="${totalSec}">`,
-    `  <testsuite name="${suiteName}" tests="${summary.total}" failures="${summary.failed}" errors="${summary.errors}" time="${totalSec}" timestamp="${ts}">`,
+    `<testsuites name="${suiteName}" tests="${summary.total}" failures="${summary.failed}" errors="${summary.errors}" skipped="${skipped}" time="${totalSec}">`,
+    `  <testsuite name="${suiteName}" tests="${summary.total}" failures="${summary.failed}" errors="${summary.errors}" skipped="${skipped}" time="${totalSec}" timestamp="${ts}">`,
     ...cases,
     '  </testsuite>',
     '</testsuites>',

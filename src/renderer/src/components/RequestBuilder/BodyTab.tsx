@@ -53,10 +53,11 @@ export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: 
       )}
 
       {mode === 'json' && (
-        <div className="rounded overflow-hidden border border-surface-700" style={{ height: 140 }}>
+        <div className="rounded overflow-hidden border border-surface-700">
           <CodeMirror
             value={body.json ?? ''}
-            height="140px"
+            height="300px"
+            maxHeight="50vh"
             theme={oneDark}
             extensions={[json(), varExt]}
             onChange={val => onChange({ body: { ...body, json: val } })}
@@ -82,10 +83,11 @@ export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: 
             placeholder="Content-Type"
             className="text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1 w-48 focus:outline-none focus:border-blue-500"
           />
-          <div className="rounded overflow-hidden border border-surface-700" style={{ height: 120 }}>
+          <div className="rounded overflow-hidden border border-surface-700">
             <CodeMirror
               value={body.raw ?? ''}
-              height="120px"
+              height="300px"
+              maxHeight="50vh"
               theme={oneDark}
               extensions={[varExt]}
               onChange={val => onChange({ body: { ...body, raw: val } })}

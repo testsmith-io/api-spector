@@ -25,6 +25,7 @@ const summary: RunSummary = {
   passed: 1,
   failed: 0,
   errors: 0,
+  skipped: 0,
   durationMs: 42,
 };
 
@@ -116,6 +117,19 @@ describe('buildJUnitReport', () => {
     expect(xml).toContain('&amp;');
     expect(xml).toContain('&quot;');
   });
+
+  it('emits <skipped> for requests with no assertions', () => {
+    const result = makeResult({ status: 'skipped', testResults: [] });
+    const xml = buildJUnitReport([result], { ...summary, passed: 0, skipped: 1 }, meta);
+    expect(xml).toContain('<skipped');
+    expect(xml).toContain('No assertions defined for this request');
+  });
+
+  it('includes the skipped attribute on testsuites and testsuite elements', () => {
+    const xml = buildJUnitReport([], { ...summary, passed: 0, skipped: 5 }, meta);
+    expect(xml).toMatch(/<testsuites[^>]*\sskipped="5"/);
+    expect(xml).toMatch(/<testsuite[^>]*\sskipped="5"/);
+  });
 });
 
 // ─── buildHtmlReport ─────────────────────────────────────────────────────────
@@ -145,13 +159,21 @@ describe('buildHtmlReport', () => {
   });
 
   it('calculates and shows pass rate percentage', () => {
-    const s = { total: 4, passed: 3, failed: 1, errors: 0, durationMs: 100 };
+    const s: RunSummary = { total: 4, passed: 3, failed: 1, errors: 0, skipped: 0, durationMs: 100 };
     expect(buildHtmlReport([], s, meta)).toContain('>75%<');
   });
 
   it('shows 0% pass rate when total is 0', () => {
-    const s = { total: 0, passed: 0, failed: 0, errors: 0, durationMs: 0 };
+    const s: RunSummary = { total: 0, passed: 0, failed: 0, errors: 0, skipped: 0, durationMs: 0 };
     expect(buildHtmlReport([], s, meta)).toContain('>0%<');
+  });
+
+  it('counts skipped requests against the pass rate denominator', () => {
+    // 5 passed + 1 skipped → 5/6 ≈ 83%, not 100%. An unverified request
+    // is a coverage gap, and a green "100%" next to a skipped row would
+    // hide it.
+    const s: RunSummary = { total: 6, passed: 5, failed: 0, errors: 0, skipped: 1, durationMs: 363 };
+    expect(buildHtmlReport([], s, meta)).toContain('>83%<');
   });
 
   it('renders a card for each result', () => {
@@ -174,6 +196,46 @@ describe('buildHtmlReport', () => {
   it('marks an error result with badge-err class', () => {
     const html = buildHtmlReport([makeResult({ status: 'error' })], { ...summary, passed: 0, errors: 1 }, meta);
     expect(html).toContain('badge-err');
+  });
+
+  it('marks a skipped result with badge-skip class', () => {
+    const html = buildHtmlReport([makeResult({ status: 'skipped' })], { ...summary, passed: 0, skipped: 1 }, meta);
+    expect(html).toContain('badge-skip');
+  });
+
+  it('shows the "No tests" stat in the summary', () => {
+    const html = buildHtmlReport([], { ...summary, passed: 0, skipped: 3 }, meta);
+    expect(html).toContain('No tests');
+    expect(html).toMatch(/stat-skip[^<]*<div class="stat-val">3</);
+  });
+
+  it('renders folder headings between requests in different scopes', () => {
+    const results = [
+      makeResult({ name: 'List users',  scopePath: ['Users'] }),
+      makeResult({ name: 'Get user',    scopePath: ['Users'] }),
+      makeResult({ name: 'List orders', scopePath: ['Orders'] }),
+    ];
+    const html = buildHtmlReport(results, { ...summary, total: 3, passed: 3 }, meta);
+    // Two scope headings, one per distinct path
+    expect(html).toContain('<div class="scope-heading">Users</div>');
+    expect(html).toContain('<div class="scope-heading">Orders</div>');
+    // Users heading appears once, not twice (two consecutive Users requests
+    // share a single heading)
+    const usersHeadingMatches = html.match(/scope-heading">Users</g);
+    expect(usersHeadingMatches?.length).toBe(1);
+  });
+
+  it('omits folder heading for requests directly under the root', () => {
+    const results = [makeResult({ scopePath: [] })];
+    const html = buildHtmlReport(results, summary, meta);
+    // No heading element should be emitted — the CSS rule itself is fine
+    expect(html).not.toContain('<div class="scope-heading">');
+  });
+
+  it('renders nested folder paths joined with " / "', () => {
+    const results = [makeResult({ scopePath: ['Users', 'Admin'] })];
+    const html = buildHtmlReport(results, summary, meta);
+    expect(html).toContain('<div class="scope-heading">Users / Admin</div>');
   });
 
   it('renders test results with pass/fail indicators', () => {

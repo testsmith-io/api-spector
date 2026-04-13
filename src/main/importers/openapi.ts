@@ -70,6 +70,69 @@ function schemaToExample(schema: any): any {
   }
 }
 
+/**
+ * Pick the most useful 2xx response from `operation.responses` and return its
+ * JSON-ish content schema as a pretty-printed JSON string. Returns undefined
+ * if there's no JSON response schema to extract.
+ *
+ * Status preference: 200 → 201 → any other 2xx (numeric, sorted) → `2XX`
+ * (OpenAPI range form) → `default`.
+ *
+ * Content type matching: any media type whose subtype contains `json`
+ * (`application/json`, `application/json; charset=utf-8`,
+ * `application/vnd.api+json`, `application/problem+json`, …).
+ */
+function buildResponseSchema(operation: any, spec: any): string | undefined {
+  const responses = operation.responses;
+  if (!responses || typeof responses !== 'object') return undefined;
+
+  const codes = Object.keys(responses);
+  const ordered: string[] = [];
+  if (codes.includes('200')) ordered.push('200');
+  if (codes.includes('201')) ordered.push('201');
+  for (const code of codes.sort()) {
+    if (/^2\d\d$/.test(code) && !ordered.includes(code)) ordered.push(code);
+  }
+  // OpenAPI range form (case-insensitive in the spec, but Swagger UI / many
+  // generators emit uppercase X)
+  for (const code of codes) {
+    if (/^2xx$/i.test(code) && !ordered.includes(code)) ordered.push(code);
+  }
+  if (codes.includes('default')) ordered.push('default');
+
+  for (const code of ordered) {
+    // IMPORTANT: must resolve with a fresh `seen` set. The caller passes us
+    // the *unresolved* operation precisely so we can do this — pre-resolved
+    // trees can have $refs replaced by `{}` when the same component is
+    // referenced more than once under the same parent.
+    //
+    // The response object itself may be a $ref to #/components/responses/X,
+    // so resolve it first before reading `.content`.
+    const responseObj = resolve(spec, responses[code]);
+    const content = responseObj?.content;
+    if (!content || typeof content !== 'object') continue;
+
+    // Walk media types in priority order, accepting anything JSON-ish.
+    const mediaKeys = Object.keys(content);
+    const jsonKey =
+      mediaKeys.find(k => k.toLowerCase().split(';')[0].trim() === 'application/json') ??
+      mediaKeys.find(k => /[+/]json(\b|;)/i.test(k)) ??
+      mediaKeys.find(k => k.toLowerCase().includes('json'));
+    if (!jsonKey) continue;
+
+    const rawSchema = content[jsonKey]?.schema;
+    if (!rawSchema) continue;
+    const resolved = resolve(spec, rawSchema);
+    if (!resolved || (typeof resolved === 'object' && Object.keys(resolved).length === 0)) continue;
+    try {
+      return JSON.stringify(resolved, null, 2);
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
 function buildBody(operation: any, spec: any): RequestBody {
   const content = resolve(spec, operation.requestBody?.content ?? {});
   if ('application/json' in content) {
@@ -89,6 +152,54 @@ function buildParams(operation: any): KeyValuePair[] {
       enabled: p.required ?? false,
       description: p.description ?? '',
     }));
+}
+
+/**
+ * Build path-parameter rows for the request's `params` table. Each row carries
+ * `paramType: 'path'` so `buildUrl()` substitutes it into the URL via
+ * `{{name}}` interpolation rather than appending it to the querystring.
+ *
+ * Default value is taken (in order of preference) from:
+ *   1. the parameter's own `example` (OpenAPI param-level example)
+ *   2. the schema's `example` or `default`
+ *   3. the first `enum` value, if any
+ *   4. a type-based placeholder (1 for numbers, true for booleans, '' for strings)
+ */
+function buildPathParamRows(operation: any): KeyValuePair[] {
+  return (operation.parameters ?? [])
+    .filter((p: any) => p.in === 'path' && p.name)
+    .map((p: any): KeyValuePair => {
+      const schema = p.schema ?? {};
+      let value: unknown;
+      if (p.example !== undefined)        value = p.example;
+      else if (schema.example !== undefined) value = schema.example;
+      else if (schema.default !== undefined) value = schema.default;
+      else if (Array.isArray(schema.enum) && schema.enum.length) value = schema.enum[0];
+      else {
+        switch (schema.type) {
+          case 'integer':
+          case 'number':  value = 1; break;
+          case 'boolean': value = true; break;
+          default:        value = '';
+        }
+      }
+      return {
+        key:         String(p.name),
+        value:       value === null || value === undefined ? '' : String(value),
+        enabled:     true,
+        description: p.description ?? '',
+        paramType:   'path',
+      };
+    });
+}
+
+/**
+ * Rewrite OpenAPI path-template syntax (`/users/{id}`) into the project's
+ * variable interpolation syntax (`/users/{{id}}`), so the path params resolve
+ * from collection/environment variables at send-time.
+ */
+function rewritePathTemplate(url: string): string {
+  return url.replace(/\{([^/{}]+)\}/g, (_m, name) => `{{${name}}}`);
 }
 
 function buildHeaders(operation: any): KeyValuePair[] {
@@ -151,17 +262,29 @@ function buildCollection(spec: any): Collection {
       const opWithParams = { ...operation, parameters: allParams };
 
       const security = operation.security ?? globalSecurity;
+      // Path params are listed first in the params table so users see them
+      // immediately on the Params tab (since they're the ones requiring action).
+      const params: KeyValuePair[] = [
+        ...buildPathParamRows(opWithParams),
+        ...buildParams(opWithParams),
+      ];
+      // Pass the *unresolved* operation so buildResponseSchema can resolve
+      // refs with its own fresh seen set (the resolved tree above shares one
+      // seen set per pathItem, which collapses repeat $refs to {}).
+      const rawOperation = pathItem[method];
+      const responseSchema = buildResponseSchema(rawOperation, spec);
       const req: ApiRequest = {
         id: uuidv4(),
         name: operation.summary ?? operation.operationId ?? `${method.toUpperCase()} ${pathStr}`,
         method: method.toUpperCase() as any,
-        url: `${baseUrl}${pathStr}`,
+        url: rewritePathTemplate(`${baseUrl}${pathStr}`),
         headers: buildHeaders(opWithParams),
-        params: buildParams(opWithParams),
+        params,
         auth: buildAuth(security, securitySchemes),
         body: buildBody(opWithParams, spec),
         description: operation.description ?? '',
         meta: { tags },
+        ...(responseSchema ? { schema: responseSchema } : {}),
       };
       requests[req.id] = req;
 
@@ -188,4 +311,49 @@ export async function importOpenApi(filePath: string): Promise<Collection> {
 
 export async function importOpenApiFromUrl(url: string): Promise<Collection> {
   return buildCollection(await loadSpecFromUrl(url));
+}
+
+// ─── Schema extraction (for sync without re-import) ────────────────────────
+
+export interface SpecSchemaEntry {
+  method: string                // uppercase: GET, POST, etc.
+  pathTemplate: string          // raw OpenAPI path, e.g. /users/{id}
+  /** The same rewritten path used in imported requests, e.g. /users/{{id}} */
+  pathRewritten: string
+  schema: string                // pretty-printed JSON Schema (response body)
+  operationId?: string
+  summary?: string
+}
+
+/**
+ * Extract all response-body schemas from an OpenAPI spec.
+ * Returns one entry per operation that has a JSON response schema.
+ */
+function extractSchemas(spec: any): SpecSchemaEntry[] {
+  const entries: SpecSchemaEntry[] = [];
+  for (const [pathStr, pathItem] of Object.entries<any>(spec.paths ?? {})) {
+    for (const method of HTTP_METHODS) {
+      const operation = pathItem?.[method];
+      if (!operation) continue;
+      const schema = buildResponseSchema(operation, spec);
+      if (!schema) continue;
+      entries.push({
+        method:        method.toUpperCase(),
+        pathTemplate:  pathStr,
+        pathRewritten: rewritePathTemplate(pathStr),
+        schema,
+        operationId:   operation.operationId,
+        summary:       operation.summary,
+      });
+    }
+  }
+  return entries;
+}
+
+export async function extractSchemasFromFile(filePath: string): Promise<SpecSchemaEntry[]> {
+  return extractSchemas(await loadSpec(filePath));
+}
+
+export async function extractSchemasFromUrl(url: string): Promise<SpecSchemaEntry[]> {
+  return extractSchemas(await loadSpecFromUrl(url));
 }

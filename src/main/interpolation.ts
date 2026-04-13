@@ -72,11 +72,42 @@ export function buildUrl(
   params: KeyValuePair[],
   vars: Record<string, string>
 ): string {
-  const url = interpolate(baseUrl, vars);
+  // Detect which keys appear as `{{name}}` tokens in the URL template, so we
+  // can route param rows correctly without depending on the user remembering
+  // to flip a dropdown. A row is treated as a path substitution iff:
+  //   - it's enabled and has a key
+  //   - AND either paramType === 'path' OR its key appears in the URL template
+  // Everything else gets appended as a query string parameter.
+  const templateTokens = new Set<string>();
+  baseUrl.replace(/\{\{([^}]+)\}\}/g, (_m, name) => {
+    templateTokens.add(String(name).trim());
+    return '';
+  });
+
   const enabled = params.filter(p => p.enabled && p.key);
-  if (!enabled.length) return url;
+  const pathRows: KeyValuePair[] = [];
+  const queryRows: KeyValuePair[] = [];
+  for (const p of enabled) {
+    const isPath = p.paramType === 'path' || templateTokens.has(p.key);
+    if (isPath) pathRows.push(p);
+    else queryRows.push(p);
+  }
+
+  // Merge path rows into the var scope (per-request priority) before
+  // interpolating the URL, so `/pets/{{id}}` resolves from a row in the
+  // request's params table.
+  const mergedVars = pathRows.length
+    ? {
+      ...vars,
+      ...Object.fromEntries(pathRows.map(p => [p.key, interpolate(p.value, vars)])),
+    }
+    : vars;
+
+  const url = interpolate(baseUrl, mergedVars);
+
+  if (!queryRows.length) return url;
   const sep = url.includes('?') ? '&' : '?';
-  const qs = enabled
+  const qs = queryRows
     .map(p => `${encodeURIComponent(interpolate(p.key, vars))}=${encodeURIComponent(interpolate(p.value, vars))}`)
     .join('&');
   return url + sep + qs;

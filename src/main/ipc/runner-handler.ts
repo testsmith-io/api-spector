@@ -20,7 +20,7 @@ import {
   performNtlmRequest,
   fetchOAuth2Token,
 } from '../auth-builder';
-import { maskPii, maskHeaders } from './request-handler';
+import { maskPii, maskHeaders, buildSchemaTestResults } from './request-handler';
 
 // ─── Build undici dispatcher (proxy + TLS) ────────────────────────────────────
 
@@ -85,7 +85,7 @@ async function executeOne(
 
   // Pre-request script
   if (req.preRequestScript?.trim()) {
-    const r = await runScript(req.preRequestScript, {
+    const r = await runScript(interpolate(req.preRequestScript, vars), {
       envVars: { ...envVars }, collectionVars: { ...collectionVars },
       globals: { ...globals }, localVars: {},
     });
@@ -175,17 +175,20 @@ async function executeOne(
       bodySize: Buffer.byteLength(responseBody, 'utf8'), durationMs,
     };
 
+    // Schema validation (synthetic test results, independent of contract)
+    const schemaTestResults = buildSchemaTestResults(req.schema, responseBody);
+
     // Post-request script
-    let testResults: RunRequestResult['testResults'] = [];
+    let testResults: RunRequestResult['testResults'] = [...schemaTestResults];
     let consoleOutput: string[] = [];
     let postScriptError: string | undefined;
 
     if (req.postRequestScript?.trim()) {
-      const r = await runScript(req.postRequestScript, {
+      const r = await runScript(interpolate(req.postRequestScript, vars), {
         envVars: updatedEnvVars, collectionVars: updatedCollectionVars,
         globals: updatedGlobals, localVars, response,
       });
-      testResults           = r.testResults;
+      testResults           = [...schemaTestResults, ...r.testResults];
       consoleOutput         = r.consoleOutput;
       postScriptError       = r.error;
       updatedEnvVars        = r.updatedEnvVars;
@@ -196,10 +199,37 @@ async function executeOne(
       await persistGlobals();
     }
 
-    const allPassed = testResults.every(t => t.passed);
+    // Status determination, in priority order:
+    //   1. post-script crashed → 'error'
+    //   2. any explicit test failed → 'failed'
+    //   3. HTTP 4xx/5xx → 'failed' (synthetic test added below to explain why)
+    //   4. has assertions, all passed → 'passed'
+    //   5. no assertions at all → 'skipped'
+    //      ("ran but unverified" — distinct from 'passed' so the user can see
+    //      coverage gaps in the runner panel and reports.)
+    const allPassed  = testResults.every(t => t.passed);
+    const httpFailed = fetchResp.status >= 400;
+    const hasTests   = testResults.length > 0;
     const status: RunRequestResult['status'] = postScriptError
       ? 'error'
-      : testResults.length > 0 ? (allPassed ? 'passed' : 'failed') : 'passed';
+      : httpFailed
+        ? 'failed'
+        : hasTests
+          ? (allPassed ? 'passed' : 'failed')
+          : 'skipped';
+
+    // If HTTP failed and no explicit test caught it, surface a synthetic
+    // result so the user sees *why* the row is red.
+    if (httpFailed && !testResults.some(t => !t.passed)) {
+      testResults = [
+        ...testResults,
+        {
+          name:   `HTTP status ${fetchResp.status} ${fetchResp.statusText}`.trim(),
+          passed: false,
+          error:  `Request returned ${fetchResp.status} — no assertion was defined to verify the status code.`,
+        },
+      ];
+    }
 
     const sentHeaders: Record<string, string> = {};
     headers.forEach((v, k) => { sentHeaders[k] = v; });
@@ -260,7 +290,7 @@ export function registerRunnerHandler(ipc: IpcMain): void {
 
     const dispatcher = await buildDispatcher(proxy, tls);
 
-    const summary: RunSummary = { total: items.length, passed: 0, failed: 0, errors: 0, durationMs: 0 };
+    const summary: RunSummary = { total: items.length, passed: 0, failed: 0, errors: 0, skipped: 0, durationMs: 0 };
     const totalStart = Date.now();
 
     let runEnvVars        = { ...envVars };
@@ -315,6 +345,7 @@ export function registerRunnerHandler(ipc: IpcMain): void {
           isHook:     item.isHook,
           hookType:   item.hookType,
           scopeId:    item.scopeId,
+          scopePath:  item.scopePath,
           iterationLabel: item.iterationLabel,
         };
         summary.failed++;
@@ -326,6 +357,7 @@ export function registerRunnerHandler(ipc: IpcMain): void {
       const runningUpdate: Partial<RunRequestResult> = {
         status: 'running', iterationLabel: item.iterationLabel,
         isHook: item.isHook, hookType: item.hookType, scopeId: item.scopeId,
+        scopePath: item.scopePath,
       };
       event.sender.send('runner:progress', { requestId: item.request.id, ...runningUpdate });
 
@@ -345,7 +377,10 @@ export function registerRunnerHandler(ipc: IpcMain): void {
       runLocalVars      = updatedLocalVars;
 
       // ── Post-run: propagate failures ────────────────────────────────────
-      if (isHook && result.status !== 'passed') {
+      // A 'skipped' hook (HTTP 2xx with no assertions) is not a failure —
+      // only real failures or errors should propagate to dependent requests.
+      const hookFailed = result.status === 'failed' || result.status === 'error';
+      if (isHook && hookFailed) {
         if (hookType === 'beforeAll' && scopeId) {
           failedScopes.add(scopeId);
         } else if (hookType === 'before' && mainRequestId) {
@@ -353,13 +388,15 @@ export function registerRunnerHandler(ipc: IpcMain): void {
         }
       }
 
-      if (result.status === 'passed')      summary.passed++;
-      else if (result.status === 'failed') summary.failed++;
-      else                                  summary.errors++;
+      if (result.status === 'passed')       summary.passed++;
+      else if (result.status === 'failed')  summary.failed++;
+      else if (result.status === 'skipped') summary.skipped++;
+      else                                   summary.errors++;
 
       event.sender.send('runner:progress', {
         ...result, iterationLabel: item.iterationLabel,
         isHook: item.isHook, hookType: item.hookType, scopeId: item.scopeId,
+        scopePath: item.scopePath,
       });
 
       if (requestDelay > 0 && item !== items[items.length - 1]) {

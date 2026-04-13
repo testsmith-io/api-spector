@@ -201,3 +201,44 @@ describe('runScript — sp.response', () => {
     expect(result.testResults[0].passed).toBe(false);
   });
 });
+
+// ─── sp.totp ─────────────────────────────────────────────────────────────────
+
+describe('runScript — sp.totp', () => {
+  it('generates a 6-digit TOTP code from a base32 secret', async () => {
+    const result = await runScript(
+      `const code = sp.totp("JBSWY3DPEHPK3PXP"); console.log(code);`,
+      baseCtx,
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.consoleOutput).toHaveLength(1);
+    expect(result.consoleOutput[0]).toMatch(/^\d{6}$/);
+  });
+
+  it('supports 8-digit codes', async () => {
+    const result = await runScript(
+      `const code = sp.totp("JBSWY3DPEHPK3PXP", { digits: 8 }); console.log(code);`,
+      baseCtx,
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.consoleOutput[0]).toMatch(/^\d{8}$/);
+  });
+
+  it('can store the TOTP in a variable', async () => {
+    const result = await runScript(
+      `sp.variables.set("otp", sp.totp("JBSWY3DPEHPK3PXP"));`,
+      baseCtx,
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.updatedLocalVars['otp']).toMatch(/^\d{6}$/);
+  });
+
+  it('throws on invalid base32 characters', async () => {
+    const result = await runScript(
+      `sp.totp("INVALID!SECRET");`,
+      baseCtx,
+    );
+    expect(result.error).toBeDefined();
+    expect(result.error).toContain('Invalid base32');
+  });
+});

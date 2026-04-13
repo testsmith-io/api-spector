@@ -89,6 +89,58 @@ describe('buildUrl', () => {
     const url = buildUrl('https://example.com', [p('q', 'hello world')], {});
     expect(url).toBe('https://example.com?q=hello%20world');
   });
+
+  it('substitutes path parameters into the URL via {{name}}', () => {
+    const pathRow: KeyValuePair = { key: 'id', value: '42', enabled: true, paramType: 'path' };
+    const url = buildUrl('https://example.com/pets/{{id}}', [pathRow], {});
+    expect(url).toBe('https://example.com/pets/42');
+  });
+
+  it('mixes path and query parameters in a single request', () => {
+    const rows: KeyValuePair[] = [
+      { key: 'id',    value: '7',  enabled: true, paramType: 'path' },
+      { key: 'limit', value: '20', enabled: true },
+    ];
+    const url = buildUrl('https://example.com/pets/{{id}}', rows, {});
+    expect(url).toBe('https://example.com/pets/7?limit=20');
+  });
+
+  it('path parameter overrides an environment variable of the same name', () => {
+    const rows: KeyValuePair[] = [
+      { key: 'id', value: '99', enabled: true, paramType: 'path' },
+    ];
+    const url = buildUrl('https://example.com/pets/{{id}}', rows, { id: '1' });
+    expect(url).toBe('https://example.com/pets/99');
+  });
+
+  it('disabled path parameter falls through to env variable', () => {
+    const rows: KeyValuePair[] = [
+      { key: 'id', value: '99', enabled: false, paramType: 'path' },
+    ];
+    const url = buildUrl('https://example.com/pets/{{id}}', rows, { id: '1' });
+    expect(url).toBe('https://example.com/pets/1');
+  });
+
+  it('row key matching a URL template token substitutes even without paramType=path', () => {
+    // Regression: a row added through the UI defaults to query, but if its
+    // key matches a {{name}} token in the URL template, treat it as a path
+    // substitution rather than appending it as a query string parameter.
+    const rows = [{ key: 'id', value: '42', enabled: true }] as KeyValuePair[];
+    const url = buildUrl('https://example.com/brands/{{id}}', rows, {});
+    expect(url).toBe('https://example.com/brands/42');
+  });
+
+  it('row matching URL token with value referencing an env var resolves through the chain', () => {
+    const rows = [{ key: 'id', value: '{{petId}}', enabled: true }] as KeyValuePair[];
+    const url = buildUrl('https://example.com/brands/{{id}}', rows, { petId: '99' });
+    expect(url).toBe('https://example.com/brands/99');
+  });
+
+  it('does not duplicate a matching row into the query string', () => {
+    const rows = [{ key: 'id', value: '42', enabled: true }] as KeyValuePair[];
+    const url = buildUrl('https://example.com/brands/{{id}}', rows, {});
+    expect(url).not.toContain('?');
+  });
 });
 
 // ─── mergeVars ───────────────────────────────────────────────────────────────

@@ -185,8 +185,9 @@ export async function runConsumerContracts(
 ): Promise<ContractReport> {
   const vars = { ...envVars, ...collectionVars };
   // Only run requests that have a contract with at least one expectation
+  // and are not disabled
   const contractRequests = requests.filter(r =>
-    r.contract && (r.contract.statusCode !== undefined || r.contract.bodySchema || r.contract.headers?.length),
+    !r.disabled && r.contract && (r.contract.statusCode !== undefined || r.contract.bodySchema || r.contract.headers?.length),
   );
 
   const start   = Date.now();

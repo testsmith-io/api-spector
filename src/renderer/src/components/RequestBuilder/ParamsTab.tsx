@@ -13,6 +13,7 @@ export function ParamsTab({ request, onChange }: { request: ApiRequest; onChange
       onChange={rows => onChange({ params: rows })}
       keyPlaceholder="param"
       valuePlaceholder="value"
+      paramMode
     />
   );
 }
