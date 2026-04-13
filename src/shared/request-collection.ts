@@ -14,15 +14,6 @@ export type CollectedRequest = {
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
-function findFolderById(root: Folder, id: string): Folder | null {
-  if (root.id === id) return root;
-  for (const sub of root.folders) {
-    const found = findFolderById(sub, id);
-    if (found) return found;
-  }
-  return null;
-}
-
 /**
  * Return the chain of folders from `root` down to (and including) the folder
  * with id `targetId`. Returns [] if not found.
