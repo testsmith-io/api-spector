@@ -21,12 +21,12 @@ export interface KeyValuePair {
 
 export type AuthType = 'none' | 'basic' | 'bearer' | 'apikey' | 'digest' | 'ntlm' | 'oauth2'
 
-export interface NoneAuth       { type: 'none' }
-export interface BasicAuth      { type: 'basic';   username?: string; password?: string; passwordSecretRef?: string }
-export interface BearerAuth     { type: 'bearer';  token?: string; tokenSecretRef?: string }
-export interface ApiKeyAuth     { type: 'apikey';  apiKeyName?: string; apiKeyValue?: string; apiKeySecretRef?: string; apiKeyIn?: 'header' | 'query' }
-export interface DigestAuth     { type: 'digest';  username?: string; password?: string; passwordSecretRef?: string }
-export interface NtlmAuth       { type: 'ntlm';    username?: string; password?: string; passwordSecretRef?: string; ntlmDomain?: string; ntlmWorkstation?: string }
+export interface NoneAuth { type: 'none' }
+export interface BasicAuth { type: 'basic'; username?: string; password?: string; passwordSecretRef?: string }
+export interface BearerAuth { type: 'bearer'; token?: string; tokenSecretRef?: string }
+export interface ApiKeyAuth { type: 'apikey'; apiKeyName?: string; apiKeyValue?: string; apiKeySecretRef?: string; apiKeyIn?: 'header' | 'query' }
+export interface DigestAuth { type: 'digest'; username?: string; password?: string; passwordSecretRef?: string }
+export interface NtlmAuth { type: 'ntlm'; username?: string; password?: string; passwordSecretRef?: string; ntlmDomain?: string; ntlmWorkstation?: string }
 export interface Oauth2Auth {
   type: 'oauth2'
   oauth2Flow?: 'client_credentials' | 'authorization_code' | 'implicit' | 'password'
@@ -51,13 +51,13 @@ export type AuthConfig = NoneAuth | BasicAuth | BearerAuth | ApiKeyAuth | Digest
 /** Shape that allows merging any field regardless of current auth.type. Used by
  *  UI setters that spread partial updates (e.g. `setAuth({ username: 'x' })`).
  *  Narrowed AuthConfig is still the source of truth at consumer sites. */
-type UnionToIntersection<U> = (U extends unknown ? (k: U) => void : never) extends (k: infer I) => void ? I : never
+type UnionToIntersection<U> = ( U extends unknown ? ( k: U ) => void : never ) extends ( k: infer I ) => void ? I : never
 export type AuthPatch = Partial<UnionToIntersection<AuthConfig>>
 
 /** Exhaustiveness helper — put in the default of a switch to get a compile
  *  error if a new auth type is added without a handler. */
-export function assertNever(x: never): never {
-  throw new Error(`Unhandled case: ${JSON.stringify(x)}`)
+export function assertNever ( x: never ): never {
+  throw new Error( `Unhandled case: ${JSON.stringify( x )}` );
 }
 
 export interface GraphQLBody {
@@ -174,7 +174,7 @@ export interface ApiRequest {
   /** Standalone JSON Schema for ad-hoc body validation. Independent of `contract`. */
   schema?: string
   contract?: ContractExpectation
-  meta?: { tags?: string[]; createdAt?: string; [key: string]: unknown }
+  meta?: { tags?: string[]; createdAt?: string;[key: string]: unknown }
   protocol?: 'http' | 'websocket'  // default 'http'
   /** When set, this request acts as a lifecycle hook within its folder/collection scope. */
   hookType?: 'beforeAll' | 'before' | 'after' | 'afterAll'
@@ -518,44 +518,44 @@ export interface MockHit {
 // ─── Recorder ─────────────────────────────────────────────────────────────────
 
 export interface RecorderConfig {
-  upstream:       string
-  port:           number
-  maskHeaders?:   string[]
+  upstream: string
+  port: number
+  maskHeaders?: string[]
   ignoreHeaders?: string[]
 }
 
 export interface RecordedRequest {
-  method:  string
-  path:    string
-  query:   Record<string, string>
+  method: string
+  path: string
+  query: Record<string, string>
   headers: Record<string, string>
-  body:    string | null
+  body: string | null
 }
 
 export interface RecordedResponse {
-  status:     number
+  status: number
   statusText: string
-  headers:    Record<string, string>
-  body:       string | null
-  binary:     boolean
-  bodySize:   number
+  headers: Record<string, string>
+  body: string | null
+  binary: boolean
+  bodySize: number
 }
 
 export interface RecordedEntry {
-  id:         string
-  timestamp:  string
+  id: string
+  timestamp: string
   durationMs: number
-  request:    RecordedRequest
-  response:   RecordedResponse
+  request: RecordedRequest
+  response: RecordedResponse
 }
 
 export interface RecordingSession {
-  version:       '1.0'
-  upstream:      string
-  port:          number
-  startedAt:     string
+  version: '1.0'
+  upstream: string
+  port: number
+  startedAt: string
   maskedHeaders: string[]
-  entries:       RecordedEntry[]
+  entries: RecordedEntry[]
 }
 
 // ─── Git ──────────────────────────────────────────────────────────────────────
@@ -568,34 +568,34 @@ export interface GitFile {
 }
 
 export interface GitStatus {
-  staged:     GitFile[]
-  unstaged:   GitFile[]
-  untracked:  GitFile[]
+  staged: GitFile[]
+  unstaged: GitFile[]
+  untracked: GitFile[]
   conflicted: string[]   // paths with merge conflicts
-  branch:     string
-  ahead:      number
-  behind:    number
-  remote:    string | null
+  branch: string
+  ahead: number
+  behind: number
+  remote: string | null
 }
 
 export interface GitCommit {
-  hash:    string
-  short:   string
+  hash: string
+  short: string
   message: string
-  author:  string
-  email:   string
-  date:    string
+  author: string
+  email: string
+  date: string
 }
 
 export interface GitBranch {
-  name:    string
+  name: string
   current: boolean
-  remote:  boolean
+  remote: boolean
 }
 
 export interface GitRemote {
   name: string
-  url:  string
+  url: string
 }
 
 export type CiPlatform = 'github' | 'gitlab' | 'azure' | 'unknown'
