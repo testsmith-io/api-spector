@@ -84,7 +84,7 @@ export function buildUrl(
     return '';
   });
 
-  const enabled = params.filter(p => p.enabled && p.key);
+  const enabled = (params ?? []).filter(p => p.enabled && p.key);
   const pathRows: KeyValuePair[] = [];
   const queryRows: KeyValuePair[] = [];
   for (const p of enabled) {

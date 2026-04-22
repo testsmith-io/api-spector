@@ -17,6 +17,7 @@
   - [Run Tests](cli/run.md)
   - [Mock Servers](cli/mock.md)
   - [Pipeline Integration](cli/cicd.md)
+  - [AI Agents](cli/agents.md)
 
 - **Reference**
   - [Variables & Scopes](reference/variables.md)

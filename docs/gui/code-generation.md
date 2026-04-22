@@ -1,6 +1,6 @@
 # Export to Code
 
-api Spector can generate test code from a collection for several frameworks.
+API Spector can generate test code from a collection for several frameworks.
 
 ## Open the code generator
 

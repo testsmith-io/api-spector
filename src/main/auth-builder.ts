@@ -3,7 +3,7 @@
 // See LICENSE for full terms.
 
 import crypto from 'crypto';
-import type { AuthConfig } from '../shared/types';
+import type { AuthConfig, DigestAuth, NtlmAuth, Oauth2Auth } from '../shared/types';
 import { getSecret } from './ipc/secret-handler';
 import { interpolate } from './interpolation';
 
@@ -151,7 +151,7 @@ export function buildDigestAuthHeader(
 export async function performDigestAuth(
   url: string,
   method: string,
-  auth: AuthConfig,
+  auth: DigestAuth,
   vars: Record<string, string>,
   fetchFn: (url: string, init: Record<string, unknown>) => Promise<{ status: number; headers: { get(k: string): string | null } }>,
 ): Promise<string | null> {
@@ -189,7 +189,7 @@ export async function performDigestAuth(
 export async function performNtlmRequest(
   _url: string,
   _method: string,
-  _auth: AuthConfig,
+  _auth: NtlmAuth,
   _vars: Record<string, string>,
 ): Promise<never> {
   throw new Error(
@@ -210,7 +210,7 @@ export interface OAuth2TokenResult {
  * The token is NOT cached here — callers should store it in auth.oauth2CachedToken.
  */
 export async function fetchOAuth2Token(
-  auth: AuthConfig,
+  auth: Oauth2Auth,
   vars: Record<string, string>,
 ): Promise<OAuth2TokenResult> {
   const flow = auth.oauth2Flow ?? 'client_credentials';

@@ -2,10 +2,12 @@
 // Licensed for private, internal, non-commercial use only.
 // See LICENSE for full terms.
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
+import { buildClientSchema, parse as parseGql, print as printGql, type IntrospectionQuery } from 'graphql';
+import { graphql as cm6Graphql } from 'cm6-graphql';
 import type { ApiRequest, GraphQLBody } from '../../../../shared/types';
 import { useStore } from '../../store';
 
@@ -90,18 +92,101 @@ function buildSnippet(field: GqlField, typeMap: Map<string, GqlType>): string {
   return `  ${field.name}${args}`;
 }
 
-/** Insert a snippet into a query string, before the last closing brace. */
-function insertSnippet(query: string, snippet: string): string {
+/**
+ * Insert a snippet into a query string.
+ *
+ * When `parentField` is given (e.g. "category"), the function first tries to
+ * find an existing `category {` block in the query and inserts inside it. If
+ * no such block exists, it creates `category {\n  <snippet>\n}` and inserts
+ * that at the deepest level.
+ *
+ * When no `parentField` is given, inserts at the deepest `{ }` block (for
+ * root-level fields).
+ *
+ * If the query is empty, wraps in `query { … }`.
+ */
+function insertSnippet(query: string, snippet: string, parentField?: string): string {
   const trimmed = query.trim();
   if (!trimmed) return `query {\n${snippet}\n}`;
 
-  const lastBrace = trimmed.lastIndexOf('}');
-  if (lastBrace === -1) return trimmed + '\n' + snippet;
+  // If we have a parentField, try to find its existing `{ }` block
+  if (parentField) {
+    // Match `parentField {` or `parentField(args) {` — find the opening brace
+    const regex = new RegExp(`\\b${parentField}\\b(?:\\s*\\([^)]*\\))?\\s*\\{`);
+    const match = regex.exec(trimmed);
+    if (match) {
+      // Found existing block — find its closing brace by counting braces
+      const openPos = match.index + match[0].length;
+      let depth = 1;
+      let closePos = -1;
+      for (let i = openPos; i < trimmed.length; i++) {
+        if (trimmed[i] === '{') depth++;
+        else if (trimmed[i] === '}') {
+          depth--;
+          if (depth === 0) { closePos = i; break; }
+        }
+      }
+      if (closePos !== -1) {
+        // Count the nesting depth at the insertion point for indentation
+        let nestDepth = 0;
+        for (let i = 0; i < closePos; i++) {
+          if (trimmed[i] === '{') nestDepth++;
+          else if (trimmed[i] === '}') nestDepth--;
+        }
+        const indent = '  '.repeat(nestDepth);
+        // Re-indent all lines of the snippet, not just the first
+        const reindented = snippet
+          .split('\n')
+          .map(line => indent + line.trim())
+          .filter(line => line.trim())
+          .join('\n');
+        return trimmed.slice(0, closePos).trimEnd() + '\n' + reindented + '\n' + '  '.repeat(nestDepth - 1) + trimmed.slice(closePos);
+      }
+    }
 
-  return trimmed.slice(0, lastBrace).trimEnd() + '\n' + snippet + '\n' + trimmed.slice(lastBrace);
+    // No existing block found — wrap the snippet and fall through to
+    // insert the wrapped block at the deepest level
+    snippet = `  ${parentField} {\n  ${snippet}\n  }`;
+  }
+
+  // Find the deepest `{ }` block and insert before its closing brace
+  let maxDepth = 0;
+  let depth = 0;
+  let insertPos = -1;
+
+  for (let i = 0; i < trimmed.length; i++) {
+    const ch = trimmed[i];
+    if (ch === '{') {
+      depth++;
+      if (depth > maxDepth) maxDepth = depth;
+    } else if (ch === '}') {
+      if (depth === maxDepth && insertPos === -1) {
+        insertPos = i;
+      }
+      depth--;
+    }
+  }
+
+  if (insertPos === -1) return trimmed + '\n' + snippet;
+
+  const depthAtInsert = maxDepth;
+  const indent = '  '.repeat(depthAtInsert);
+  const reindented = snippet
+    .split('\n')
+    .map(line => {
+      const stripped = line.replace(/^ {0,2}/, '');
+      return indent + stripped;
+    })
+    .join('\n');
+
+  return trimmed.slice(0, insertPos).trimEnd() + '\n' + reindented + '\n' + '  '.repeat(depthAtInsert - 1) + trimmed.slice(insertPos);
 }
 
 // ─── Introspection ────────────────────────────────────────────────────────────
+
+// 7 levels of ofType unwrapping covers types like [[String!]!]! which needs 5,
+// plus some margin. buildClientSchema throws if the chain is truncated.
+const TYPE_REF = `kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name } } } } } }`;
 
 const INTROSPECTION_QUERY = `query IntrospectionQuery {
   __schema {
@@ -112,17 +197,37 @@ const INTROSPECTION_QUERY = `query IntrospectionQuery {
       name kind description
       fields(includeDeprecated: false) {
         name description
-        type { kind name ofType { kind name ofType { kind name } } }
+        type { ${TYPE_REF} }
         args {
           name description
-          type { kind name ofType { kind name ofType { kind name } } }
+          type { ${TYPE_REF} }
         }
       }
     }
   }
 }`;
 
-async function fetchSchema(url: string, extraHeaders: Record<string, string> = {}): Promise<ParsedSchema> {
+interface FetchSchemaResult {
+  parsed: ParsedSchema
+  /** Raw introspection JSON for caching + building the full GraphQLSchema. */
+  rawIntrospection: IntrospectionQuery
+}
+
+function parseIntrospection(rawData: { __schema: unknown }): ParsedSchema {
+  const schema = rawData.__schema as Record<string, unknown>;
+  const typeMap = new Map<string, GqlType>();
+  for (const t of (schema.types ?? []) as GqlType[]) {
+    if (t.name && !t.name.startsWith('__')) typeMap.set(t.name, t);
+  }
+  return {
+    queryType: (schema.queryType as { name: string } | null)?.name ?? null,
+    mutationType: (schema.mutationType as { name: string } | null)?.name ?? null,
+    subscriptionType: (schema.subscriptionType as { name: string } | null)?.name ?? null,
+    typeMap,
+  };
+}
+
+async function fetchSchemaFromUrl(url: string, extraHeaders: Record<string, string> = {}): Promise<FetchSchemaResult> {
   const resp = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...extraHeaders },
@@ -134,17 +239,9 @@ async function fetchSchema(url: string, extraHeaders: Record<string, string> = {
     const msg = data?.errors?.[0]?.message ?? 'Invalid introspection response';
     throw new Error(msg);
   }
-
-  const typeMap = new Map<string, GqlType>();
-  for (const t of schema.types as GqlType[]) {
-    if (t.name && !t.name.startsWith('__')) typeMap.set(t.name, t);
-  }
-
   return {
-    queryType: schema.queryType?.name ?? null,
-    mutationType: schema.mutationType?.name ?? null,
-    subscriptionType: schema.subscriptionType?.name ?? null,
-    typeMap,
+    parsed: parseIntrospection(data.data),
+    rawIntrospection: data.data as IntrospectionQuery,
   };
 }
 
@@ -159,7 +256,7 @@ function FieldNode({
   field: GqlField
   typeMap: Map<string, GqlType>
   depth: number
-  onInsert: (snippet: string) => void
+  onInsert: (snippet: string, parentField?: string) => void
 }) {
   const [expanded, setExpanded] = useState(false);
   const baseTypeName = getBaseTypeName(field.type);
@@ -167,6 +264,15 @@ function FieldNode({
   const isObject     = baseKind === 'OBJECT' || baseKind === 'INTERFACE';
   const nestedType   = typeMap.get(baseTypeName);
   const hasChildren  = isObject && !!nestedType?.fields?.length;
+
+  // When a child field is clicked, pass it up with the parent context.
+  // If the child already carries a parentField (from a deeper nesting level),
+  // pass it through unchanged — the deeper child knows which block it needs.
+  // Only set this field's name as parentField if the child didn't provide one
+  // (i.e. the child is a direct leaf of this field).
+  const childInsert = useCallback((childSnippet: string, childParent?: string) => {
+    onInsert(childSnippet, childParent ?? field.name);
+  }, [field.name, onInsert]);
 
   return (
     <div>
@@ -208,7 +314,7 @@ function FieldNode({
       </div>
 
       {expanded && hasChildren && nestedType!.fields!.map(f => (
-        <FieldNode key={f.name} field={f} typeMap={typeMap} depth={depth + 1} onInsert={onInsert} />
+        <FieldNode key={f.name} field={f} typeMap={typeMap} depth={depth + 1} onInsert={childInsert} />
       ))}
     </div>
   );
@@ -223,7 +329,7 @@ function RootTypeSection({
   label: string
   typeName: string
   typeMap: Map<string, GqlType>
-  onInsert: (snippet: string) => void
+  onInsert: (snippet: string, parentField?: string) => void
 }) {
   const [expanded, setExpanded] = useState(true);
   const type = typeMap.get(typeName);
@@ -251,13 +357,13 @@ function SchemaExplorer({
   onInsert,
 }: {
   schema: ParsedSchema
-  onInsert: (snippet: string) => void
+  onInsert: (snippet: string, parentField?: string) => void
 }) {
   const [search, setSearch] = useState('');
 
   const filter = search.trim().toLowerCase();
 
-  function filteredInsert(snippet: string) { onInsert(snippet); }
+  function filteredInsert(snippet: string, parentField?: string) { onInsert(snippet, parentField); }
 
   // When searching, show a flat filtered list across all root type fields
   const rootTypeNames = [schema.queryType, schema.mutationType, schema.subscriptionType].filter(Boolean) as string[];
@@ -319,23 +425,32 @@ interface Props {
   onChange: (p: Partial<ApiRequest>) => void
 }
 
-export function GraphQLEditor({ request, onChange }: Props) {
-  const gql = request.body.graphql ?? { query: '', variables: '' };
+const EMPTY_GQL: GraphQLBody = { query: '', variables: '' };
 
-  // For introspection hook: build plain env/collection/globals maps (renderer-side, no secret decryption)
-  const hookVars = useStore(s => {
-    const envId = s.activeEnvironmentId;
-    const colId = s.activeCollectionId;
+export function GraphQLEditor({ request, onChange }: Props) {
+  const gql = useMemo(
+    () => request.body.graphql ?? EMPTY_GQL,
+    [request.body.graphql],
+  );
+
+  // For introspection hook: build plain env/collection/globals maps.
+  // Read reactively from the store so edits to variables are picked up
+  // without needing to switch environments.
+  const activeEnvironmentId = useStore(s => s.activeEnvironmentId);
+  const activeCollectionId  = useStore(s => s.activeCollectionId);
+  const envData        = useStore(s => activeEnvironmentId ? s.environments[activeEnvironmentId]?.data : null);
+  const colVarsData    = useStore(s => activeCollectionId ? s.collections[activeCollectionId]?.data.collectionVariables : null);
+  const globals        = useStore(s => s.globals);
+  const hookVars = useMemo(() => {
     const envVars: Record<string, string> = {};
-    if (envId) {
-      for (const v of s.environments[envId]?.data.variables ?? []) {
+    if (envData) {
+      for (const v of envData.variables) {
         if (v.enabled && v.key && !v.secret && !v.envRef) envVars[v.key] = v.value;
       }
     }
-    const collectionVars: Record<string, string> =
-      colId ? { ...(s.collections[colId]?.data.collectionVariables ?? {}) } : {};
-    return { envVars, collectionVars, globals: { ...s.globals } };
-  });
+    const collectionVars: Record<string, string> = colVarsData ? { ...colVarsData } : {};
+    return { envVars, collectionVars, globals: { ...globals } };
+  }, [envData, colVarsData, globals]);
 
   const [schema,      setSchema]      = useState<ParsedSchema | null>(null);
   const [schemaState, setSchemaState] = useState<'idle' | 'loading' | 'error'>('idle');
@@ -343,12 +458,51 @@ export function GraphQLEditor({ request, onChange }: Props) {
   const [showVars,    setShowVars]    = useState(false);
   const [showExplorer, setShowExplorer] = useState(true);
 
+  // Build a full GraphQLSchema for CM6 autocomplete from the cached or
+  // freshly-fetched introspection result.
+  const gqlSchema = useMemo(() => {
+    const raw = request.graphqlIntrospectionCache;
+    if (!raw) return null;
+    try {
+      return buildClientSchema(JSON.parse(raw) as IntrospectionQuery);
+    } catch {
+      return null;
+    }
+  }, [request.graphqlIntrospectionCache]);
+
+  // CM6 extension for GraphQL syntax highlighting + autocomplete.
+  // Memoised with a stable reference so CodeMirror doesn't reconfigure
+  // on every render.
+  const gqlExtension = useMemo(() => {
+    if (!gqlSchema) return [];
+    try {
+      return [cm6Graphql(gqlSchema)];
+    } catch {
+      return [];
+    }
+  }, [gqlSchema]);
+
+  // Restore the schema explorer from cache when the request changes (tab
+  // switch) or when the cache is first populated after a fetch.
+  useEffect(() => {
+    if (request.graphqlIntrospectionCache) {
+      try {
+        const data = JSON.parse(request.graphqlIntrospectionCache) as { __schema: unknown };
+        setSchema(parseIntrospection(data));
+      } catch {
+        setSchema(null);
+      }
+    } else {
+      setSchema(null);
+    }
+  }, [request.graphqlIntrospectionCache, request.id]);
+
   function updateGql(patch: Partial<GraphQLBody>) {
     onChange({ body: { ...request.body, graphql: { ...gql, ...patch } } });
   }
 
-  const handleInsert = useCallback((snippet: string) => {
-    onChange({ body: { ...request.body, graphql: { ...gql, query: insertSnippet(gql.query, snippet) } } });
+  const handleInsert = useCallback((snippet: string, parentField?: string) => {
+    onChange({ body: { ...request.body, graphql: { ...gql, query: insertSnippet(gql.query, snippet, parentField) } } });
   }, [gql, onChange, request.body]);
 
   async function loadSchema() {
@@ -386,8 +540,11 @@ export function GraphQLEditor({ request, onChange }: Props) {
           extraHeaders[key] = val;
         }
       }
-      const parsed = await fetchSchema(url, extraHeaders);
+      const { parsed, rawIntrospection } = await fetchSchemaFromUrl(url, extraHeaders);
       setSchema(parsed);
+      // Cache the raw introspection on the request so it persists across tab
+      // switches and app restarts, and feeds CM6 autocomplete.
+      onChange({ graphqlIntrospectionCache: JSON.stringify(rawIntrospection) });
       setSchemaState('idle');
       setShowExplorer(true);
     } catch (e) {
@@ -449,26 +606,61 @@ export function GraphQLEditor({ request, onChange }: Props) {
         <div className="flex-1 flex flex-col min-h-0 gap-2">
           {/* Query editor */}
           <div className="flex-1 min-h-0 rounded overflow-hidden border border-surface-700">
+            <div className="flex justify-end px-2 py-0.5 bg-surface-800/50 border-b border-surface-700">
+              <button
+                onClick={() => {
+                  try {
+                    // Temporarily replace {{var}} tokens so parseGql doesn't choke
+                    const vars: string[] = [];
+                    const safe = gql.query.replace(/\{\{([^}]+)\}\}/g, (_m, v) => {
+                      vars.push(v);
+                      return `__TPL${vars.length - 1}__`;
+                    });
+                    let formatted = printGql(parseGql(safe));
+                    // Restore {{var}} tokens
+                    formatted = formatted.replace(/__TPL(\d+)__/g, (_m, i) => `{{${vars[Number(i)]}}}`);
+                    updateGql({ query: formatted });
+                  } catch { /* invalid query */ }
+                }}
+                className="text-[10px] text-surface-500 hover:text-white transition-colors"
+                title="Format GraphQL query (comments will not be preserved)"
+              >
+                Format
+              </button>
+            </div>
             <CodeMirror
               value={gql.query}
               height="100%"
               theme={oneDark}
-              extensions={[]}
+              extensions={gqlExtension}
               onChange={val => updateGql({ query: val })}
               placeholder="query {\n  # your query here\n}"
-              basicSetup={{ lineNumbers: true, foldGutter: true, bracketMatching: true, autocompletion: false }}
+              basicSetup={{ lineNumbers: true, foldGutter: true, bracketMatching: true, autocompletion: !gqlSchema }}
             />
           </div>
 
           {/* Variables section */}
           <div className="flex-shrink-0">
-            <button
-              onClick={() => setShowVars(v => !v)}
-              className="text-[10px] text-surface-600 hover:text-surface-300 uppercase tracking-wider font-medium flex items-center gap-1 mb-1"
-            >
-              <span>{showVars ? '▾' : '▸'}</span> Variables
-              {gql.variables?.trim() && <span className="text-blue-400 ml-1">●</span>}
-            </button>
+            <div className="flex items-center gap-2 mb-1">
+              <button
+                onClick={() => setShowVars(v => !v)}
+                className="text-[10px] text-surface-600 hover:text-surface-300 uppercase tracking-wider font-medium flex items-center gap-1"
+              >
+                <span>{showVars ? '▾' : '▸'}</span> Variables
+                {gql.variables?.trim() && <span className="text-blue-400 ml-1">●</span>}
+              </button>
+              {showVars && gql.variables?.trim() && (
+                <button
+                  onClick={() => {
+                    try { updateGql({ variables: JSON.stringify(JSON.parse(gql.variables), null, 2) }); } catch { /* invalid json */ }
+                  }}
+                  className="text-[10px] text-surface-500 hover:text-white transition-colors"
+                  title="Format JSON variables"
+                >
+                  Format
+                </button>
+              )}
+            </div>
             {showVars && (
               <div className="rounded overflow-hidden border border-surface-700" style={{ height: 100 }}>
                 <CodeMirror

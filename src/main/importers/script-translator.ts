@@ -5,7 +5,7 @@
 // ─── Script translator ────────────────────────────────────────────────────────
 //
 // Converts pre/post-request scripts from Postman (pm.*), Bruno (bru.*/res.*),
-// and Insomnia (insomnia.*) into api spector's sp.* scripting API.
+// and Insomnia (insomnia.*) into API Spector's sp.* scripting API.
 
 type Rule = [RegExp, string]
 

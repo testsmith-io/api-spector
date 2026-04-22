@@ -2,7 +2,7 @@
 // Licensed for private, internal, non-commercial use only.
 // See LICENSE for full terms.
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore } from '../../store';
 import CodeMirror from '@uiw/react-codemirror';
 import { oneDark } from '@codemirror/theme-one-dark';
@@ -43,10 +43,22 @@ export function GeneratorPanel() {
     activeCollectionId ?? colList[0]?.data.id ?? ''
   );
 
+  // Clear preview whenever the user changes target/collection — the previously
+  // generated files are stale and would mislead if shown alongside a different
+  // target's output.
+  useEffect(() => {
+    setFiles([]);
+    setSelectedFile(null);
+    setError(null);
+  }, [target, selectedCollectionId]);
+
   async function generate() {
     if (!selectedCollectionId) return;
     setGenerating(true);
     setError(null);
+    // Hard reset: replace, never merge. Each Generate is a fresh output.
+    setFiles([]);
+    setSelectedFile(null);
     try {
       const col = collections[selectedCollectionId]?.data;
       const env = activeEnvironmentId ? environments[activeEnvironmentId]?.data ?? null : null;

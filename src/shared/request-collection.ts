@@ -2,7 +2,7 @@
 // Licensed for private, internal, non-commercial use only.
 // See LICENSE for full terms.
 
-import type { Folder, Collection, ApiRequest, RunnerItem } from './types';
+import type { Folder, Collection, ApiRequest, RunnerItem, AuthConfig, KeyValuePair } from './types';
 
 export type CollectedRequest = {
   request: ApiRequest
@@ -217,6 +217,51 @@ function folderPathTo(root: Folder, requestId: string): Folder[] {
  * before: [outermost scope → innermost scope], beforeAll then before within each scope.
  * after:  [innermost scope → outermost scope], after then afterAll within each scope.
  */
+/**
+ * Collect all hook requests applicable to a given folder, by walking from
+ * the collection root down to (and including) that folder. Hooks defined at
+ * any ancestor scope wrap requests in this folder.
+ *
+ * Returned in correct execution order:
+ *   - beforeAll: outer → inner
+ *   - before:    outer → inner
+ *   - after:     inner → outer
+ *   - afterAll:  inner → outer
+ */
+export function getAllApplicableHooks(
+  folderId: string,
+  collection: Collection,
+): { beforeAll: ApiRequest[]; before: ApiRequest[]; after: ApiRequest[]; afterAll: ApiRequest[] } {
+  // folderPathTo expects a request id; build a similar walk for folder ids
+  function chainToFolder(root: Folder, targetId: string): Folder[] {
+    if (root.id === targetId) return [root];
+    for (const sub of root.folders) {
+      const chain = chainToFolder(sub, targetId);
+      if (chain.length) return [root, ...chain];
+    }
+    return [];
+  }
+  const chain = chainToFolder(collection.rootFolder, folderId);
+
+  const beforeAll: ApiRequest[] = [];
+  const before:    ApiRequest[] = [];
+  const after:     ApiRequest[] = [];
+  const afterAll:  ApiRequest[] = [];
+
+  for (const folder of chain) {
+    const reqs = folder.requestIds.map(id => collection.requests[id]).filter(r => r && !r.disabled) as ApiRequest[];
+    beforeAll.push(...reqs.filter(r => r.hookType === 'beforeAll'));
+    before   .push(...reqs.filter(r => r.hookType === 'before'));
+  }
+  // after hooks fire inner → outer
+  for (const folder of [...chain].reverse()) {
+    const reqs = folder.requestIds.map(id => collection.requests[id]).filter(r => r && !r.disabled) as ApiRequest[];
+    after   .push(...reqs.filter(r => r.hookType === 'after'));
+    afterAll.push(...reqs.filter(r => r.hookType === 'afterAll'));
+  }
+  return { beforeAll, before, after, afterAll };
+}
+
 export function getHooksForRequest(
   requestId: string,
   collection: Collection,
@@ -237,6 +282,35 @@ export function getHooksForRequest(
   }
 
   return { before, after: afterReversed.reverse() };
+}
+
+/**
+ * Resolve inherited auth and headers for a request by walking the collection →
+ * root folder → … → immediate parent folder chain. Each level can override
+ * auth (if non-'none') and append headers.
+ *
+ * This is the shared/main-process equivalent of the renderer's
+ * `getInheritedAuthAndHeaders` store action.
+ */
+export function resolveInheritedAuthAndHeaders(
+  requestId: string,
+  collection: Collection,
+): { auth: AuthConfig | null; headers: KeyValuePair[] } {
+  // Start with collection-level settings
+  let inheritedAuth: AuthConfig | null =
+    collection.auth && collection.auth.type !== 'none' ? collection.auth : null;
+  let inheritedHeaders: KeyValuePair[] =
+    collection.headers?.filter(h => h.enabled && h.key) ?? [];
+
+  // Walk folder path (root → immediate folder); each level can override
+  const path = folderPathTo(collection.rootFolder, requestId);
+  for (const folder of path) {
+    if (folder.auth && folder.auth.type !== 'none') inheritedAuth = folder.auth;
+    if (folder.headers?.length) {
+      inheritedHeaders = [...inheritedHeaders, ...folder.headers.filter(h => h.enabled && h.key)];
+    }
+  }
+  return { auth: inheritedAuth, headers: inheritedHeaders };
 }
 
 /**

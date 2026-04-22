@@ -1,4 +1,4 @@
-# api Spector
+# API Spector
 
 Local-first API testing tool. Inspect, test and mock APIs. Secrets stay on your machine.
 

@@ -34,7 +34,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
   ipc.handle('file:openWorkspace', async () => {
     const result = await dialog.showOpenDialog({
       title: 'Open Workspace',
-      filters: [{ name: 'api Spector Workspace', extensions: ['spector', 'json'] }],
+      filters: [{ name: 'API Spector Workspace', extensions: ['spector', 'json'] }],
       properties: ['openFile']
     });
     if (result.canceled || !result.filePaths[0]) return null;
@@ -51,7 +51,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     const result = await dialog.showSaveDialog({
       title: 'Create Workspace',
       defaultPath: 'my-workspace.spector',
-      filters: [{ name: 'api Spector Workspace', extensions: ['spector', 'json'] }]
+      filters: [{ name: 'API Spector Workspace', extensions: ['spector', 'json'] }]
     });
     if (result.canceled || !result.filePath) return null;
     workspaceDir = dirname(result.filePath);
@@ -63,7 +63,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     await mkdir(join(workspaceDir, 'environments'), { recursive: true });
 
     // Write .gitignore
-    const gitignore = '# api Spector — never commit secrets\n*.secrets\n.env.local\n\n# Dependencies\nnode_modules/\n';
+    const gitignore = '# API Spector — never commit secrets\n*.secrets\n.env.local\n\n# Dependencies\nnode_modules/\n';
     await atomicWrite(join(workspaceDir, '.gitignore'), gitignore);
 
     const ws: Workspace = {

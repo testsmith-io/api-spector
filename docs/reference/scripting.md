@@ -9,7 +9,7 @@ Scripts run in a sandboxed Node.js VM context with a 5-second timeout.
 
 ## The `sp` object
 
-The scripting API is available as `sp` (api **Sp**ector).
+The scripting API is available as `sp` (API **Sp**ector).
 
 ### Variable scopes
 

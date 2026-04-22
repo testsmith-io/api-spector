@@ -1,6 +1,6 @@
 # Pipeline Integration
 
-api Spector runs headlessly via the CLI. No display or GUI needed for `run` and `mock` commands. This makes it straightforward to drop into any CI/CD pipeline.
+API Spector runs headlessly via the CLI. No display or GUI needed for `run` and `mock` commands. This makes it straightforward to drop into any CI/CD pipeline.
 
 ## How it works in a pipeline
 

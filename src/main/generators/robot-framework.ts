@@ -2,7 +2,9 @@
 // Licensed for private, internal, non-commercial use only.
 // See LICENSE for full terms.
 
-import type { Collection, Environment, EnvVariable, Folder, GeneratedFile } from '../../shared/types';
+import type { ApiRequest, Collection, Environment, EnvVariable, Folder, GeneratedFile } from '../../shared/types';
+import { resolveInheritedAuthAndHeaders } from '../../shared/request-collection';
+import { parsePostScript, accessorToJsonPath } from './script-parser';
 
 // ─── Robot Framework generator ────────────────────────────────────────────────
 
@@ -38,7 +40,7 @@ function buildNameMap(root: Folder, requests: Collection['requests']): Map<strin
   function visit(folder: Folder) {
     for (const id of folder.requestIds) {
       const req = requests[id];
-      if (!req) continue;
+      if (!req || req.disabled) continue;
       const base = safeName(req.name);
       let name   = base;
       if (used.has(name)) {
@@ -96,19 +98,72 @@ function buildKeywordsFile(
   collection: Collection,
   varMap:     Map<string, EnvVariable>,
   nameMap:    Map<string, string>,
+  hookExtractedVars: Set<string>,
 ): string {
   const lines = [
     '*** Settings ***',
     'Library    RequestsLibrary',
+    'Library    Collections',
     'Resource    variables.resource',
     '',
     '*** Keywords ***',
   ];
 
+  // Generate hook keywords (they extract variables and set them as suite vars)
+  function processHooks(folder: Folder) {
+    for (const reqId of folder.requestIds) {
+      const req = collection.requests[reqId];
+      if (!req || req.disabled || !req.hookType) continue;
+
+      const kwName = nameMap.get(reqId);
+      if (!kwName) continue;
+      const url = interpolate(req.url, varMap);
+      const method = req.method.charAt(0) + req.method.slice(1).toLowerCase();
+
+      lines.push(kwName);
+      lines.push(`    [Documentation]    Hook: ${req.hookType} — ${req.name}`);
+
+      // Body
+      const { body } = req;
+      const hasBody = body.mode !== 'none' && !['GET', 'HEAD'].includes(req.method);
+      if (hasBody && body.mode === 'json' && body.json) {
+        const bodyPairs = jsonToRfDictPairs(body.json, varMap);
+        if (bodyPairs !== null) {
+          lines.push(`    VAR    &{body}    ${bodyPairs}`);
+        } else {
+          lines.push(`    VAR    \${body}    ${interpolate(body.json, varMap)}`);
+        }
+      }
+
+      const callArgs: string[] = [];
+      if (hasBody && body.mode === 'json') callArgs.push('json=${body}');
+
+      lines.push(`    \${response}=    ${method}    ${url}`);
+      if (callArgs.length) lines.push(`    ...    ${callArgs.join('    ')}`);
+
+      // Extract variables from post-script
+      const parsed = parsePostScript(req.postRequestScript);
+      for (const e of parsed.extractions) {
+        const jp = accessorToJsonPath(e.accessor);
+        const rfVar = e.varName.replace(/\W+/g, '_').toUpperCase();
+        hookExtractedVars.add(rfVar);
+        lines.push(`    \${${rfVar}}=    Evaluate    str($response.json().get('${jp}', ''))`);
+        lines.push(`    Set Suite Variable    \${${rfVar}}`);
+      }
+
+      lines.push(`    RETURN    \${response}`);
+      lines.push('');
+    }
+    for (const sub of folder.folders) processHooks(sub);
+  }
+
+  processHooks(collection.rootFolder);
+
+  // Generate regular request keywords
   function processFolder(folder: Folder) {
     for (const reqId of folder.requestIds) {
       const req = collection.requests[reqId];
-      if (!req) continue;
+      if (!req || req.disabled || req.hookType) continue;
 
       const kwName = nameMap.get(reqId)!;
       const url    = interpolate(req.url, varMap);
@@ -116,25 +171,40 @@ function buildKeywordsFile(
       lines.push(kwName);
       lines.push(`    [Documentation]    ${req.description || req.name}`);
 
-      // ── Collect header pairs (auth + custom) ────────────────────────────────
+      // ── Collect header pairs (inherited auth + custom) ─────────────────────
+      const inherited = resolveInheritedAuthAndHeaders(reqId, collection);
+      const effectiveAuth = req.auth.type !== 'none' ? req.auth : (inherited.auth ?? req.auth);
+      const allHeaders = [...inherited.headers.filter(h => h.enabled && h.key), ...req.headers.filter(h => h.enabled && h.key)];
+
       const headerPairs: string[] = [];
 
-      const { auth } = req;
-      if (auth.type === 'bearer') {
-        const ref = auth.tokenSecretRef ?? 'API_TOKEN';
-        headerPairs.push(`Authorization=Bearer ${envVar(ref)}`);
-      } else if (auth.type === 'basic') {
-        const passRef = auth.passwordSecretRef ?? 'API_PASSWORD';
-        const user    = auth.username ?? '';
+      if (effectiveAuth.type === 'bearer') {
+        const token = effectiveAuth.token ?? '';
+        if (token.includes('{{')) {
+          // Check if it references a hook-extracted variable
+          const varRef = token.match(/\{\{([^}]+)\}\}/)?.[1]?.trim();
+          const rfVar = varRef ? varRef.replace(/\W+/g, '_').toUpperCase() : '';
+          if (rfVar && hookExtractedVars.has(rfVar)) {
+            headerPairs.push(`Authorization=Bearer \${${rfVar}}`);
+          } else {
+            headerPairs.push(`Authorization=Bearer ${interpolate(token, varMap)}`);
+          }
+        } else {
+          const ref = effectiveAuth.tokenSecretRef ?? 'API_TOKEN';
+          headerPairs.push(`Authorization=Bearer ${envVar(ref)}`);
+        }
+      } else if (effectiveAuth.type === 'basic') {
+        const passRef = effectiveAuth.passwordSecretRef ?? 'API_PASSWORD';
+        const user    = effectiveAuth.username ?? '';
         lines.push(`    \${credentials}=    Evaluate    base64.b64encode(f"${user}:${envVar(passRef)}".encode()).decode()    base64`);
         headerPairs.push(`Authorization=Basic \${credentials}`);
-      } else if (auth.type === 'apikey' && auth.apiKeyIn === 'header') {
-        const keyRef  = auth.apiKeySecretRef ?? 'API_KEY';
-        const keyName = auth.apiKeyName ?? 'X-API-Key';
+      } else if (effectiveAuth.type === 'apikey' && effectiveAuth.apiKeyIn === 'header') {
+        const keyRef  = effectiveAuth.apiKeySecretRef ?? 'API_KEY';
+        const keyName = effectiveAuth.apiKeyName ?? 'X-API-Key';
         headerPairs.push(`${keyName}=${envVar(keyRef)}`);
       }
 
-      for (const h of req.headers.filter(h => h.enabled && h.key)) {
+      for (const h of allHeaders) {
         headerPairs.push(`${h.key}=${interpolate(h.value, varMap)}`);
       }
 
@@ -192,11 +262,34 @@ function buildTestSuite(
   const colName = safeName(collection.name);
   const envName = environment?.name ?? 'default';
 
+  // Collect beforeAll/afterAll hooks from every folder in the collection
+  // (root + nested) so they fire as Suite Setup/Teardown.
+  const beforeAllHooks: ApiRequest[] = [];
+  const afterAllHooks:  ApiRequest[] = [];
+  function collectAll(folder: Folder) {
+    for (const id of folder.requestIds) {
+      const r = collection.requests[id];
+      if (!r || r.disabled) continue;
+      if (r.hookType === 'beforeAll') beforeAllHooks.push(r);
+      else if (r.hookType === 'afterAll') afterAllHooks.push(r);
+    }
+    for (const sub of folder.folders) collectAll(sub);
+  }
+  collectAll(collection.rootFolder);
+
+  const suiteSetup = beforeAllHooks.length
+    ? `Suite Setup    Run Keywords    ${beforeAllHooks.map(h => nameMap.get(h.id) ?? safeName(h.name)).join('    AND    ')}`
+    : `Suite Setup    Log    Running ${colName} against ${envName} environment`;
+  const suiteTeardown = afterAllHooks.length
+    ? `Suite Teardown    Run Keywords    ${afterAllHooks.map(h => nameMap.get(h.id) ?? safeName(h.name)).join('    AND    ')}`
+    : '';
+
   const lines = [
     '*** Settings ***',
     'Resource    ../resources/api_keywords.resource',
     '',
-    `Suite Setup    Log    Running ${colName} against ${envName} environment`,
+    suiteSetup,
+    ...(suiteTeardown ? [suiteTeardown] : []),
     '',
     '*** Test Cases ***',
   ];
@@ -204,12 +297,49 @@ function buildTestSuite(
   function processFolder(folder: Folder) {
     for (const reqId of folder.requestIds) {
       const req = collection.requests[reqId];
-      if (!req) continue;
+      if (!req || req.disabled || req.hookType) continue;
       const kwName = nameMap.get(reqId)!;
       lines.push(kwName);
       lines.push(`    [Documentation]    ${req.description || req.name}`);
       lines.push(`    \${response}=    ${kwName}`);
-      lines.push(`    Status Should Be    200    \${response}`);
+
+      const parsed = parsePostScript(req.postRequestScript);
+      if (parsed.assertions.length > 0) {
+        for (const a of parsed.assertions) {
+          const jp = accessorToJsonPath(a.accessor);
+          switch (a.kind) {
+            case 'status':
+              lines.push(`    Status Should Be    ${a.expected ?? 200}    \${response}`);
+              break;
+            case 'equals': {
+              const expected = a.expected?.replace(/^"|"$/g, '') ?? '';
+              lines.push(`    \${value}=    Get From Dictionary    \${response.json()}    ${jp}`);
+              lines.push(`    Should Be Equal As Strings    \${value}    ${expected}`);
+              break;
+            }
+            case 'contains': {
+              const expected = a.expected?.replace(/^"|"$/g, '') ?? '';
+              lines.push(`    \${value}=    Get From Dictionary    \${response.json()}    ${jp}`);
+              lines.push(`    Should Contain    \${value}    ${expected}`);
+              break;
+            }
+            case 'exists':
+              lines.push(`    Dictionary Should Contain Key    \${response.json()}    ${jp}`);
+              break;
+            default:
+              lines.push(`    Status Should Be    200    \${response}`);
+          }
+        }
+      } else {
+        lines.push(`    Status Should Be    200    \${response}`);
+      }
+
+      for (const e of parsed.extractions) {
+        const jp = accessorToJsonPath(e.accessor);
+        lines.push(`    \${${e.varName}}=    Get From Dictionary    \${response.json()}    ${jp}`);
+        lines.push(`    Set Suite Variable    \${${e.varName}}`);
+      }
+
       lines.push('');
     }
     for (const sub of folder.folders) processFolder(sub);
@@ -277,9 +407,10 @@ export function generateRobotFramework(
   const nameMap = buildNameMap(collection.rootFolder, collection.requests);
   const slug    = collection.name.replace(/\W+/g, '_').toLowerCase();
 
+  const hookExtractedVars = new Set<string>();
   const contentFiles: GeneratedFile[] = [
     { path: 'resources/variables.resource',     content: buildVariablesFile(environment) },
-    { path: 'resources/api_keywords.resource', content: buildKeywordsFile(collection, varMap, nameMap) },
+    { path: 'resources/api_keywords.resource', content: buildKeywordsFile(collection, varMap, nameMap, hookExtractedVars) },
     { path: `tests/test_${slug}.robot`,        content: buildTestSuite(collection, environment, nameMap) },
   ];
 

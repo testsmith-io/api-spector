@@ -8,16 +8,23 @@ import { useStore } from '../../store';
 const { electron } = window;
 
 const DEFAULT_PII_PATTERNS = ['authorization', 'password', 'token', 'secret', 'api-key', 'x-api-key'];
+const ZOOM_STEPS = [0.75, 0.90, 1.0, 1.10, 1.25, 1.50];
 
-type SettingsTab = 'proxy' | 'tls' | 'privacy'
+type SettingsTab = 'appearance' | 'proxy' | 'tls' | 'privacy'
 
 export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
   const workspace = useStore(s => s.workspace);
   const updateWorkspaceSettings = useStore(s => s.updateWorkspaceSettings);
 
+  // Appearance (applied live — theme/zoom changes preview instantly)
+  const theme   = useStore(s => s.theme);
+  const zoom    = useStore(s => s.zoom);
+  const setTheme = useStore(s => s.setTheme);
+  const setZoom  = useStore(s => s.setZoom);
+
   const existing = workspace?.settings ?? {};
 
-  const [activeTab, setActiveTab] = useState<SettingsTab>('proxy');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
 
   // Proxy state
   const [proxyUrl,      setProxyUrl]      = useState(existing.proxy?.url ?? '');
@@ -49,13 +56,19 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
   }
 
   async function save() {
-    const settings: NonNullable<NonNullable<typeof workspace>['settings']> = {};
+    // Start from what's already in the workspace so live-applied appearance
+    // settings (theme, zoom) aren't wiped out by this form's rebuild.
+    const settings: NonNullable<NonNullable<typeof workspace>['settings']> = {
+      ...(workspace?.settings ?? {}),
+    };
 
     if (proxyUrl.trim()) {
       settings.proxy = { url: proxyUrl.trim() };
       if (proxyUser.trim() || proxyPass.trim()) {
         settings.proxy.auth = { username: proxyUser, password: proxyPass };
       }
+    } else {
+      delete settings.proxy;
     }
 
     settings.tls = {
@@ -74,10 +87,19 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
     onClose();
   }
 
+  function zoomStep(dir: 1 | -1) {
+    const idx  = ZOOM_STEPS.indexOf(zoom);
+    const next = idx === -1
+      ? ZOOM_STEPS[2]
+      : ZOOM_STEPS[Math.max(0, Math.min(ZOOM_STEPS.length - 1, idx + dir))];
+    setZoom(next);
+  }
+
   const tabs: { id: SettingsTab; label: string }[] = [
-    { id: 'proxy',   label: 'Proxy' },
-    { id: 'tls',     label: 'TLS / Certificates' },
-    { id: 'privacy', label: 'Privacy' },
+    { id: 'appearance', label: 'Appearance' },
+    { id: 'proxy',      label: 'Proxy' },
+    { id: 'tls',        label: 'TLS / Certificates' },
+    { id: 'privacy',    label: 'Privacy' },
   ];
 
   return (
@@ -119,6 +141,71 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
 
         {/* Tab content */}
         <div className="flex-1 overflow-y-auto px-4 py-4 text-xs flex flex-col gap-4">
+          {activeTab === 'appearance' && (
+            <>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">
+                  Theme
+                </label>
+                <div className="flex gap-1">
+                  {(['system', 'dark', 'light'] as const).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setTheme(t)}
+                      className={`flex-1 py-1.5 text-xs rounded capitalize transition-colors ${
+                        theme === t
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-surface-800 hover:bg-surface-700 text-surface-300'
+                      }`}
+                    >
+                      {t === 'system' ? '⊙ Auto' : t === 'dark' ? '☾ Dark' : '☀ Light'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">
+                  Interface size
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => zoomStep(-1)}
+                    disabled={zoom <= ZOOM_STEPS[0]}
+                    className="w-7 h-7 flex items-center justify-center bg-surface-800 hover:bg-surface-700 disabled:opacity-30 rounded text-sm transition-colors"
+                  >
+                    −
+                  </button>
+                  <span className="flex-1 text-center font-mono">{Math.round(zoom * 100)}%</span>
+                  <button
+                    onClick={() => zoomStep(1)}
+                    disabled={zoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1]}
+                    className="w-7 h-7 flex items-center justify-center bg-surface-800 hover:bg-surface-700 disabled:opacity-30 rounded text-sm transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
+                <div className="flex gap-0.5 mt-1">
+                  {ZOOM_STEPS.map(z => (
+                    <button
+                      key={z}
+                      onClick={() => setZoom(z)}
+                      className={`flex-1 py-0.5 text-[9px] rounded transition-colors ${
+                        zoom === z ? 'bg-blue-600 text-white' : 'bg-surface-800 hover:bg-surface-700 text-surface-600'
+                      }`}
+                    >
+                      {Math.round(z * 100)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-surface-600 text-[11px]">
+                Theme and interface size are stored with the workspace and travel with it to other machines.
+              </p>
+            </>
+          )}
+
           {activeTab === 'proxy' && (
             <>
               <div className="flex flex-col gap-1">

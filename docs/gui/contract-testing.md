@@ -1,6 +1,6 @@
 # Contract Testing
 
-Contract testing verifies that a consumer (your API collection) and a provider (the real API) agree on a shared contract: the expected status codes, response headers, and response body shapes. api Spector supports three modes: **Consumer**, **Provider**, and **Bi-directional**.
+Contract testing verifies that a consumer (your API collection) and a provider (the real API) agree on a shared contract: the expected status codes, response headers, and response body shapes. API Spector supports three modes: **Consumer**, **Provider**, and **Bi-directional**.
 
 Think of it as **who owns the definition of "correct"**.
 

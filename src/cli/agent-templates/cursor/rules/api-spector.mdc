@@ -1,0 +1,21 @@
+---
+description: API Spector API testing tool — scripting API, collection format, and test generation
+globs: ["**/*.spector", "**/*.env.json", "**/workspace.json"]
+---
+
+# API Spector
+
+This project uses API Spector for API testing. When editing collection files (`.spector`), environment files (`.env.json`), or generating test scripts, follow these references:
+
+- `.cursor/docs/api-spector-scripting-reference.md` — Full `sp.*` scripting API
+- `.cursor/docs/collection-file-format.md` — `.spector` and `.env.json` file structure
+- `.cursor/docs/functional-testing-guide.md` — Functional test design patterns
+- `.cursor/docs/security-testing-guide.md` — OWASP API Top 10 security tests
+
+## Script conventions
+
+- Wrap assertions in `sp.test('descriptive name', function() { ... })`
+- Parse JSON once per script: `const json = sp.response.json();`
+- Use `sp.environment.set("key", value)` to pass data between requests
+- Use `{{variable}}` interpolation in URLs, headers, body, and scripts
+- Hooks: `beforeAll` runs once per folder, `before` runs per request

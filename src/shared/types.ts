@@ -19,40 +19,45 @@ export interface KeyValuePair {
   paramType?: 'query' | 'path'
 }
 
-export interface AuthConfig {
-  type: 'none' | 'basic' | 'bearer' | 'apikey' | 'digest' | 'ntlm' | 'oauth2'
+export type AuthType = 'none' | 'basic' | 'bearer' | 'apikey' | 'digest' | 'ntlm' | 'oauth2'
 
-  // Basic / Digest / NTLM — shared credential fields
-  username?: string
-  password?: string
-  passwordSecretRef?: string
-
-  // Bearer
-  token?: string
-  tokenSecretRef?: string
-
-  // API Key
-  apiKeyName?: string
-  apiKeyValue?: string
-  apiKeySecretRef?: string
-  apiKeyIn?: 'header' | 'query'
-
-  // NTLM (username/password reused from above)
-  ntlmDomain?: string
-  ntlmWorkstation?: string
-
-  // OAuth 2.0
+export interface NoneAuth       { type: 'none' }
+export interface BasicAuth      { type: 'basic';   username?: string; password?: string; passwordSecretRef?: string }
+export interface BearerAuth     { type: 'bearer';  token?: string; tokenSecretRef?: string }
+export interface ApiKeyAuth     { type: 'apikey';  apiKeyName?: string; apiKeyValue?: string; apiKeySecretRef?: string; apiKeyIn?: 'header' | 'query' }
+export interface DigestAuth     { type: 'digest';  username?: string; password?: string; passwordSecretRef?: string }
+export interface NtlmAuth       { type: 'ntlm';    username?: string; password?: string; passwordSecretRef?: string; ntlmDomain?: string; ntlmWorkstation?: string }
+export interface Oauth2Auth {
+  type: 'oauth2'
   oauth2Flow?: 'client_credentials' | 'authorization_code' | 'implicit' | 'password'
   oauth2TokenUrl?: string
   oauth2AuthUrl?: string
   oauth2ClientId?: string
   oauth2ClientSecret?: string
   oauth2ClientSecretRef?: string
-  oauth2Scopes?: string        // space-separated
-  oauth2RedirectPort?: number  // for authorization_code flow, default 9876
+  oauth2Scopes?: string
+  oauth2RedirectPort?: number
   /** In-memory cache — NOT persisted to disk. Cleared on app load. */
   oauth2CachedToken?: string
-  oauth2TokenExpiry?: number   // unix timestamp ms
+  oauth2TokenExpiry?: number
+  // Basic auth fields reused for oauth2 'password' flow
+  username?: string
+  password?: string
+  passwordSecretRef?: string
+}
+
+export type AuthConfig = NoneAuth | BasicAuth | BearerAuth | ApiKeyAuth | DigestAuth | NtlmAuth | Oauth2Auth
+
+/** Shape that allows merging any field regardless of current auth.type. Used by
+ *  UI setters that spread partial updates (e.g. `setAuth({ username: 'x' })`).
+ *  Narrowed AuthConfig is still the source of truth at consumer sites. */
+type UnionToIntersection<U> = (U extends unknown ? (k: U) => void : never) extends (k: infer I) => void ? I : never
+export type AuthPatch = Partial<UnionToIntersection<AuthConfig>>
+
+/** Exhaustiveness helper — put in the default of a switch to get a compile
+ *  error if a new auth type is added without a handler. */
+export function assertNever(x: never): never {
+  throw new Error(`Unhandled case: ${JSON.stringify(x)}`)
 }
 
 export interface GraphQLBody {
@@ -175,6 +180,9 @@ export interface ApiRequest {
   hookType?: 'beforeAll' | 'before' | 'after' | 'afterAll'
   /** When true, the request is excluded from collection/folder runs. */
   disabled?: boolean
+  /** Cached GraphQL introspection result (raw JSON). Persisted so the schema
+   *  explorer and query autocomplete survive tab switches and app restarts. */
+  graphqlIntrospectionCache?: string
 }
 
 export interface Folder {
@@ -269,6 +277,9 @@ export interface Workspace {
     }
     tls?: TlsSettings
     piiMaskPatterns?: string[]
+    /** UI appearance — previously in localStorage, now travels with the workspace */
+    theme?: 'dark' | 'light' | 'system'
+    zoom?: number
   }
 }
 

@@ -142,6 +142,17 @@ export function ContractTab({ request, onChange }: Props) {
           </button>
         </div>
         <div className="border border-surface-700 rounded overflow-hidden">
+          <div className="flex justify-end px-2 py-0.5 bg-surface-800/50 border-b border-surface-700">
+            <button
+              onClick={() => {
+                try { update({ bodySchema: JSON.stringify(JSON.parse(contract.bodySchema ?? ''), null, 2) }); } catch { /* invalid json */ }
+              }}
+              className="text-[10px] text-surface-500 hover:text-white transition-colors"
+              title="Format JSON"
+            >
+              Format
+            </button>
+          </div>
           <CodeMirror
             value={contract.bodySchema ?? ''}
             height="300px"

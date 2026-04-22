@@ -11,7 +11,7 @@ import type {
   RunSummary,
   ApiRequest,
 } from '../../shared/types';
-import { interpolate, buildUrl, buildEnvVars, mergeVars } from '../interpolation';
+import { interpolate, buildUrl, buildEnvVars, mergeVars, buildDynamicVars } from '../interpolation';
 import { runScript } from '../script-runner';
 import { getGlobals, patchGlobals, persistGlobals } from '../globals-store';
 import {
@@ -69,6 +69,12 @@ async function executeOne(
   dispatcher: ProxyAgent | Agent | undefined,
   piiMaskPatterns: string[],
 ): Promise<ExecuteOneResult> {
+  // Defensive defaults — AI-generated collections may omit empty arrays
+  if (!req.headers) req.headers = [];
+  if (!req.params) req.params = [];
+  if (!req.body) req.body = { mode: 'none' };
+  if (!req.auth) req.auth = { type: 'none' };
+
   const base: RunRequestResult = {
     requestId:   req.id,
     name:        req.name,
@@ -77,7 +83,10 @@ async function executeOne(
     status:      'running',
   };
 
-  let vars                  = mergeVars(envVars, collectionVars, globals, localVars);
+  // Dynamic built-in vars ($uuid, $timestamp, $randomInt, etc.) — generated
+  // fresh for each request so each gets unique values.
+  const dynamicVars = await buildDynamicVars();
+  let vars                  = mergeVars(envVars, collectionVars, globals, localVars, dynamicVars);
   let updatedEnvVars        = { ...envVars };
   let updatedCollectionVars = { ...collectionVars };
   let updatedGlobals        = { ...globals };
@@ -96,7 +105,7 @@ async function executeOne(
     updatedGlobals        = r.updatedGlobals;
     patchGlobals(r.updatedGlobals);
     await persistGlobals();
-    vars = mergeVars(updatedEnvVars, updatedCollectionVars, updatedGlobals, localVars);
+    vars = mergeVars(updatedEnvVars, updatedCollectionVars, updatedGlobals, localVars, dynamicVars);
   }
 
   const resolvedUrl = buildUrl(req.url, req.params, vars);
@@ -202,25 +211,25 @@ async function executeOne(
     // Status determination, in priority order:
     //   1. post-script crashed → 'error'
     //   2. any explicit test failed → 'failed'
-    //   3. HTTP 4xx/5xx → 'failed' (synthetic test added below to explain why)
-    //   4. has assertions, all passed → 'passed'
-    //   5. no assertions at all → 'skipped'
-    //      ("ran but unverified" — distinct from 'passed' so the user can see
-    //      coverage gaps in the runner panel and reports.)
+    //   3. has tests, all passed → 'passed' (even if HTTP 4xx/5xx — the user
+    //      intentionally expects that status, e.g. negative tests for 422)
+    //   4. no tests + HTTP 4xx/5xx → 'failed' (synthetic test added below)
+    //   5. no tests + HTTP 2xx/3xx → 'skipped'
     const allPassed  = testResults.every(t => t.passed);
     const httpFailed = fetchResp.status >= 400;
     const hasTests   = testResults.length > 0;
     const status: RunRequestResult['status'] = postScriptError
       ? 'error'
-      : httpFailed
-        ? 'failed'
-        : hasTests
-          ? (allPassed ? 'passed' : 'failed')
+      : hasTests
+        ? (allPassed ? 'passed' : 'failed')
+        : httpFailed
+          ? 'failed'
           : 'skipped';
 
-    // If HTTP failed and no explicit test caught it, surface a synthetic
-    // result so the user sees *why* the row is red.
-    if (httpFailed && !testResults.some(t => !t.passed)) {
+    // If HTTP failed and the user has NO tests at all, surface a synthetic
+    // result. But if tests exist and passed, the user intentionally expects
+    // that status code (e.g. negative tests expecting 422).
+    if (httpFailed && testResults.length === 0) {
       testResults = [
         ...testResults,
         {

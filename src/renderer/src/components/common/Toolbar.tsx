@@ -2,7 +2,7 @@
 // Licensed for private, internal, non-commercial use only.
 // See LICENSE for full terms.
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useStore } from '../../store';
 import type { Collection } from '../../../../shared/types';
 import { EnvironmentBar } from '../EnvironmentBar/EnvironmentBar';
@@ -13,108 +13,6 @@ import { useWorkspaceLoader } from '../../hooks/useWorkspaceLoader';
 import { colRelPath } from '../../store';
 
 const { electron } = window;
-
-// ─── Preferences popover ──────────────────────────────────────────────────────
-
-const ZOOM_STEPS = [0.75, 0.90, 1.0, 1.10, 1.25, 1.50];
-
-function PreferencesPopover() {
-  const theme    = useStore(s => s.theme);
-  const zoom     = useStore(s => s.zoom);
-  const setTheme = useStore(s => s.setTheme);
-  const setZoom  = useStore(s => s.setZoom);
-
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  function zoomStep(dir: 1 | -1) {
-    const idx = ZOOM_STEPS.indexOf(zoom);
-    const next = idx === -1
-      ? ZOOM_STEPS[2]
-      : ZOOM_STEPS[Math.max(0, Math.min(ZOOM_STEPS.length - 1, idx + dir))];
-    setZoom(next);
-  }
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen(v => !v)}
-        className={`px-2.5 py-1 text-xs rounded transition-colors ${open ? 'bg-blue-700 text-white' : 'bg-surface-800 hover:bg-surface-700'}`}
-        title="Preferences"
-      >
-        <span style={{ fontSize: '16px', lineHeight: 1 }}>⚙</span>
-      </button>
-
-      {open && (
-        <div className="absolute top-full right-0 mt-1 w-56 bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-50 p-3 flex flex-col gap-4">
-          {/* Theme */}
-          <div>
-            <p className="text-[10px] text-surface-600 font-semibold uppercase tracking-wider mb-2">Theme</p>
-            <div className="flex gap-1">
-              {(['system', 'dark', 'light'] as const).map(t => (
-                <button
-                  key={t}
-                  onClick={() => setTheme(t)}
-                  className={`flex-1 py-1.5 text-xs rounded capitalize transition-colors ${
-                    theme === t
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-surface-800 hover:bg-surface-700 text-surface-300'
-                  }`}
-                >
-                  {t === 'system' ? '⊙ Auto' : t === 'dark' ? '☾ Dark' : '☀ Light'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Zoom */}
-          <div>
-            <p className="text-[10px] text-surface-600 font-semibold uppercase tracking-wider mb-2">Interface size</p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => zoomStep(-1)}
-                disabled={zoom <= ZOOM_STEPS[0]}
-                className="w-7 h-7 flex items-center justify-center bg-surface-800 hover:bg-surface-700 disabled:opacity-30 rounded text-sm transition-colors"
-              >
-                −
-              </button>
-              <span className="flex-1 text-center text-xs font-mono">{Math.round(zoom * 100)}%</span>
-              <button
-                onClick={() => zoomStep(1)}
-                disabled={zoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1]}
-                className="w-7 h-7 flex items-center justify-center bg-surface-800 hover:bg-surface-700 disabled:opacity-30 rounded text-sm transition-colors"
-              >
-                +
-              </button>
-            </div>
-            <div className="flex gap-0.5 mt-2">
-              {ZOOM_STEPS.map(z => (
-                <button
-                  key={z}
-                  onClick={() => setZoom(z)}
-                  className={`flex-1 py-0.5 text-[9px] rounded transition-colors ${
-                    zoom === z ? 'bg-blue-600 text-white' : 'bg-surface-800 hover:bg-surface-700 text-surface-600'
-                  }`}
-                >
-                  {Math.round(z * 100)}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ─── Toolbar ──────────────────────────────────────────────────────────────────
 
@@ -209,19 +107,32 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { onOpenDocs?: () => void }
           `}</style>
           <div className="flex items-center gap-1.5 mr-1 shrink-0 select-none">
             <svg width="52" height="52" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-              <ellipse cx="256" cy="300" rx="145" ry="150" fill="#205d96" opacity="0.2"/>
-              <path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z" fill="#205d96"/>
-              <path d="M 155,235 C 155,125 357,125 357,235 L 357,248 C 357,138 155,138 155,248 Z" fill="#6aa3c8" opacity="0.3"/>
+              <defs>
+                <radialGradient id="logoBody" cx="35%" cy="22%" r="70%">
+                  <stop offset="0%" stopColor="#5497c8"/>
+                  <stop offset="55%" stopColor="#205d96"/>
+                  <stop offset="100%" stopColor="#123a60"/>
+                </radialGradient>
+                <linearGradient id="logoGloss" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="white" stopOpacity="0.45"/>
+                  <stop offset="100%" stopColor="white" stopOpacity="0"/>
+                </linearGradient>
+                <clipPath id="logoGhostClip">
+                  <path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z"/>
+                </clipPath>
+              </defs>
+              <path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z" fill="url(#logoBody)"/>
               <ellipse cx="198" cy="262" rx="29" ry="33" fill="white"/>
               <ellipse cx="314" cy="262" rx="29" ry="33" fill="white"/>
-              <ellipse cx="204" cy="268" rx="16" ry="20" fill="#1e1b2e" className="logo-pupil"/>
-              <ellipse cx="320" cy="268" rx="16" ry="20" fill="#1e1b2e" className="logo-pupil logo-pupil-r"/>
-              <ellipse cx="194" cy="254" rx="6" ry="7" fill="white" opacity="0.55"/>
-              <ellipse cx="310" cy="254" rx="6" ry="7" fill="white" opacity="0.55"/>
+              <ellipse cx="204" cy="268" rx="16" ry="20" fill="#0b1624" className="logo-pupil"/>
+              <ellipse cx="320" cy="268" rx="16" ry="20" fill="#0b1624" className="logo-pupil logo-pupil-r"/>
+              <ellipse cx="194" cy="254" rx="6" ry="7" fill="white" opacity="0.65"/>
+              <ellipse cx="310" cy="254" rx="6" ry="7" fill="white" opacity="0.65"/>
+              <ellipse cx="256" cy="100" rx="200" ry="180" fill="url(#logoGloss)" clipPath="url(#logoGhostClip)"/>
             </svg>
             <div className="flex flex-col leading-tight">
-              <span className="text-xs font-semibold tracking-wide text-surface-300">
-                api <span style={{ color: '#6aa3c8' }}>Spector</span>
+              <span className="text-xs font-semibold tracking-wide">
+                <span style={{ color: 'var(--wordmark-muted)' }}>API</span> <span style={{ color: '#6aa3c8' }}>Spector</span>
               </span>
               <button
                 onClick={() => window.electron.openExternal('https://testsmith.io')}
@@ -299,14 +210,12 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { onOpenDocs?: () => void }
             {saving ? 'Saving…' : 'Save'}
           </button>
 
-          <PreferencesPopover />
-
           <button
             onClick={() => setWorkspaceSettingsOpen(true)}
             className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
             title="Workspace settings"
           >
-            <span style={{ fontSize: '16px', lineHeight: 1 }}>⚙</span> WS
+            <span style={{ fontSize: '16px', lineHeight: 1 }}>⚙</span>
           </button>
 
           <button

@@ -8,7 +8,7 @@ const [, , cmd = 'ui', ...rest] = process.argv
 
 function printHelp() {
   console.log('')
-  console.log('  api Spector — local-first API testing tool')
+  console.log('  API Spector — local-first API testing tool')
   console.log('')
   console.log('  Usage:')
   console.log('    api-spector ui                            Launch the app')
@@ -17,6 +17,9 @@ function printHelp() {
   console.log('    api-spector record --upstream <url>       Record API traffic as mock stubs')
   console.log('')
   console.log('  Options:')
+  console.log('    api-spector agents init <name>            Initialize AI agent files')
+  console.log('    api-spector agents list                   Show available agents')
+  console.log('')
   console.log('    api-spector run    --help                 Show run options')
   console.log('    api-spector mock   --help                 Show mock options')
   console.log('    api-spector record --help                 Show record options')
@@ -59,8 +62,15 @@ if (cmd === '--help' || cmd === '-h') {
     env: process.env,
   })
   proc.on('close', code => process.exit(code ?? 0))
+} else if (cmd === 'agents') {
+  const agentsPath = path.join(__dirname, '..', 'out', 'main', 'agents.js')
+  const proc = spawn(process.execPath, [agentsPath, ...rest], {
+    stdio: 'inherit',
+    env: process.env,
+  })
+  proc.on('close', code => process.exit(code ?? 0))
 } else {
-  console.error(`api Spector — unknown command: "${cmd}"`)
+  console.error(`API Spector — unknown command: "${cmd}"`)
   printHelp()
   process.exit(1)
 }
