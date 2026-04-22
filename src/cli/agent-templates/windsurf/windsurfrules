@@ -1,0 +1,19 @@
+# API Spector — Windsurf Rules
+
+This project uses API Spector for API testing.
+
+## References
+
+When working with test scripts or collection files, read:
+- `.windsurf/docs/api-spector-scripting-reference.md` — Full `sp.*` scripting API
+- `.windsurf/docs/collection-file-format.md` — Collection and environment file format
+- `.windsurf/docs/functional-testing-guide.md` — Functional test patterns
+- `.windsurf/docs/security-testing-guide.md` — OWASP API Top 10 test patterns
+
+## Script conventions
+
+- Use `sp.test('name', function() { ... })` for assertions
+- Use `sp.expect(value)` with `.to.equal()`, `.to.include()`, `.to.be.a()`, etc.
+- Parse body: `const json = sp.response.json();`
+- Set variables: `sp.environment.set("key", "value")`
+- Use `{{variable}}` in URLs, headers, body, and scripts

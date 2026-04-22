@@ -1,6 +1,6 @@
 # TLS & Certificates
 
-api Spector supports custom CA certificates, mutual TLS (client certificates), and disabling certificate verification. TLS settings can be configured at two levels:
+API Spector supports custom CA certificates, mutual TLS (client certificates), and disabling certificate verification. TLS settings can be configured at two levels:
 
 | Level | Scope | Where |
 |---|---|---|

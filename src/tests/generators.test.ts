@@ -95,9 +95,9 @@ describe( 'generateRobotFramework', () => {
     expect( content ).not.toContain( 'Create Dictionary' );
   } );
 
-  it( 'keywords file does not import Collections library', () => {
+  it( 'keywords file imports Collections library', () => {
     const kw = fileByPath( files, 'api_keywords.resource' )!;
-    expect( kw.content ).not.toContain( 'Library    Collections' );
+    expect( kw.content ).toContain( 'Library    Collections' );
   } );
 
   it( 'keywords file uses VAR syntax for body variable as a dictionary', () => {

@@ -1,9 +1,9 @@
-# api Spector
+# API Spector
 
 > Local-first API testing tool to inspect, test and mock APIs. Secrets stay on your machine.
 
 <p align="center">
-  <img src="_icon.svg" width="96" height="96" alt="api Spector">
+  <img src="_icon.svg" width="96" height="96" alt="API Spector">
 </p>
 
 ## Features

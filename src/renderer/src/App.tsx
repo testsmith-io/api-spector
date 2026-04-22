@@ -2,7 +2,8 @@
 // Licensed for private, internal, non-commercial use only.
 // See LICENSE for full terms.
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import type { ApiRequest } from '../../shared/types';
 import { useStore } from './store';
 import { useAutoSave } from './hooks/useAutoSave';
 import { useWorkspaceLoader } from './hooks/useWorkspaceLoader';
@@ -128,6 +129,53 @@ const TAB_METHOD_COLORS: Record<string, string> = {
   OPTIONS: 'text-gray-400',
 };
 
+// Memoized tab row — prevents every tab from re-rendering when only one tab's
+// state (active/response/sending) changes. Props are intentionally scalar so
+// React.memo's shallow comparison catches no-op renders.
+interface TabRowProps {
+  tabId: string
+  method?: string
+  name: string
+  isActive: boolean
+  onActivate: ( id: string ) => void
+  onClose: ( id: string ) => void
+  onContextMenu: ( id: string, x: number, y: number ) => void
+}
+
+const TabRow = React.memo( function TabRow ( {
+  tabId, method, name, isActive, onActivate, onClose, onContextMenu,
+}: TabRowProps ) {
+  return (
+    <div
+      onClick={() => onActivate( tabId )}
+      onContextMenu={e => {
+        e.preventDefault();
+        onContextMenu( tabId, e.clientX, e.clientY );
+      }}
+      className={`group flex items-center gap-1.5 px-3 py-1.5 border-r border-surface-800 cursor-pointer min-w-0 max-w-[200px] flex-shrink-0 transition-colors ${isActive
+        ? 'bg-surface-900 border-b-2 border-b-blue-500 -mb-px'
+        : 'hover:bg-surface-900/50 text-surface-600'
+        }`}
+    >
+      {method && (
+        <span className={`text-[10px] font-bold shrink-0 ${TAB_METHOD_COLORS[method] ?? 'text-gray-400'}`}>
+          {method}
+        </span>
+      )}
+      <span className={`text-xs truncate ${isActive ? 'text-white' : ''}`}>
+        {name}
+      </span>
+      <button
+        onClick={e => { e.stopPropagation(); onClose( tabId ); }}
+        className="ml-auto opacity-0 group-hover:opacity-100 shrink-0 text-surface-600 hover:text-white transition-all leading-none"
+        title="Close tab"
+      >
+        ×
+      </button>
+    </div>
+  );
+} );
+
 export default function App () {
   useAutoSave();
   const { applyWorkspace } = useWorkspaceLoader();
@@ -234,10 +282,27 @@ export default function App () {
     return () => mq.removeEventListener( 'change', handler );
   }, [theme] );
 
-  const activeTab = tabs.find( t => t.id === activeTabId ) ?? null;
-  const activeRequest = activeTab?.requestId
-    ? Object.values( collections ).find( c => c.data.requests[activeTab.requestId!] )?.data.requests[activeTab.requestId!]
-    : null;
+  // Build a single requestId → ApiRequest lookup from all collections. Previously
+  // both `activeRequest` and each tab rendered a linear `Object.values(collections).find(...)`,
+  // making the tab bar O(tabs × collections). Now it's O(1) per lookup.
+  const requestsById = useMemo( () => {
+    const map = new Map<string, ApiRequest>();
+    for ( const col of Object.values( collections ) ) {
+      for ( const req of Object.values( col.data.requests ) ) {
+        map.set( req.id, req );
+      }
+    }
+    return map;
+  }, [collections] );
+
+  const activeTab = useMemo( () => tabs.find( t => t.id === activeTabId ) ?? null, [tabs, activeTabId] );
+  const activeRequest = activeTab?.requestId ? requestsById.get( activeTab.requestId ) ?? null : null;
+
+  // Stable callback so <TabRow> memoization holds — a fresh inline arrow
+  // per render would invalidate every row's shallow-equal check.
+  const openTabContextMenu = useCallback( ( tabId: string, x: number, y: number ) => {
+    setTabContextMenu( { x, y, tabId } );
+  }, [] );
 
   // The response panel mirrors whether the *active tab* has a response yet.
   // Open as soon as one arrives (or when switching to a tab that has one),
@@ -265,7 +330,7 @@ export default function App () {
       {window.electron.platform !== 'win32' && (
         <div className="drag-region flex-shrink-0 bg-surface-950 flex items-center justify-center">
           <span className="no-drag text-[11px] font-medium tracking-widest select-none" style={{ color: 'var(--text-muted)' }}>
-            api <span style={{ color: '#6aa3c8' }}>Spector</span>
+            <span style={{ color: 'var(--wordmark-muted)' }}>API</span> <span style={{ color: '#6aa3c8' }}>Spector</span>
             {__APP_VERSION__ && <span className="ml-2 text-[10px] font-normal opacity-50">v{__APP_VERSION__}</span>}
             <span className="mx-2 opacity-30">·</span>
             <button
@@ -387,39 +452,18 @@ export default function App () {
               <div className="flex items-center border-b border-surface-800 bg-surface-950 flex-shrink-0">
                 <div className="flex items-center overflow-x-auto flex-1 min-w-0">
                   {tabs.map( tab => {
-                    const req = tab.requestId
-                      ? Object.values( collections ).find( c => c.data.requests[tab.requestId!] )?.data.requests[tab.requestId!]
-                      : null;
-                    const isActive = tab.id === activeTabId;
+                    const req = tab.requestId ? requestsById.get( tab.requestId ) ?? null : null;
                     return (
-                      <div
+                      <TabRow
                         key={tab.id}
-                        onClick={() => setActiveTabId( tab.id )}
-                        onContextMenu={e => {
-                          e.preventDefault();
-                          setTabContextMenu( { x: e.clientX, y: e.clientY, tabId: tab.id } );
-                        }}
-                        className={`group flex items-center gap-1.5 px-3 py-1.5 border-r border-surface-800 cursor-pointer min-w-0 max-w-[200px] flex-shrink-0 transition-colors ${isActive
-                          ? 'bg-surface-900 border-b-2 border-b-blue-500 -mb-px'
-                          : 'hover:bg-surface-900/50 text-surface-600'
-                          }`}
-                      >
-                        {req && (
-                          <span className={`text-[10px] font-bold shrink-0 ${TAB_METHOD_COLORS[req.method] ?? 'text-gray-400'}`}>
-                            {req.method}
-                          </span>
-                        )}
-                        <span className={`text-xs truncate ${isActive ? 'text-white' : ''}`}>
-                          {req?.name ?? 'Untitled'}
-                        </span>
-                        <button
-                          onClick={e => { e.stopPropagation(); closeTab( tab.id ); }}
-                          className="ml-auto opacity-0 group-hover:opacity-100 shrink-0 text-surface-600 hover:text-white transition-all leading-none"
-                          title="Close tab"
-                        >
-                          ×
-                        </button>
-                      </div>
+                        tabId={tab.id}
+                        method={req?.method}
+                        name={req?.name ?? 'Untitled'}
+                        isActive={tab.id === activeTabId}
+                        onActivate={setActiveTabId}
+                        onClose={closeTab}
+                        onContextMenu={openTabContextMenu}
+                      />
                     );
                   } )}
                 </div>

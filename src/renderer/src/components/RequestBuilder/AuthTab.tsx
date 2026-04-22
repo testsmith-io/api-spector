@@ -3,7 +3,7 @@
 // See LICENSE for full terms.
 
 import React, { useState } from 'react';
-import type { ApiRequest, AuthConfig } from '../../../../shared/types';
+import type { ApiRequest, AuthConfig, AuthPatch, Oauth2Auth } from '../../../../shared/types';
 import { VarInput } from '../common/VarInput';
 
 const { electron } = window;
@@ -20,8 +20,8 @@ export function AuthTab({ request, onChange }: { request: ApiRequest; onChange: 
   const [oauth2Error, setOauth2Error]       = useState<string>('');
   const [oauth2RefreshToken, setOauth2RT]   = useState<string>('');
 
-  function setAuth(patch: Partial<AuthConfig>) {
-    onChange({ auth: { ...auth, ...patch } });
+  function setAuth(patch: AuthPatch) {
+    onChange({ auth: { ...auth, ...patch } as AuthConfig });
   }
 
   async function saveSecret(ref: string) {
@@ -35,26 +35,18 @@ export function AuthTab({ request, onChange }: { request: ApiRequest; onChange: 
   // ── OAuth 2.0 token fetch ──────────────────────────────────────────────────
 
   async function fetchOAuth2Token() {
+    if (auth.type !== 'oauth2') return;
+    const oauth2Auth: Oauth2Auth = auth;
     setOauth2Status('fetching');
     setOauth2Error('');
     try {
       const vars: Record<string, string> = {};
-      if (auth.oauth2Flow === 'authorization_code') {
-        const result = await electron.oauth2StartFlow(auth, vars);
-        setAuth({
-          oauth2CachedToken: result.accessToken,
-          oauth2TokenExpiry: result.expiresAt,
-        });
-        if (result.refreshToken) setOauth2RT(result.refreshToken);
-      } else {
-        // client_credentials / password — handled in main process
-        const result = await electron.oauth2StartFlow(auth, vars); // triggers fetchOAuth2Token on main side via IPC
-        setAuth({
-          oauth2CachedToken: result.accessToken,
-          oauth2TokenExpiry: result.expiresAt,
-        });
-        if (result.refreshToken) setOauth2RT(result.refreshToken);
-      }
+      const result = await electron.oauth2StartFlow(oauth2Auth, vars);
+      setAuth({
+        oauth2CachedToken: result.accessToken,
+        oauth2TokenExpiry: result.expiresAt,
+      });
+      if (result.refreshToken) setOauth2RT(result.refreshToken);
       setOauth2Status('ok');
     } catch (e: unknown) {
       setOauth2Status('error');
@@ -63,11 +55,12 @@ export function AuthTab({ request, onChange }: { request: ApiRequest; onChange: 
   }
 
   async function refreshOAuth2Token() {
-    if (!oauth2RefreshToken) return;
+    if (auth.type !== 'oauth2' || !oauth2RefreshToken) return;
+    const oauth2Auth: Oauth2Auth = auth;
     setOauth2Status('fetching');
     setOauth2Error('');
     try {
-      const result = await electron.oauth2RefreshToken(auth, {}, oauth2RefreshToken);
+      const result = await electron.oauth2RefreshToken(oauth2Auth, {}, oauth2RefreshToken);
       setAuth({
         oauth2CachedToken: result.accessToken,
         oauth2TokenExpiry: result.expiresAt,
@@ -88,6 +81,7 @@ export function AuthTab({ request, onChange }: { request: ApiRequest; onChange: 
   }
 
   const tokenPreview = (() => {
+    if (auth.type !== 'oauth2') return null;
     const t = auth.oauth2CachedToken;
     if (!t) return null;
     const preview = t.length > 16 ? `${t.slice(0, 6)}…${t.slice(-6)}` : t;
@@ -268,7 +262,7 @@ export function AuthTab({ request, onChange }: { request: ApiRequest; onChange: 
             <label className="text-surface-400">Flow</label>
             <select
               value={auth.oauth2Flow ?? 'client_credentials'}
-              onChange={e => setAuth({ oauth2Flow: e.target.value as AuthConfig['oauth2Flow'] })}
+              onChange={e => setAuth({ oauth2Flow: e.target.value as Oauth2Auth['oauth2Flow'] })}
               className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
             >
               <option value="client_credentials">Client Credentials</option>
@@ -440,11 +434,11 @@ function BasicCredentialsFields({
   label,
   note,
 }: {
-  auth: AuthConfig
+  auth: { username?: string; password?: string; passwordSecretRef?: string }
   secretValue: string
   setSecretValue: (v: string) => void
   saved: boolean
-  setAuth: (p: Partial<AuthConfig>) => void
+  setAuth: (p: AuthPatch) => void
   saveSecret: (ref: string) => Promise<void>
   label: string
   note?: string
@@ -500,11 +494,11 @@ function BasicCredentialsFields({
 function BearerPanel({
   auth, secretValue, setSecretValue, saved, setAuth, saveSecret,
 }: {
-  auth: AuthConfig
+  auth: { token?: string; tokenSecretRef?: string }
   secretValue: string
   setSecretValue: (v: string) => void
   saved: boolean
-  setAuth: (p: Partial<AuthConfig>) => void
+  setAuth: (p: AuthPatch) => void
   saveSecret: (ref: string) => Promise<void>
 }) {
   const [keychainOpen, setKeychainOpen] = useState(!!auth.tokenSecretRef);

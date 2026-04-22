@@ -3,7 +3,7 @@
 // See LICENSE for full terms.
 
 import React, { useState } from 'react';
-import type { Collection, AuthConfig, KeyValuePair } from '../../../../shared/types';
+import type { Collection, AuthConfig, AuthPatch, KeyValuePair } from '../../../../shared/types';
 import { useStore } from '../../store';
 import { KVTable } from '../RequestBuilder/KVTable';
 
@@ -33,8 +33,8 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
   const [clientKeyPath,      setClientKeyPath]       = useState(existing?.clientKeyPath ?? '');
   const [rejectUnauthorized, setRejectUnauthorized] = useState(existing?.rejectUnauthorized !== false);
 
-  function patchAuth(patch: Partial<AuthConfig>) {
-    setAuth(prev => ({ ...prev, ...patch }));
+  function patchAuth(patch: AuthPatch) {
+    setAuth(prev => ({ ...prev, ...patch } as AuthConfig));
   }
 
   function save() {
@@ -167,7 +167,7 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
 
 // ─── Collection auth panel ────────────────────────────────────────────────────
 
-function CollectionAuthPanel({ auth, onChange }: { auth: AuthConfig; onChange: (p: Partial<AuthConfig>) => void }) {
+function CollectionAuthPanel({ auth, onChange }: { auth: AuthConfig; onChange: (p: AuthPatch) => void }) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-[10px] text-surface-600">

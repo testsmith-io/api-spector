@@ -54,6 +54,17 @@ export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: 
 
       {mode === 'json' && (
         <div className="rounded overflow-hidden border border-surface-700">
+          <div className="flex justify-end px-2 py-0.5 bg-surface-800/50 border-b border-surface-700">
+            <button
+              onClick={() => {
+                try { onChange({ body: { ...body, json: JSON.stringify(JSON.parse(body.json ?? ''), null, 2) } }); } catch { /* invalid json */ }
+              }}
+              className="text-[10px] text-surface-500 hover:text-white transition-colors"
+              title="Format JSON"
+            >
+              Format
+            </button>
+          </div>
           <CodeMirror
             value={body.json ?? ''}
             height="300px"

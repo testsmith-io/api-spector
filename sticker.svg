@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+  <defs>
+    <radialGradient id="body" cx="35%" cy="22%" r="70%">
+      <stop offset="0%"   stop-color="#5497c8"/>
+      <stop offset="55%"  stop-color="#205d96"/>
+      <stop offset="100%" stop-color="#123a60"/>
+    </radialGradient>
+
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="white" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0.0"/>
+    </linearGradient>
+
+    <clipPath id="ghostClip">
+      <path d="M 174,195 C 174,65 426,65 426,195 L 426,360 Q 384,405 342,360 Q 300,405 258,360 Q 216,405 174,360 Z"/>
+    </clipPath>
+
+    <filter id="stickerOutline" x="-15%" y="-15%" width="130%" height="130%">
+      <feMorphology in="SourceAlpha" operator="dilate" radius="18" result="dilated"/>
+      <feFlood flood-color="white" result="whiteFill"/>
+      <feComposite in="whiteFill" in2="dilated" operator="in" result="outline"/>
+
+      <feGaussianBlur in="dilated" stdDeviation="6" result="shadowBlur"/>
+      <feOffset in="shadowBlur" dx="0" dy="4" result="shadowOffset"/>
+      <feFlood flood-color="black" flood-opacity="0.35" result="shadowColor"/>
+      <feComposite in="shadowColor" in2="shadowOffset" operator="in" result="shadow"/>
+
+      <feMerge>
+        <feMergeNode in="shadow"/>
+        <feMergeNode in="outline"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <g filter="url(#stickerOutline)">
+    <!-- Rounded rectangle pedestal: shapes the sticker silhouette at the bottom; fill matches the sticker interior so only the outline/form reads -->
+    <rect x="140" y="390" width="320" height="50" rx="18" ry="18" fill="white"/>
+
+    <!-- Ghost: exact coordinates from the dock icon, translated into this canvas -->
+    <g transform="translate(44,-30)">
+      <path d="
+        M 130,225
+        C 130,95 382,95 382,225
+        L 382,390
+        Q 340,435 298,390
+        Q 256,435 214,390
+        Q 172,435 130,390
+        Z
+      " fill="url(#body)"/>
+
+      <ellipse cx="198" cy="262" rx="29" ry="33" fill="white"/>
+      <ellipse cx="314" cy="262" rx="29" ry="33" fill="white"/>
+
+      <ellipse cx="204" cy="268" rx="16" ry="20" fill="#0b1624"/>
+      <ellipse cx="320" cy="268" rx="16" ry="20" fill="#0b1624"/>
+
+      <ellipse cx="192" cy="252" rx="6" ry="7" fill="white" opacity="0.65"/>
+      <ellipse cx="308" cy="252" rx="6" ry="7" fill="white" opacity="0.65"/>
+    </g>
+
+    <!-- Gloss, clipped to translated ghost shape -->
+    <ellipse cx="300" cy="70" rx="200" ry="180" fill="url(#gloss)" clip-path="url(#ghostClip)"/>
+
+    <!-- Wordmark + slogan on the rounded pedestal, centered -->
+    <g font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" text-anchor="middle">
+      <text x="300" y="418" font-weight="900" font-size="36">
+        <tspan fill="#4a5568">API</tspan><tspan fill="#6aa3c8"> Spector</tspan>
+      </text>
+      <text x="300" y="437" font-weight="600" font-size="15" fill="#4a5568">
+        sharp eyes on every API
+      </text>
+    </g>
+  </g>
+</svg>

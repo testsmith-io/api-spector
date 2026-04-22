@@ -34,7 +34,7 @@ import { loadGlobals, getGlobals, patchGlobals, persistGlobals } from '../main/g
 import { getSecret } from '../main/ipc/secret-handler';
 import { buildDispatcher } from '../main/ipc/request-handler';
 import { buildJsonReport, buildJUnitReport, buildHtmlReport } from '../shared/report';
-import { collectTagged } from '../shared/request-collection';
+import { collectTagged, resolveInheritedAuthAndHeaders } from '../shared/request-collection';
 
 // ─── ANSI colour helpers ──────────────────────────────────────────────────────
 
@@ -136,6 +136,12 @@ async function executeRequest(
   verbose: boolean,
   tls?: TlsSettings,
 ): Promise<ExecuteRequestResult> {
+  // Defensive defaults — AI-generated collections may omit empty arrays
+  if (!req.headers) req.headers = [];
+  if (!req.params) req.params = [];
+  if (!req.body) req.body = { mode: 'none' };
+  if (!req.auth) req.auth = { type: 'none' };
+
   const base: RunRequestResult = {
     requestId:   req.id,
     name:        req.name,
@@ -249,25 +255,25 @@ async function executeRequest(
       if (verbose && r.consoleOutput.length) r.consoleOutput.forEach(l => console.log(color(`    [post] ${l}`, C.gray)));
     }
 
-    // Status determination, in priority order:
+    // Status determination:
     //   1. post-script crashed → 'error'
-    //   2. HTTP 4xx/5xx        → 'failed' (synthetic test added below)
-    //   3. has assertions      → 'passed' or 'failed'
-    //   4. no assertions       → 'skipped' (request worked, nothing checked)
+    //   2. has tests, any failed → 'failed'
+    //   3. has tests, all passed → 'passed' (even on HTTP 4xx — user expects it)
+    //   4. no tests + HTTP 4xx/5xx → 'failed'
+    //   5. no tests + HTTP 2xx/3xx → 'skipped'
     const allPassed  = testResults.every(t => t.passed);
     const httpFailed = fetchResp.status >= 400;
     const hasTests   = testResults.length > 0;
     const status: RunRequestResult['status'] = postScriptError
       ? 'error'
-      : httpFailed
-        ? 'failed'
-        : hasTests
-          ? (allPassed ? 'passed' : 'failed')
+      : hasTests
+        ? (allPassed ? 'passed' : 'failed')
+        : httpFailed
+          ? 'failed'
           : 'skipped';
 
-    // If HTTP failed and no explicit test caught it, append a synthetic
-    // failed test so the user sees *why* the row is red.
-    if (httpFailed && !testResults.some(t => !t.passed)) {
+    // If HTTP failed and user has NO tests, add synthetic failure.
+    if (httpFailed && testResults.length === 0) {
       testResults = [
         ...testResults,
         {
@@ -459,6 +465,19 @@ async function main() {
     const effectiveTls = col.tls
       ? { ...workspaceTls, ...col.tls }
       : workspaceTls;
+
+    // Merge inherited auth/headers from collection/folder into each request
+    for (const item of items) {
+      const req = item.request;
+      const inherited = resolveInheritedAuthAndHeaders(req.id, col);
+      if (req.auth.type === 'none' && inherited.auth && inherited.auth.type !== 'none') {
+        req.auth = inherited.auth;
+      }
+      const inheritedHeaders = inherited.headers.filter(h => h.enabled && h.key);
+      if (inheritedHeaders.length) {
+        req.headers = [...inheritedHeaders, ...req.headers];
+      }
+    }
 
     let bailed = false;
     let lastPrintedScope: string | null = null;

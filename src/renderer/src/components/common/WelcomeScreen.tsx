@@ -24,7 +24,10 @@ export function WelcomeScreen() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-6 text-center p-8">
       <div>
-        <h1 className="text-2xl font-semibold text-white mb-1">api Spector</h1>
+        <h1 className="text-2xl font-semibold mb-1">
+          <span style={{ color: 'var(--wordmark-muted)' }}>API</span>{' '}
+          <span style={{ color: '#6aa3c8' }}>Spector</span>
+        </h1>
         <p className="text-[11px] mb-3" style={{ color: 'var(--text-muted)' }}>
           by{' '}
           <button

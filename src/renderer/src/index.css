@@ -55,6 +55,7 @@
   --surface-950: #272630;
   --text-primary: #e4e3ea;
   --text-muted:   #9d9aa8;
+  --wordmark-muted: #9d9aa8;
 
   --bg-app:  #272630;
   --border:  #3d3b48;
@@ -74,6 +75,7 @@
   --surface-950: #e2e0e9;
   --text-primary: #1c1b24;
   --text-muted:   #615e6d;
+  --wordmark-muted: #4a5568;
 
   --bg-app:  #e2e0e9;
   --border:  #c4c2cb;

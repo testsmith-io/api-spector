@@ -708,7 +708,7 @@ steps:
       versionSpec: '${NODE_LTS}.x'
     displayName: 'Use Node.js ${NODE_LTS}'
   - script: npm install -g @testsmith/api-spector
-    displayName: 'Install api Spector'
+    displayName: 'Install API Spector'
 ${secretHint}  - script: ${runCmd}
     displayName: 'Run API tests'${envBlock}
   - publish: results.html

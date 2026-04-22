@@ -13,6 +13,8 @@ export function useWorkspaceLoader() {
   const loadEnvironment  = useStore(s => s.loadEnvironment);
   const loadMock         = useStore(s => s.loadMock);
   const setActiveCollection = useStore(s => s.setActiveCollection);
+  const setTheme = useStore(s => s.setTheme);
+  const setZoom  = useStore(s => s.setZoom);
 
   const applyWorkspace = useCallback(async (ws: Workspace, path: string) => {
     // Reset to a clean slate before loading the new workspace
@@ -26,6 +28,10 @@ export function useWorkspaceLoader() {
       activeTabId: null,
       activeMockId: null,
     });
+
+    // Apply appearance from workspace settings (theme + zoom)
+    if (ws.settings?.theme) setTheme(ws.settings.theme);
+    if (typeof ws.settings?.zoom === 'number') setZoom(ws.settings.zoom);
 
     for (const colPath of ws.collections) {
       try {
@@ -54,7 +60,7 @@ export function useWorkspaceLoader() {
         setActiveCollection(firstCol.id);
       } catch { /* ignore */ }
     }
-  }, [loadCollection, loadEnvironment, loadMock, setActiveCollection]);
+  }, [loadCollection, loadEnvironment, loadMock, setActiveCollection, setTheme, setZoom]);
 
   return { applyWorkspace };
 }

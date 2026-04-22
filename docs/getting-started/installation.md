@@ -1,6 +1,6 @@
 # Installation
 
-api Spector is distributed as an npm package. It includes both a desktop GUI (Electron) and a CLI for running tests and mock servers headlessly.
+API Spector is distributed as an npm package. It includes both a desktop GUI (Electron) and a CLI for running tests and mock servers headlessly.
 
 ## Requirements
 
@@ -22,7 +22,7 @@ api-spector --help
 Expected output:
 
 ```
-  api Spector — local-first API testing tool
+  API Spector — local-first API testing tool
 
   Usage:
     api-spector ui                            Launch the app

@@ -91,19 +91,31 @@
 </head>
 <body>
   <svg class="ghost" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-    <rect width="512" height="512" rx="115" ry="115" fill="#1e1b2e"/>
-    <ellipse cx="256" cy="300" rx="145" ry="150" fill="#205d96" opacity="0.15"/>
-    <path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z" fill="#205d96"/>
-    <path d="M 155,235 C 155,125 357,125 357,235 L 357,248 C 357,138 155,138 155,248 Z" fill="#6aa3c8" opacity="0.3"/>
+    <defs>
+      <radialGradient id="body" cx="35%" cy="22%" r="70%">
+        <stop offset="0%"   stop-color="#5497c8"/>
+        <stop offset="55%"  stop-color="#205d96"/>
+        <stop offset="100%" stop-color="#123a60"/>
+      </radialGradient>
+      <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stop-color="white" stop-opacity="0.45"/>
+        <stop offset="100%" stop-color="white" stop-opacity="0.0"/>
+      </linearGradient>
+      <clipPath id="ghostClip">
+        <path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z"/>
+      </clipPath>
+    </defs>
+    <path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z" fill="url(#body)"/>
     <ellipse cx="198" cy="262" rx="29" ry="33" fill="white"/>
     <ellipse cx="314" cy="262" rx="29" ry="33" fill="white"/>
-    <ellipse cx="204" cy="268" rx="16" ry="20" fill="#1e1b2e" class="pupil"/>
-    <ellipse cx="320" cy="268" rx="16" ry="20" fill="#1e1b2e" class="pupil pupil-r"/>
-    <ellipse cx="194" cy="254" rx="6" ry="7" fill="white" opacity="0.55"/>
-    <ellipse cx="310" cy="254" rx="6" ry="7" fill="white" opacity="0.55"/>
+    <ellipse cx="204" cy="268" rx="16" ry="20" fill="#0b1624" class="pupil"/>
+    <ellipse cx="320" cy="268" rx="16" ry="20" fill="#0b1624" class="pupil pupil-r"/>
+    <ellipse cx="194" cy="254" rx="6" ry="7" fill="white" opacity="0.65"/>
+    <ellipse cx="310" cy="254" rx="6" ry="7" fill="white" opacity="0.65"/>
+    <ellipse cx="256" cy="100" rx="200" ry="180" fill="url(#gloss)" clip-path="url(#ghostClip)"/>
   </svg>
 
-  <div class="name">api <span class="hl">Spector</span></div>
+  <div class="name">API <span class="hl">Spector</span></div>
   <div class="tagline">Sharp eyes on every API</div>
   <div class="loader"><div class="loader-fill"></div></div>
 </body>

@@ -1,6 +1,6 @@
 # Variables: Scopes and Precedence
 
-api Spector has four variable scopes. Understanding how they relate lets you share data between requests, across collections, and across sessions.
+API Spector has four variable scopes. Understanding how they relate lets you share data between requests, across collections, and across sessions.
 
 ## The four scopes
 

@@ -123,7 +123,7 @@ function createWindow(): void {
   // On Windows the native title bar is shown — include the version in the title
   if (process.platform === 'win32') {
     const version = app.getVersion();
-    win.setTitle(`api Spector${version ? ` v${version}` : ''}`);
+    win.setTitle(`API Spector${version ? ` v${version}` : ''}`);
     win.webContents.on('page-title-updated', e => e.preventDefault());
   }
 

@@ -1,6 +1,6 @@
 # Import OpenAPI
 
-api Spector can import an OpenAPI 3.x specification and convert it into a collection.
+API Spector can import an OpenAPI 3.x specification and convert it into a collection.
 
 ## How to import
 

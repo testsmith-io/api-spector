@@ -3,6 +3,8 @@
 // See LICENSE for full terms.
 
 import type { Collection, Environment, Folder, GeneratedFile } from '../../shared/types';
+import { resolveInheritedAuthAndHeaders, getAllApplicableHooks } from '../../shared/request-collection';
+import { parsePostScript } from './script-parser';
 
 // ─── Supertest + Jest TypeScript generator ────────────────────────────────────
 
@@ -14,9 +16,13 @@ function toEnvVar(key: string): string {
   return key.replace(/\W+/g, '_').toUpperCase();
 }
 
-function interpolateValue(value: string): string {
-  // Replaces {{var}} with `${process.env.VAR ?? ''}`
-  return value.replace(/\{\{([^}]+)\}\}/g, (_, key) => `\${process.env.${toEnvVar(key.trim())} ?? ''}`);
+function interpolateValue(value: string, sharedVars: Set<string> = new Set()): string {
+  // Replaces {{var}} with `${VAR}` if it was extracted by a hook,
+  // otherwise `${process.env.VAR ?? ''}`.
+  return value.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
+    const envKey = toEnvVar(key.trim());
+    return sharedVars.has(envKey) ? `\${${envKey}}` : `\${process.env.${envKey} ?? ''}`;
+  });
 }
 
 // ─── jest.config.ts ────────────────────────────────────────────────────────────
@@ -62,14 +68,15 @@ export const api = supertest(BASE_URL);
 
 // ─── Test file per folder ─────────────────────────────────────────────────────
 
-function buildTestFile(folderName: string, folder: Folder, requests: Collection['requests']): string {
+function buildTestFile(folderName: string, folder: Folder, collection: Collection): string {
+  const requests = collection.requests;
   const tests: string[] = [];
 
   const used = new Set<string>();
   const nameMap = new Map<string, string>();
   for (const id of folder.requestIds) {
     const req = requests[id];
-    if (!req) continue;
+    if (!req || req.disabled || req.hookType) continue;
     const base = req.name;
     let name = base;
     if (used.has(name)) {
@@ -81,14 +88,58 @@ function buildTestFile(folderName: string, folder: Folder, requests: Collection[
     nameMap.set(id, name);
   }
 
+  // Hook blocks (collected from this folder + all ancestors) with variable extraction
+  const hooks = getAllApplicableHooks(folder.id, collection);
+  const beforeAllH = hooks.beforeAll;
+  const afterAllH  = hooks.afterAll;
+  const sharedVars = new Set<string>();
+
+  function buildSupertestHookLines(h: typeof beforeAllH[0]): string[] {
+    const lines: string[] = [`    // ${h.name}`];
+    const method = h.method.toLowerCase();
+    const path = h.url.replace(/^https?:\/\/[^/]+/, '') || '/';
+    const parsed = parsePostScript(h.postRequestScript);
+    if (parsed.extractions.length > 0) {
+      lines.push(`    const hookRes = await api.${method}('${path}');`);
+      for (const e of parsed.extractions) {
+        const jp = e.accessor.replace(/^json\.?/, '');
+        const expr = jp ? `hookRes.body.${jp}` : 'hookRes.body';
+        const varName = toEnvVar(e.varName);
+        sharedVars.add(varName);
+        lines.push(`    ${varName} = String(${expr});`);
+      }
+    } else {
+      lines.push(`    await api.${method}('${path}');`);
+    }
+    return lines;
+  }
+
+  const hookBlocks: string[] = [];
+  if (beforeAllH.length) {
+    const lines = beforeAllH.flatMap(buildSupertestHookLines);
+    hookBlocks.push(`  beforeAll(async () => {\n${lines.join('\n')}\n  });\n`);
+  }
+  if (afterAllH.length) {
+    const lines = afterAllH.flatMap(buildSupertestHookLines);
+    hookBlocks.push(`  afterAll(async () => {\n${lines.join('\n')}\n  });\n`);
+  }
+
+  for (const v of sharedVars) tests.push(`  let ${v}: string = '';`);
+  if (sharedVars.size) tests.push('');
+  tests.push(...hookBlocks);
+
   for (const reqId of folder.requestIds) {
     const req = requests[reqId];
-    if (!req) continue;
+    if (!req || req.disabled || req.hookType) continue;
 
     const method = req.method.toLowerCase();
-    const path = interpolateValue(req.url.replace(/^https?:\/\/[^/]+/, '') || '/');
-    const enabledHeaders = req.headers.filter(h => h.enabled && h.key);
-    const enabledParams  = req.params.filter(p => p.enabled && p.key);
+    const path = interpolateValue(req.url.replace(/^https?:\/\/[^/]+/, '') || '/', sharedVars);
+
+    // Inherited auth + headers
+    const inherited = resolveInheritedAuthAndHeaders(reqId, collection);
+    const effectiveAuth = req.auth.type !== 'none' ? req.auth : (inherited.auth ?? req.auth);
+    const allHeaders = [...inherited.headers.filter(h => h.enabled && h.key), ...req.headers.filter(h => h.enabled && h.key)];
+    const enabledParams = req.params.filter(p => p.enabled && p.key);
     const hasBody = req.body.mode !== 'none' && !['get', 'head'].includes(method);
 
     const lines: string[] = [];
@@ -96,21 +147,38 @@ function buildTestFile(folderName: string, folder: Folder, requests: Collection[
     lines.push(`    const res = await api`);
     lines.push(`      .${method}(\`${path}\`)`);
 
-    for (const h of enabledHeaders) {
-      lines.push(`      .set('${h.key}', \`${interpolateValue(h.value)}\`)`);
+    // Auth header
+    if (effectiveAuth.type === 'bearer') {
+      const token = effectiveAuth.token ?? '';
+      if (token.includes('{{')) {
+        lines.push(`      .set('Authorization', \`Bearer ${interpolateValue(token, sharedVars)}\`)`);
+      } else {
+        const ref = effectiveAuth.tokenSecretRef ?? 'API_TOKEN';
+        lines.push(`      .set('Authorization', \`Bearer \${process.env.${toEnvVar(ref)} ?? ''}\`)`);
+      }
+    }
+
+    for (const h of allHeaders) {
+      lines.push(`      .set('${h.key}', \`${interpolateValue(h.value, sharedVars)}\`)`);
     }
 
     if (enabledParams.length) {
-      const pairs = enabledParams.map(p => `${p.key}: \`${interpolateValue(p.value)}\``).join(', ');
+      const pairs = enabledParams.map(p => `${p.key}: \`${interpolateValue(p.value, sharedVars)}\``).join(', ');
       lines.push(`      .query({ ${pairs} })`);
     }
 
     if (hasBody) {
       if (req.body.mode === 'json') {
-        lines.push(`      .send(${req.body.json ?? '{}'})`);
+        // Interpolate {{var}} tokens in the JSON string body
+        const jsonBody = req.body.json ?? '{}';
+        if (jsonBody.includes('{{')) {
+          lines.push(`      .send(JSON.parse(\`${interpolateValue(jsonBody, sharedVars)}\`))`);
+        } else {
+          lines.push(`      .send(${jsonBody})`);
+        }
       } else if (req.body.mode === 'form' && req.body.form) {
         const pairs = req.body.form.filter(p => p.enabled && p.key)
-          .map(p => `${p.key}: \`${interpolateValue(p.value)}\``).join(', ');
+          .map(p => `${p.key}: \`${interpolateValue(p.value, sharedVars)}\``).join(', ');
         lines.push(`      .type('form')`);
         lines.push(`      .send({ ${pairs} })`);
       }
@@ -118,8 +186,33 @@ function buildTestFile(folderName: string, folder: Folder, requests: Collection[
 
     lines[lines.length - 1] += ';';
     lines.push(``);
-    lines.push(`    expect(res.status).toBe(200);`);
-    lines.push(`    // expect(res.body).toMatchObject({});`);
+
+    const parsed = parsePostScript(req.postRequestScript);
+    if (parsed.assertions.length > 0) {
+      for (const a of parsed.assertions) {
+        const path = a.accessor.replace(/^json\.?/, '');
+        const bodyExpr = path ? `res.body.${path}` : 'res.body';
+        switch (a.kind) {
+          case 'status':
+            lines.push(`    expect(res.status).toBe(${a.expected ?? 200});`);
+            break;
+          case 'equals':   lines.push(`    expect(${bodyExpr}).toBe(${a.expected});`); break;
+          case 'contains': lines.push(`    expect(${bodyExpr}).toContain(${a.expected});`); break;
+          case 'exists':   lines.push(`    expect(${bodyExpr}).toBeDefined();`); break;
+          case 'type':     lines.push(`    expect(typeof ${bodyExpr}).toBe(${a.expected});`); break;
+          case 'above':    lines.push(`    expect(${bodyExpr}).toBeGreaterThan(${a.expected});`); break;
+        }
+      }
+    } else {
+      lines.push(`    expect(res.status).toBe(200);`);
+    }
+
+    for (const e of parsed.extractions) {
+      const path = e.accessor.replace(/^json\.?/, '');
+      const expr = path ? `res.body.${path}` : 'res.body';
+      lines.push(`    process.env.${toEnvVar(e.varName)} = String(${expr});`);
+    }
+
     lines.push(`  })`);
 
     tests.push(lines.join('\n'));
@@ -225,7 +318,7 @@ export function generateSupertestTs(
     if (folder.requestIds.length > 0) {
       files.push({
         path: `tests/${slug(name)}.test.ts`,
-        content: buildTestFile(name, folder, collection.requests),
+        content: buildTestFile(name, folder, collection),
       });
     }
     for (const sub of folder.folders) {

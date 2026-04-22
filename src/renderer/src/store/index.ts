@@ -422,6 +422,21 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
     setWorkspaceSettingsOpen: (open) => set(s => { s.workspaceSettingsOpen = open; }),
 
     loadCollection: (relPath, data) => set(s => {
+      // Ensure every request has required array/object fields — AI-generated
+      // or hand-edited collections may omit them.
+      for (const req of Object.values(data.requests)) {
+        if (!req.headers) req.headers = [];
+        if (!req.params) req.params = [];
+        if (!req.body) req.body = { mode: 'none' };
+        if (!req.auth) req.auth = { type: 'none' };
+      }
+      // Ensure every folder has required arrays
+      function sanitizeFolder(f: Folder) {
+        if (!f.folders) f.folders = [];
+        if (!f.requestIds) f.requestIds = [];
+        f.folders.forEach(sanitizeFolder);
+      }
+      sanitizeFolder(data.rootFolder);
       s.collections[data.id] = { relPath, data, dirty: false };
     }),
 
@@ -1025,9 +1040,18 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
     }),
 
     // ── Theme & zoom ──────────────────────────────────────────────────────────
+    // Persisted in workspace.settings when a workspace is open; otherwise
+    // fall back to localStorage so the welcome screen still remembers the
+    // user's choice across app restarts.
     setTheme: (t) => set(s => {
       s.theme = t;
+      // Always mirror to localStorage so the welcome screen (no workspace open)
+      // still remembers the most recent choice on next launch.
       localStorage.setItem('theme', t);
+      if (s.workspace) {
+        if (!s.workspace.settings) s.workspace.settings = {};
+        s.workspace.settings.theme = t;
+      }
       if (t === 'system') {
         const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         document.documentElement.classList.toggle('light', !dark);
@@ -1039,6 +1063,10 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
     setZoom: (z) => set(s => {
       s.zoom = z;
       localStorage.setItem('zoom', String(z));
+      if (s.workspace) {
+        if (!s.workspace.settings) s.workspace.settings = {};
+        s.workspace.settings.zoom = z;
+      }
       window.electron.setZoomFactor(z);
     }),
 

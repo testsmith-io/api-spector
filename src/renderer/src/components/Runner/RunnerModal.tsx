@@ -7,7 +7,7 @@ import { useStore } from '../../store';
 import type { RunRequestResult, RunSummary, RunnerItem } from '../../../../shared/types';
 import { findFolder } from '../../store';
 import { buildJsonReport, buildJUnitReport, buildHtmlReport } from '../../../../shared/report';
-import { collectAllTags, buildRunPlan } from '../../../../shared/request-collection';
+import { collectAllTags, buildRunPlan, resolveInheritedAuthAndHeaders } from '../../../../shared/request-collection';
 import { buildCliArgs, generateGitHub, generateAzure, generateGitLab } from '../../../../shared/ci-generators';
 import { getMethodColor } from '../../../../shared/colors';
 import { EmptyState } from '../common/EmptyState';
@@ -134,6 +134,25 @@ export function RunnerModal() {
       });
     } else {
       items = baseItems;
+    }
+
+    // Merge inherited auth/headers from collection/folder into each request
+    // so the runner sees the effective auth, not just request-level overrides.
+    // Deep-clone via JSON round-trip — store objects are frozen by Immer.
+    const col = colEntry?.data;
+    if (col) {
+      items = items.map(item => {
+        const inherited = resolveInheritedAuthAndHeaders(item.request.id, col);
+        const req = JSON.parse(JSON.stringify(item.request));
+        if (req.auth?.type === 'none' && inherited.auth && inherited.auth.type !== 'none') {
+          req.auth = inherited.auth;
+        }
+        const inheritedHeaders = inherited.headers.filter(h => h.enabled && h.key);
+        if (inheritedHeaders.length) {
+          req.headers = [...inheritedHeaders, ...(req.headers ?? [])];
+        }
+        return { ...item, request: req };
+      });
     }
 
     const env = selectedEnvId ? environments[selectedEnvId]?.data ?? null : null;

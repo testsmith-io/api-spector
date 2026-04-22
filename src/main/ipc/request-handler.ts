@@ -266,6 +266,12 @@ export function registerRequestHandler(ipc: IpcMain): void {
       tls,
       piiMaskPatterns = [],
     } = payload;
+    // Defensive defaults — AI-generated collections may omit empty arrays
+    if (!req.headers) req.headers = [];
+    if (!req.params) req.params = [];
+    if (!req.body) req.body = { mode: 'none' };
+    if (!req.auth) req.auth = { type: 'none' };
+
     const start = Date.now();
 
     // Merge globals: in-memory store wins over payload snapshot
@@ -549,14 +555,15 @@ export function registerRequestHandler(ipc: IpcMain): void {
       await persistGlobals();
     }
 
-    // If the HTTP response was a 4xx/5xx and no explicit test caught it,
-    // surface a synthetic failed result so the user notices instead of
-    // assuming silence == success.
+    // If the HTTP response was a 4xx/5xx and the user has NO tests at all,
+    // surface a synthetic failed result so the user notices. But if the user
+    // wrote tests and they all passed, trust them — they intentionally tested
+    // for that status code (e.g. negative tests expecting 422).
     const combinedTestResults: TestResult[] = [...schemaTestResults, ...postTestResults];
     if (
       !response.error &&
       response.status >= 400 &&
-      !combinedTestResults.some(t => !t.passed)
+      combinedTestResults.length === 0
     ) {
       combinedTestResults.push({
         name:   `HTTP status ${response.status} ${response.statusText}`.trim(),

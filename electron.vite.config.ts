@@ -12,6 +12,7 @@ export default defineConfig( {
           runner: resolve( __dirname, 'src/cli/runner.ts' ),
           mock:   resolve( __dirname, 'src/cli/mock.ts' ),
           record: resolve( __dirname, 'src/cli/record.ts' ),
+          agents: resolve( __dirname, 'src/cli/agents.ts' ),
         }
       }
     }

@@ -2,7 +2,9 @@
 // Licensed for private, internal, non-commercial use only.
 // See LICENSE for full terms.
 
-import type { Collection, Environment, Folder, GeneratedFile } from '../../shared/types';
+import type { Collection, Environment, Folder, GeneratedFile, ApiRequest } from '../../shared/types';
+import { resolveInheritedAuthAndHeaders, getAllApplicableHooks } from '../../shared/request-collection';
+import { parsePostScript } from './script-parser';
 
 // ─── Playwright TypeScript generator ─────────────────────────────────────────
 
@@ -14,8 +16,11 @@ function toEnvVar(key: string): string {
   return key.replace(/\W+/g, '_').toUpperCase();
 }
 
-function interpolatePath(value: string): string {
-  return value.replace(/\{\{([^}]+)\}\}/g, (_, key) => `\${process.env.${toEnvVar(key.trim())} ?? ''}`);
+function interpolatePath(value: string, sharedVars: Set<string> = new Set()): string {
+  return value.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
+    const envKey = toEnvVar(key.trim());
+    return sharedVars.has(envKey) ? `\${${envKey}}` : `\${process.env.${envKey} ?? ''}`;
+  });
 }
 
 function buildNameMap(folder: Folder, requests: Collection['requests']): Map<string, string> {
@@ -38,25 +43,24 @@ function buildNameMap(folder: Folder, requests: Collection['requests']): Map<str
 }
 
 /** Render a parsed JSON value as a JS literal, converting {{VAR}} to template expressions. */
-function renderJsValue(value: unknown, indent: string): string {
+function renderJsValue(value: unknown, indent: string, sharedVars: Set<string> = new Set()): string {
   const next = indent + '  ';
   if (value === null) return 'null';
   if (typeof value === 'boolean' || typeof value === 'number') return String(value);
   if (typeof value === 'string') {
     if (value.includes('{{')) {
-      const s = value.replace(/\{\{([^}]+)\}\}/g, (_, k) => `\${process.env.${toEnvVar(k.trim())} ?? ''}`);
-      return '`' + s + '`';
+      return '`' + interpolatePath(value, sharedVars) + '`';
     }
     return JSON.stringify(value);
   }
   if (Array.isArray(value)) {
     if (!value.length) return '[]';
-    return `[\n${value.map(v => next + renderJsValue(v, next)).join(',\n')},\n${indent}]`;
+    return `[\n${value.map(v => next + renderJsValue(v, next, sharedVars)).join(',\n')},\n${indent}]`;
   }
   if (typeof value === 'object') {
     const entries = Object.entries(value as Record<string, unknown>);
     if (!entries.length) return '{}';
-    return `{\n${entries.map(([k, v]) => `${next}${k}: ${renderJsValue(v, next)}`).join(',\n')},\n${indent}}`;
+    return `{\n${entries.map(([k, v]) => `${next}${k}: ${renderJsValue(v, next, sharedVars)}`).join(',\n')},\n${indent}}`;
   }
   return JSON.stringify(value);
 }
@@ -87,12 +91,107 @@ export default defineConfig({
 
 // ─── Test spec ────────────────────────────────────────────────────────────────
 
-function buildSpec(folderName: string, folder: Folder, requests: Collection['requests'], nameMap: Map<string, string>): string {
+/**
+ * Build lines for a hook request inside a beforeAll/beforeEach/afterAll/afterEach
+ * block. Parses the hook's post-script to extract variables from the response
+ * (e.g. tokens), and populates `sharedVars` so the caller can declare them at
+ * the describe scope.
+ */
+function buildHookLines(req: ApiRequest, sharedVars: Set<string>): string[] {
+  const method = req.method.toLowerCase();
+  const path = req.url.replace(/^https?:\/\/[^/]+/, '').replace(/^\{\{[^}]+\}\}/, '') || '/';
+  const pathExpr = path.includes('{{') ? '`' + interpolatePath(path) + '`' : `'${path}'`;
+
+  const headerEntries: string[] = [];
+  if (req.auth.type === 'bearer') {
+    const token = req.auth.token ?? '';
+    if (token.includes('{{')) {
+      headerEntries.push(`Authorization: \`Bearer ${interpolatePath(token)}\``);
+    } else {
+      const ref = req.auth.tokenSecretRef ?? 'API_TOKEN';
+      headerEntries.push(`Authorization: \`Bearer \${process.env.${toEnvVar(ref)} ?? ''}\``);
+    }
+  }
+  for (const h of req.headers.filter(h => h.enabled && h.key)) {
+    headerEntries.push(`'${h.key}': \`${interpolatePath(h.value)}\``);
+  }
+
+  const optionParts: string[] = [];
+  if (headerEntries.length) {
+    optionParts.push(`headers: { ${headerEntries.join(', ')} }`);
+  }
+  if (req.body.mode === 'json' && req.body.json && !['get', 'head'].includes(method)) {
+    try {
+      optionParts.push(`data: ${renderJsValue(JSON.parse(req.body.json), '        ')}`);
+    } catch { /* skip */ }
+  }
+  const opts = optionParts.length ? `, { ${optionParts.join(', ')} }` : '';
+
+  const lines: string[] = [];
+  lines.push(`    // ${req.name}`);
+
+  // Parse post-script for variable extractions
+  const parsed = parsePostScript(req.postRequestScript);
+  if (parsed.extractions.length > 0) {
+    lines.push(`    const hookResponse = await request.${method}(${pathExpr}${opts});`);
+    lines.push(`    const hookJson = await hookResponse.json();`);
+    for (const e of parsed.extractions) {
+      const jsonPath = e.accessor.replace(/^json\.?/, '');
+      const expr = jsonPath ? `hookJson.${jsonPath}` : 'hookJson';
+      const varName = toEnvVar(e.varName);
+      sharedVars.add(varName);
+      lines.push(`    ${varName} = String(${expr});`);
+    }
+  } else {
+    lines.push(`    await request.${method}(${pathExpr}${opts});`);
+  }
+
+  return lines;
+}
+
+function buildSpec(folderName: string, folder: Folder, collection: Collection, nameMap: Map<string, string>): string {
+  const requests = collection.requests;
   const tests: string[] = [];
+
+  // Collect hooks from this folder + all ancestors (root/collection-level too)
+  const hooks = getAllApplicableHooks(folder.id, collection);
+  const beforeAllHooks = hooks.beforeAll;
+  const beforeHooks    = hooks.before;
+  const afterHooks     = hooks.after;
+  const afterAllHooks  = hooks.afterAll;
+
+  // Shared variables extracted by hooks (declared at describe scope)
+  const sharedVars = new Set<string>();
+
+  // Generate hook blocks — buildHookLines populates sharedVars
+  const hookBlocks: string[] = [];
+  if (beforeAllHooks.length) {
+    const lines = beforeAllHooks.flatMap(h => buildHookLines(h, sharedVars));
+    hookBlocks.push(`  test.beforeAll(async ({ request }) => {\n${lines.join('\n')}\n  });\n`);
+  }
+  if (beforeHooks.length) {
+    const lines = beforeHooks.flatMap(h => buildHookLines(h, sharedVars));
+    hookBlocks.push(`  test.beforeEach(async ({ request }) => {\n${lines.join('\n')}\n  });\n`);
+  }
+  if (afterHooks.length) {
+    const lines = afterHooks.flatMap(h => buildHookLines(h, sharedVars));
+    hookBlocks.push(`  test.afterEach(async ({ request }) => {\n${lines.join('\n')}\n  });\n`);
+  }
+  if (afterAllHooks.length) {
+    const lines = afterAllHooks.flatMap(h => buildHookLines(h, sharedVars));
+    hookBlocks.push(`  test.afterAll(async ({ request }) => {\n${lines.join('\n')}\n  });\n`);
+  }
+
+  // Declare shared variables and add hook blocks
+  for (const v of sharedVars) {
+    tests.push(`  let ${v} = '';`);
+  }
+  if (sharedVars.size) tests.push('');
+  tests.push(...hookBlocks);
 
   for (const reqId of folder.requestIds) {
     const req = requests[reqId];
-    if (!req) continue;
+    if (!req || req.disabled || req.hookType) continue;
 
     const testName = nameMap.get(reqId) ?? req.name;
     const method   = req.method.toLowerCase();
@@ -103,25 +202,38 @@ function buildSpec(folderName: string, folder: Folder, requests: Collection['req
       .replace(/^\{\{[^}]+\}\}/, '')
       || '/';
     const pathExpr = path.includes('{{')
-      ? '`' + interpolatePath(path) + '`'
+      ? '`' + interpolatePath(path, sharedVars) + '`'
       : `'${path}'`;
 
     // Options: headers, params, data
     const optionParts: string[] = [];
 
-    // Auth + custom headers
+    // Auth + custom headers (including inherited from collection/folder)
+    const inherited = resolveInheritedAuthAndHeaders(reqId, collection);
+    const effectiveAuth = req.auth.type !== 'none' ? req.auth : (inherited.auth ?? req.auth);
+    const allHeaders = [...inherited.headers.filter(h => h.enabled && h.key), ...req.headers.filter(h => h.enabled && h.key)];
+
     const headerEntries: string[] = [];
-    const { auth } = req;
-    if (auth.type === 'bearer') {
-      const ref = auth.tokenSecretRef ?? 'API_TOKEN';
-      headerEntries.push(`Authorization: \`Bearer \${process.env.${toEnvVar(ref)} ?? ''}\``);
-    } else if (auth.type === 'apikey' && auth.apiKeyIn === 'header') {
-      const ref  = auth.apiKeySecretRef ?? 'API_KEY';
-      const name = auth.apiKeyName ?? 'X-API-Key';
-      headerEntries.push(`'${name}': \`\${process.env.${toEnvVar(ref)} ?? ''}\``);
+    if (effectiveAuth.type === 'bearer') {
+      const token = effectiveAuth.token ?? '';
+      if (token.includes('{{')) {
+        headerEntries.push(`Authorization: \`Bearer ${interpolatePath(token, sharedVars)}\``);
+      } else {
+        const ref = effectiveAuth.tokenSecretRef ?? 'API_TOKEN';
+        headerEntries.push(`Authorization: \`Bearer \${process.env.${toEnvVar(ref)} ?? ''}\``);
+      }
+    } else if (effectiveAuth.type === 'apikey' && effectiveAuth.apiKeyIn === 'header') {
+      const val = effectiveAuth.apiKeyValue ?? '';
+      const name = effectiveAuth.apiKeyName ?? 'X-API-Key';
+      if (val.includes('{{')) {
+        headerEntries.push(`'${name}': \`${interpolatePath(val, sharedVars)}\``);
+      } else {
+        const ref = effectiveAuth.apiKeySecretRef ?? 'API_KEY';
+        headerEntries.push(`'${name}': \`\${process.env.${toEnvVar(ref)} ?? ''}\``);
+      }
     }
-    for (const h of req.headers.filter(h => h.enabled && h.key)) {
-      headerEntries.push(`'${h.key}': \`${interpolatePath(h.value)}\``);
+    for (const h of allHeaders) {
+      headerEntries.push(`'${h.key}': \`${interpolatePath(h.value, sharedVars)}\``);
     }
     if (headerEntries.length) {
       optionParts.push(`      headers: {\n        ${headerEntries.join(',\n        ')},\n      }`);
@@ -130,7 +242,10 @@ function buildSpec(folderName: string, folder: Folder, requests: Collection['req
     // Query params
     const enabledParams = req.params.filter(p => p.enabled && p.key);
     if (enabledParams.length) {
-      const pairs = enabledParams.map(p => `'${p.key}': '${interpolatePath(p.value)}'`).join(', ');
+      const pairs = enabledParams.map(p => p.value.includes('{{')
+        ? `'${p.key}': \`${interpolatePath(p.value, sharedVars)}\``
+        : `'${p.key}': '${p.value}'`
+      ).join(', ');
       optionParts.push(`      params: { ${pairs} }`);
     }
 
@@ -138,21 +253,80 @@ function buildSpec(folderName: string, folder: Folder, requests: Collection['req
     const hasBody = req.body.mode !== 'none' && !['get', 'head'].includes(method);
     if (hasBody && req.body.mode === 'json' && req.body.json) {
       try {
-        const rendered = renderJsValue(JSON.parse(req.body.json), '      ');
+        const rendered = renderJsValue(JSON.parse(req.body.json), '      ', sharedVars);
         optionParts.push(`      data: ${rendered}`);
       } catch {
-        optionParts.push(`      data: \`${interpolatePath(req.body.json)}\``);
+        optionParts.push(`      data: \`${interpolatePath(req.body.json, sharedVars)}\``);
       }
     }
 
     const optionsStr = optionParts.length ? `, {\n${optionParts.join(',\n')},\n    }` : '';
 
-    tests.push([
+    // Parse post-request script for assertions + variable extractions
+    const parsed = parsePostScript(req.postRequestScript);
+    const lines: string[] = [
       `  test('${testName}', async ({ request }) => {`,
       `    const response = await request.${method}(${pathExpr}${optionsStr});`,
-      `    expect(response.ok()).toBeTruthy();`,
-      `  });`,
-    ].join('\n'));
+    ];
+
+    // If there are JSON assertions or extractions, parse the body
+    const needsJson = parsed.assertions.some(a => a.accessor.startsWith('json')) ||
+                      parsed.extractions.length > 0;
+    if (needsJson) {
+      lines.push(`    const json = await response.json();`);
+    }
+
+    // Schema validation (JSON Schema on the request)
+    if (req.schema?.trim()) {
+      lines.push(`    // JSON Schema validation`);
+      lines.push(`    // Schema: ${req.schema.replace(/\n/g, ' ').slice(0, 80)}...`);
+    }
+
+    // Assertions from post-script
+    if (parsed.assertions.length > 0) {
+      for (const a of parsed.assertions) {
+        const path = a.accessor.replace(/^json\.?/, '');
+        const jsonExpr = path ? `json.${path}` : 'json';
+        switch (a.kind) {
+          case 'status':
+            if (a.expected) {
+              lines.push(`    expect(response.status()).toBe(${a.expected});`);
+            } else {
+              lines.push(`    expect(response.ok()).toBeTruthy();`);
+            }
+            break;
+          case 'equals':
+            lines.push(`    expect(${jsonExpr}).toBe(${a.expected});`);
+            break;
+          case 'contains':
+            lines.push(`    expect(${jsonExpr}).toContain(${a.expected});`);
+            break;
+          case 'exists':
+            lines.push(`    expect(${jsonExpr}).toBeDefined();`);
+            break;
+          case 'type':
+            lines.push(`    expect(typeof ${jsonExpr}).toBe(${a.expected});`);
+            break;
+          case 'above':
+            lines.push(`    expect(${jsonExpr}).toBeGreaterThan(${a.expected});`);
+            break;
+        }
+      }
+    } else {
+      // Default assertion if no script assertions
+      lines.push(`    expect(response.ok()).toBeTruthy();`);
+    }
+
+    // Variable extractions from post-script
+    for (const e of parsed.extractions) {
+      const path = e.accessor.replace(/^json\.?/, '');
+      const expr = path ? `json.${path}` : 'json';
+      lines.push(`    // Extract: ${e.varName} = ${expr}`);
+      lines.push(`    process.env.${toEnvVar(e.varName)} = String(${expr});`);
+    }
+
+    lines.push(`  });`);
+    tests.push(lines.join('\n'));
   }
 
   return `import { test, expect } from '@playwright/test'
@@ -237,7 +411,7 @@ export function generatePlaywright(
   function processFolder(folder: Folder, name: string) {
     if (folder.requestIds.length > 0) {
       const nameMap = buildNameMap(folder, collection.requests);
-      files.push({ path: `tests/${slug(name)}.spec.ts`, content: buildSpec(name, folder, collection.requests, nameMap) });
+      files.push({ path: `tests/${slug(name)}.spec.ts`, content: buildSpec(name, folder, collection, nameMap) });
     }
     for (const sub of folder.folders) processFolder(sub, sub.name);
   }
