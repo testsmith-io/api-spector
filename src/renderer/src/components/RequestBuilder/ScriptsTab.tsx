@@ -8,6 +8,7 @@ import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
 import type { ApiRequest } from '../../../../shared/types';
 import { SNIPPET_GROUPS } from './scriptSnippets';
+import { appendSnippetToScript } from './scriptAppend';
 import { atCompletionExtension, varHoverTooltipExtension } from './atCompletions';
 import { useVarNames } from '../../hooks/useVarNames';
 import { useVarValues } from '../../hooks/useVarValues';
@@ -49,9 +50,15 @@ export function ScriptsTab({ request, onChange }: Props) {
   }
 
   function insertSnippet(code: string) {
-    const current = value;
-    const separator = current.trim() ? '\n\n' : '';
-    handleChange(current + separator + code);
+    // Post-script snippets: route through appendSnippetToScript so
+    // `const json = sp.response.json();` is hoisted once rather than
+    // duplicated inside every sp.test block.
+    if (scriptType === 'post') {
+      handleChange(appendSnippetToScript(value, code));
+    } else {
+      const separator = value.trim() ? '\n\n' : '';
+      handleChange(value + separator + code);
+    }
   }
 
   return (

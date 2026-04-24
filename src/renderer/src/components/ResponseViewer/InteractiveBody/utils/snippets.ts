@@ -7,6 +7,10 @@ import { jsonAccessor, jsonPathLabel, toJsonPathExpr, varNameFromPath, type Json
 
 // ─── JSON assertions ──────────────────────────────────────────────────────────
 
+// Snippets reference the `json` variable directly. `appendSnippetToScript`
+// hoists a single `const json = sp.response.json();` to the top of the
+// script so multiple assertions don't each redeclare it.
+
 export function makeJsonSnippet(
   path: JsonPath,
   value: unknown,
@@ -15,26 +19,25 @@ export function makeJsonSnippet(
   const acc = jsonAccessor(path);
   const label = jsonPathLabel(path);
   const lit = toLit(value);
-  const decl = 'const json = sp.response.json();';
 
   switch (mode) {
     case 'equals':
-      return `sp.test('${label} equals ${lit}', function() {\n  ${decl}\n  sp.expect(${acc}).to.equal(${lit});\n});`;
+      return `sp.test('${label} equals ${lit}', function() {\n  sp.expect(${acc}).to.equal(${lit});\n});`;
     case 'exists':
-      return `sp.test('${label} exists', function() {\n  ${decl}\n  sp.expect(${acc}).to.not.be.oneOf([null, undefined]);\n});`;
+      return `sp.test('${label} exists', function() {\n  sp.expect(${acc}).to.not.be.oneOf([null, undefined]);\n});`;
     case 'type': {
       const t = value === null ? 'null' : typeof value;
-      return `sp.test('${label} is ${t}', function() {\n  ${decl}\n  sp.expect(${acc}).to.be.a("${t}");\n});`;
+      return `sp.test('${label} is ${t}', function() {\n  sp.expect(${acc}).to.be.a("${t}");\n});`;
     }
     case 'contains':
-      return `sp.test('${label} contains ${lit}', function() {\n  ${decl}\n  sp.expect(${acc}).to.include(${lit});\n});`;
+      return `sp.test('${label} contains ${lit}', function() {\n  sp.expect(${acc}).to.include(${lit});\n});`;
   }
 }
 
 export function makeJsonPathSnippet(path: JsonPath, value: unknown, filterKey: string, filterValue: string): string {
   const expr = toJsonPathExpr(path, filterKey, filterValue);
   const lit  = toLit(value);
-  return `sp.test('${expr} equals ${lit}', function() {\n  const matches = sp.jsonPath(sp.response.json(), '${expr}');\n  sp.expect(matches.length).to.be.above(0);\n  sp.expect(matches[0]).to.equal(${lit});\n});`;
+  return `sp.test('${expr} equals ${lit}', function() {\n  const matches = sp.jsonPath(json, '${expr}');\n  sp.expect(matches.length).to.be.above(0);\n  sp.expect(matches[0]).to.equal(${lit});\n});`;
 }
 
 // ─── XML assertions ───────────────────────────────────────────────────────────
@@ -60,7 +63,7 @@ export function makeXmlSnippet(
 export function makeJsonExtractSnippet(path: JsonPath, target: 'variables' | 'environment'): string {
   const acc     = jsonAccessor(path);
   const varName = varNameFromPath(path);
-  return `const json = sp.response.json();\nsp.${target}.set("${varName}", String(${acc}));`;
+  return `sp.${target}.set("${varName}", String(${acc}));`;
 }
 
 export function makeJsonPathExtractSnippet(
@@ -71,7 +74,7 @@ export function makeJsonPathExtractSnippet(
 ): string {
   const expr    = toJsonPathExpr(path, filterKey, filterValue);
   const varName = varNameFromPath(path);
-  return `const matches = sp.jsonPath(sp.response.json(), '${expr}');\nsp.${target}.set("${varName}", String(matches[0] ?? ''));`;
+  return `const matches = sp.jsonPath(json, '${expr}');\nsp.${target}.set("${varName}", String(matches[0] ?? ''));`;
 }
 
 export function makeXmlExtractSnippet(selector: string, target: 'variables' | 'environment'): string {

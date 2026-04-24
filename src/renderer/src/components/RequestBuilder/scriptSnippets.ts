@@ -38,11 +38,11 @@ export const SNIPPET_GROUPS: SnippetGroup[] = [
       },
       {
         label: 'Check JSON value',
-        code: `sp.test("JSON field equals value", function() {\n  const json = sp.response.json();\n  sp.expect(json.field).to.equal("expected_value");\n});`,
+        code: `sp.test("JSON field equals value", function() {\n  sp.expect(json.field).to.equal("expected_value");\n});`,
       },
       {
         label: 'Validate JSON schema (tv4)',
-        code: `sp.test("JSON matches schema", function() {\n  const schema = {\n    type: "object",\n    properties: {\n      id: { type: "number" },\n      name: { type: "string" }\n    },\n    required: ["id", "name"]\n  };\n  sp.expect(tv4.validate(sp.response.json(), schema)).to.be.true;\n});`,
+        code: `sp.test("JSON matches schema", function() {\n  const schema = {\n    type: "object",\n    properties: {\n      id: { type: "number" },\n      name: { type: "string" }\n    },\n    required: ["id", "name"]\n  };\n  sp.expect(tv4.validate(json, schema)).to.be.true;\n});`,
       },
     ],
   },
@@ -72,7 +72,7 @@ export const SNIPPET_GROUPS: SnippetGroup[] = [
     items: [
       {
         label: 'Save token from response (use in next requests)',
-        code: `// Use collectionVariables so the value persists across requests\nconst json = sp.response.json();\nsp.collectionVariables.set("token", json.access_token);`,
+        code: `// Use collectionVariables so the value persists across requests\nsp.collectionVariables.set("token", json.access_token);`,
       },
       {
         label: 'Set collection variable (persists across requests)',
@@ -156,19 +156,19 @@ export const SNIPPET_GROUPS: SnippetGroup[] = [
     items: [
       {
         label: 'Save JSON field to variable',
-        code: `const json = sp.response.json();\nsp.variables.set("field_value", json.field);`,
+        code: `sp.variables.set("field_value", json.field);`,
       },
       {
         label: 'Save JSON field to environment',
-        code: `const json = sp.response.json();\nsp.environment.set("token", json.token);`,
+        code: `sp.environment.set("token", json.token);`,
       },
       {
         label: 'Extract via JSONPath to variable',
-        code: `const matches = sp.jsonPath(sp.response.json(), '$.data[0].id');\nsp.variables.set("extracted_value", String(matches[0] ?? ''));`,
+        code: `const matches = sp.jsonPath(json, '$.data[0].id');\nsp.variables.set("extracted_value", String(matches[0] ?? ''));`,
       },
       {
         label: 'Extract via JSONPath to environment',
-        code: `const matches = sp.jsonPath(sp.response.json(), '$.data[0].id');\nsp.environment.set("extracted_value", String(matches[0] ?? ''));`,
+        code: `const matches = sp.jsonPath(json, '$.data[0].id');\nsp.environment.set("extracted_value", String(matches[0] ?? ''));`,
       },
       {
         label: 'Extract from XML to variable',
