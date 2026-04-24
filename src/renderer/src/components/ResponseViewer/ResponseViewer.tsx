@@ -17,6 +17,7 @@ import { TestsPanel } from './TestsPanel';
 import { RequestPanel } from './RequestPanel';
 import { ConsolePanel } from './ConsolePanel';
 import { prettyJson, prettyXml } from './utils/formatters';
+import { appendSnippetToScript } from '../RequestBuilder/scriptAppend';
 
 const { electron } = window;
 
@@ -79,17 +80,7 @@ export function ResponseViewer() {
       .find(c => c.data.requests[requestId])?.data.requests[requestId];
     if (!req) return;
     const existing = req.postRequestScript ?? '';
-    // If the script already declares `const json = sp.response.json()`,
-    // strip the duplicate declaration from the incoming snippet so we
-    // don't redeclare the variable on every assertion added from the tree.
-    let cleaned = snippet;
-    if (existing.includes('const json = sp.response.json()')) {
-      cleaned = cleaned
-        .replace(/^\s*const json = sp\.response\.json\(\);?\s*\n?/m, '')
-        .replace(/\n\s*const json = sp\.response\.json\(\);?\s*\n/g, '\n');
-    }
-    const sep = existing.trim() ? '\n\n' : '';
-    updateRequest(requestId, { postRequestScript: existing + sep + cleaned });
+    updateRequest(requestId, { postRequestScript: appendSnippetToScript(existing, snippet) });
     if (activeTabId) {
       setTabRequestTab(activeTabId, 'scripts');
       setTabScriptTab(activeTabId, 'post');
