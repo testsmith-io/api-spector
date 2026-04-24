@@ -253,7 +253,9 @@ describe('makeJsonSnippet', () => {
   it('builds an equals assertion', () => {
     const out = makeJsonSnippet(path, 'alice', 'equals');
     expect(out).toContain("sp.test('user.name equals \"alice\"'");
-    expect(out).toContain('const json = sp.response.json();');
+    // `const json = sp.response.json();` is now hoisted by appendSnippetToScript,
+    // not embedded in every sp.test block. Snippets reference `json` directly.
+    expect(out).not.toContain('const json = sp.response.json();');
     expect(out).toContain('sp.expect(json.user.name).to.equal("alice");');
   });
 
@@ -285,7 +287,7 @@ describe('makeJsonPathSnippet', () => {
   it('builds a JSONPath assertion that filters on a sibling key', () => {
     const path: JsonPath = ['users', 0, 'name'];
     const out = makeJsonPathSnippet(path, 'alice', 'id', '42');
-    expect(out).toContain("sp.jsonPath(sp.response.json(), '$.users[?(@.id==42)].name')");
+    expect(out).toContain("sp.jsonPath(json, '$.users[?(@.id==42)].name')");
     expect(out).toContain('matches.length).to.be.above(0)');
     expect(out).toContain('matches[0]).to.equal("alice")');
   });
@@ -322,7 +324,7 @@ describe('extract snippets', () => {
 
   it('makeJsonPathExtractSnippet uses the JSONPath filter expression', () => {
     const out = makeJsonPathExtractSnippet(['users', 0, 'token'], 'id', '42', 'variables');
-    expect(out).toContain("sp.jsonPath(sp.response.json(), '$.users[?(@.id==42)].token')");
+    expect(out).toContain("sp.jsonPath(json, '$.users[?(@.id==42)].token')");
     expect(out).toContain('sp.variables.set("token"');
   });
 
