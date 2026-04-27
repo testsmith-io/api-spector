@@ -13,6 +13,7 @@ export function useWorkspaceLoader() {
   const loadEnvironment  = useStore(s => s.loadEnvironment);
   const loadMock         = useStore(s => s.loadMock);
   const setActiveCollection = useStore(s => s.setActiveCollection);
+  const loadContractSnapshot = useStore(s => s.loadContractSnapshot);
   const setTheme = useStore(s => s.setTheme);
   const setZoom  = useStore(s => s.setZoom);
 
@@ -54,13 +55,21 @@ export function useWorkspaceLoader() {
       } catch { /* ignore */ }
     }
 
+    // Load contract snapshots referenced by the workspace, plus any orphan
+    // `.contract.json` files present in the contracts/ dir (the main process
+    // handler unions both). Silently skip missing / malformed files.
+    try {
+      const snapshots = await electron.listContractSnapshots(ws.contracts ?? []);
+      for (const { relPath, snapshot } of snapshots) loadContractSnapshot(relPath, snapshot);
+    } catch { /* no workspace dir yet, or no contracts */ }
+
     if (ws.collections.length > 0) {
       try {
         const firstCol: Collection = await electron.loadCollection(ws.collections[0]);
         setActiveCollection(firstCol.id);
       } catch { /* ignore */ }
     }
-  }, [loadCollection, loadEnvironment, loadMock, setActiveCollection, setTheme, setZoom]);
+  }, [loadCollection, loadEnvironment, loadMock, loadContractSnapshot, setActiveCollection, setTheme, setZoom]);
 
   return { applyWorkspace };
 }

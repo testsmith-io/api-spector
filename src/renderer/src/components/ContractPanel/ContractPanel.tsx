@@ -17,12 +17,24 @@ export function ContractPanel() {
   const activeCollId         = useStore(s => s.activeCollectionId);
   const report               = useStore(s => s.lastContractReport);
   const setReport            = useStore(s => s.setLastContractReport);
+  const snapshots            = useStore(s => s.contractSnapshots);
+  const activeSnapshotRelPath = useStore(s => s.activeContractSnapshotRelPath);
+  const setActiveSnapshot    = useStore(s => s.setActiveContractSnapshot);
+  const loadContractSnapshot  = useStore(s => s.loadContractSnapshot);
+  const removeContractSnapshot = useStore(s => s.removeContractSnapshot);
+  const workspace = useStore(s => s.workspace);
 
   const [mode, setMode]               = useState<ContractMode>('consumer');
   const [specUrl, setSpecUrl]         = useState('');
   const [requestBaseUrl, setRequestBaseUrl] = useState('');
   const [running, setRunning]         = useState(false);
+  const [capturing, setCapturing]     = useState(false);
   const [error, setError]             = useState<string | null>(null);
+
+  const snapshotList = Object.entries(snapshots)
+    .map(([relPath, snapshot]) => ({ relPath, snapshot }))
+    .sort((a, b) => b.snapshot.capturedAt.localeCompare(a.snapshot.capturedAt));
+  const activeSnapshot = activeSnapshotRelPath ? snapshots[activeSnapshotRelPath] ?? null : null;
 
   const allRequests = Object.values(collections).flatMap(c => Object.values(c.data.requests));
   const contractRequests = allRequests.filter(r =>
@@ -40,8 +52,9 @@ export function ContractPanel() {
     : {};
 
   async function runContracts() {
-    if (mode !== 'consumer' && !specUrl.trim()) {
-      setError('Provide an OpenAPI spec URL for provider / bi-directional mode.');
+    // Either a live URL or a pinned snapshot is required for non-consumer modes.
+    if (mode !== 'consumer' && !specUrl.trim() && !activeSnapshotRelPath) {
+      setError('Provide an OpenAPI spec URL or pick a pinned snapshot for provider / bi-directional mode.');
       return;
     }
     setRunning(true);
@@ -56,14 +69,49 @@ export function ContractPanel() {
         requests,
         envVars,
         collectionVars,
-        specUrl:        specUrl.trim() || undefined,
-        requestBaseUrl: requestBaseUrl.trim() || undefined,
+        specUrl:             specUrl.trim() || undefined,
+        specSnapshotRelPath: activeSnapshotRelPath ?? undefined,
+        requestBaseUrl:      requestBaseUrl.trim() || undefined,
       });
       setReport(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setRunning(false);
+    }
+  }
+
+  async function captureSnapshot() {
+    if (!specUrl.trim()) {
+      setError('Enter a spec URL before pinning a snapshot.');
+      return;
+    }
+    setCapturing(true);
+    setError(null);
+    try {
+      const { relPath, snapshot } = await electron.captureContractSnapshot({ specUrl: specUrl.trim() });
+      loadContractSnapshot(relPath, snapshot);
+      setActiveSnapshot(relPath);
+      // Persist workspace so `contracts` array is saved to disk.
+      const ws = useStore.getState().workspace;
+      if (ws) await electron.saveWorkspace(ws);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCapturing(false);
+    }
+  }
+
+  async function deleteActiveSnapshot() {
+    if (!activeSnapshotRelPath) return;
+    const relPath = activeSnapshotRelPath;
+    try {
+      await electron.deleteContractSnapshot(relPath);
+      removeContractSnapshot(relPath);
+      const ws = useStore.getState().workspace;
+      if (ws) await electron.saveWorkspace(ws);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -95,20 +143,74 @@ export function ContractPanel() {
             : 'Checks static schema compatibility between consumer contracts and provider spec, then verifies live responses.'}
         </p>
 
-        {/* Spec URL + Request base URL (provider / bidirectional) */}
+        {/* Spec source (provider / bidirectional) */}
         {mode !== 'consumer' && (
           <div className="flex flex-col gap-2">
+            {/* Snapshot picker */}
             <div>
               <label className="text-[10px] text-surface-500 uppercase tracking-wider font-medium block mb-1">
-                OpenAPI Spec URL
+                Spec version
               </label>
-              <input
-                value={specUrl}
-                onChange={e => setSpecUrl(e.target.value)}
-                placeholder="https://api.example.com/openapi.json"
-                className="w-full text-xs bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
-              />
+              <div className="flex gap-1">
+                <select
+                  value={activeSnapshotRelPath ?? ''}
+                  onChange={e => setActiveSnapshot(e.target.value || null)}
+                  disabled={!workspace}
+                  className="flex-1 text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                >
+                  <option value="">Live URL (latest from provider)</option>
+                  {snapshotList.map(({ relPath, snapshot }) => (
+                    <option key={relPath} value={relPath}>
+                      {snapshot.name}
+                      {snapshot.specVersion ? '' : ` — ${snapshot.capturedAt.slice(0, 10)}`}
+                    </option>
+                  ))}
+                </select>
+                {activeSnapshotRelPath && (
+                  <button
+                    onClick={deleteActiveSnapshot}
+                    title="Delete this snapshot"
+                    className="px-2 text-xs text-surface-500 hover:text-red-400 bg-surface-800 hover:bg-surface-700 rounded transition-colors"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              {activeSnapshot && (
+                <p className="text-[10px] text-surface-600 mt-1 font-mono truncate">
+                  Captured {activeSnapshot.capturedAt.slice(0, 19).replace('T', ' ')} — sha {activeSnapshot.sha256.slice(0, 8)}
+                </p>
+              )}
             </div>
+
+            {/* Live URL (only meaningful when no snapshot is pinned) */}
+            {!activeSnapshotRelPath && (
+              <div>
+                <label className="text-[10px] text-surface-500 uppercase tracking-wider font-medium block mb-1">
+                  OpenAPI Spec URL
+                </label>
+                <div className="flex gap-1">
+                  <input
+                    value={specUrl}
+                    onChange={e => setSpecUrl(e.target.value)}
+                    placeholder="https://api.example.com/openapi.json"
+                    className="flex-1 text-xs bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
+                  />
+                  <button
+                    onClick={captureSnapshot}
+                    disabled={capturing || !specUrl.trim() || !workspace}
+                    title="Fetch and pin this spec as a versioned snapshot"
+                    className="px-2.5 text-xs bg-surface-800 hover:bg-surface-700 disabled:opacity-50 disabled:hover:bg-surface-800 rounded transition-colors"
+                  >
+                    {capturing ? '…' : 'Pin'}
+                  </button>
+                </div>
+                <p className="text-[10px] text-surface-600 mt-1 leading-relaxed">
+                  Pin a snapshot to run against a specific spec version later, even after the provider ships an update.
+                </p>
+              </div>
+            )}
+
             <div>
               <label className="text-[10px] text-surface-500 uppercase tracking-wider font-medium block mb-1">
                 Request base URL <span className="normal-case text-surface-600">(optional)</span>
@@ -135,7 +237,7 @@ export function ContractPanel() {
           </span>
           <button
             onClick={runContracts}
-            disabled={running || (mode !== 'consumer' && !specUrl.trim())}
+            disabled={running || (mode !== 'consumer' && !specUrl.trim() && !activeSnapshotRelPath)}
             className="px-3 py-1 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors font-medium"
           >
             {running ? 'Running…' : 'Run'}

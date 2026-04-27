@@ -23,6 +23,7 @@ import type {
   MockHit,
   WsMessage,
   ContractReport,
+  ContractSnapshot,
 } from '../../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
 import { uniqueName, colRelPath } from '../../../shared/naming-utils';
@@ -188,6 +189,10 @@ interface AppState {
 
   // Contract testing
   lastContractReport: ContractReport | null
+  /** Pinned contract spec snapshots, keyed by the snapshot's relative path. */
+  contractSnapshots: Record<string, ContractSnapshot>
+  /** When set, contract runs use this snapshot's spec instead of a live URL. */
+  activeContractSnapshotRelPath: string | null
 
   // Runner
   runnerModal: {
@@ -294,6 +299,11 @@ interface AppActions {
   // Contract testing
   setLastContractReport: (r: ContractReport | null) => void
 
+  // Contract snapshots
+  loadContractSnapshot: (relPath: string, snapshot: ContractSnapshot) => void
+  removeContractSnapshot: (relPath: string) => void
+  setActiveContractSnapshot: (relPath: string | null) => void
+
   // Inherited auth/headers selector
   getInheritedAuthAndHeaders: (requestId: string) => { auth: AuthConfig | null; headers: KeyValuePair[] }
 
@@ -389,6 +399,8 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
     commandPaletteOpen: false,
     pinnedResponse: null,
     lastContractReport: null,
+    contractSnapshots: {},
+    activeContractSnapshotRelPath: null,
     wsConnections: {},
 
     // ── Workspace ─────────────────────────────────────────────────────────────
@@ -413,6 +425,8 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
       s.wsConnections       = {};
       s.pinnedResponse      = null;
       s.lastContractReport  = null;
+      s.contractSnapshots   = {};
+      s.activeContractSnapshotRelPath = null;
     }),
 
     updateWorkspaceSettings: (settings) => set(s => {
@@ -950,6 +964,25 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
 
     // ── Contract testing ──────────────────────────────────────────────────────
     setLastContractReport: (r) => set(s => { s.lastContractReport = r; }),
+
+    // ── Contract snapshots ────────────────────────────────────────────────────
+    loadContractSnapshot: (relPath, snapshot) => set(s => {
+      s.contractSnapshots[relPath] = snapshot;
+      if (s.workspace) {
+        if (!s.workspace.contracts) s.workspace.contracts = [];
+        if (!s.workspace.contracts.includes(relPath)) s.workspace.contracts.push(relPath);
+      }
+    }),
+
+    removeContractSnapshot: (relPath) => set(s => {
+      delete s.contractSnapshots[relPath];
+      if (s.activeContractSnapshotRelPath === relPath) s.activeContractSnapshotRelPath = null;
+      if (s.workspace?.contracts) {
+        s.workspace.contracts = s.workspace.contracts.filter(p => p !== relPath);
+      }
+    }),
+
+    setActiveContractSnapshot: (relPath) => set(s => { s.activeContractSnapshotRelPath = relPath; }),
 
     // ── Inherited auth/headers ────────────────────────────────────────────────
     getInheritedAuthAndHeaders: (requestId) => {

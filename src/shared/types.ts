@@ -152,9 +152,39 @@ export interface ContractRunPayload {
   collectionVars?: Record<string, string>
   specUrl?: string
   specPath?: string
+  /** Run against a pinned snapshot stored in the workspace. Takes priority over
+   *  `specUrl`/`specPath` so callers don't have to clear those when switching. */
+  specSnapshotRelPath?: string
   /** Strip this base URL from request URLs before matching against spec paths.
    *  Useful when collection requests point at a different host than the spec's servers[]. */
   requestBaseUrl?: string
+}
+
+// ─── Contract snapshots (pinned OpenAPI/spec versions) ───────────────────────
+//
+// A snapshot captures the exact bytes of an external spec at a point in time
+// so runs can be replayed against a specific version even after the provider
+// ships a new release. Stored per-workspace under `contracts/*.contract.json`.
+
+export interface ContractSnapshot {
+  version: '1.0'
+  /** Stable id — used as the snapshot filename and in CLI --snapshot <id>. */
+  id: string
+  /** Human label (e.g. "users-api v1.3"). */
+  name: string
+  /** Original URL or absolute path the snapshot was captured from. Informational
+   *  only — the verifier reads `spec` directly from this file. */
+  source?: string
+  /** ISO timestamp when the snapshot was captured. */
+  capturedAt: string
+  /** Wire format of the embedded spec text. */
+  format: 'yaml' | 'json'
+  /** Optional semantic version extracted from the spec's `info.version`. */
+  specVersion?: string
+  /** Raw spec text as captured (yaml or json, matches `format`). */
+  spec: string
+  /** SHA-256 hex of `spec`. Makes git diffs easy to sanity-check. */
+  sha256: string
 }
 
 export interface ApiRequest {
@@ -270,6 +300,8 @@ export interface Workspace {
   environments: string[]
   activeEnvironmentId: string | null
   mocks?: string[]
+  /** Paths (relative to the workspace dir) of pinned contract snapshots. */
+  contracts?: string[]
   settings?: {
     proxy?: {
       url: string
