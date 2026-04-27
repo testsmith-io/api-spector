@@ -12,9 +12,10 @@ function printHelp() {
   console.log('')
   console.log('  Usage:')
   console.log('    api-spector ui                            Launch the app')
-  console.log('    api-spector run    --workspace <path>     Run tests from CLI')
-  console.log('    api-spector mock   --workspace <path>     Start mock servers from CLI')
-  console.log('    api-spector record --upstream <url>       Record API traffic as mock stubs')
+  console.log('    api-spector run      --workspace <path>   Run tests from CLI')
+  console.log('    api-spector mock     --workspace <path>   Start mock servers from CLI')
+  console.log('    api-spector record   --upstream <url>     Record API traffic as mock stubs')
+  console.log('    api-spector contract list|run             Manage & run pinned contract snapshots')
   console.log('')
   console.log('  Options:')
   console.log('    api-spector agents init <name>            Initialize AI agent files')
@@ -65,6 +66,13 @@ if (cmd === '--help' || cmd === '-h') {
 } else if (cmd === 'agents') {
   const agentsPath = path.join(__dirname, '..', 'out', 'main', 'agents.js')
   const proc = spawn(process.execPath, [agentsPath, ...rest], {
+    stdio: 'inherit',
+    env: process.env,
+  })
+  proc.on('close', code => process.exit(code ?? 0))
+} else if (cmd === 'contract') {
+  const contractPath = path.join(__dirname, '..', 'out', 'main', 'contract.js')
+  const proc = spawn(process.execPath, [contractPath, ...rest], {
     stdio: 'inherit',
     env: process.env,
   })

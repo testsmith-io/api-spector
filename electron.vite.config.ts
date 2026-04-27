@@ -9,10 +9,11 @@ export default defineConfig( {
       rollupOptions: {
         input: {
           index: resolve( __dirname, 'src/main/index.ts' ),
-          runner: resolve( __dirname, 'src/cli/runner.ts' ),
-          mock:   resolve( __dirname, 'src/cli/mock.ts' ),
-          record: resolve( __dirname, 'src/cli/record.ts' ),
-          agents: resolve( __dirname, 'src/cli/agents.ts' ),
+          runner:   resolve( __dirname, 'src/cli/runner.ts' ),
+          mock:     resolve( __dirname, 'src/cli/mock.ts' ),
+          record:   resolve( __dirname, 'src/cli/record.ts' ),
+          agents:   resolve( __dirname, 'src/cli/agents.ts' ),
+          contract: resolve( __dirname, 'src/cli/contract.ts' ),
         }
       }
     }

@@ -23,6 +23,7 @@ import type {
   ApiRequest,
   ContractRunPayload,
   ContractReport,
+  ContractSnapshot,
   GitStatus,
   GitCommit,
   GitBranch,
@@ -191,6 +192,14 @@ const api = {
     ipcRenderer.invoke('contract:run', payload),
   inferContractSchema: (jsonBody: string): Promise<string | null> =>
     ipcRenderer.invoke('contract:inferSchema', jsonBody),
+  captureContractSnapshot: (opts: { specUrl?: string; specPath?: string; name?: string }) =>
+    ipcRenderer.invoke('contract:captureSnapshot', opts) as Promise<{ relPath: string; snapshot: ContractSnapshot }>,
+  listContractSnapshots: (registered: string[] = []) =>
+    ipcRenderer.invoke('contract:listSnapshots', registered) as Promise<Array<{ relPath: string; snapshot: ContractSnapshot }>>,
+  loadContractSnapshot: (relPath: string) =>
+    ipcRenderer.invoke('contract:loadSnapshot', relPath) as Promise<ContractSnapshot>,
+  deleteContractSnapshot: (relPath: string) =>
+    ipcRenderer.invoke('contract:deleteSnapshot', relPath) as Promise<void>,
 
   // ─── Script hooks ─────────────────────────────────────────────────────────
   runScriptHook: (payload: {
