@@ -1041,13 +1041,31 @@ export const useStore: UseBoundStore<StoreApi<FullState>> = create<FullState>()(
 
     // ── Apply script results back to store ────────────────────────────────────
     applyScriptUpdates: (result) => set(s => {
+      // Defensive filter: never persist mask sentinels into the workspace
+      // even if a script accidentally extracted one (e.g. from a redacted
+      // response on an older build). Storing `[REDACTED]` as a token would
+      // poison every later request that interpolates the variable.
+      const isMaskSentinel = (v: string) => v === '[REDACTED]' || v === '[*****]';
+      const safeFilter = (m: Record<string, string>): Record<string, string> => {
+        const out: Record<string, string> = {};
+        for (const [k, v] of Object.entries(m)) {
+          if (!isMaskSentinel(v)) out[k] = v;
+          else console.warn(`applyScriptUpdates: refusing to persist mask sentinel into "${k}"`);
+        }
+        return out;
+      };
+      const safeColVars  = safeFilter(result.updatedCollectionVars);
+      const safeEnvVars  = safeFilter(result.updatedEnvVars);
+      const safeGlobals  = safeFilter(result.updatedGlobals);
+      const safeLocalVars = safeFilter(result.updatedLocalVars);
+
       // Patch collection vars on the active collection
       const activeColId = s.activeCollectionId;
       if (activeColId && s.collections[activeColId]) {
         const col = s.collections[activeColId].data;
         col.collectionVariables = {
           ...(col.collectionVariables ?? {}),
-          ...result.updatedCollectionVars,
+          ...safeColVars,
         };
         s.collections[activeColId].dirty = true;
       }
@@ -1058,7 +1076,7 @@ export const useStore: UseBoundStore<StoreApi<FullState>> = create<FullState>()(
       const activeEnvId = s.activeEnvironmentId;
       if (activeEnvId && s.environments[activeEnvId]) {
         const env = s.environments[activeEnvId].data;
-        for (const [key, value] of Object.entries(result.updatedEnvVars)) {
+        for (const [key, value] of Object.entries(safeEnvVars)) {
           const existing = env.variables.find(v => v.key === key);
           if (existing && !existing.secret) {
             existing.value = value;
@@ -1068,9 +1086,9 @@ export const useStore: UseBoundStore<StoreApi<FullState>> = create<FullState>()(
         }
       }
       // Patch globals
-      s.globals = { ...s.globals, ...result.updatedGlobals };
+      s.globals = { ...s.globals, ...safeGlobals };
       // Persist local vars (sp.variables.set) in session — in-memory only
-      s.sessionVars = { ...s.sessionVars, ...result.updatedLocalVars };
+      s.sessionVars = { ...s.sessionVars, ...safeLocalVars };
     }),
 
     // ── Theme & zoom ──────────────────────────────────────────────────────────

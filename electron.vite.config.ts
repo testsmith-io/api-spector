@@ -5,6 +5,13 @@ import { resolve } from 'path'
 export default defineConfig( {
   main: {
     plugins: [externalizeDepsPlugin()],
+    // Inject the package version into all main-process bundles (the Electron
+    // entry plus every CLI binary). Lets `api-spector run` print its version
+    // alongside the workspace banner without re-reading package.json at
+    // runtime.
+    define: {
+      __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? ''),
+    },
     build: {
       rollupOptions: {
         input: {

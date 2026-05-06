@@ -20,7 +20,7 @@ import {
   performNtlmRequest,
   fetchOAuth2Token,
 } from '../auth-builder';
-import { maskPii, maskHeaders, buildSchemaTestResults } from './request-handler';
+import { maskPii, maskHeaders, buildSchemaTestResults, buildProtocolFaultTests } from './request-handler';
 
 // ─── Build undici dispatcher (proxy + TLS) ────────────────────────────────────
 
@@ -97,6 +97,7 @@ async function executeOne(
     const r = await runScript(interpolate(req.preRequestScript, vars), {
       envVars: { ...envVars }, collectionVars: { ...collectionVars },
       globals: { ...globals }, localVars: {},
+      piiMaskPatterns,
     });
     preScriptError        = r.error;
     localVars             = r.updatedLocalVars;
@@ -140,6 +141,24 @@ async function executeOne(
     } else if (req.body.mode === 'raw' && req.body.raw) {
       body = interpolate(req.body.raw, vars);
       if (!headers.has('content-type')) headers.set('Content-Type', req.body.rawContentType ?? 'text/plain');
+    } else if (req.body.mode === 'graphql' && req.body.graphql) {
+      const gql = req.body.graphql;
+      const gqlBody: Record<string, unknown> = { query: interpolate(gql.query, vars) };
+      const rawVars = gql.variables?.trim();
+      if (rawVars) {
+        try { gqlBody.variables = JSON.parse(interpolate(rawVars, vars)); } catch { /* skip */ }
+      }
+      if (gql.operationName?.trim()) gqlBody.operationName = gql.operationName.trim();
+      body = JSON.stringify(gqlBody);
+      if (!headers.has('content-type')) headers.set('Content-Type', 'application/json');
+    } else if (req.body.mode === 'soap' && req.body.soap) {
+      // Send the SOAP envelope. Without this branch the body went out empty
+      // and the server returned `Root element is missing`.
+      body = interpolate(req.body.soap.envelope, vars);
+      if (!headers.has('content-type')) headers.set('Content-Type', 'text/xml; charset=utf-8');
+      if (req.body.soap.soapAction && !headers.has('soapaction')) {
+        headers.set('SOAPAction', req.body.soap.soapAction);
+      }
     }
 
     const methodHasBody = !['GET', 'HEAD'].includes(req.method);
@@ -183,21 +202,34 @@ async function executeOne(
       headers: maskedHeaders, body: maskedBody,
       bodySize: Buffer.byteLength(responseBody, 'utf8'), durationMs,
     };
+    // Same shape with the unmasked bytes — handed to the post-script so
+    // `sp.response.json().access_token` returns the real value, not
+    // "[REDACTED]". The displayed `response` keeps the redacted copy.
+    const scriptResponse = {
+      status: fetchResp.status, statusText: fetchResp.statusText,
+      headers: rawRespHeaders, body: responseBody,
+      bodySize: Buffer.byteLength(responseBody, 'utf8'), durationMs,
+    };
 
     // Schema validation (synthetic test results, independent of contract)
     const schemaTestResults = buildSchemaTestResults(req.schema, responseBody);
+    // Protocol-level fault check — auto-pass/fail for SOAP / GraphQL so they
+    // stop landing in 'skipped' just because no hand-written assertion was
+    // added. Empty for REST, preserving the "add assertions" nudge there.
+    const protocolFaultTests = buildProtocolFaultTests(req.body.mode, responseBody);
 
     // Post-request script
-    let testResults: RunRequestResult['testResults'] = [...schemaTestResults];
+    let testResults: RunRequestResult['testResults'] = [...schemaTestResults, ...protocolFaultTests];
     let consoleOutput: string[] = [];
     let postScriptError: string | undefined;
 
     if (req.postRequestScript?.trim()) {
       const r = await runScript(interpolate(req.postRequestScript, vars), {
         envVars: updatedEnvVars, collectionVars: updatedCollectionVars,
-        globals: updatedGlobals, localVars, response,
+        globals: updatedGlobals, localVars, response: scriptResponse,
+        piiMaskPatterns,
       });
-      testResults           = [...schemaTestResults, ...r.testResults];
+      testResults           = [...schemaTestResults, ...protocolFaultTests, ...r.testResults];
       consoleOutput         = r.consoleOutput;
       postScriptError       = r.error;
       updatedEnvVars        = r.updatedEnvVars;
@@ -210,11 +242,13 @@ async function executeOne(
 
     // Status determination, in priority order:
     //   1. post-script crashed → 'error'
-    //   2. any explicit test failed → 'failed'
+    //   2. any test failed → 'failed'
     //   3. has tests, all passed → 'passed' (even if HTTP 4xx/5xx — the user
     //      intentionally expects that status, e.g. negative tests for 422)
     //   4. no tests + HTTP 4xx/5xx → 'failed' (synthetic test added below)
-    //   5. no tests + HTTP 2xx/3xx → 'skipped'
+    //   5. no tests + HTTP 2xx/3xx → 'passed' (a 2xx is success on its own;
+    //      SOAP Fault and GraphQL `errors` already turned into failing tests
+    //      via buildProtocolFaultTests above, so we won't mislabel those)
     const allPassed  = testResults.every(t => t.passed);
     const httpFailed = fetchResp.status >= 400;
     const hasTests   = testResults.length > 0;
@@ -224,7 +258,7 @@ async function executeOne(
         ? (allPassed ? 'passed' : 'failed')
         : httpFailed
           ? 'failed'
-          : 'skipped';
+          : 'passed';
 
     // If HTTP failed and the user has NO tests at all, surface a synthetic
     // result. But if tests exist and passed, the user intentionally expects
