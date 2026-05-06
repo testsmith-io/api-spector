@@ -7,7 +7,7 @@ import { simpleGit } from 'simple-git';
 import { writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import type { GitStatus, GitCommit, GitBranch, GitRemote } from '../../shared/types';
-import { getWorkspaceDir } from './file-handler';
+import { getWorkspaceDir, ensureGitignore } from './file-handler';
 
 function git() {
   const dir = getWorkspaceDir();
@@ -28,6 +28,10 @@ export function registerGitHandlers(ipc: IpcMain): void {
 
   ipc.handle('git:init', async () => {
     await git().init();
+    // Ensure secrets / generated artifacts aren't committed when the user
+    // initializes git on an existing workspace that pre-dates the auto-write.
+    const dir = getWorkspaceDir();
+    if (dir) await ensureGitignore(dir);
   });
 
   ipc.handle('git:status', async (): Promise<GitStatus> => {
@@ -101,19 +105,75 @@ export function registerGitHandlers(ipc: IpcMain): void {
   });
 
   ipc.handle('git:branches', async (): Promise<GitBranch[]> => {
-    const result = await git().branch(['-a', '--format=%(refname:short)|%(objectname:short)|%(upstream:short)|%(upstream:track)']);
-    return result.all
-      .filter(name => !name.includes('HEAD'))
-      .map(name => ({
-        name:    name.replace(/^remotes\//, ''),
-        current: name === result.current,
-        remote:  name.startsWith('remotes/'),
-      }));
+    // The previous implementation passed a `--format=…` arg but then read
+    // `result.all` (which simple-git doesn't honor when --format is set),
+    // so upstream/ahead/behind were silently dropped. Run the format flag
+    // via `raw` and parse line-by-line so we get the real metadata.
+    const raw = await git().raw([
+      'for-each-ref',
+      '--format=%(refname:short)|%(HEAD)|%(upstream:short)|%(upstream:track)',
+      'refs/heads', 'refs/remotes',
+    ]);
+    const current = (await git().branch()).current;
+
+    const branches: GitBranch[] = [];
+    for (const line of raw.split('\n')) {
+      if (!line.trim()) continue;
+      const [shortName, head, upstream, track] = line.split('|');
+      if (!shortName || shortName.endsWith('/HEAD')) continue;
+      const isRemote = shortName.startsWith('origin/') || shortName.includes('/');
+      const looksLocal = !isRemote;
+
+      // `--format=%(upstream:track)` → "[ahead 1, behind 2]" or empty
+      let ahead: number | undefined;
+      let behind: number | undefined;
+      const aheadM  = track?.match(/ahead (\d+)/);
+      const behindM = track?.match(/behind (\d+)/);
+      if (aheadM)  ahead  = Number(aheadM[1]);
+      if (behindM) behind = Number(behindM[1]);
+
+      branches.push({
+        name:     shortName,
+        current:  looksLocal && (head === '*' || shortName === current),
+        remote:   isRemote,
+        upstream: upstream || undefined,
+        ahead, behind,
+      });
+    }
+    return branches;
   });
 
   ipc.handle('git:checkout', async (_e, branch: string, create: boolean) => {
-    if (create) await git().checkoutLocalBranch(branch);
-    else        await git().checkout(branch);
+    if (create) {
+      await git().checkoutLocalBranch(branch);
+      return;
+    }
+
+    // If `branch` looks like a remote ref (e.g. "origin/feature-x") and no
+    // local branch with that name exists, create a tracking branch instead
+    // of erroring out. Matches the user expectation of clicking a remote
+    // branch in the sidebar to "switch to it".
+    const m = /^([^/]+)\/(.+)$/.exec(branch);
+    if (m) {
+      const remote     = m[1];
+      const localName  = m[2];
+      const localList  = await git().branchLocal();
+      if (!localList.all.includes(localName)) {
+        await git().checkoutBranch(localName, `${remote}/${localName}`);
+        return;
+      }
+      // local exists with the same name — fall through to plain checkout of
+      // the local one, which is what users almost always want.
+      await git().checkout(localName);
+      return;
+    }
+
+    await git().checkout(branch);
+  });
+
+  ipc.handle('git:deleteBranch', async (_e, name: string, force = false) => {
+    // simple-git's deleteLocalBranch wraps `git branch -d` (-D when force).
+    await git().deleteLocalBranch(name, force);
   });
 
   ipc.handle('git:pull', async () => {

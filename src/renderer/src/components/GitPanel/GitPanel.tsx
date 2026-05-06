@@ -51,7 +51,7 @@ function StatusBadge({ status }: { status: GitFile['status'] }) {
 
 // ─── Diff viewer ─────────────────────────────────────────────────────────────
 
-function DiffViewer({ diff }: { diff: string }) {
+export function DiffViewer({ diff }: { diff: string }) {
   if (!diff) return <p className="text-xs text-surface-500 p-3">No changes.</p>;
   return (
     <pre className="text-[11px] font-mono overflow-auto p-3 leading-relaxed">
@@ -85,6 +85,9 @@ function ChangesTab({ status, onRefresh }: { status: GitStatus; onRefresh: () =>
   async function showDiff(file: GitFile, staged: boolean) {
     setDiffFile(file.path);
     setDiffStaged(staged);
+    // Surface the diff in the main pane (full-width). The sidebar still
+    // shows a small inline diff so users with the panel collapsed can peek.
+    useStore.getState().setActiveGitDiff({ path: file.path, staged });
     try {
       const d = staged
         ? await electron.gitDiffStaged(file.path)
@@ -395,11 +398,17 @@ function BranchesTab({ onRefresh }: { onRefresh: () => void }) {
   const [remoteUrl,    setRemoteUrl]    = useState('');
   const [editUrl,      setEditUrl]      = useState('');
   const [error,        setError]        = useState<string | null>(null);
+  const [loadError,    setLoadError]    = useState<string | null>(null);
+  const [filter,       setFilter]       = useState('');
 
   const load = useCallback(() => {
+    setLoadError(null);
     Promise.all([electron.gitBranches(), electron.gitRemotes()])
       .then(([b, r]) => { setBranches(b); setRemotes(r); })
-      .catch(() => {})
+      .catch(err => {
+        console.warn('GitPanel: failed to load branches/remotes', err);
+        setLoadError(err instanceof Error ? err.message : String(err));
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -457,17 +466,44 @@ function BranchesTab({ onRefresh }: { onRefresh: () => void }) {
     } catch (e) { setError(String(e)); }
   }
 
-  const local  = branches.filter(b => !b.remote);
-  const remote = branches.filter(b => b.remote);
+  async function deleteBranch(name: string) {
+    if (!confirm(`Delete branch "${name}"?`)) return;
+    try {
+      setError(null);
+      try {
+        await electron.gitDeleteBranch(name, false);
+      } catch {
+        // -d refuses if branch isn't fully merged; offer force-delete.
+        if (!confirm(`"${name}" isn't fully merged. Force delete?`)) return;
+        await electron.gitDeleteBranch(name, true);
+      }
+      load(); onRefresh();
+    } catch (e) { setError(String(e)); }
+  }
+
+  const q = filter.trim().toLowerCase();
+  const local  = branches.filter(b => !b.remote && (!q || b.name.toLowerCase().includes(q)));
+  const remote = branches.filter(b => b.remote  && (!q || b.name.toLowerCase().includes(q)));
 
   if (loading) return <p className="text-xs text-surface-500 px-3 py-4">Loading…</p>;
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-y-auto">
       {error && <p className="text-[11px] text-red-400 px-3 py-1 truncate">{error}</p>}
+      {loadError && (
+        <p className="text-[11px] text-amber-400 px-3 py-1 truncate" title={loadError}>
+          Couldn't load git state: {loadError}
+        </p>
+      )}
 
-      {/* New branch */}
-      <div className="px-3 py-2 border-b border-surface-800">
+      {/* Filter + new branch */}
+      <div className="px-3 py-2 border-b border-surface-800 flex flex-col gap-1.5">
+        <input
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+          placeholder="Filter branches…"
+          className="bg-surface-800 border border-surface-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500 placeholder-surface-600"
+        />
         {creating ? (
           <div className="flex gap-1.5">
             <input
@@ -482,8 +518,8 @@ function BranchesTab({ onRefresh }: { onRefresh: () => void }) {
             <button onClick={() => setCreating(false)} className="text-xs text-surface-500 hover:text-white px-1">✕</button>
           </div>
         ) : (
-          <button onClick={() => setCreating(true)} className="text-[11px] text-blue-400 hover:text-blue-300 transition-colors">
-            + New branch
+          <button onClick={() => setCreating(true)} className="text-[11px] text-blue-400 hover:text-blue-300 transition-colors text-left">
+            + New branch (from {branches.find(b => b.current)?.name ?? 'HEAD'})
           </button>
         )}
       </div>
@@ -493,16 +529,45 @@ function BranchesTab({ onRefresh }: { onRefresh: () => void }) {
         <section>
           <p className="px-3 py-1.5 text-[10px] uppercase tracking-widest text-surface-500 font-semibold">Local</p>
           {local.map(b => (
-            <button
+            <div
               key={b.name}
-              onClick={() => !b.current && checkout(b.name, false)}
-              className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${
-                b.current ? 'text-blue-300 cursor-default' : 'text-surface-300 hover:bg-surface-800/50'
+              className={`group w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors ${
+                b.current ? 'bg-blue-900/30 text-blue-200' : 'text-surface-300 hover:bg-surface-800/50'
               }`}
             >
-              {b.current ? <span className="text-blue-400 text-[10px]">●</span> : <span className="w-3" />}
-              <span className="font-mono">{b.name}</span>
-            </button>
+              {b.current
+                ? <span className="text-blue-400 text-[10px]">●</span>
+                : <span className="w-3" />}
+              <button
+                onClick={() => !b.current && checkout(b.name, false)}
+                disabled={b.current}
+                className="flex-1 text-left font-mono truncate disabled:cursor-default"
+                title={b.upstream ? `tracks ${b.upstream}` : 'no upstream'}
+              >
+                {b.name}
+              </button>
+              {/* Sync indicators — colored chips for ahead/behind so the user
+                  sees at a glance which branches need pushing/pulling. */}
+              {b.behind ? (
+                <span className="text-[10px] px-1 rounded bg-amber-900/40 text-amber-300" title={`${b.behind} commits behind ${b.upstream}`}>
+                  ↓{b.behind}
+                </span>
+              ) : null}
+              {b.ahead ? (
+                <span className="text-[10px] px-1 rounded bg-emerald-900/40 text-emerald-300" title={`${b.ahead} commits ahead of ${b.upstream}`}>
+                  ↑{b.ahead}
+                </span>
+              ) : null}
+              {!b.current && (
+                <button
+                  onClick={() => deleteBranch(b.name)}
+                  className="opacity-0 group-hover:opacity-100 text-surface-500 hover:text-red-400 transition-all text-xs leading-none"
+                  title={`Delete ${b.name}`}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           ))}
         </section>
       )}
@@ -510,18 +575,24 @@ function BranchesTab({ onRefresh }: { onRefresh: () => void }) {
       {/* Remote branches */}
       {remote.length > 0 && (
         <section>
-          <p className="px-3 py-1.5 text-[10px] uppercase tracking-widest text-surface-500 font-semibold">Remote branches</p>
+          <p className="px-3 py-1.5 text-[10px] uppercase tracking-widest text-surface-500 font-semibold">Remote</p>
           {remote.map(b => (
             <button
               key={b.name}
-              onClick={() => checkout(b.name, true)}
+              onClick={() => checkout(b.name, false)}
               className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-surface-400 hover:bg-surface-800/50 hover:text-surface-200 transition-colors"
+              title="Click to check out — creates a local tracking branch if needed"
             >
               <span className="w-3" />
-              <span className="font-mono">{b.name}</span>
+              <span className="font-mono truncate">{b.name}</span>
             </button>
           ))}
         </section>
+      )}
+
+      {/* Empty filter result */}
+      {q && local.length === 0 && remote.length === 0 && (
+        <p className="px-3 py-3 text-[11px] text-surface-500">No branches match "{filter}".</p>
       )}
 
       {/* Remotes */}
@@ -745,7 +816,12 @@ function CiTab() {
       setRemotes(r);
       const detected = detectPlatform(r);
       setPlatform(detected);
-    }).catch(() => {});
+    }).catch(err => {
+      // Not having a git remote is the common case for fresh workspaces — log
+      // for diagnostics but don't surface a UI error here, the platform picker
+      // will simply default to 'unknown'.
+      console.warn('GitPanel: failed to read git remotes', err);
+    });
   }, []);
 
   useEffect(() => {

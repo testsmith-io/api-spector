@@ -14,6 +14,7 @@ export default defineConfig( {
           record:   resolve( __dirname, 'src/cli/record.ts' ),
           agents:   resolve( __dirname, 'src/cli/agents.ts' ),
           contract: resolve( __dirname, 'src/cli/contract.ts' ),
+          wsdl:     resolve( __dirname, 'src/cli/wsdl.ts' ),
         }
       }
     }

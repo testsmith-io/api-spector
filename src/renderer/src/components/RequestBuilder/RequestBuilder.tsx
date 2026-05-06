@@ -258,13 +258,15 @@ export function RequestBuilder({ request }: Props) {
 
   const hasPreScript  = Boolean(request.preRequestScript?.trim());
   const hasPostScript = Boolean(request.postRequestScript?.trim());
-  const isWs         = request.protocol === 'websocket';
+  const isWs   = request.protocol === 'websocket';
+  const isSoap = request.protocol === 'soap';
 
   const tabs = [
-    { id: 'params',  label: 'Params',  count: request.params.filter(p => p.enabled && p.key).length },
+    // SOAP collapses Params + Body into a single "SOAP" tab — the WSDL drives both.
+    ...(!isSoap ? [{ id: 'params', label: 'Params', count: request.params.filter(p => p.enabled && p.key).length }] : []),
     { id: 'headers', label: 'Headers', count: request.headers.filter(h => h.enabled && h.key).length },
     ...(!isWs ? [
-      { id: 'body',    label: 'Body',    count: request.body.mode !== 'none' ? 1 : 0 },
+      { id: 'body',    label: isSoap ? 'SOAP' : 'Body', count: request.body.mode !== 'none' ? 1 : 0 },
       { id: 'auth',    label: 'Auth',    count: request.auth.type !== 'none' ? 1 : 0 },
       { id: 'scripts', label: 'Scripts', count: (hasPreScript ? 1 : 0) + (hasPostScript ? 1 : 0) },
       { id: 'schema',   label: 'Schema',   count: request.schema?.trim() ? 1 : 0 },
@@ -301,7 +303,7 @@ export function RequestBuilder({ request }: Props) {
         <div className="flex bg-surface-800 border border-surface-700 rounded overflow-hidden text-xs font-bold flex-shrink-0">
           <button
             onClick={() => update({ protocol: 'http' })}
-            className={`px-2 py-1.5 transition-colors ${!isWs ? 'bg-blue-600 text-white' : 'text-surface-500 hover:text-white'}`}
+            className={`px-2 py-1.5 transition-colors ${request.protocol !== 'websocket' && request.protocol !== 'soap' ? 'bg-blue-600 text-white' : 'text-surface-500 hover:text-white'}`}
             title="HTTP request"
           >
             HTTP
@@ -313,10 +315,28 @@ export function RequestBuilder({ request }: Props) {
           >
             WS
           </button>
+          <button
+            onClick={() => {
+              update({
+                protocol: 'soap',
+                method: 'POST',
+                body: request.body.mode === 'soap' ? request.body : { ...request.body, mode: 'soap', soap: request.body.soap ?? { wsdlUrl: '', envelope: '' } },
+              });
+              // SOAP's primary surface is the WSDL fetcher inside the Body
+              // tab — jump there so the user sees it immediately instead of
+              // landing on the (now-hidden) Params tab.
+              if (activeTabId) setTabRequestTab(activeTabId, 'body');
+            }}
+            className={`px-2 py-1.5 transition-colors ${isSoap ? 'bg-amber-700 text-amber-100' : 'text-surface-500 hover:text-white'}`}
+            title="SOAP — endpoint and method are derived from the WSDL"
+          >
+            SOAP
+          </button>
         </div>
 
-        {/* Method selector (HTTP only) */}
-        {!isWs && (
+        {/* Method selector — only meaningful for HTTP. SOAP is always POST,
+            shown as a static badge so the user sees what's on the wire. */}
+        {!isWs && !isSoap && (
           <select
             value={request.method}
             onChange={e => update({ method: e.target.value as HttpMethod })}
@@ -327,13 +347,29 @@ export function RequestBuilder({ request }: Props) {
             ))}
           </select>
         )}
+        {isSoap && (
+          <span
+            className="bg-surface-900 border border-surface-700 rounded px-2 py-1.5 text-xs font-bold text-amber-400 select-none"
+            title="SOAP requests are always POST"
+          >
+            POST
+          </span>
+        )}
 
         <VarInput
           value={request.url}
           onChange={url => update({ url })}
-          placeholder={isWs ? 'ws://example.com/socket' : 'https://api.example.com/endpoint'}
+          placeholder={
+            isWs   ? 'ws://example.com/socket'
+            : isSoap ? 'Endpoint (auto-filled from WSDL <soap:address>)'
+            : 'https://api.example.com/endpoint'
+          }
           wrapperClassName="flex-1"
-          className="bg-surface-800 border border-surface-700 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 font-mono placeholder-surface-700"
+          className={`border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 font-mono placeholder-surface-700 ${
+            isSoap
+              ? 'bg-surface-900 border-amber-900/50 text-surface-300'
+              : 'bg-surface-800 border-surface-700'
+          }`}
         />
 
         {/* Hooks toggle + Send button (HTTP only) */}

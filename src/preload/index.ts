@@ -56,6 +56,11 @@ const api = {
     ipcRenderer.invoke('file:loadEnvironment', relPath),
   saveEnvironment: (relPath: string, env: Environment): Promise<void> =>
     ipcRenderer.invoke('file:saveEnvironment', relPath, env),
+  /** Idempotent unlink of a workspace-relative file. Used by collection /
+   *  environment / mock delete flows so the file is removed from disk, not
+   *  just from the workspace manifest. */
+  deleteWorkspaceFile: (relPath: string): Promise<void> =>
+    ipcRenderer.invoke('file:deleteWorkspaceFile', relPath),
 
   // ─── HTTP execution ────────────────────────────────────────────────────────
   sendRequest: (payload: SendRequestPayload): Promise<RequestExecutionResult> =>
@@ -177,14 +182,36 @@ const api = {
 
   // ─── SOAP / WSDL ──────────────────────────────────────────────────────────
   wsdlFetch: (url: string, extraHeaders?: Record<string, string>): Promise<{
-    operations: Array<{ name: string; soapAction?: string; inputTemplate: string }>
+    operations: Array<{
+      name: string
+      binding?: string
+      soapAction?: string
+      soapVersion: '1.1' | '1.2'
+      endpoint?: string
+      inputTemplate: string
+      params?: Array<{ name: string; typeHint: string; children?: unknown[] }>
+    }>
+    endpoints: Array<{ binding: string; address: string; soapVersion: '1.1' | '1.2' }>
     targetNamespace: string
   }> => ipcRenderer.invoke('wsdl:fetch', url, extraHeaders ?? {}),
+
+  /** Build a Collection + MockServer from a WSDL. Renderer registers the
+   *  returned objects via the usual loadCollection/loadMock + save flows. */
+  wsdlImport: (opts: { url?: string; xml?: string; name?: string; existingMockPorts?: number[] }) =>
+    ipcRenderer.invoke('wsdl:import', opts) as Promise<{
+      parsed: { targetNamespace: string; endpoints: Array<{ binding: string; address: string; soapVersion: '1.1' | '1.2' }>; operations: unknown[] }
+      collection: Collection
+      mock: MockServer
+    }>,
 
   // ─── Docs generation ──────────────────────────────────────────────────────
   generateDocs: (payload: {
     collections: Array<{ collection: Collection; requests: Record<string, ApiRequest> }>
     format: 'html' | 'markdown'
+    /** Captured example exchanges (request body + response body) keyed by
+     *  requestId. The docs handler appends them as "Example Request/Response"
+     *  blocks so docs include real data, not just templates. */
+    examples?: Record<string, { sent?: unknown; response?: unknown }>
   }): Promise<string> => ipcRenderer.invoke('docs:generate', payload),
 
   // ─── Contract testing ─────────────────────────────────────────────────────
@@ -240,6 +267,8 @@ const api = {
     ipcRenderer.invoke('git:branches'),
   gitCheckout:   (branch: string, create: boolean): Promise<void> =>
     ipcRenderer.invoke('git:checkout', branch, create),
+  gitDeleteBranch: (name: string, force = false): Promise<void> =>
+    ipcRenderer.invoke('git:deleteBranch', name, force),
   gitPull:       (): Promise<void> =>
     ipcRenderer.invoke('git:pull'),
   gitPush:       (setUpstream: boolean): Promise<void> =>

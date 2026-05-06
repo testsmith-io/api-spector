@@ -83,7 +83,8 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
   const [pendingEncryptIdx, setPendingEncryptIdx] = useState<number | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
 
-  const deleteEnvironment = useStore(s => s.deleteEnvironment);
+  const deleteEnvironment    = useStore(s => s.deleteEnvironment);
+  const duplicateEnvironment = useStore(s => s.duplicateEnvironment);
 
   const envList = Object.values(environments);
   const env = selectedId ? environments[selectedId]?.data ?? null : null;
@@ -92,6 +93,13 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
     deleteEnvironment(id);
     const remaining = Object.keys(environments).filter(k => k !== id);
     setSelectedId(remaining[0] ?? '');
+  }
+
+  function handleDuplicate(id: string) {
+    duplicateEnvironment(id);
+    // Select the duplicate — it's the most recently added environment.
+    const next = Object.keys(useStore.getState().environments).at(-1);
+    if (next) setSelectedId(next);
   }
 
   function updateVar(idx: number, patch: Partial<EnvVariable>) {
@@ -233,6 +241,11 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                     {e.name}
                   </button>
                   <button
+                    onClick={() => handleDuplicate(e.id)}
+                    className="opacity-0 group-hover:opacity-100 text-surface-400 hover:text-white transition-all px-1 text-xs leading-none shrink-0"
+                    title="Duplicate environment"
+                  >⧉</button>
+                  <button
                     onClick={() => handleDelete(e.id)}
                     className="opacity-0 group-hover:opacity-100 text-surface-400 hover:text-red-400 transition-all px-1 text-sm leading-none shrink-0"
                     title="Delete environment"
@@ -277,18 +290,21 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                   <thead>
                     <tr className="text-surface-400 text-left border-b border-surface-800">
                       <th className="px-3 py-2 w-8">On</th>
-                      <th className="px-2 py-2 w-36">Variable</th>
+                      {/* Variable name column — was 144px which truncated typical names
+                          like OAUTH2_CLIENT_SECRET. 224px fits ~25 chars comfortably. */}
+                      <th className="px-2 py-2 w-56">Variable</th>
                       <th className="px-2 py-2">Value / Encrypted / Env var</th>
-                      <th className="px-2 py-2 w-44">Description</th>
-                      <th className="px-2 py-2 w-20 text-center">Source</th>
                       <th className="px-2 py-2 w-6"></th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {env.variables.map((v, idx) => {
-                      const mode = getSourceMode(v);
-                      return (
-                        <tr key={idx} className="group border-b border-surface-800/50 hover:bg-surface-800/30">
+                  {env.variables.map((v, idx) => {
+                    const mode = getSourceMode(v);
+                    // Each variable gets its own <tbody> so the two rows
+                    // (main fields + description/source) hover and group
+                    // together visually.
+                    return (
+                      <tbody key={idx} className="group border-b border-surface-800/50 hover:bg-surface-800/30">
+                        <tr>
                           {/* Enabled */}
                           <td className="px-3 py-1.5">
                             <input
@@ -370,33 +386,6 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                             )}
                           </td>
 
-                          {/* Description */}
-                          <td className="px-2 py-1.5">
-                            <input
-                              value={v.description ?? ''}
-                              onChange={e => updateVar(idx, { description: e.target.value })}
-                              placeholder="Optional description…"
-                              className="w-full bg-surface-800/50 rounded px-2 py-1 text-[10px] text-surface-300 placeholder-surface-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
-                            />
-                          </td>
-
-                          {/* Source cycle button */}
-                          <td className="px-2 py-1.5 text-center">
-                            <button
-                              onClick={() => cycleSource(idx)}
-                              title={
-                                mode === 'plain'     ? 'Plain text — click to switch to encrypted secret'  :
-                                mode === 'encrypted' ? 'Encrypted secret — click to switch to env var ref' :
-                                                       'OS env var reference — click to switch to plain text'
-                              }
-                              className="flex items-center justify-center gap-1 mx-auto px-1.5 py-0.5 rounded border transition-colors text-[10px] font-medium w-16 border-surface-700 hover:border-surface-500"
-                            >
-                              {mode === 'plain'     && <span>abc</span>}
-                              {mode === 'encrypted' && <><span className="text-amber-400">🔒</span><span className="text-amber-400">enc</span></>}
-                              {mode === 'env'       && <><span className="text-blue-400">$</span><span className="text-blue-400">env</span></>}
-                            </button>
-                          </td>
-
                           {/* Delete */}
                           <td className="px-2 py-1.5">
                             <button
@@ -405,9 +394,41 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                             >×</button>
                           </td>
                         </tr>
-                      );
-                    })}
-                  </tbody>
+
+                        {/* Row 2 — description + source mode toggle. Sits
+                            underneath the main row, aligned under the Value
+                            cell so the secondary fields don't crowd horizontal
+                            space. */}
+                        <tr>
+                          <td></td>
+                          <td colSpan={2} className="px-2 pb-2">
+                            <div className="flex items-center gap-2">
+                              <input
+                                value={v.description ?? ''}
+                                onChange={e => updateVar(idx, { description: e.target.value })}
+                                placeholder="Optional description…"
+                                className="flex-1 bg-surface-800/50 rounded px-2 py-1 text-[10px] text-surface-300 placeholder-surface-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                              />
+                              <button
+                                onClick={() => cycleSource(idx)}
+                                title={
+                                  mode === 'plain'     ? 'Plain text — click to switch to encrypted secret'  :
+                                  mode === 'encrypted' ? 'Encrypted secret — click to switch to env var ref' :
+                                                         'OS env var reference — click to switch to plain text'
+                                }
+                                className="flex items-center justify-center gap-1 px-1.5 py-0.5 rounded border transition-colors text-[10px] font-medium w-16 shrink-0 border-surface-700 hover:border-surface-500"
+                              >
+                                {mode === 'plain'     && <span>abc</span>}
+                                {mode === 'encrypted' && <><span className="text-amber-400">🔒</span><span className="text-amber-400">enc</span></>}
+                                {mode === 'env'       && <><span className="text-blue-400">$</span><span className="text-blue-400">env</span></>}
+                              </button>
+                            </div>
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tbody>
+                    );
+                  })}
                 </table>
 
                 <button

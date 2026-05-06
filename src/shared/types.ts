@@ -205,7 +205,11 @@ export interface ApiRequest {
   schema?: string
   contract?: ContractExpectation
   meta?: { tags?: string[]; createdAt?: string;[key: string]: unknown }
-  protocol?: 'http' | 'websocket'  // default 'http'
+  /** Transport / wire protocol. Drives which UI shell is rendered:
+   *  - 'http' (default) → method picker, URL bar, body modes
+   *  - 'websocket'      → ws:// URL, message panel
+   *  - 'soap'           → WSDL-driven endpoint, single SOAP editor (POST + xml) */
+  protocol?: 'http' | 'websocket' | 'soap'  // default 'http'
   /** When set, this request acts as a lifecycle hook within its folder/collection scope. */
   hookType?: 'beforeAll' | 'before' | 'after' | 'afterAll'
   /** When true, the request is excluded from collection/folder runs. */
@@ -521,9 +525,13 @@ export interface MockRoute {
   delay?: number           // ms before responding
   description?: string
   /** JavaScript that runs before the response is sent.
-   *  Context: { request, response, faker, dayjs, console }
+   *  Context: { request, response, metadata, faker, dayjs, console }
    *  Mutate `response.statusCode`, `response.body`, `response.headers` to customise output. */
   script?: string
+  /** Free-form data exposed to `script` as `metadata`. Used by the WSDL importer
+   *  to externalize per-operation SOAP envelopes so the script body stays compact
+   *  (`metadata.soapEnvelopes[opName]` instead of a giant JSON literal). */
+  metadata?: Record<string, unknown>
 }
 
 export interface MockServer {
@@ -623,6 +631,11 @@ export interface GitBranch {
   name: string
   current: boolean
   remote: boolean
+  /** For local branches: their upstream short ref (e.g. "origin/main"). */
+  upstream?: string
+  /** Commits ahead/behind upstream — informational, only set for tracking branches. */
+  ahead?: number
+  behind?: number
 }
 
 export interface GitRemote {

@@ -25,6 +25,7 @@ import {
 } from '../auth-builder';
 import Ajv from 'ajv';
 import { buildProxyUri } from '../proxy-utils';
+import { validateSendRequestPayload } from './ipc-validate';
 
 // ─── PII masking ──────────────────────────────────────────────────────────────
 
@@ -257,6 +258,10 @@ export function registerRequestHandler(ipc: IpcMain): void {
     _e,
     payload: SendRequestPayload,
   ): Promise<RequestExecutionResult> => {
+    // Reject malformed payloads before they reach any IO. Throws an Error
+    // with a useful path → reason mapping that ipcRenderer.invoke surfaces
+    // to the renderer.
+    validateSendRequestPayload(payload);
     const {
       request: req,
       environment,

@@ -21,6 +21,7 @@ import { MockDetailPanel } from './components/MockPanel/MockDetailPanel';
 import { RecorderPanel } from './components/MockPanel/RecorderPanel';
 import { ContractPanel } from './components/ContractPanel/ContractPanel';
 import { ContractResultsPanel } from './components/ContractPanel/ContractResultsPanel';
+import { GitDiffPane } from './components/GitPanel/GitDiffPane';
 import { GitPanel } from './components/GitPanel/GitPanel';
 import { CommandPalette } from './components/common/CommandPalette';
 import { DocsGeneratorModal } from './components/common/DocsGeneratorModal';
@@ -513,7 +514,11 @@ export default function App () {
               </>
             )}
 
-            {sidebarTab === 'contracts' ? (
+            {sidebarTab === 'git' ? (
+              <div className="flex-1 min-h-0 flex flex-col">
+                <GitDiffPane />
+              </div>
+            ) : sidebarTab === 'contracts' ? (
               <div className="flex-1 min-h-0">
                 <ContractResultsPanel />
               </div>
