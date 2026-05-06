@@ -211,6 +211,60 @@ export function buildSchemaTestResults(
   }));
 }
 
+// ─── Protocol-level "did the call succeed" tests ─────────────────────────────
+//
+// REST requests with no user-defined assertions stay 'skipped' — the runner
+// nudges the user to write an explicit check. SOAP and GraphQL are different:
+// HTTP 200 alone doesn't mean success (a SOAP service can return a Fault,
+// GraphQL can return a populated `errors` array), so we add a synthetic
+// pass/fail check based on the response shape. That promotes those requests
+// from 'skipped' to 'passed'/'failed' automatically.
+
+/** Returns synthetic test results for SOAP / GraphQL requests so the runner
+ *  can mark them passed (no fault / no errors) or failed (fault / errors)
+ *  without requiring a hand-written post-script. Returns `[]` for other body
+ *  modes — REST keeps the existing "no tests = skipped" semantics. */
+export function buildProtocolFaultTests(
+  bodyMode: string | undefined,
+  body: string,
+): TestResult[] {
+  if (!body) return [];
+
+  if (bodyMode === 'soap') {
+    // SOAP 1.1 fault element name: `Fault`. SOAP 1.2 same (different ns).
+    // Match `<…:Fault` or `<Fault` (some servers omit the ns prefix on the
+    // root response). Case-insensitive to cover non-standard servers.
+    const isFault = /<(?:[\w-]+:)?Fault(?:\s|>)/i.test(body);
+    if (isFault) {
+      // Best-effort: extract the faultstring / Reason text for the error msg.
+      const reason = /<(?:[\w-]+:)?(?:faultstring|Text)[^>]*>([\s\S]*?)<\/(?:[\w-]+:)?(?:faultstring|Text)>/i.exec(body);
+      return [{
+        name:   '[soap] response is not a Fault',
+        passed: false,
+        error:  reason?.[1]?.trim() ?? 'SOAP Fault returned',
+      }];
+    }
+    return [{ name: '[soap] response is not a Fault', passed: true }];
+  }
+
+  if (bodyMode === 'graphql') {
+    let parsed: unknown;
+    try { parsed = JSON.parse(body); } catch { return []; } // not valid JSON, can't tell
+    const errors = (parsed as { errors?: unknown })?.errors;
+    if (Array.isArray(errors) && errors.length > 0) {
+      const first = errors[0] as { message?: string };
+      return [{
+        name:   '[graphql] response has no errors',
+        passed: false,
+        error:  first?.message ?? 'GraphQL response contained an `errors` array',
+      }];
+    }
+    return [{ name: '[graphql] response has no errors', passed: true }];
+  }
+
+  return [];
+}
+
 // ─── Build undici dispatcher (proxy + TLS) ────────────────────────────────────
 
 export async function buildDispatcher(
@@ -334,6 +388,12 @@ export function registerRequestHandler(ipc: IpcMain): void {
 
     // ── Build & send HTTP request ─────────────────────────────────────────────
     let response: ResponsePayload;
+    /** Unmasked response handed to the post-request script. The displayed
+     *  `response` has PII patterns + the always-mask headers (Authorization,
+     *  Cookie, Set-Cookie) replaced with `[REDACTED]` — but the *script*
+     *  needs the real bytes so it can extract real tokens via
+     *  `sp.response.json().access_token` and friends. */
+    let scriptResponse: ResponsePayload;
     let sentRequest: SentRequest = { method: req.method, url: '', headers: {} };
     const resolvedUrl = buildUrl(req.url, req.params, vars);
 
@@ -506,6 +566,17 @@ export function registerRequestHandler(ipc: IpcMain): void {
         bodySize:   Buffer.byteLength(responseBody, 'utf8'),
         durationMs,
       };
+      // Same shape but with the unmasked bytes — used only for feeding the
+      // post-request script so `sp.response.json().access_token` returns the
+      // real value, not "[REDACTED]".
+      scriptResponse = {
+        status:     fetchResp.status,
+        statusText: fetchResp.statusText,
+        headers:    rawResponseHeaders,
+        body:       responseBody,
+        bodySize:   Buffer.byteLength(responseBody, 'utf8'),
+        durationMs,
+      };
     } catch (err) {
       const diagnostic = formatRequestError(err, {
         requestId: req.id,
@@ -524,15 +595,19 @@ export function registerRequestHandler(ipc: IpcMain): void {
         durationMs: Date.now() - start,
         error:      diagnostic,
       };
+      // Mirror for the script — same empty payload either way.
+      scriptResponse = response;
     }
 
     // ── Schema validation ─────────────────────────────────────────────────────
     // If the request has a standalone JSON Schema defined (Schema tab),
     // validate the response body against it and surface the result as
     // TestResults so it shows up in the runner output alongside post-script
-    // tests. Independent of `req.contract`.
+    // tests. Independent of `req.contract`. Run against the unmasked body —
+    // PII patterns can include keys the schema requires; masking would
+    // produce a false negative.
     const schemaTestResults = !response.error
-      ? buildSchemaTestResults(req.schema, response.body)
+      ? buildSchemaTestResults(req.schema, scriptResponse.body)
       : [];
 
     // ── Post-request script ───────────────────────────────────────────────────
@@ -546,7 +621,9 @@ export function registerRequestHandler(ipc: IpcMain): void {
         collectionVars: { ...updatedCollectionVars },
         globals:        { ...updatedGlobals },
         localVars:      { ...localVars },
-        response,
+        // Pass the *unmasked* response so the script can extract real values
+        // (tokens, ids, …). The displayed `response` keeps the redacted copy.
+        response: scriptResponse,
       });
       postTestResults       = result.testResults;
       postConsole           = result.consoleOutput;

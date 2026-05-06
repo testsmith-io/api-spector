@@ -24,6 +24,9 @@
 import { readFile, writeFile, stat, readdir } from 'fs/promises';
 import { join, dirname, resolve, extname } from 'path';
 import { fetch, Headers } from 'undici';
+
+// Replaced at build time by electron-vite (`define` in main config).
+declare const __APP_VERSION__: string;
 import type {
   Workspace, Collection, Environment, ApiRequest,
   RunRequestResult, RunSummary, TlsSettings,
@@ -32,9 +35,9 @@ import { buildEnvVars, buildUrl, mergeVars, interpolate, buildDynamicVars } from
 import { runScript } from '../main/script-runner';
 import { loadGlobals, getGlobals, patchGlobals, persistGlobals } from '../main/globals-store';
 import { getSecret } from '../main/ipc/secret-handler';
-import { buildDispatcher } from '../main/ipc/request-handler';
+import { buildDispatcher, buildProtocolFaultTests, maskHeaders, maskPii } from '../main/ipc/request-handler';
 import { buildJsonReport, buildJUnitReport, buildHtmlReport } from '../shared/report';
-import { collectTagged, resolveInheritedAuthAndHeaders } from '../shared/request-collection';
+import { buildRunPlan, resolveInheritedAuthAndHeaders } from '../shared/request-collection';
 
 // ─── ANSI colour helpers ──────────────────────────────────────────────────────
 
@@ -135,6 +138,7 @@ async function executeRequest(
   localVars: Record<string, string>,
   verbose: boolean,
   tls?: TlsSettings,
+  piiMaskPatterns: string[] = [],
 ): Promise<ExecuteRequestResult> {
   // Defensive defaults — AI-generated collections may omit empty arrays
   if (!req.headers) req.headers = [];
@@ -163,6 +167,7 @@ async function executeRequest(
     const r = await runScript(interpolate(req.preRequestScript, vars), {
       envVars: { ...envVars }, collectionVars: { ...collectionVars },
       globals: { ...globals }, localVars: { ...localVars },
+      piiMaskPatterns,
     });
     preScriptError        = r.error;
     localVars             = r.updatedLocalVars;
@@ -214,6 +219,15 @@ async function executeRequest(
       if (gql.operationName?.trim()) gqlBody.operationName = gql.operationName.trim();
       body = JSON.stringify(gqlBody);
       if (!headers.has('content-type')) headers.set('Content-Type', 'application/json');
+    } else if (req.body.mode === 'soap' && req.body.soap) {
+      // Send the SOAP envelope and the SOAPAction header. Without this
+      // branch SOAP requests went out with an empty body and the server
+      // replied `Root element is missing`.
+      body = interpolate(req.body.soap.envelope, vars);
+      if (!headers.has('content-type')) headers.set('Content-Type', 'text/xml; charset=utf-8');
+      if (req.body.soap.soapAction && !headers.has('soapaction')) {
+        headers.set('SOAPAction', req.body.soap.soapAction);
+      }
     }
 
     const dispatcher = await buildDispatcher(undefined, tls);
@@ -234,7 +248,12 @@ async function executeRequest(
       bodySize: Buffer.byteLength(responseBody, 'utf8'), durationMs,
     };
 
-    let testResults: RunRequestResult['testResults'] = [];
+    // Protocol-level fault check — auto-pass/fail for SOAP / GraphQL so they
+    // stop landing in 'skipped' just because no hand-written assertion was
+    // added. Empty for REST, preserving the "add assertions" nudge there.
+    const protocolFaultTests = buildProtocolFaultTests(req.body.mode, responseBody);
+
+    let testResults: RunRequestResult['testResults'] = [...protocolFaultTests];
     let consoleOutput: string[] = [];
     let postScriptError: string | undefined;
 
@@ -242,8 +261,9 @@ async function executeRequest(
       const r = await runScript(interpolate(req.postRequestScript, vars), {
         envVars: updatedEnvVars, collectionVars: updatedCollectionVars,
         globals: updatedGlobals, localVars, response,
+        piiMaskPatterns,
       });
-      testResults           = r.testResults;
+      testResults           = [...protocolFaultTests, ...r.testResults];
       consoleOutput         = r.consoleOutput;
       postScriptError       = r.error;
       updatedEnvVars        = r.updatedEnvVars;
@@ -260,7 +280,9 @@ async function executeRequest(
     //   2. has tests, any failed → 'failed'
     //   3. has tests, all passed → 'passed' (even on HTTP 4xx — user expects it)
     //   4. no tests + HTTP 4xx/5xx → 'failed'
-    //   5. no tests + HTTP 2xx/3xx → 'skipped'
+    //   5. no tests + HTTP 2xx/3xx → 'passed' (a 2xx is success on its own;
+    //      SOAP Fault / GraphQL `errors` are already failing tests from
+    //      buildProtocolFaultTests, so they won't slip through here)
     const allPassed  = testResults.every(t => t.passed);
     const httpFailed = fetchResp.status >= 400;
     const hasTests   = testResults.length > 0;
@@ -270,7 +292,7 @@ async function executeRequest(
         ? (allPassed ? 'passed' : 'failed')
         : httpFailed
           ? 'failed'
-          : 'skipped';
+          : 'passed';
 
     // If HTTP failed and user has NO tests, add synthetic failure.
     if (httpFailed && testResults.length === 0) {
@@ -333,8 +355,11 @@ function printResult(r: RunRequestResult, verbose: boolean) {
   const http = r.httpStatus ? color(` ${r.httpStatus}`, r.httpStatus < 400 ? C.green : C.red) : '';
   const dur  = r.durationMs !== undefined ? color(` ${r.durationMs}ms`, C.gray) : '';
   const method = color(r.method.padEnd(7), C.cyan);
+  const hookTag = r.isHook && r.hookType
+    ? color(` [${r.hookType.toUpperCase()}]`, C.yellow)
+    : '';
 
-  console.log(`  ${icon}  ${method}  ${r.name}${http}${dur}`);
+  console.log(`  ${icon}  ${method}  ${r.name}${hookTag}${http}${dur}`);
   if (verbose) console.log(color(`       ${r.resolvedUrl}`, C.gray));
 
   if (r.testResults?.length) {
@@ -405,9 +430,11 @@ async function main() {
     console.warn(color(`Warning: environment "${envName}" not found. Running without environment.`, C.yellow));
   }
 
-  // Print header
+  // Print header — include the package version (injected by electron-vite's
+  // `define`) so CI logs show exactly which API Spector ran the suite.
+  const version = typeof __APP_VERSION__ === 'string' && __APP_VERSION__ ? `v${__APP_VERSION__}` : '';
   console.log('');
-  console.log(color('  API Test Runner', C.bold, C.white));
+  console.log(color('  API Test Runner' + (version ? ` ${version}` : ''), C.bold, C.white));
   console.log(color(`  Workspace:   ${wsPath}`, C.gray));
   console.log(color(`  Environment: ${env?.name ?? '(none)'}`, C.gray));
   if (filterTags.length) console.log(color(`  Tags:        ${filterTags.join(', ')}`, C.gray));
@@ -426,16 +453,28 @@ async function main() {
     return out;
   }
 
+  // Pattern-based PII redaction — applied to *both* sent and received traffic
+  // so reports never leak credentials. Defaults mirror the UI's
+  // WorkspaceSettingsModal so CLI runs of an unconfigured workspace still
+  // get sane masking. `maskHeaders` always redacts authorization/cookie even
+  // with an empty list, but we keep the explicit defaults for body fields.
+  const DEFAULT_PII_PATTERNS = ['authorization', 'password', 'token', 'secret', 'api-key', 'x-api-key'];
+  const piiPatterns = workspace.settings?.piiMaskPatterns ?? DEFAULT_PII_PATTERNS;
+
   function maskResult(r: RunRequestResult): RunRequestResult {
     return {
       ...r,
       sentRequest: r.sentRequest ? {
-        headers: Object.fromEntries(Object.entries(r.sentRequest.headers).map(([k, v]) => [k, redact(v)])),
-        body:    r.sentRequest.body != null ? redact(r.sentRequest.body) : undefined,
+        headers: Object.fromEntries(
+          Object.entries(maskHeaders(r.sentRequest.headers, piiPatterns))
+            .map(([k, v]) => [k, redact(v)]),
+        ),
+        body: r.sentRequest.body != null ? redact(maskPii(r.sentRequest.body, piiPatterns)) : undefined,
       } : undefined,
       receivedResponse: r.receivedResponse ? {
         ...r.receivedResponse,
-        body: redact(r.receivedResponse.body),
+        headers: maskHeaders(r.receivedResponse.headers, piiPatterns),
+        body:    redact(maskPii(r.receivedResponse.body, piiPatterns)),
       } : undefined,
     };
   }
@@ -449,7 +488,12 @@ async function main() {
   for (const col of collections) {
     if (colName && col.name.toLowerCase() !== colName.toLowerCase()) continue;
 
-    const items = collectTagged(col.rootFolder, col.requests, col.collectionVariables ?? {}, filterTags);
+    // Use the same plan builder the in-app runner uses, so before/beforeAll
+    // hooks (e.g. a "fetch token" request) actually execute and propagate
+    // their extracted variables to subsequent requests. `collectTagged`
+    // silently dropped hooks, which is why CLI runs of an authed request
+    // came back 401 even though the UI runner worked.
+    const items = buildRunPlan(col, null, filterTags);
     if (items.length === 0) continue;
 
     if (!firstColName) firstColName = col.name;
@@ -481,9 +525,56 @@ async function main() {
 
     let bailed = false;
     let lastPrintedScope: string | null = null;
+    // Mirrors runner-handler.ts: a beforeAll failure poisons its scope, a
+    // before failure poisons its single main request. Subsequent items in
+    // those scopes / for that request are reported as skipped without
+    // executing.
+    const failedScopes = new Set<string>();
+    const skipRequests = new Set<string>();
+
     for (const item of items) {
-      const { result, updatedEnvVars, updatedCollectionVars, updatedGlobals, updatedLocalVars } =
-        await executeRequest(
+      const { isHook, hookType, scopeId, scopeAncestors, mainRequestId } = item;
+
+      let skipReason: string | undefined;
+      if (isHook) {
+        if (hookType === 'beforeAll') {
+          if ((scopeAncestors ?? []).some(id => failedScopes.has(id))) {
+            skipReason = 'Skipped — outer scope hook failed';
+          }
+        } else if (hookType === 'before') {
+          const allScopes = [...(scopeAncestors ?? []), scopeId].filter(Boolean) as string[];
+          if (allScopes.some(id => failedScopes.has(id))) {
+            skipReason = 'Skipped — scope hook failed';
+          } else if (mainRequestId && skipRequests.has(mainRequestId)) {
+            skipReason = 'Skipped — before hook failed';
+          }
+        }
+        // after / afterAll: never skip
+      } else {
+        const allScopes = [...(scopeAncestors ?? []), scopeId].filter(Boolean) as string[];
+        if (allScopes.some(id => failedScopes.has(id))) {
+          skipReason = 'Skipped — beforeAll hook failed';
+        } else if (skipRequests.has(item.request.id)) {
+          skipReason = 'Skipped — before hook failed';
+        }
+      }
+
+      let result: RunRequestResult;
+      if (skipReason) {
+        result = {
+          requestId:  item.request.id,
+          name:       item.request.name,
+          method:     item.request.method,
+          resolvedUrl: item.request.url,
+          status:     'failed',
+          error:      skipReason,
+          isHook,
+          hookType,
+          scopeId,
+          scopePath:  item.scopePath,
+        };
+      } else {
+        const out = await executeRequest(
           item.request,
           { ...item.collectionVars, ...runCollectionVars },
           runEnvVars,
@@ -491,15 +582,27 @@ async function main() {
           { ...runLocalVars },
           verbose,
           effectiveTls,
+          piiPatterns,
         );
+        result            = out.result;
+        runEnvVars        = out.updatedEnvVars;
+        runCollectionVars = out.updatedCollectionVars;
+        runGlobals        = out.updatedGlobals;
+        runLocalVars      = out.updatedLocalVars;
 
-      runEnvVars        = updatedEnvVars;
-      runCollectionVars = updatedCollectionVars;
-      runGlobals        = updatedGlobals;
-      runLocalVars      = updatedLocalVars;
+        result.isHook    = isHook;
+        result.hookType  = hookType;
+        result.scopeId   = scopeId;
+        result.scopePath = item.scopePath;
 
-      // Attach folder path so exported reports show grouped structure.
-      result.scopePath = item.scopePath;
+        if (result.status === 'failed' || result.status === 'error') {
+          if (isHook && hookType === 'beforeAll' && scopeId) {
+            failedScopes.add(scopeId);
+          } else if (isHook && hookType === 'before' && mainRequestId) {
+            skipRequests.add(mainRequestId);
+          }
+        }
+      }
 
       // Print a folder heading whenever the scope changes
       const scopeKey = (item.scopePath ?? []).join(' / ');

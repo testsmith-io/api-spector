@@ -79,6 +79,11 @@ export interface ScriptContext {
   globals: Record<string, string>
   localVars: Record<string, string>
   response?: ResponsePayload
+  /** Substring patterns matched (case-insensitive) against variable names
+   *  when emitting `[set]` console lines. Matched values are redacted so
+   *  that secrets extracted via post-script (e.g. access_token) don't leak
+   *  into reports or verbose CLI output. */
+  piiMaskPatterns?: string[]
 }
 
 export interface ScriptOutput {
@@ -248,14 +253,18 @@ function buildAt(
   testResults: TestResult[],
   consoleOutput: string[],
 ) {
-  const { envVars, collectionVars, globals, localVars } = ctx;
+  const { envVars, collectionVars, globals, localVars, piiMaskPatterns = [] } = ctx;
+
+  const isSensitiveKey = (key: string) =>
+    piiMaskPatterns.some(p => key.toLowerCase().includes(p.toLowerCase()));
 
   function makeVarScope(store: Record<string, string>, scopeName: string) {
     return {
       get: (key: string) => store[key] ?? null,
       set: (key: string, value: string) => {
         store[key] = String(value);
-        consoleOutput.push(`[set] ${scopeName}.${key} = ${JSON.stringify(String(value))}`);
+        const display = isSensitiveKey(key) ? '"[REDACTED]"' : JSON.stringify(String(value));
+        consoleOutput.push(`[set] ${scopeName}.${key} = ${display}`);
       },
       clear: (key: string) => {
         delete store[key];
@@ -411,6 +420,7 @@ export async function runScript(
     globals:        globalsCopy,
     localVars:      localVarsCopy,
     response:       ctx.response,
+    piiMaskPatterns: ctx.piiMaskPatterns,
   };
 
   const sp = buildAt(scriptCtx, testResults, consoleOutput);

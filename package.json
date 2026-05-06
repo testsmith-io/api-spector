@@ -1,7 +1,7 @@
 {
   "name": "@testsmith/api-spector",
   "productName": "API Spector",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Local-first API testing tool to inspect, test and mock APIs",
   "repository": {
     "type": "git",
