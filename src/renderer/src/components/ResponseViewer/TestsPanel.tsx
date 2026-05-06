@@ -30,11 +30,14 @@ export function TestsPanel({ scriptResult }: { scriptResult: ScriptExecutionMeta
         </div>
       )}
       {sr.testResults.map((result, i) => (
+        // Pass uses the bright lime-400 border at 50% (was: dark olive-800
+        // border on near-invisible 20% bg) so the green test row actually
+        // reads as green in dark mode.
         <div
           key={i}
           className={`flex items-start gap-2 p-2 rounded border ${result.passed
-            ? 'bg-emerald-900/20 border-emerald-800'
-            : 'bg-red-900/20 border-red-800'
+            ? 'bg-emerald-800/30 border-emerald-400/50'
+            : 'bg-red-900/30 border-red-700'
             }`}
         >
           <span className={`text-xs font-bold shrink-0 ${result.passed ? 'text-emerald-400' : 'text-red-400'}`}>

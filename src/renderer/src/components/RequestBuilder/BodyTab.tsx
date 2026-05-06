@@ -19,6 +19,7 @@ type BodyMode = RequestBody['mode']
 export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
   const body     = request.body;
   const mode     = body.mode;
+  const isSoap   = request.protocol === 'soap';
   const varNames  = useVarNames();
   const varValues = useVarValues();
   const varExt    = useMemo(
@@ -30,6 +31,19 @@ export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: 
     onChange({ body: { ...body, mode: m } });
   }
 
+  // SOAP requests skip the body-mode picker — the protocol decides everything.
+  // Hand the entire pane to SoapEditor so the WSDL-driven UX is the only thing
+  // shown.
+  if (isSoap) {
+    return (
+      <div className="flex flex-col h-full min-h-0">
+        <SoapEditor request={request} onChange={onChange} />
+      </div>
+    );
+  }
+
+  // The 'soap' option here is kept for users who still want raw control
+  // (advanced) — it's reachable but no longer the main entry point.
   return (
     <div className="flex flex-col gap-2 h-full min-h-0">
       {/* Mode selector */}

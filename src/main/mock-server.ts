@@ -187,6 +187,10 @@ async function handleRequest(
       vm.runInNewContext(route.script, {
         request:  requestCtx,
         response: responseDraft,
+        // Free-form per-route data the importer/user can stash (e.g. SOAP
+        // envelopes by operation, lookup tables, fixtures). Frozen so a script
+        // can't mutate it across calls.
+        metadata: route.metadata ? Object.freeze({ ...route.metadata }) : {},
         faker,
         dayjs,
         console: { log: (...args: unknown[]) => console.log('[mock-script]', ...args) },

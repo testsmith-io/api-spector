@@ -96,6 +96,11 @@ const FAKER_NAMESPACES: Completion[] = [
   { label: 'location', type: 'property', info: 'Addresses, cities, countries' },
   { label: 'finance',  type: 'property', info: 'Credit cards, currency, etc.' },
   { label: 'color',    type: 'property', info: 'Color values' },
+  { label: 'company',  type: 'property', info: 'Company names, catch phrases' },
+  { label: 'commerce', type: 'property', info: 'Products, prices, departments' },
+  { label: 'image',    type: 'property', info: 'Image URLs / placeholders' },
+  { label: 'system',   type: 'property', info: 'File names, MIME types, semver' },
+  { label: 'helpers',  type: 'property', info: 'Utility helpers (slugify, arrayElement, …)' },
 ];
 
 const FAKER_SUB: Record<string, Completion[]> = {
@@ -130,10 +135,15 @@ const FAKER_SUB: Record<string, Completion[]> = {
     { label: 'between', type: 'function', detail: '(from, to)', info: 'Random date in range' },
   ],
   lorem: [
-    { label: 'word',      type: 'function', detail: '()',      info: 'Single lorem word' },
-    { label: 'words',     type: 'function', detail: '(count)', info: 'Multiple lorem words' },
-    { label: 'sentence',  type: 'function', detail: '()',      info: 'Lorem sentence' },
-    { label: 'paragraph', type: 'function', detail: '()',      info: 'Lorem paragraph' },
+    { label: 'word',       type: 'function', detail: '()',           info: 'Single lorem word' },
+    { label: 'words',      type: 'function', detail: '(count?)',     info: 'Multiple lorem words' },
+    { label: 'sentence',   type: 'function', detail: '()',           info: 'Lorem sentence' },
+    { label: 'sentences',  type: 'function', detail: '(count?)',     info: 'Multiple lorem sentences' },
+    { label: 'paragraph',  type: 'function', detail: '()',           info: 'Lorem paragraph' },
+    { label: 'paragraphs', type: 'function', detail: '(count?)',     info: 'Multiple lorem paragraphs' },
+    { label: 'slug',       type: 'function', detail: '(words?)',     info: 'Kebab-case slug from random words (e.g. "magnam-officia-laborum")' },
+    { label: 'lines',      type: 'function', detail: '(count?)',     info: 'Random lines of text' },
+    { label: 'text',       type: 'function', detail: '()',           info: 'Random lorem ipsum text' },
   ],
   location: [
     { label: 'city',          type: 'function', detail: '()', info: 'Random city name' },
@@ -161,6 +171,39 @@ const FAKER_SUB: Record<string, Completion[]> = {
     { label: 'hex',   type: 'function', detail: '()', info: 'Hex color string (e.g. #a3f1c2)' },
     { label: 'rgb',   type: 'function', detail: '()', info: 'CSS rgb() string' },
     { label: 'hsl',   type: 'function', detail: '()', info: 'CSS hsl() string' },
+  ],
+  company: [
+    { label: 'name',         type: 'function', detail: '()', info: 'Random company name' },
+    { label: 'catchPhrase',  type: 'function', detail: '()', info: 'Random business catch phrase' },
+    { label: 'buzzPhrase',   type: 'function', detail: '()', info: 'Marketing-style buzz phrase' },
+  ],
+  commerce: [
+    { label: 'productName',  type: 'function', detail: '()',     info: 'Random product name' },
+    { label: 'product',      type: 'function', detail: '()',     info: 'Single product noun' },
+    { label: 'department',   type: 'function', detail: '()',     info: 'Department name' },
+    { label: 'price',        type: 'function', detail: '({min, max, dec, symbol}?)', info: 'Random price (string)' },
+    { label: 'productDescription', type: 'function', detail: '()', info: 'Product description' },
+    { label: 'isbn',         type: 'function', detail: '()',     info: 'ISBN-10 or ISBN-13' },
+  ],
+  image: [
+    { label: 'avatar',       type: 'function', detail: '()',                info: 'Avatar URL' },
+    { label: 'url',          type: 'function', detail: '({width, height}?)', info: 'Placeholder image URL' },
+    { label: 'urlLoremFlickr', type: 'function', detail: '({category}?)',   info: 'LoremFlickr URL by category' },
+  ],
+  system: [
+    { label: 'fileName',  type: 'function', detail: '()', info: 'Random file name with extension' },
+    { label: 'mimeType',  type: 'function', detail: '()', info: 'Random MIME type' },
+    { label: 'semver',    type: 'function', detail: '()', info: 'Random semver string' },
+    { label: 'directoryPath', type: 'function', detail: '()', info: 'Random directory path' },
+  ],
+  helpers: [
+    { label: 'slugify',      type: 'function', detail: '(text)',     info: 'Convert any string to a URL slug (lower-case, dashes, no diacritics)' },
+    { label: 'arrayElement', type: 'function', detail: '(arr)',      info: 'Random element from an array' },
+    { label: 'arrayElements',type: 'function', detail: '(arr, n?)',  info: 'Multiple random elements' },
+    { label: 'shuffle',      type: 'function', detail: '(arr)',      info: 'Shuffled copy of the array' },
+    { label: 'replaceSymbols',type: 'function', detail: '("###?")',  info: 'Replace # / ? / * with random chars' },
+    { label: 'fromRegExp',   type: 'function', detail: '(regex)',    info: 'Generate a string matching a regex' },
+    { label: 'multiple',     type: 'function', detail: '(fn, {count}?)', info: 'Call a generator multiple times' },
   ],
 };
 

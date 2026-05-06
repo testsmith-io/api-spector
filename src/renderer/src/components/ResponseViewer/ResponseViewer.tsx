@@ -85,6 +85,10 @@ export function ResponseViewer() {
       setTabRequestTab(activeTabId, 'scripts');
       setTabScriptTab(activeTabId, 'post');
     }
+    // Coming from the response tree means the user already chose what to
+    // insert — fold the Quick Inserts sidebar so it doesn't crowd the editor
+    // they're now looking at. They can reopen it with the Snippets toggle.
+    state.setQuickInsertsOpen(false);
     setAssertToast(true);
     setTimeout(() => setAssertToast(false), 2500);
   }

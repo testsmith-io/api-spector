@@ -3,9 +3,17 @@
 // See LICENSE for full terms.
 
 import { type IpcMain } from 'electron';
-import type { Collection, ApiRequest, Folder } from '../../shared/types';
+import type { Collection, ApiRequest, Folder, SentRequest, ResponsePayload } from '../../shared/types';
 
 // ─── Payload types ────────────────────────────────────────────────────────────
+
+/** Captured "last successful round-trip" for a request. The renderer pulls
+ *  these from open tabs at docs-generation time so the docs include an
+ *  example response body, not just the request template. */
+export interface ExampleSnapshot {
+  sent?: SentRequest
+  response?: ResponsePayload
+}
 
 export interface DocsPayload {
   collections: Array<{
@@ -13,6 +21,34 @@ export interface DocsPayload {
     requests: Record<string, ApiRequest>
   }>
   format: 'html' | 'markdown'
+  /** requestId → captured example. Optional — requests without a captured
+   *  exchange still render their template-only documentation. */
+  examples?: Record<string, ExampleSnapshot>
+}
+
+// ─── Body formatting helpers ────────────────────────────────────────────────
+
+function isJsonContentType(ct: string | undefined): boolean {
+  return !!ct && /\bjson\b/i.test(ct);
+}
+
+/** Pretty-print JSON bodies, fall through unchanged on parse failure. Trim
+ *  excessively long bodies so docs stay readable. */
+function formatBody(body: string, contentType?: string): string {
+  if (!body) return '';
+  const trimmed = body.length > 8000 ? body.slice(0, 8000) + '\n… (truncated)' : body;
+  if (isJsonContentType(contentType)) {
+    try { return JSON.stringify(JSON.parse(trimmed), null, 2); } catch { /* not JSON */ }
+  }
+  return trimmed;
+}
+
+function langForContentType(ct: string | undefined): string {
+  if (!ct) return '';
+  if (/\bjson\b/i.test(ct)) return 'json';
+  if (/\bxml\b/i.test(ct))  return 'xml';
+  if (/\bhtml\b/i.test(ct)) return 'html';
+  return '';
 }
 
 // ─── Markdown generation ─────────────────────────────────────────────────────
@@ -21,7 +57,7 @@ export function escMd(s: string): string {
   return s.replace(/[|\\`*_{}[\]()#+\-.!]/g, c => `\\${c}`);
 }
 
-function requestToMarkdown(req: ApiRequest): string {
+function requestToMarkdown(req: ApiRequest, example?: ExampleSnapshot): string {
   const lines: string[] = [];
 
   const methodLabel = req.protocol === 'websocket' ? 'WS' : req.method;
@@ -96,10 +132,34 @@ function requestToMarkdown(req: ApiRequest): string {
     lines.push('');
   }
 
+  // ── Captured example exchange (sent body + response body) ─────────────────
+  if (example?.sent?.body?.trim()) {
+    const ct   = example.sent.headers?.['Content-Type'] ?? example.sent.headers?.['content-type'];
+    const lang = langForContentType(ct);
+    lines.push('**Example Request Body**');
+    lines.push('```' + lang);
+    lines.push(formatBody(example.sent.body, ct));
+    lines.push('```');
+    lines.push('');
+  }
+  if (example?.response) {
+    const ct   = example.response.headers['content-type'] ?? example.response.headers['Content-Type'];
+    const lang = langForContentType(ct);
+    lines.push(`**Example Response** (${example.response.status})`);
+    if (example.response.body?.trim()) {
+      lines.push('```' + lang);
+      lines.push(formatBody(example.response.body, ct));
+      lines.push('```');
+    } else {
+      lines.push('_(empty body)_');
+    }
+    lines.push('');
+  }
+
   return lines.join('\n');
 }
 
-function folderToMarkdown(folder: Folder, requests: Record<string, ApiRequest>, depth: number): string {
+function folderToMarkdown(folder: Folder, requests: Record<string, ApiRequest>, depth: number, examples: Record<string, ExampleSnapshot>): string {
   const lines: string[] = [];
   const heading = '#'.repeat(depth);
 
@@ -115,12 +175,12 @@ function folderToMarkdown(folder: Folder, requests: Record<string, ApiRequest>, 
   for (const reqId of folder.requestIds) {
     const req = requests[reqId];
     if (req) {
-      lines.push(requestToMarkdown(req));
+      lines.push(requestToMarkdown(req, examples[reqId]));
     }
   }
 
   for (const sub of folder.folders) {
-    lines.push(folderToMarkdown(sub, requests, depth + 1));
+    lines.push(folderToMarkdown(sub, requests, depth + 1, examples));
   }
 
   return lines.join('\n');
@@ -131,6 +191,7 @@ export function generateMarkdown(payload: DocsPayload): string {
   lines.push('# API Documentation');
   lines.push('');
 
+  const examples = payload.examples ?? {};
   for (const { collection, requests } of payload.collections) {
     lines.push(`## ${escMd(collection.name)}`);
     lines.push('');
@@ -138,7 +199,7 @@ export function generateMarkdown(payload: DocsPayload): string {
       lines.push(collection.description.trim());
       lines.push('');
     }
-    lines.push(folderToMarkdown(collection.rootFolder, requests, 3));
+    lines.push(folderToMarkdown(collection.rootFolder, requests, 3, examples));
   }
 
   return lines.join('\n');
@@ -159,7 +220,7 @@ const METHOD_COLORS: Record<string, string> = {
   DELETE: '#f87171', HEAD: '#6aa3c8', OPTIONS: '#9ca3af', WS: '#22d3ee',
 };
 
-function requestToHtml(req: ApiRequest): string {
+function requestToHtml(req: ApiRequest, example?: ExampleSnapshot): string {
   const methodLabel = req.protocol === 'websocket' ? 'WS' : req.method;
   const color = METHOD_COLORS[methodLabel] ?? '#9ca3af';
   let html = `<div class="request">`;
@@ -204,11 +265,26 @@ function requestToHtml(req: ApiRequest): string {
     html += `<div class="label">Body (SOAP)</div><pre><code>${escHtml(req.body.soap.envelope.trim())}</code></pre>`;
   }
 
+  // ── Captured example exchange ─────────────────────────────────────────────
+  if (example?.sent?.body?.trim()) {
+    const ct = example.sent.headers?.['Content-Type'] ?? example.sent.headers?.['content-type'];
+    html += `<div class="label">Example Request Body</div><pre><code class="lang-${escHtml(langForContentType(ct))}">${escHtml(formatBody(example.sent.body, ct))}</code></pre>`;
+  }
+  if (example?.response) {
+    const ct = example.response.headers['content-type'] ?? example.response.headers['Content-Type'];
+    html += `<div class="label">Example Response (${example.response.status})</div>`;
+    if (example.response.body?.trim()) {
+      html += `<pre><code class="lang-${escHtml(langForContentType(ct))}">${escHtml(formatBody(example.response.body, ct))}</code></pre>`;
+    } else {
+      html += `<p class="desc"><em>(empty body)</em></p>`;
+    }
+  }
+
   html += `</div>`;
   return html;
 }
 
-function folderToHtml(folder: Folder, requests: Record<string, ApiRequest>, depth: number): string {
+function folderToHtml(folder: Folder, requests: Record<string, ApiRequest>, depth: number, examples: Record<string, ExampleSnapshot>): string {
   let html = '';
   const tag = `h${Math.min(depth, 6)}`;
 
@@ -221,11 +297,11 @@ function folderToHtml(folder: Folder, requests: Record<string, ApiRequest>, dept
 
   for (const reqId of folder.requestIds) {
     const req = requests[reqId];
-    if (req) html += requestToHtml(req);
+    if (req) html += requestToHtml(req, examples[reqId]);
   }
 
   for (const sub of folder.folders) {
-    html += folderToHtml(sub, requests, depth + 1);
+    html += folderToHtml(sub, requests, depth + 1, examples);
   }
 
   return html;
@@ -233,12 +309,13 @@ function folderToHtml(folder: Folder, requests: Record<string, ApiRequest>, dept
 
 export function generateHtml(payload: DocsPayload): string {
   let body = '';
+  const examples = payload.examples ?? {};
   for (const { collection, requests } of payload.collections) {
     body += `<section class="collection"><h2>${escHtml(collection.name)}</h2>`;
     if (collection.description?.trim()) {
       body += `<p class="collection-desc">${escHtml(collection.description.trim())}</p>`;
     }
-    body += folderToHtml(collection.rootFolder, requests, 3);
+    body += folderToHtml(collection.rootFolder, requests, 3, examples);
     body += `</section>`;
   }
 

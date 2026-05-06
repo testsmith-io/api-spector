@@ -306,7 +306,7 @@ export function buildHtmlReport(
     const html = document.documentElement
     const isLight = html.classList.toggle('light')
     document.getElementById('themeBtn').textContent = isLight ? '🌙' : '☀️'
-    try { localStorage.setItem('theme', isLight ? 'light' : 'dark') } catch {}
+    try { localStorage.setItem('theme', isLight ? 'light' : 'dark') } catch {} /* private mode / quota — non-fatal */
   }
   // Restore saved preference or respect OS preference
   (function() {
@@ -316,7 +316,7 @@ export function buildHtmlReport(
         document.documentElement.classList.add('light')
         document.getElementById('themeBtn').textContent = '🌙'
       }
-    } catch {}
+    } catch {} /* private mode / quota — non-fatal */
   })()
 </script>
 </body>

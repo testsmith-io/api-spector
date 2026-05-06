@@ -36,11 +36,24 @@ export function DocsGeneratorModal({ onClose }: Props) {
   }
 
   function buildPayload() {
+    // Pull the most recent sent-request + response from any open tab so the
+    // generated docs include real example bodies, not just templates.
+    const tabs = useStore.getState().tabs;
+    const examples: Record<string, { sent?: unknown; response?: unknown }> = {};
+    for (const t of tabs) {
+      if (!t.requestId) continue;
+      if (!t.lastSentRequest && !t.lastResponse) continue;
+      examples[t.requestId] = {
+        sent:     t.lastSentRequest ?? undefined,
+        response: t.lastResponse    ?? undefined,
+      };
+    }
     return {
       collections: collectionList
         .filter(c => selectedIds.has(c.data.id))
         .map(c => ({ collection: c.data, requests: c.data.requests })),
       format,
+      examples,
     };
   }
 

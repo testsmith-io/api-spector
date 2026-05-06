@@ -71,14 +71,72 @@ function isLeafKind(kind: string): boolean {
   return kind === 'SCALAR' || kind === 'ENUM';
 }
 
-/** Build a smart field snippet: scalars → plain name, objects → name { <first scalars> } */
+function isRequired(ref: GqlTypeRef | null): boolean {
+  return !!ref && ref.kind === 'NON_NULL';
+}
+
+/** Default literal value for an argument based on its type. Picks something
+ *  the user can immediately edit in place, instead of a `$var` reference
+ *  that forces a side-trip to the variables JSON. Common pagination names
+ *  get pragmatic integers (`first: 5`, `skip: 0`). */
+function defaultArgValue(arg: GqlArg): string {
+  const baseTypeName = getBaseTypeName(arg.type);
+  const baseKind     = getBaseKind(arg.type);
+  const isList       = arg.type.kind === 'LIST'
+    || (arg.type.kind === 'NON_NULL' && arg.type.ofType?.kind === 'LIST');
+
+  // Pagination heuristic — well-known arg names get useful defaults so the
+  // user lands on a runnable query for the most common case.
+  const name = arg.name.toLowerCase();
+  if (baseTypeName === 'Int' || baseTypeName === 'Long') {
+    if (['first', 'last', 'limit', 'take', 'top', 'count', 'size'].includes(name)) return '5';
+    if (['skip', 'offset', 'page'].includes(name)) return '0';
+    return '10';
+  }
+
+  if (isList) return '[]';
+
+  switch (baseTypeName) {
+    case 'Float':
+    case 'Double':   return '1.0';
+    case 'Boolean':  return 'true';
+    case 'ID':       return '"id"';
+    case 'String':   return '""';
+    case 'DateTime':
+    case 'Date':     return '""';
+  }
+
+  // Enum — we don't have the enum's values cached here, so leave a hint the
+  // user can replace. Same for input objects (complex shapes need a JSON
+  // variable anyway).
+  if (baseKind === 'ENUM') return `# ${baseTypeName}`;
+  return `$${arg.name}`;
+}
+
+/** Build a smart field snippet:
+ *  - scalars  → `name`
+ *  - objects  → `name { <first scalars> }`
+ *  - args     → required args + well-known pagination args, with literal
+ *               defaults inlined so the snippet is runnable without first
+ *               populating the variables JSON. */
 function buildSnippet(field: GqlField, typeMap: Map<string, GqlType>): string {
   const baseTypeName = getBaseTypeName(field.type);
   const baseKind     = getBaseKind(field.type);
   const type         = typeMap.get(baseTypeName);
 
-  const args = field.args.length > 0
-    ? `(${field.args.map(a => `${a.name}: $${a.name}`).join(', ')})`
+  // Include required args (NON_NULL) and recognizable pagination args. Other
+  // optional args are dropped — the user can add them back via the schema
+  // explorer or autocomplete if they need them.
+  const PAGINATION_NAMES = new Set([
+    'first', 'last', 'limit', 'take', 'top', 'count', 'size',
+    'skip', 'offset', 'page',
+    'after', 'before',
+  ]);
+  const includedArgs = field.args.filter(a =>
+    isRequired(a.type) || PAGINATION_NAMES.has(a.name.toLowerCase()),
+  );
+  const args = includedArgs.length > 0
+    ? `(${includedArgs.map(a => `${a.name}: ${defaultArgValue(a)}`).join(', ')})`
     : '';
 
   if ((baseKind === 'OBJECT' || baseKind === 'INTERFACE') && type?.fields?.length) {

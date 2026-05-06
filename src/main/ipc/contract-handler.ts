@@ -16,6 +16,7 @@ import {
   captureSnapshot, listSnapshots, loadSnapshot, deleteSnapshot, relPathOf,
 } from '../contract/snapshots';
 import { getWorkspaceDir } from './file-handler';
+import { validateContractRunPayload } from './ipc-validate';
 
 /** If the caller picked a pinned snapshot, materialize it to a temp file so
  *  the existing provider-verifier flow (which wants a URL or a file path)
@@ -31,6 +32,7 @@ async function resolveSnapshotSpec(relPath: string): Promise<{ specPath: string 
 
 export function registerContractHandlers(ipc: IpcMain): void {
   ipc.handle('contract:run', async (_e, payload: ContractRunPayload): Promise<ContractReport> => {
+    validateContractRunPayload(payload);
     const { mode, requests, envVars, collectionVars = {}, requestBaseUrl } = payload;
     let { specUrl, specPath } = payload;
 

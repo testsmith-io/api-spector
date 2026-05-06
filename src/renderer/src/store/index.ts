@@ -16,17 +16,18 @@ import type {
   TlsSettings,
   ResponsePayload,
   SentRequest,
-  HistoryEntry,
   ScriptExecutionMeta,
   RunRequestResult,
   MockServer,
   MockHit,
-  WsMessage,
-  ContractReport,
-  ContractSnapshot,
 } from '../../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
 import { uniqueName, colRelPath } from '../../../shared/naming-utils';
+import { createWsSlice, type WsSlice } from './slices/ws-slice';
+import { createHistorySlice, type HistorySlice } from './slices/history-slice';
+import { createRunnerSlice, type RunnerSlice } from './slices/runner-slice';
+import { createRecorderSlice, type RecorderSlice } from './slices/recorder-slice';
+import { createContractSlice, type ContractSlice } from './slices/contract-slice';
 
 export { uniqueName, colRelPath };
 
@@ -126,7 +127,7 @@ export interface AppTab {
   requestTab: 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'schema' | 'contract'
 }
 
-function makeTab(requestId: string, collectionId: string): AppTab {
+function makeTab(requestId: string, collectionId: string, opts: { protocol?: ApiRequest['protocol'] } = {}): AppTab {
   return {
     id: uuidv4(),
     requestId,
@@ -136,12 +137,35 @@ function makeTab(requestId: string, collectionId: string): AppTab {
     lastSentRequest: null,
     lastHookResults: null,
     isSending: false,
-    requestTab: 'params',
-    scriptTab: 'pre',
+    // SOAP requests: 'params' isn't even shown for SOAP and 'body' renders the
+    // WSDL-driven SoapEditor — that's the primary surface, so jump there.
+    // HTTP/WebSocket: keep the existing 'params' default.
+    requestTab: opts.protocol === 'soap' ? 'body' : 'params',
+    // Default to the post-response tab — that's where the typical workflow
+    // (assertions, extracting tokens, saving variables) lives.
+    scriptTab: 'post',
   };
 }
 
+/** Look up a request's protocol by id across all loaded collections.
+ *  Returns undefined for unknown ids — caller defaults to HTTP behavior. */
+function protocolFor(state: AppState, requestId: string): ApiRequest['protocol'] {
+  for (const c of Object.values(state.collections)) {
+    const r = c.data.requests[requestId];
+    if (r) return r.protocol;
+  }
+  return undefined;
+}
+
 // ─── State shape ─────────────────────────────────────────────────────────────
+
+// `AppState` here only owns the *un-sliced* parts of the store. The fields
+// below come from individual slices in `./slices/`:
+//   • WsSlice        — wsConnections + setWsStatus/addWsMessage/clearWsMessages
+//   • HistorySlice   — history + addHistoryEntry/clearHistory
+//   • RunnerSlice    — runnerModal/runnerResults/runnerRunning + actions
+//   • RecorderSlice  — recorder* fields + setters
+//   • ContractSlice  — lastContractReport + contractSnapshots + actions
 
 interface AppState {
   workspace: Workspace | null
@@ -165,7 +189,6 @@ interface AppState {
   showGeneratorPanel: boolean
   theme: 'dark' | 'light' | 'system'
   zoom: number
-  history: HistoryEntry[]           // newest first, capped at 200
   sidebarTab: 'collections' | 'history' | 'mocks' | 'contracts' | 'git'
 
   workspaceSettingsOpen: boolean
@@ -174,44 +197,22 @@ interface AppState {
   activeMockId: string | null
   mockLogs: Record<string, MockHit[]>    // serverId → hits, newest first, capped at 100
 
-  // Recorder
-  recorderOpen:           boolean
-  recorderRunning:        boolean
-  recorderUpstream:       string
-  recorderPort:           number
-  recorderTargetMockId:   string   // '' = create new mock server
-
   // Command palette
   commandPaletteOpen: boolean
 
   // Pinned response for diffing
   pinnedResponse: ResponsePayload | null
 
-  // Contract testing
-  lastContractReport: ContractReport | null
-  /** Pinned contract spec snapshots, keyed by the snapshot's relative path. */
-  contractSnapshots: Record<string, ContractSnapshot>
-  /** When set, contract runs use this snapshot's spec instead of a live URL. */
-  activeContractSnapshotRelPath: string | null
+  /** When set + sidebarTab === 'git', the main pane renders the diff for this
+   *  file instead of the request builder. Lets users see the change at full
+   *  width instead of a cramped sidebar panel. */
+  activeGitDiff: { path: string; staged: boolean } | null
 
-  // Runner
-  runnerModal: {
-    open: boolean
-    collectionId: string | null
-    /** folderId scopes to a folder; null means whole collection */
-    folderId: string | null
-    /** Pre-selected tag filter */
-    filterTags: string[]
-  }
-  runnerResults: RunRequestResult[]
-  runnerRunning: boolean
-
-  // WebSocket connections
-  wsConnections: Record<string, {
-    status: 'disconnected' | 'connecting' | 'connected' | 'error'
-    messages: WsMessage[]
-    error?: string
-  }>
+  /** Scripts-tab "Quick Inserts" sidebar visibility. Lifted into the store so
+   *  the response-tree assertion flow (handleAssert) can collapse it after
+   *  adding a snippet — otherwise the user lands on the script with the now-
+   *  irrelevant snippet palette still taking up half the editor width. */
+  quickInsertsOpen: boolean
 }
 
 interface AppActions {
@@ -296,13 +297,11 @@ interface AppActions {
   // Pinned response
   setPinnedResponse: (r: ResponsePayload | null) => void
 
-  // Contract testing
-  setLastContractReport: (r: ContractReport | null) => void
+  // Git diff in main pane
+  setActiveGitDiff: (d: { path: string; staged: boolean } | null) => void
 
-  // Contract snapshots
-  loadContractSnapshot: (relPath: string, snapshot: ContractSnapshot) => void
-  removeContractSnapshot: (relPath: string) => void
-  setActiveContractSnapshot: (relPath: string | null) => void
+  // Quick Inserts sidebar
+  setQuickInsertsOpen: (open: boolean) => void
 
   // Inherited auth/headers selector
   getInheritedAuthAndHeaders: (requestId: string) => { auth: AuthConfig | null; headers: KeyValuePair[] }
@@ -310,6 +309,7 @@ interface AppActions {
   // Environment CRUD
   updateEnvironment: (id: string, data: Environment) => void
   addEnvironment: () => void
+  duplicateEnvironment: (id: string) => void
   deleteEnvironment: (id: string) => void
 
   // Collection dataset
@@ -323,13 +323,6 @@ interface AppActions {
   setGlobals: (globals: Record<string, string>) => void
   patchGlobals: (patch: Record<string, string>) => void
 
-  // Runner modal
-  openRunner: (collectionId: string, folderId?: string | null, filterTags?: string[]) => void
-  closeRunner: () => void
-  setRunnerResults: (results: RunRequestResult[]) => void
-  patchRunnerResult: (idx: number, patch: Partial<RunRequestResult>) => void
-  setRunnerRunning: (v: boolean) => void
-
   // Apply script result back into store (env/collection vars + globals)
   applyScriptUpdates: (result: ScriptExecutionMeta) => void
 
@@ -337,9 +330,6 @@ interface AppActions {
   setTheme: (t: 'dark' | 'light' | 'system') => void
   setZoom: (z: number) => void
 
-  // History
-  addHistoryEntry: (entry: HistoryEntry) => void
-  clearHistory: () => void
   setSidebarTab: (tab: AppState['sidebarTab']) => void
 
   // Mock servers
@@ -351,24 +341,22 @@ interface AppActions {
   setActiveMockId: (id: string | null) => void
   addMockHit: (hit: MockHit) => void
   clearMockLogs: (serverId: string) => void
-
-  // Recorder
-  setRecorderOpen:           (open: boolean) => void
-  setRecorderRunning:        (running: boolean) => void
-  setRecorderUpstream:       (url: string) => void
-  setRecorderPort:           (port: number) => void
-  setRecorderTargetMockId:   (id: string) => void
-
-  // WebSocket actions
-  setWsStatus: (requestId: string, status: 'disconnected' | 'connecting' | 'connected' | 'error', error?: string) => void
-  addWsMessage: (requestId: string, message: WsMessage) => void
-  clearWsMessages: (requestId: string) => void
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
-export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<AppState & AppActions>()(
-  immer((set) => ({
+export type FullState = AppState & AppActions & WsSlice & HistorySlice & RunnerSlice & RecorderSlice & ContractSlice
+
+export const useStore: UseBoundStore<StoreApi<FullState>> = create<FullState>()(
+  immer((set, get, api) => ({
+    // ── Slice composition ─────────────────────────────────────────────────────
+    ...createWsSlice(set, get, api),
+    ...createHistorySlice(set, get, api),
+    ...createRunnerSlice(set, get, api),
+    ...createRecorderSlice(set, get, api),
+    ...createContractSlice(set, get, api),
+
+    // ── Initial state for the parts that haven't been sliced yet ──────────────
     workspace: null,
     workspacePath: null,
     collections: {},
@@ -382,26 +370,15 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
     showGeneratorPanel: false,
     theme: (localStorage.getItem('theme') as 'dark' | 'light' | 'system') ?? 'dark',
     zoom: Number(localStorage.getItem('zoom') ?? '1.1'),
-    history: [],
     sidebarTab: 'collections' as AppState['sidebarTab'],
     workspaceSettingsOpen: false,
     mocks: {},
     activeMockId: null,
     mockLogs: {},
-    recorderOpen:         false,
-    recorderRunning:      false,
-    recorderUpstream:     '',
-    recorderPort:         4001,
-    recorderTargetMockId: '',
-    runnerModal: { open: false, collectionId: null, folderId: null, filterTags: [] },
-    runnerResults: [],
-    runnerRunning: false,
     commandPaletteOpen: false,
     pinnedResponse: null,
-    lastContractReport: null,
-    contractSnapshots: {},
-    activeContractSnapshotRelPath: null,
-    wsConnections: {},
+    activeGitDiff: null,
+    quickInsertsOpen: true,
 
     // ── Workspace ─────────────────────────────────────────────────────────────
     setWorkspace: (ws, path) => set(s => { s.workspace = ws; s.workspacePath = path; }),
@@ -443,6 +420,10 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
         if (!req.params) req.params = [];
         if (!req.body) req.body = { mode: 'none' };
         if (!req.auth) req.auth = { type: 'none' };
+        // Migration: requests pre-dating the `soap` protocol value were
+        // identified solely by body.mode. Lift them so the new request shell
+        // (locked POST, WSDL-derived URL) kicks in automatically.
+        if (!req.protocol && req.body.mode === 'soap') req.protocol = 'soap';
       }
       // Ensure every folder has required arrays
       function sanitizeFolder(f: Folder) {
@@ -469,7 +450,7 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
         s.activeTabId = existing.id;
         s.activeCollectionId = collectionId;
       } else {
-        const tab = makeTab(requestId, collectionId);
+        const tab = makeTab(requestId, collectionId, { protocol: protocolFor(s, requestId) });
         s.tabs.push(tab);
         s.activeTabId = tab.id;
         s.activeCollectionId = collectionId;
@@ -557,7 +538,7 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
         s.activeTabId = existing.id;
         s.activeCollectionId = existing.collectionId;
       } else {
-        const tab = makeTab(id, collectionId);
+        const tab = makeTab(id, collectionId, { protocol: protocolFor(s, id) });
         s.tabs.push(tab);
         s.activeTabId = tab.id;
         s.activeCollectionId = collectionId;
@@ -694,20 +675,30 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
       s.activeCollectionId = collectionId;
     }),
 
-    deleteCollection: (id) => set(s => {
-      const relPath = s.collections[id]?.relPath;
-      delete s.collections[id];
-      if (s.workspace && relPath) {
-        s.workspace.collections = s.workspace.collections.filter(p => p !== relPath);
+    deleteCollection: (id) => {
+      const relPath = useStore.getState().collections[id]?.relPath;
+      // Fire-and-forget the disk unlink — handler is idempotent so a missing
+      // file isn't an error. Store mutation continues regardless so the UI
+      // stays in sync even if the unlink fails.
+      if (relPath) {
+        window.electron.deleteWorkspaceFile(relPath).catch(err => {
+          console.warn('deleteCollection: could not remove file', relPath, err);
+        });
       }
-      // Close any tabs belonging to this collection
-      s.tabs = s.tabs.filter(t => t.collectionId !== id);
-      if (s.activeCollectionId === id) {
-        s.activeCollectionId = Object.keys(s.collections)[0] ?? null;
-        const activeTab = s.tabs.find(t => t.id === s.activeTabId);
-        if (!activeTab) s.activeTabId = s.tabs[0]?.id ?? null;
-      }
-    }),
+      set(s => {
+        delete s.collections[id];
+        if (s.workspace && relPath) {
+          s.workspace.collections = s.workspace.collections.filter(p => p !== relPath);
+        }
+        // Close any tabs belonging to this collection
+        s.tabs = s.tabs.filter(t => t.collectionId !== id);
+        if (s.activeCollectionId === id) {
+          s.activeCollectionId = Object.keys(s.collections)[0] ?? null;
+          const activeTab = s.tabs.find(t => t.id === s.activeTabId);
+          if (!activeTab) s.activeTabId = s.tabs[0]?.id ?? null;
+        }
+      });
+    },
 
     updateCollectionDataSet: (id, ds) => set(s => {
       if (!s.collections[id]) return;
@@ -853,8 +844,9 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
         folder.requestIds.splice(idx + 1, 0, copy.id);
       }
       s.collections[collectionId].dirty = true;
-      // Open copy in a new tab
-      const tab = makeTab(copy.id, collectionId);
+      // Open copy in a new tab — preserves protocol so SOAP duplicates land
+      // on the SOAP panel directly.
+      const tab = makeTab(copy.id, collectionId, { protocol: copy.protocol });
       s.tabs.push(tab);
       s.activeTabId = tab.id;
     }),
@@ -961,28 +953,10 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
 
     // ── Pinned response ───────────────────────────────────────────────────────
     setPinnedResponse: (r) => set(s => { s.pinnedResponse = r; }),
+    setActiveGitDiff: (d) => set(s => { s.activeGitDiff = d; }),
+    setQuickInsertsOpen: (open) => set(s => { s.quickInsertsOpen = open; }),
 
-    // ── Contract testing ──────────────────────────────────────────────────────
-    setLastContractReport: (r) => set(s => { s.lastContractReport = r; }),
-
-    // ── Contract snapshots ────────────────────────────────────────────────────
-    loadContractSnapshot: (relPath, snapshot) => set(s => {
-      s.contractSnapshots[relPath] = snapshot;
-      if (s.workspace) {
-        if (!s.workspace.contracts) s.workspace.contracts = [];
-        if (!s.workspace.contracts.includes(relPath)) s.workspace.contracts.push(relPath);
-      }
-    }),
-
-    removeContractSnapshot: (relPath) => set(s => {
-      delete s.contractSnapshots[relPath];
-      if (s.activeContractSnapshotRelPath === relPath) s.activeContractSnapshotRelPath = null;
-      if (s.workspace?.contracts) {
-        s.workspace.contracts = s.workspace.contracts.filter(p => p !== relPath);
-      }
-    }),
-
-    setActiveContractSnapshot: (relPath) => set(s => { s.activeContractSnapshotRelPath = relPath; }),
+    // Contract testing + contract snapshots are now in slices/contract-slice.ts.
 
     // ── Inherited auth/headers ────────────────────────────────────────────────
     getInheritedAuthAndHeaders: (requestId) => {
@@ -1025,14 +999,41 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
       if (s.workspace) s.workspace.environments.push(relPath);
     }),
 
-    deleteEnvironment: (id) => set(s => {
-      const relPath = s.environments[id]?.relPath;
-      delete s.environments[id];
-      if (s.activeEnvironmentId === id) s.activeEnvironmentId = null;
-      if (relPath && s.workspace) {
-        s.workspace.environments = s.workspace.environments.filter(p => p !== relPath);
-      }
+    duplicateEnvironment: (id) => set(s => {
+      const src = s.environments[id];
+      if (!src) return;
+      const existingNames = Object.values(s.environments).map(e => e.data.name);
+      const newName = uniqueName(src.data.name + ' (copy)', existingNames);
+      const newId   = uuidv4();
+      // Deep-clone variables; secrets are stored by reference (key) so we
+      // copy the reference too — the same OS keychain entry can back both
+      // environments without re-prompting.
+      const env: Environment = {
+        ...JSON.parse(JSON.stringify(src.data)),
+        id: newId,
+        name: newName,
+      };
+      const relPath = `environments/${newName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.env.json`;
+      s.environments[env.id] = { relPath, data: env };
+      s.activeEnvironmentId = env.id;
+      if (s.workspace) s.workspace.environments.push(relPath);
     }),
+
+    deleteEnvironment: (id) => {
+      const relPath = useStore.getState().environments[id]?.relPath;
+      if (relPath) {
+        window.electron.deleteWorkspaceFile(relPath).catch(err => {
+          console.warn('deleteEnvironment: could not remove file', relPath, err);
+        });
+      }
+      set(s => {
+        delete s.environments[id];
+        if (s.activeEnvironmentId === id) s.activeEnvironmentId = null;
+        if (relPath && s.workspace) {
+          s.workspace.environments = s.workspace.environments.filter(p => p !== relPath);
+        }
+      });
+    },
 
     // ── Globals ───────────────────────────────────────────────────────────────
     setGlobals: (globals) => set(s => { s.globals = globals; }),
@@ -1103,24 +1104,9 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
       window.electron.setZoomFactor(z);
     }),
 
-    // ── Runner modal ──────────────────────────────────────────────────────────
-    openRunner: (collectionId, folderId = null, filterTags = []) => set(s => {
-      s.runnerModal = { open: true, collectionId, folderId, filterTags };
-      s.runnerResults = [];
-    }),
-    closeRunner: () => set(s => { s.runnerModal.open = false; s.runnerRunning = false; }),
-    setRunnerResults: (results) => set(s => { s.runnerResults = results; }),
-    patchRunnerResult: (idx, patch) => set(s => {
-      if (s.runnerResults[idx]) Object.assign(s.runnerResults[idx], patch);
-    }),
-    setRunnerRunning: (v) => set(s => { s.runnerRunning = v; }),
+    // Runner modal lives in slices/runner-slice.ts.
+    // History lives in slices/history-slice.ts.
 
-    // ── History ───────────────────────────────────────────────────────────────
-    addHistoryEntry: (entry) => set(s => {
-      s.history.unshift(entry);
-      if (s.history.length > 200) s.history.length = 200;
-    }),
-    clearHistory: () => set(s => { s.history = []; }),
     setSidebarTab: (tab) => set(s => { s.sidebarTab = tab; }),
 
     // ── Mock servers ──────────────────────────────────────────────────────────
@@ -1149,14 +1135,21 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
       if (s.mocks[id]) s.mocks[id].data = data;
     }),
 
-    deleteMock: (id) => set(s => {
-      const relPath = s.mocks[id]?.relPath;
-      delete s.mocks[id];
-      if (s.workspace?.mocks && relPath) {
-        s.workspace.mocks = s.workspace.mocks.filter(p => p !== relPath);
+    deleteMock: (id) => {
+      const relPath = useStore.getState().mocks[id]?.relPath;
+      if (relPath) {
+        window.electron.deleteWorkspaceFile(relPath).catch(err => {
+          console.warn('deleteMock: could not remove file', relPath, err);
+        });
       }
-      if (s.activeMockId === id) s.activeMockId = null;
-    }),
+      set(s => {
+        delete s.mocks[id];
+        if (s.workspace?.mocks && relPath) {
+          s.workspace.mocks = s.workspace.mocks.filter(p => p !== relPath);
+        }
+        if (s.activeMockId === id) s.activeMockId = null;
+      });
+    },
 
     setMockRunning: (id, running) => set(s => {
       if (s.mocks[id]) s.mocks[id].running = running;
@@ -1172,35 +1165,7 @@ export const useStore: UseBoundStore<StoreApi<AppState & AppActions>> = create<A
 
     clearMockLogs: (serverId) => set(s => { s.mockLogs[serverId] = []; }),
 
-    // ── Recorder ──────────────────────────────────────────────────────────────
-    setRecorderOpen:           (open)    => set(s => { s.recorderOpen          = open;    }),
-    setRecorderRunning:        (running) => set(s => { s.recorderRunning       = running; }),
-    setRecorderUpstream:       (url)     => set(s => { s.recorderUpstream      = url;     }),
-    setRecorderPort:           (port)    => set(s => { s.recorderPort          = port;    }),
-    setRecorderTargetMockId:   (id)      => set(s => { s.recorderTargetMockId  = id;      }),
-
-    // ── WebSocket ─────────────────────────────────────────────────────────────
-    setWsStatus: (requestId, status, error) => set(s => {
-      if (!s.wsConnections[requestId]) {
-        s.wsConnections[requestId] = { status, messages: [], error };
-      } else {
-        s.wsConnections[requestId].status = status;
-        s.wsConnections[requestId].error = error;
-      }
-    }),
-
-    addWsMessage: (requestId, message) => set(s => {
-      if (!s.wsConnections[requestId]) {
-        s.wsConnections[requestId] = { status: 'connected', messages: [message] };
-      } else {
-        s.wsConnections[requestId].messages.push(message);
-      }
-    }),
-
-    clearWsMessages: (requestId) => set(s => {
-      if (s.wsConnections[requestId]) {
-        s.wsConnections[requestId].messages = [];
-      }
-    }),
+    // Recorder lives in slices/recorder-slice.ts.
+    // WebSocket actions live in slices/ws-slice.ts.
   }))
 );

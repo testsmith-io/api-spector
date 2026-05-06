@@ -265,8 +265,8 @@ export function ContractPanel() {
         {report && !running && (
           <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs ${
             report.failed === 0
-              ? 'bg-emerald-900/20 border-emerald-700 text-emerald-300'
-              : 'bg-red-900/20 border-red-700 text-red-300'
+              ? 'bg-emerald-800/30 border-emerald-400/50 text-emerald-400'
+              : 'bg-red-900/30 border-red-700 text-red-300'
           }`}>
             <span className="font-semibold">{report.failed === 0 ? '✓ All passed' : `✗ ${report.failed} failed`}</span>
             <span className="text-surface-500 ml-auto">{report.passed}/{report.total}</span>

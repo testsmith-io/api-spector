@@ -10,14 +10,15 @@ import { MethodBadge } from '../common/MethodBadge';
 import { FolderSettingsModal } from './FolderSettingsModal';
 import { CollectionSettingsModal } from './CollectionSettingsModal';
 import { SchemaSyncModal } from './SchemaSyncModal';
+import { RequestRow } from './RequestRow';
 
 // ─── Drag-and-drop context ────────────────────────────────────────────────────
 
-type DragState =
+export type DragState =
   | { type: 'request'; requestId: string; collectionId: string }
   | { type: 'folder';  folderId: string;  collectionId: string }
 
-const DragCtx = createContext<{
+export const DragCtx = createContext<{
   dragging:       DragState | null
   setDragging:    (d: DragState | null) => void
   onDropRequest:  (destCollectionId: string, destFolderId: string, destIndex?: number) => void
@@ -26,7 +27,7 @@ const DragCtx = createContext<{
 
 // ─── Inline rename ────────────────────────────────────────────────────────────
 
-function InlineEdit({
+export function InlineEdit({
   value, onCommit, onCancel, className = '', validate,
 }: {
   value: string; onCommit: (v: string) => void; onCancel: () => void; className?: string
@@ -57,7 +58,11 @@ function InlineEdit({
           if (e.key === 'Escape') onCancel();
           e.stopPropagation();
         }}
-        className={`bg-surface-700 rounded px-1 focus:outline-none focus:ring-1 w-full ${
+        // Force the input's own text color so it's consistent regardless of
+        // the parent row's `text-surface-*` (folder rows are dimmer than
+        // request rows; without this, renaming a folder *looks* different
+        // from renaming a request).
+        className={`bg-surface-700 text-[var(--text-primary)] rounded px-1 focus:outline-none focus:ring-1 w-full ${
           error ? 'ring-1 ring-red-500 focus:ring-red-500' : 'focus:ring-blue-500'
         } ${className}`}
       />
@@ -68,7 +73,7 @@ function InlineEdit({
 
 // ─── Tag chips ────────────────────────────────────────────────────────────────
 
-function TagChips({
+export function TagChips({
   tags, onRemove, onAdd, forceAdding = false, onDoneAdding,
 }: {
   tags: string[]
@@ -161,7 +166,7 @@ function ConfirmDialog({ message, onConfirm, onCancel }: {
 
 // ─── Context menu ─────────────────────────────────────────────────────────────
 
-type MenuItem =
+export type MenuItem =
   | { type: 'item'; label: string; icon?: React.ReactNode; danger?: boolean; onClick: () => void }
   | { type: 'separator' }
   | { type: 'header'; label: string }
@@ -227,7 +232,7 @@ function ContextMenu({ items, x, y, onClose }: {
   );
 }
 
-function DotsBtn({ items }: { items: MenuItem[] }) {
+export function DotsBtn({ items }: { items: MenuItem[] }) {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
 
   return (
@@ -749,6 +754,7 @@ function FolderContents({
             reqIndex={reqIndex}
             name={req.name}
             method={req.method}
+            protocol={req.protocol}
             authType={req.auth.type}
             hookType={req.hookType}
             disabled={req.disabled}
@@ -767,170 +773,6 @@ function FolderContents({
         );
       })}
     </>
-  );
-}
-
-// ─── Request row ──────────────────────────────────────────────────────────────
-
-const HOOK_LABELS: Record<NonNullable<ApiRequest['hookType']>, string> = {
-  beforeAll: 'Before All',
-  before:    'Before',
-  after:     'After',
-  afterAll:  'After All',
-};
-
-const HOOK_COLORS: Record<NonNullable<ApiRequest['hookType']>, string> = {
-  beforeAll: 'bg-violet-700 text-white',
-  before:    'bg-violet-600 text-white',
-  after:     'bg-cyan-700 text-white',
-  afterAll:  'bg-cyan-800 text-white',
-};
-
-const AUTH_BADGE_LABELS: Record<string, string> = {
-  basic:   'Basic',
-  bearer:  'Bearer',
-  apikey:  'Key',
-  digest:  'Digest',
-  ntlm:    'NTLM',
-  oauth2:  'OAuth2',
-};
-
-function RequestRow({
-  reqId, collectionId, folderId, reqIndex, name, method, authType, hookType, disabled, tags, isActive, indent, autoRename = false,
-  onSelect, onRename, onDelete, onDuplicate, onUpdateTags, onSetHookType, onToggleDisabled,
-}: {
-  reqId: string
-  collectionId: string
-  folderId: string
-  reqIndex: number
-  name: string
-  method: string
-  authType: string
-  hookType?: ApiRequest['hookType']
-  disabled?: boolean
-  tags: string[]
-  isActive: boolean
-  indent: number
-  autoRename?: boolean
-  onSelect: () => void
-  onRename: (name: string) => void
-  onDelete: () => void
-  onDuplicate: () => void
-  onUpdateTags: (tags: string[]) => void
-  onSetHookType: (ht: ApiRequest['hookType']) => void
-  onToggleDisabled: () => void
-}) {
-  const [renaming, setRenaming] = useState(autoRename);
-  const [addingTag, setAddingTag] = useState(false);
-  const [showSchemaSync, setShowSchemaSync] = useState(false);
-  const [dropPos, setDropPos] = useState<'before' | 'after' | null>(null);
-  const dragCtx = useContext(DragCtx);
-
-  const hookMenuItems: MenuItem[] = [
-    ...((['beforeAll', 'before', 'after', 'afterAll'] as const).map(ht => ({
-      type: 'item' as const,
-      label: (hookType === ht ? '✓ ' : '    ') + HOOK_LABELS[ht],
-      onClick: () => onSetHookType(hookType === ht ? undefined : ht),
-    }))),
-  ];
-
-  function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
-    if (!dragCtx.dragging || dragCtx.dragging.type !== 'request' || dragCtx.dragging.requestId === reqId) return;
-    e.preventDefault();
-    const rect = e.currentTarget.getBoundingClientRect();
-    setDropPos(e.clientY < rect.top + rect.height / 2 ? 'before' : 'after');
-  }
-
-  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
-    e.preventDefault();
-    e.stopPropagation();
-    const insertIndex = dropPos === 'before' ? reqIndex : reqIndex + 1;
-    dragCtx.onDropRequest(collectionId, folderId, insertIndex);
-    setDropPos(null);
-  }
-
-  return (
-    <div className="relative">
-      {dropPos === 'before' && <div className="absolute top-0 inset-x-0 h-0.5 bg-blue-500 z-10 pointer-events-none" />}
-      <div
-        draggable
-        className={`group flex items-start gap-1.5 py-1 pr-1 rounded-sm cursor-pointer transition-colors ${
-          disabled ? 'opacity-40' : ''
-        } ${
-          isActive ? 'bg-surface-800 text-[var(--text-primary)]' : 'text-surface-300 hover:bg-surface-800'
-        }`}
-        style={{ paddingLeft: indent }}
-        onClick={onSelect}
-        onDoubleClick={() => setRenaming(true)}
-        onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; dragCtx.setDragging({ type: 'request', requestId: reqId, collectionId }); }}
-        onDragEnd={() => { dragCtx.setDragging(null); setDropPos(null); }}
-        onDragOver={handleDragOver}
-        onDragLeave={() => setDropPos(null)}
-        onDrop={handleDrop}
-      >
-      <MethodBadge method={method} size="xs" />
-
-      <div className="flex-1 min-w-0">
-        {renaming ? (
-          <InlineEdit
-            value={name}
-            onCommit={v => { onRename(v); setRenaming(false); }}
-            onCancel={() => setRenaming(false)}
-            className="w-full text-xs"
-          />
-        ) : (
-          <div className="flex items-center gap-1 min-w-0">
-            <span className="text-xs truncate">{name}</span>
-            {hookType && (
-              <span className={`shrink-0 text-[9px] font-bold px-1 py-px rounded ${HOOK_COLORS[hookType]}`}>
-                {HOOK_LABELS[hookType].toUpperCase()}
-              </span>
-            )}
-            {authType !== 'none' && (
-              <span
-                className="shrink-0 text-[9px] px-1 py-px rounded bg-amber-800/40 text-amber-400"
-                title={`Auth: ${AUTH_BADGE_LABELS[authType] ?? authType}`}
-              >
-                {AUTH_BADGE_LABELS[authType] ?? authType}
-              </span>
-            )}
-          </div>
-        )}
-        {(tags.length > 0 || addingTag) && (
-          <TagChips
-            tags={tags}
-            onRemove={tag => onUpdateTags(tags.filter(t => t !== tag))}
-            onAdd={tag => onUpdateTags([...tags, tag])}
-            forceAdding={addingTag}
-            onDoneAdding={() => setAddingTag(false)}
-          />
-        )}
-      </div>
-
-      <div className="shrink-0">
-        <DotsBtn items={[
-          { type: 'item', label: 'Rename', icon: <PencilIcon />, onClick: () => setRenaming(true) },
-          { type: 'item', label: 'Duplicate', icon: <CopyIcon />, onClick: onDuplicate },
-          { type: 'item', label: 'Add tag', icon: <TagIcon />, onClick: () => setAddingTag(true) },
-          { type: 'item', label: 'Sync schema', icon: <SyncIcon />, onClick: () => setShowSchemaSync(true) },
-          { type: 'item', label: disabled ? 'Enable' : 'Disable', onClick: onToggleDisabled },
-          { type: 'separator' },
-          { type: 'header', label: 'Hook type' },
-          ...hookMenuItems,
-          { type: 'separator' },
-          { type: 'item', label: 'Delete', icon: <TrashIcon />, danger: true, onClick: onDelete },
-        ]} />
-      </div>
-      {dropPos === 'after' && <div className="absolute bottom-0 inset-x-0 h-0.5 bg-blue-500 z-10 pointer-events-none" />}
-    </div>
-      {showSchemaSync && (
-        <SchemaSyncModal
-          collectionId={collectionId}
-          scope={{ type: 'request', requestId: reqId }}
-          onClose={() => setShowSchemaSync(false)}
-        />
-      )}
-    </div>
   );
 }
 
@@ -957,7 +799,7 @@ function PlusIcon() {
     </svg>
   );
 }
-function TagIcon() {
+export function TagIcon() {
   return (
     <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A2 2 0 013 10V5a2 2 0 012-2z" />
@@ -971,14 +813,14 @@ function FolderIcon({ className = '' }: { className?: string }) {
     </svg>
   );
 }
-function PencilIcon() {
+export function PencilIcon() {
   return (
     <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.768-6.768a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H8v-2.414a2 2 0 01.586-1.414z" />
     </svg>
   );
 }
-function TrashIcon() {
+export function TrashIcon() {
   return (
     <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0a1 1 0 00-1-1h-4a1 1 0 00-1 1m6 0H7" />
@@ -992,7 +834,7 @@ function TableIcon() {
     </svg>
   );
 }
-function CopyIcon() {
+export function CopyIcon() {
   return (
     <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -1021,7 +863,7 @@ function CollapseAllIcon() {
   );
 }
 
-function SyncIcon() {
+export function SyncIcon() {
   return (
     <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M20.984 4.356v4.993" />
