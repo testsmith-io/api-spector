@@ -12,6 +12,7 @@ import { generatePlaywrightJs }   from '../generators/playwright-js';
 import { generateSupertestTs }    from '../generators/supertest-ts';
 import { generateSupertestJs }    from '../generators/supertest-js';
 import { generateRestAssured }    from '../generators/rest-assured';
+import { generateKarate }         from '../generators/karate';
 import type { GenerateOptions, GeneratedFile } from '../../shared/types';
 
 export function registerGenerateHandlers(ipc: IpcMain): void {
@@ -24,6 +25,7 @@ export function registerGenerateHandlers(ipc: IpcMain): void {
       case 'supertest_ts':    return generateSupertestTs(collection, environment);
       case 'supertest_js':    return generateSupertestJs(collection, environment);
       case 'rest_assured':    return generateRestAssured(collection, environment);
+      case 'karate':          return generateKarate(collection, environment);
       default:                throw new Error(`Unknown target: ${target}`);
     }
   });

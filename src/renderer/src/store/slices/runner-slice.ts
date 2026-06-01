@@ -18,30 +18,30 @@ export interface RunnerSliceState {
 }
 
 export interface RunnerSliceActions {
-  openRunner: (collectionId: string, folderId?: string | null, filterTags?: string[]) => void
+  openRunner: ( collectionId: string, folderId?: string | null, filterTags?: string[] ) => void
   closeRunner: () => void
-  setRunnerResults: (results: RunRequestResult[]) => void
-  patchRunnerResult: (idx: number, patch: Partial<RunRequestResult>) => void
-  setRunnerRunning: (v: boolean) => void
+  setRunnerResults: ( results: RunRequestResult[] ) => void
+  patchRunnerResult: ( idx: number, patch: Partial<RunRequestResult> ) => void
+  setRunnerRunning: ( v: boolean ) => void
 }
 
 export type RunnerSlice = RunnerSliceState & RunnerSliceActions
 
 type ImmerStateCreator<T> = StateCreator<T, [['zustand/immer', never]], [], T>
 
-export const createRunnerSlice: ImmerStateCreator<RunnerSlice> = (set) => ({
+export const createRunnerSlice: ImmerStateCreator<RunnerSlice> = ( set ) => ( {
   runnerModal: { open: false, collectionId: null, folderId: null, filterTags: [] },
   runnerResults: [],
   runnerRunning: false,
 
-  openRunner: (collectionId, folderId = null, filterTags = []) => set(s => {
+  openRunner: ( collectionId, folderId = null, filterTags = [] ) => set( s => {
     s.runnerModal = { open: true, collectionId, folderId, filterTags };
     s.runnerResults = [];
-  }),
-  closeRunner: () => set(s => { s.runnerModal.open = false; s.runnerRunning = false; }),
-  setRunnerResults: (results) => set(s => { s.runnerResults = results; }),
-  patchRunnerResult: (idx, patch) => set(s => {
-    if (s.runnerResults[idx]) Object.assign(s.runnerResults[idx], patch);
-  }),
-  setRunnerRunning: (v) => set(s => { s.runnerRunning = v; }),
-});
+  } ),
+  closeRunner: () => set( s => { s.runnerModal.open = false; s.runnerRunning = false; } ),
+  setRunnerResults: ( results ) => set( s => { s.runnerResults = results; } ),
+  patchRunnerResult: ( idx, patch ) => set( s => {
+    if ( s.runnerResults[idx] ) Object.assign( s.runnerResults[idx], patch );
+  } ),
+  setRunnerRunning: ( v ) => set( s => { s.runnerRunning = v; } ),
+} );

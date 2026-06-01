@@ -7,6 +7,7 @@ import { generateRobotFramework } from '../main/generators/robot-framework';
 import { generatePlaywright } from '../main/generators/playwright';
 import { generateSupertestTs } from '../main/generators/supertest-ts';
 import { generateRestAssured } from '../main/generators/rest-assured';
+import { generateKarate } from '../main/generators/karate';
 import { makeCollection, makeEnvironment } from './fixtures/collection';
 import type { Collection } from '../shared/types';
 
@@ -242,5 +243,107 @@ describe( 'generateRestAssured', () => {
 
   it( 'works without an environment', () => {
     expect( () => generateRestAssured( collection, null ) ).not.toThrow();
+  } );
+} );
+
+// ─── Karate ───────────────────────────────────────────────────────────────────
+
+describe( 'generateKarate', () => {
+  const files = generateKarate( collection, environment );
+
+  it( 'generates at least one file', () => {
+    expect( files.length ).toBeGreaterThan( 0 );
+  } );
+
+  it( 'generates a pom.xml referencing karate-junit5', () => {
+    const pom = fileByPath( files, 'pom.xml' )!;
+    expect( pom.content ).toContain( 'karate-junit5' );
+  } );
+
+  it( 'generates karate-config.js with baseUrl from the environment', () => {
+    const cfg = fileByPath( files, 'karate-config.js' )!;
+    expect( cfg.content ).toContain( 'baseUrl' );
+    expect( cfg.content ).toContain( 'api.staging.example.com' );
+  } );
+
+  it( 'generates a JUnit 5 runner using @Karate.Test', () => {
+    const runner = files.find( f => f.path.endsWith( 'Runner.java' ) )!;
+    expect( runner.content ).toContain( '@Karate.Test' );
+  } );
+
+  it( 'generates a .feature file', () => {
+    const feature = files.find( f => f.path.endsWith( '.feature' ) );
+    expect( feature ).toBeDefined();
+  } );
+
+  it( 'feature file contains Karate Gherkin steps', () => {
+    const feature = files.find( f => f.path.endsWith( '.feature' ) )!;
+    expect( feature.content ).toMatch( /^Feature:/m );
+    expect( feature.content ).toMatch( /^Scenario:/m );
+    expect( feature.content ).toMatch( /When method (get|post|delete)/ );
+    expect( feature.content ).toMatch( /Then status \d+/ );
+  } );
+
+  it( 'POST body is emitted as a Karate docstring under `And request`', () => {
+    const feature = files.find( f => f.path.endsWith( '.feature' ) )!;
+    expect( feature.content ).toContain( 'And request' );
+    expect( feature.content ).toMatch( /And request\n {4}"""\n/ );
+  } );
+
+  it( 'SOAP body emits envelope, SOAPAction header, and text/xml content type', () => {
+    const soapCol: Collection = {
+      version: '1.0', id: 'soap', name: 'Soap API', description: '',
+      rootFolder: { id: 'root', name: 'root', description: '', folders: [], requestIds: [ 'r1' ] },
+      requests: {
+        r1: {
+          id: 'r1', name: 'GetCity', method: 'POST', url: 'https://example.com/ws',
+          headers: [], params: [], auth: { type: 'none' },
+          body: {
+            mode: 'soap',
+            soap: {
+              wsdlUrl: 'https://example.com/ws?wsdl',
+              soapAction: 'http://example.com/GetCity',
+              envelope: '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">\n  <soap:Body>\n    <GetCity><Id>1</Id></GetCity>\n  </soap:Body>\n</soap:Envelope>',
+            },
+          },
+        },
+      },
+    };
+    const f = generateKarate( soapCol, null );
+    const feature = f.find( x => x.path.endsWith( '.feature' ) )!;
+    expect( feature.content ).toContain( '<soap:Envelope' );
+    expect( feature.content ).toContain( "header SOAPAction = '\"http://example.com/GetCity\"'" );
+    expect( feature.content ).toContain( "header Content-Type = 'text/xml; charset=utf-8'" );
+    expect( feature.content ).toMatch( /And request\n {4}"""/ );
+  } );
+
+  it( 'works without an environment', () => {
+    expect( () => generateKarate( collection, null ) ).not.toThrow();
+  } );
+
+  it( 'literal absolute URL becomes a single `Given url \'…\'` step (no baseUrl)', () => {
+    const col: Collection = {
+      version: '1.0', id: 'abs', name: 'Abs API', description: '',
+      rootFolder: { id: 'root', name: 'root', description: '', folders: [], requestIds: [ 'r1' ] },
+      requests: {
+        r1: {
+          id: 'r1', name: 'List', method: 'GET',
+          url: 'https://api.example.com/v1/items',
+          headers: [], params: [], auth: { type: 'none' }, body: { mode: 'none' },
+        },
+      },
+    };
+    const f = generateKarate( col, null );
+    const feature = f.find( x => x.path.endsWith( '.feature' ) )!;
+    expect( feature.content ).toContain( "Given url 'https://api.example.com/v1/items'" );
+    expect( feature.content ).not.toMatch( /Given url baseUrl/ );
+    expect( feature.content ).not.toMatch( /And path/ );
+  } );
+
+  it( '`{{BASE_URL}}/path` keeps the config-driven baseUrl + path split', () => {
+    // makeCollection uses {{BASE_URL}}/users — the default fixture covers this.
+    const feature = files.find( x => x.path.endsWith( '.feature' ) )!;
+    expect( feature.content ).toMatch( /Given url baseUrl/ );
+    expect( feature.content ).toMatch( /And path 'users'/ );
   } );
 } );

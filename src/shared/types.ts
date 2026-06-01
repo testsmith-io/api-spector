@@ -396,6 +396,7 @@ export type GenerateTarget =
   | 'supertest_ts'
   | 'supertest_js'
   | 'rest_assured'
+  | 'karate'
 
 export interface GenerateOptions {
   collection: Collection

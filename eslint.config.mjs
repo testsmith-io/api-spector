@@ -1,4 +1,5 @@
 import js from '@eslint/js'
+import globals from 'globals'
 import tseslint from 'typescript-eslint'
 import reactPlugin from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
@@ -89,6 +90,21 @@ export default tseslint.config(
   // console.log is legitimate here (structured logging, startup messages)
   {
     files: ['src/main/**/*.ts', 'src/preload/**/*.ts', 'src/cli/**/*.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+
+  // ─── bin/*.js — vanilla CommonJS Node scripts ────────────────────────────────
+  // Tell ESLint about `require`, `__dirname`, `process`, `console`, etc., so
+  // they aren't flagged as undefined globals. These files run before any
+  // bundling so they intentionally stay plain JS, not TS.
+  {
+    files: ['bin/**/*.js'],
+    languageOptions: {
+      globals: { ...globals.node },
+      sourceType: 'commonjs',
+    },
     rules: {
       'no-console': 'off',
     },
