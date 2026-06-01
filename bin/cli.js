@@ -63,7 +63,48 @@ if (!command) {
 
 // ui: spawn electron with the app dir
 if (command.runner === 'electron') {
-  const electron = require('electron')
+  // `require('electron')` throws if electron's postinstall didn't download
+  // the platform binary (common behind corporate proxies on Windows: the
+  // npm install completes but the GitHub Releases download is blocked).
+  // The raw stack trace is intimidating; turn it into actionable steps.
+  let electron
+  try {
+    electron = require('electron')
+  } catch (err) {
+    const msg = err && err.message ? err.message : String(err)
+    const looksLikeBinaryMissing = /Electron failed to install correctly|Cannot find module 'electron'/i.test(msg)
+    console.error('')
+    console.error('  API Spector — failed to launch the UI.')
+    console.error('')
+    if (looksLikeBinaryMissing) {
+      const installDir = path.dirname(__dirname)
+      console.error('  Electron is installed, but its platform binary is missing — the')
+      console.error('  download during `npm install` did not complete (often a proxy or')
+      console.error('  firewall blocking github.com / electronjs.org).')
+      console.error('')
+      console.error('  Fix options (try in order):')
+      console.error('')
+      console.error('    1. Reinstall and force the postinstall script to run:')
+      console.error('         npm install -g @testsmith/api-spector --force')
+      console.error('')
+      console.error('    2. Behind a proxy? Set npm + electron mirrors and reinstall:')
+      console.error('         npm config set proxy http://your-proxy:port')
+      console.error('         npm config set https-proxy http://your-proxy:port')
+      console.error('         set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/')
+      console.error('         npm install -g @testsmith/api-spector --force')
+      console.error('')
+      console.error('    3. Re-run electron\'s postinstall manually:')
+      console.error(`         cd "${path.join(installDir, 'node_modules', 'electron')}"`)
+      console.error('         node install.js')
+      console.error('')
+      console.error('  CLI subcommands (run / mock / record / contract / wsdl) do not')
+      console.error('  need the UI binary and should work even while this is broken.')
+    } else {
+      console.error(`  ${msg}`)
+    }
+    console.error('')
+    process.exit(1)
+  }
   const appDir = path.join(__dirname, '..')
   // Forward the user's cwd so the main process can decide whether to open a
   // workspace in this folder, or fall through to the welcome screen. Without

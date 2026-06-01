@@ -9,10 +9,28 @@ import { join, dirname } from 'path';
 import type { GitStatus, GitCommit, GitBranch, GitRemote } from '../../shared/types';
 import { getWorkspaceDir, ensureGitignore } from './file-handler';
 
+// Hard ceiling on any single git invocation — if git produces no output for
+// this long, simple-git kills the child. Mostly defends against creds prompts
+// over HTTPS (no stored credentials → `git push` blocks on stdin forever);
+// also catches hung network ops.
+const GIT_BLOCK_TIMEOUT_MS = 60_000;
+
 function git() {
   const dir = getWorkspaceDir();
   if (!dir) throw new Error('No workspace open');
-  return simpleGit(dir);
+  // GIT_TERMINAL_PROMPT=0  — refuse interactive prompts (no TTY in Electron)
+  // GIT_ASKPASS / SSH_ASKPASS = `echo` — neuter any GUI askpass helper that
+  //   would otherwise pop up a system-level credentials dialog and block.
+  // GCM_INTERACTIVE=Never  — same idea for Git Credential Manager on Windows.
+  // The user sees a real error ("could not read Username") instead of the
+  // app silently hanging.
+  return simpleGit(dir, { timeout: { block: GIT_BLOCK_TIMEOUT_MS } }).env({
+    ...process.env,
+    GIT_TERMINAL_PROMPT: '0',
+    GIT_ASKPASS:         'echo',
+    SSH_ASKPASS:         'echo',
+    GCM_INTERACTIVE:     'Never',
+  });
 }
 
 export function registerGitHandlers(ipc: IpcMain): void {
