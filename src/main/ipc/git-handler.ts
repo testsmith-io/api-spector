@@ -3,39 +3,31 @@
 
 import { type IpcMain } from 'electron';
 import { simpleGit } from 'simple-git';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, stat } from 'fs/promises';
 import { join, dirname } from 'path';
 import type { GitStatus, GitCommit, GitBranch, GitRemote } from '../../shared/types';
 import { getWorkspaceDir, ensureGitignore } from './file-handler';
 
-// Hard ceiling on any single git invocation — if git produces no output for
-// this long, simple-git kills the child. Mostly defends against creds prompts
-// over HTTPS (no stored credentials → `git push` blocks on stdin forever);
-// also catches hung network ops.
-const GIT_BLOCK_TIMEOUT_MS = 60_000;
-
 function git() {
   const dir = getWorkspaceDir();
   if (!dir) throw new Error('No workspace open');
-  // The only env override we still apply is the timeout. Suppressing
-  // credentials prompts in Electron is best left to the user's git config
-  // (credential.helper) — going further with GIT_ASKPASS / SSH_ASKPASS
-  // triggers simple-git's unsafe-plugin guard and, even with the opt-in
-  // flag, interacted badly with the chained .env() call and froze the
-  // panel after `git init`. GIT_TERMINAL_PROMPT=0 still helps in the
-  // common no-tty case and doesn't trigger any safety check.
-  return simpleGit(dir, { timeout: { block: GIT_BLOCK_TIMEOUT_MS } }).env({
-    ...process.env,
-    GIT_TERMINAL_PROMPT: '0',
-  });
+  return simpleGit(dir);
 }
 
 export function registerGitHandlers(ipc: IpcMain): void {
 
   ipc.handle('git:isRepo', async () => {
+    // Check the workspace directory itself — NOT `git rev-parse --git-dir`,
+    // which walks up the directory tree and may pick up an ancestor repo
+    // (e.g. a `~/.git` dotfiles repo). When that happens, every subsequent
+    // git command in the panel ends up running against the ancestor's
+    // working tree (the entire home directory), which is what caused the
+    // panel to wedge on Loading… while `git status` walked huge subtrees.
+    const dir = getWorkspaceDir();
+    if (!dir) return false;
     try {
-      await git().revparse(['--git-dir']);
-      return true;
+      const s = await stat(join(dir, '.git'));
+      return s.isDirectory() || s.isFile();  // file = worktree pointer
     } catch {
       return false;
     }
