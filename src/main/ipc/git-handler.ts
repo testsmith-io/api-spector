@@ -23,7 +23,14 @@ function git() {
   // GCM_INTERACTIVE=Never  — same idea for Git Credential Manager on Windows.
   // The user sees a real error ("could not read Username") instead of the
   // app silently hanging.
-  return simpleGit(dir, { timeout: { block: GIT_BLOCK_TIMEOUT_MS } }).env({
+  //
+  // simple-git refuses to forward askpass env vars by default (they're a
+  // shell-execution vector if attacker-controlled) — we opt in via `unsafe`
+  // because the values are hardcoded constants, not user input.
+  return simpleGit(dir, {
+    timeout: { block: GIT_BLOCK_TIMEOUT_MS },
+    unsafe:  { allowUnsafeAskPass: true },
+  }).env({
     ...process.env,
     GIT_TERMINAL_PROMPT: '0',
     GIT_ASKPASS:         'echo',
