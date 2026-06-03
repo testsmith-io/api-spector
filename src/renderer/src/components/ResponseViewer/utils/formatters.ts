@@ -1,6 +1,5 @@
-// Copyright (c) 2024-2026 Testsmith.io. All rights reserved.
-// Licensed for private, internal, non-commercial use only.
-// See LICENSE for full terms.
+// Copyright (c) 2024-2026 Testsmith.io
+// SPDX-License-Identifier: MIT
 
 /** Pretty-print a JSON string. Returns the input unchanged if it's not valid JSON. */
 export function prettyJson(raw: string): string {

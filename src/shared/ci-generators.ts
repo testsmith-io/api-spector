@@ -1,6 +1,5 @@
-// Copyright (c) 2024-2026 Testsmith.io. All rights reserved.
-// Licensed for private, internal, non-commercial use only.
-// See LICENSE for full terms.
+// Copyright (c) 2024-2026 Testsmith.io
+// SPDX-License-Identifier: MIT
 
 export function buildCliArgs(wsPath: string, envName: string | null, tags: string[]): string {
   const parts = [`node out/main/runner.js --workspace ${wsPath}`];

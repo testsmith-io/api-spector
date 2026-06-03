@@ -1,6 +1,5 @@
-// Copyright (c) 2024-2026 Testsmith.io. All rights reserved.
-// Licensed for private, internal, non-commercial use only.
-// See LICENSE for full terms.
+// Copyright (c) 2024-2026 Testsmith.io
+// SPDX-License-Identifier: MIT
 
 import crypto from 'crypto';
 import type { AuthConfig, DigestAuth, NtlmAuth, Oauth2Auth } from '../shared/types';
