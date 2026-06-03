@@ -17,25 +17,16 @@ const GIT_BLOCK_TIMEOUT_MS = 60_000;
 function git() {
   const dir = getWorkspaceDir();
   if (!dir) throw new Error('No workspace open');
-  // GIT_TERMINAL_PROMPT=0  — refuse interactive prompts (no TTY in Electron)
-  // GIT_ASKPASS / SSH_ASKPASS = `echo` — neuter any GUI askpass helper that
-  //   would otherwise pop up a system-level credentials dialog and block.
-  // GCM_INTERACTIVE=Never  — same idea for Git Credential Manager on Windows.
-  // The user sees a real error ("could not read Username") instead of the
-  // app silently hanging.
-  //
-  // simple-git refuses to forward askpass env vars by default (they're a
-  // shell-execution vector if attacker-controlled) — we opt in via `unsafe`
-  // because the values are hardcoded constants, not user input.
-  return simpleGit(dir, {
-    timeout: { block: GIT_BLOCK_TIMEOUT_MS },
-    unsafe:  { allowUnsafeAskPass: true },
-  }).env({
+  // The only env override we still apply is the timeout. Suppressing
+  // credentials prompts in Electron is best left to the user's git config
+  // (credential.helper) — going further with GIT_ASKPASS / SSH_ASKPASS
+  // triggers simple-git's unsafe-plugin guard and, even with the opt-in
+  // flag, interacted badly with the chained .env() call and froze the
+  // panel after `git init`. GIT_TERMINAL_PROMPT=0 still helps in the
+  // common no-tty case and doesn't trigger any safety check.
+  return simpleGit(dir, { timeout: { block: GIT_BLOCK_TIMEOUT_MS } }).env({
     ...process.env,
     GIT_TERMINAL_PROMPT: '0',
-    GIT_ASKPASS:         'echo',
-    SSH_ASKPASS:         'echo',
-    GCM_INTERACTIVE:     'Never',
   });
 }
 
