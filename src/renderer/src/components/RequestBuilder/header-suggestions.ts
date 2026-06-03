@@ -1,6 +1,5 @@
-// Copyright (c) 2024-2026 Testsmith.io. All rights reserved.
-// Licensed for private, internal, non-commercial use only.
-// See LICENSE for full terms.
+// Copyright (c) 2024-2026 Testsmith.io
+// SPDX-License-Identifier: MIT
 
 /** Common HTTP request header names, ordered by frequency of use. */
 export const HEADER_NAMES: string[] = [

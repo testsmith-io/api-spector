@@ -1,6 +1,5 @@
-// Copyright (c) 2024-2026 Testsmith.io. All rights reserved.
-// Licensed for private, internal, non-commercial use only.
-// See LICENSE for full terms.
+// Copyright (c) 2024-2026 Testsmith.io
+// SPDX-License-Identifier: MIT
 
 /**
  * Return a name that doesn't collide with `existing`, appending " (2)", " (3)", etc.

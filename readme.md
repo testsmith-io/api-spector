@@ -118,8 +118,6 @@ npm run package
 
 ## License
 
-Copyright (c) 2024-2026 Testsmith.io. All rights reserved.
+API Spector is released under the [MIT License](LICENSE) — free to use, modify, and distribute, including for commercial purposes.
 
-This repository is publicly viewable for reference purposes only.
-
-Commercial use, public hosting, redistribution, and use for third-party services are not permitted without prior written permission. See [LICENSE](LICENSE) for full terms.
+Copyright (c) 2024-2026 Testsmith.io

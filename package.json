@@ -11,7 +11,7 @@
     "url": "https://github.com/testsmith-io/api-spector/issues"
   },
   "homepage": "https://github.com/testsmith-io/api-spector",
-  "license": "GPL-3.0-only",
+  "license": "MIT",
   "main": "out/main/index.js",
   "bin": {
     "api-spector": "bin/cli.js"
