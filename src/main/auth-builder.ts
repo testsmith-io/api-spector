@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: MIT
 
 import crypto from 'crypto';
-import type { AuthConfig, DigestAuth, NtlmAuth, Oauth2Auth } from '../shared/types';
+import { STATUS_CODES } from 'http';
+import { readFile } from 'fs/promises';
+import type { AuthConfig, DigestAuth, NtlmAuth, Oauth2Auth, TlsSettings } from '../shared/types';
 import { getSecret } from './ipc/secret-handler';
 import { interpolate } from './interpolation';
+import { createType1Message, decodeType2Message, createType3Message } from './ntlm';
 
 // ─── Auth header builder ──────────────────────────────────────────────────────
 
@@ -175,25 +178,138 @@ export async function performDigestAuth(
   return buildDigestAuthHeader(challenge, username, password, method, uri);
 }
 
-// ─── NTLM helpers ─────────────────────────────────────────────────────────────
+// ─── NTLM ───────────────────────────────────────────────────────────────────
 
 /**
- * NTLM is a 3-message handshake that requires keeping a persistent TCP
- * connection across all three messages.  The `httpntlm` npm package handles
- * this correctly but is not currently in package.json.
- *
- * TODO: add `httpntlm` to dependencies and implement this.
- * Until then this function throws so the caller can surface a helpful error.
+ * Minimal response shape the request handler consumes — deliberately matches
+ * the slice of the undici `fetch` response it reads (status, statusText,
+ * iterable headers, and a `text()` resolver), so the NTLM branch slots in
+ * alongside the normal/digest branches without special-casing downstream.
  */
-export async function performNtlmRequest(
-  _url: string,
-  _method: string,
-  _auth: NtlmAuth,
-  _vars: Record<string, string>,
-): Promise<never> {
-  throw new Error(
-    'NTLM auth is not yet implemented. Add "httpntlm" to package.json dependencies and implement performNtlmRequest in auth-builder.ts.',
-  );
+export interface NtlmResponseAdapter {
+  status: number
+  statusText: string
+  headers: { forEach(cb: (value: string, key: string) => void): void }
+  text(): Promise<string>
+}
+
+export interface NtlmRequestOptions {
+  url: string
+  method: string
+  auth: NtlmAuth
+  vars: Record<string, string>
+  /** Already-resolved request headers (user headers + content-type). No Authorization. */
+  baseHeaders: Record<string, string>
+  body?: string
+  tls?: TlsSettings
+  proxy?: { url?: string }
+}
+
+/** Pull the base64 NTLM token out of a (possibly multi-valued) WWW-Authenticate header. */
+function extractNtlmChallenge(value: string | string[] | undefined): string | null {
+  if (!value) return null;
+  const values = Array.isArray(value) ? value : [value];
+  for (const v of values) {
+    for (const part of v.split(',')) {
+      const m = /^\s*NTLM\s+(.+)\s*$/i.exec(part);
+      if (m) return m[1].trim();
+    }
+  }
+  return null;
+}
+
+async function buildNtlmConnectOpts(tls?: TlsSettings): Promise<Record<string, unknown> | undefined> {
+  if (!tls) return undefined;
+  const connect: Record<string, unknown> = {};
+  if (tls.rejectUnauthorized !== undefined) connect['rejectUnauthorized'] = tls.rejectUnauthorized;
+  if (tls.caCertPath)     { try { connect['ca']   = await readFile(tls.caCertPath); }     catch { /* ignore */ } }
+  if (tls.clientCertPath) { try { connect['cert'] = await readFile(tls.clientCertPath); } catch { /* ignore */ } }
+  if (tls.clientKeyPath)  { try { connect['key']  = await readFile(tls.clientKeyPath); }  catch { /* ignore */ } }
+  return Object.keys(connect).length ? connect : undefined;
+}
+
+/**
+ * Perform an NTLM (NTLMv2) authenticated request.
+ *
+ * NTLM authenticates the *connection*, not the request, so the three messages
+ * (negotiate → challenge → authenticate) must travel over one keep-alive
+ * socket. We use a dedicated single-connection undici `Client` to guarantee
+ * that — the global fetch pool gives no such guarantee.
+ *
+ *   1. send Type 1 (negotiate), expect 401 + `WWW-Authenticate: NTLM <type2>`
+ *   2. parse the Type 2 challenge
+ *   3. resend on the SAME connection with Type 3 (authenticate) + the real body
+ */
+export async function performNtlmRequest(opts: NtlmRequestOptions): Promise<NtlmResponseAdapter> {
+  if (opts.proxy?.url) {
+    throw new Error('NTLM authentication through a proxy is not supported. Disable the proxy for this request, or target the server directly.');
+  }
+
+  const { Client } = await import('undici');
+
+  // Resolve credentials
+  let password = opts.auth.password ?? '';
+  if (!password && opts.auth.passwordSecretRef) password = (await getSecret(opts.auth.passwordSecretRef)) ?? '';
+  password = interpolate(password, opts.vars);
+  const username    = interpolate(opts.auth.username ?? '', opts.vars);
+  const domain      = interpolate(opts.auth.ntlmDomain ?? '', opts.vars);
+  const workstation = interpolate(opts.auth.ntlmWorkstation ?? '', opts.vars);
+
+  const parsed = new URL(opts.url);
+  const origin = `${parsed.protocol}//${parsed.host}`;
+  const path   = parsed.pathname + parsed.search;
+
+  const connect = await buildNtlmConnectOpts(opts.tls);
+  const client  = new Client(origin, { pipelining: 1, ...(connect ? { connect } : {}) });
+
+  const toAdapter = (statusCode: number, headers: Record<string, string | string[] | undefined>, bodyText: string): NtlmResponseAdapter => {
+    const entries: [string, string][] = [];
+    for (const [k, v] of Object.entries(headers)) {
+      if (v === undefined) continue;
+      entries.push([k, Array.isArray(v) ? v.join(', ') : String(v)]);
+    }
+    return {
+      status: statusCode,
+      statusText: STATUS_CODES[statusCode] ?? '',
+      headers: { forEach: (cb) => entries.forEach(([k, v]) => cb(v, k)) },
+      text: () => Promise.resolve(bodyText),
+    };
+  };
+
+  try {
+    // ── Message 1: negotiate ────────────────────────────────────────────────
+    const negotiate = await client.request({
+      path,
+      method: opts.method,
+      headers: { authorization: `NTLM ${createType1Message()}` },
+    });
+    // Must drain the body before reusing the connection for message 3.
+    await negotiate.body.text();
+
+    const challengeToken = extractNtlmChallenge(negotiate.headers['www-authenticate']);
+
+    // Server didn't offer an NTLM challenge — surface whatever it returned.
+    if (negotiate.statusCode !== 401 || !challengeToken) {
+      const second = await client.request({ path, method: opts.method, headers: opts.baseHeaders, body: opts.body });
+      const bodyText = await second.body.text();
+      return toAdapter(second.statusCode, second.headers, bodyText);
+    }
+
+    // ── Message 3: authenticate (same connection) ────────────────────────────
+    const challenge = decodeType2Message(challengeToken);
+    const type3 = createType3Message({ user: username, password, domain, workstation, challenge });
+
+    const authed = await client.request({
+      path,
+      method: opts.method,
+      headers: { ...opts.baseHeaders, authorization: `NTLM ${type3}` },
+      body: opts.body,
+    });
+    const bodyText = await authed.body.text();
+    return toAdapter(authed.statusCode, authed.headers, bodyText);
+  } finally {
+    await client.close().catch(() => { /* best effort */ });
+  }
 }
 
 // ─── OAuth 2.0 token fetch ────────────────────────────────────────────────────

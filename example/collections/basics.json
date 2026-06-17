@@ -1,0 +1,170 @@
+{
+  "version": "1.0",
+  "id": "basics",
+  "name": "API basics",
+  "description": "GET, POST, PUT, PATCH, DELETE, query params, and custom headers.",
+  "rootFolder": {
+    "id": "root",
+    "name": "root",
+    "description": "",
+    "folders": [
+      {
+        "id": "folder-basics",
+        "name": "API basics",
+        "description": "",
+        "folders": [],
+        "requestIds": [
+          "get-one",
+          "get-query",
+          "post-create",
+          "put-replace",
+          "patch-update",
+          "delete-one",
+          "set-header"
+        ]
+      }
+    ],
+    "requestIds": []
+  },
+  "requests": {
+    "get-one": {
+      "id": "get-one",
+      "name": "GET a resource",
+      "method": "GET",
+      "url": "{{BASE_URL}}/products/42",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "postRequestScript": "sp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });\nsp.test('returns the requested id', function () { sp.expect(sp.response.json().id).to.equal(42); });",
+      "description": "A simple GET with a path parameter.",
+      "protocol": "http"
+    },
+    "get-query": {
+      "id": "get-query",
+      "name": "GET with query parameters",
+      "method": "GET",
+      "url": "{{BASE_URL}}/search",
+      "headers": [],
+      "params": [
+        {
+          "key": "q",
+          "value": "keyboard",
+          "enabled": true
+        },
+        {
+          "key": "limit",
+          "value": "5",
+          "enabled": true
+        }
+      ],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "postRequestScript": "sp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });\nsp.test('echoes the q parameter', function () { sp.expect(sp.response.json().query.q).to.equal('keyboard'); });",
+      "description": "Query-string params are defined in the Params tab.",
+      "protocol": "http"
+    },
+    "post-create": {
+      "id": "post-create",
+      "name": "POST — create a resource",
+      "method": "POST",
+      "url": "{{BASE_URL}}/products",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "json",
+        "json": "{\"name\":\"Keyboard\",\"price\":49.99}"
+      },
+      "postRequestScript": "sp.test('status is 201', function () { sp.expect(sp.response.code).to.equal(201); });\nsp.test('echoes the posted name', function () { sp.expect(sp.response.json().name).to.equal('Keyboard'); });\nsp.test('assigns a numeric id', function () { sp.expect(sp.response.json().id).to.be.a('number'); });",
+      "description": "Send a JSON body and assert on the created resource.",
+      "protocol": "http"
+    },
+    "put-replace": {
+      "id": "put-replace",
+      "name": "PUT — replace a resource",
+      "method": "PUT",
+      "url": "{{BASE_URL}}/products/42",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "json",
+        "json": "{\"name\":\"Keyboard Pro\",\"price\":79}"
+      },
+      "postRequestScript": "sp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });\nsp.test('reflects the new name', function () { sp.expect(sp.response.json().name).to.equal('Keyboard Pro'); });",
+      "protocol": "http"
+    },
+    "patch-update": {
+      "id": "patch-update",
+      "name": "PATCH — update fields",
+      "method": "PATCH",
+      "url": "{{BASE_URL}}/products/42",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "json",
+        "json": "{\"price\":59}"
+      },
+      "postRequestScript": "sp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });",
+      "protocol": "http"
+    },
+    "delete-one": {
+      "id": "delete-one",
+      "name": "DELETE a resource",
+      "method": "DELETE",
+      "url": "{{BASE_URL}}/products/42",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "postRequestScript": "sp.test('status is 204', function () { sp.expect(sp.response.code).to.equal(204); });",
+      "protocol": "http"
+    },
+    "set-header": {
+      "id": "set-header",
+      "name": "Set a custom request header",
+      "method": "GET",
+      "url": "{{BASE_URL}}/headers",
+      "headers": [
+        {
+          "key": "X-Request-Id",
+          "value": "{{$uuid}}",
+          "enabled": true
+        }
+      ],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "postRequestScript": "sp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });\nsp.test('custom header was sent', function () { sp.expect(sp.response.json()).to.have.property('x-request-id'); });",
+      "description": "Adds X-Request-Id using the built-in {{$uuid}} variable; the mock echoes headers back.",
+      "protocol": "http"
+    }
+  },
+  "collectionVariables": {
+    "BASE_URL": "http://127.0.0.1:19200"
+  }
+}

@@ -1,0 +1,184 @@
+{
+  "version": "1.0",
+  "id": "auth-mechanisms",
+  "name": "Auth mechanisms",
+  "description": "Tests every supported auth type (none, bearer, basic, apikey, digest, ntlm, oauth2) against the local mock server.",
+  "rootFolder": {
+    "id": "root",
+    "name": "root",
+    "description": "",
+    "folders": [
+      {
+        "id": "folder-auth",
+        "name": "Auth Mechanisms",
+        "description": "",
+        "folders": [],
+        "requestIds": [
+          "req-none",
+          "req-bearer",
+          "req-basic",
+          "req-apikey-header",
+          "req-apikey-query",
+          "req-digest",
+          "req-ntlm",
+          "req-oauth2"
+        ]
+      }
+    ],
+    "requestIds": []
+  },
+  "requests": {
+    "req-none": {
+      "id": "req-none",
+      "name": "None (no auth)",
+      "method": "GET",
+      "url": "{{BASE_URL}}/none",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "postRequestScript": "sp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });\nsp.test('server reports authenticated', function () { sp.expect(sp.response.json().authenticated).to.equal(true); });",
+      "protocol": "http"
+    },
+    "req-bearer": {
+      "id": "req-bearer",
+      "name": "Bearer token",
+      "method": "GET",
+      "url": "{{BASE_URL}}/bearer",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "bearer",
+        "token": "mock-bearer-token-123"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "postRequestScript": "sp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });\nsp.test('server reports authenticated', function () { sp.expect(sp.response.json().authenticated).to.equal(true); });",
+      "protocol": "http"
+    },
+    "req-basic": {
+      "id": "req-basic",
+      "name": "Basic auth",
+      "method": "GET",
+      "url": "{{BASE_URL}}/basic",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "basic",
+        "username": "demo",
+        "password": "p@ssw0rd"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "postRequestScript": "sp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });\nsp.test('server reports authenticated', function () { sp.expect(sp.response.json().authenticated).to.equal(true); });",
+      "protocol": "http"
+    },
+    "req-apikey-header": {
+      "id": "req-apikey-header",
+      "name": "API key (header)",
+      "method": "GET",
+      "url": "{{BASE_URL}}/apikey",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "apikey",
+        "apiKeyIn": "header",
+        "apiKeyName": "X-API-Key",
+        "apiKeyValue": "mock-api-key-123"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "postRequestScript": "sp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });\nsp.test('server reports authenticated', function () { sp.expect(sp.response.json().authenticated).to.equal(true); });",
+      "protocol": "http"
+    },
+    "req-apikey-query": {
+      "id": "req-apikey-query",
+      "name": "API key (query)",
+      "method": "GET",
+      "url": "{{BASE_URL}}/apikey-query",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "apikey",
+        "apiKeyIn": "query",
+        "apiKeyName": "apikey",
+        "apiKeyValue": "mock-api-key-123"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "postRequestScript": "sp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });\nsp.test('server reports authenticated', function () { sp.expect(sp.response.json().authenticated).to.equal(true); });",
+      "protocol": "http"
+    },
+    "req-digest": {
+      "id": "req-digest",
+      "name": "Digest auth",
+      "method": "GET",
+      "url": "{{BASE_URL}}/digest",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "digest",
+        "username": "demo",
+        "password": "p@ssw0rd"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "postRequestScript": "sp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });\nsp.test('server reports authenticated', function () { sp.expect(sp.response.json().authenticated).to.equal(true); });",
+      "protocol": "http"
+    },
+    "req-ntlm": {
+      "id": "req-ntlm",
+      "name": "NTLM auth",
+      "method": "GET",
+      "url": "{{BASE_URL}}/ntlm",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "ntlm",
+        "username": "demo",
+        "password": "p@ssw0rd",
+        "ntlmDomain": "WORKGROUP",
+        "ntlmWorkstation": "CLIENT"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "postRequestScript": "sp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });\nsp.test('server reports authenticated', function () { sp.expect(sp.response.json().authenticated).to.equal(true); });",
+      "protocol": "http",
+      "description": "NTLMv2 handshake against the mock's /ntlm route. The mock can't verify the proof cryptographically, so this exercises the client-side negotiate → challenge → authenticate flow."
+    },
+    "req-oauth2": {
+      "id": "req-oauth2",
+      "name": "OAuth2 (client credentials)",
+      "method": "GET",
+      "url": "{{BASE_URL}}/oauth/protected",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "oauth2",
+        "oauth2Flow": "client_credentials",
+        "oauth2TokenUrl": "{{BASE_URL}}/oauth/token",
+        "oauth2ClientId": "demo-client",
+        "oauth2ClientSecret": "demo-secret",
+        "oauth2Scopes": "read"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "postRequestScript": "sp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });\nsp.test('server reports authenticated', function () { sp.expect(sp.response.json().authenticated).to.equal(true); });",
+      "protocol": "http"
+    }
+  },
+  "collectionVariables": {
+    "BASE_URL": "http://127.0.0.1:19200"
+  }
+}
