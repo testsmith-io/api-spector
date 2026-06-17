@@ -5,6 +5,7 @@ import { createServer, type IncomingMessage, type ServerResponse, type Server } 
 import { randomUUID } from 'crypto';
 import * as vm from 'vm';
 import dayjs from 'dayjs';
+import { DOMParser } from '@xmldom/xmldom';
 import type { MockServer, MockRoute, MockHit } from '../shared/types';
 import type { faker as FakerType } from '@faker-js/faker';
 
@@ -88,6 +89,96 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+// ─── XML body parsing ───────────────────────────────────────────────────────
+
+/** Minimal subset of the @xmldom/xmldom node shape we walk. */
+interface XmlNode {
+  nodeType:   number
+  nodeName:   string
+  nodeValue:  string | null
+  childNodes: { length: number; [i: number]: XmlNode }
+  attributes: { length: number; [i: number]: { nodeName: string; nodeValue: string | null } } | null
+}
+
+const ELEMENT_NODE = 1, TEXT_NODE = 3, CDATA_NODE = 4;
+
+/**
+ * Convert an XML element into a plain JS value so `request.body.x` works the
+ * same as it does for JSON. Rules:
+ *   - leaf element (text only)        → its trimmed text string
+ *   - element with children/attrs     → object keyed by child tag name
+ *   - repeated child tags             → array
+ *   - attributes                      → `@name` keys
+ *   - mixed text + children           → text stored under `#text`
+ * Namespaced tags keep their prefix (e.g. `soap:Body`); access via bracket
+ * notation in templates: `request.body['soap:Envelope']`.
+ */
+function elementToValue(el: XmlNode): unknown {
+  const obj: Record<string, unknown> = {};
+
+  if (el.attributes) {
+    for (let i = 0; i < el.attributes.length; i++) {
+      const a = el.attributes[i];
+      obj['@' + a.nodeName] = a.nodeValue ?? '';
+    }
+  }
+
+  let text = '';
+  const childEls: XmlNode[] = [];
+  for (let i = 0; i < el.childNodes.length; i++) {
+    const c = el.childNodes[i];
+    if (c.nodeType === ELEMENT_NODE) childEls.push(c);
+    else if (c.nodeType === TEXT_NODE || c.nodeType === CDATA_NODE) text += c.nodeValue ?? '';
+  }
+
+  for (const child of childEls) {
+    const name = child.nodeName;
+    const val  = elementToValue(child);
+    const existing = obj[name];
+    if (existing === undefined) obj[name] = val;
+    else if (Array.isArray(existing)) existing.push(val);
+    else obj[name] = [existing, val];
+  }
+
+  const trimmed = text.trim();
+  // Pure leaf: no children and no attributes → just the text.
+  if (childEls.length === 0 && Object.keys(obj).length === 0) return trimmed;
+  if (trimmed) obj['#text'] = trimmed;
+  return obj;
+}
+
+/** Parse an XML string into a plain object, or null if it isn't valid XML. */
+function parseXmlToObject(xml: string): Record<string, unknown> | null {
+  try {
+    const silent = { warning() {}, error() {}, fatalError() {} };
+    const doc = new DOMParser({ errorHandler: silent })
+      .parseFromString(xml, 'text/xml') as unknown as { documentElement: XmlNode | null };
+    const root = doc.documentElement;
+    if (!root || root.nodeType !== ELEMENT_NODE) return null;
+    return { [root.nodeName]: elementToValue(root) };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse a request body into a value for `request.body`. Tries JSON first, then
+ * XML (by content-type or a leading `<`); falls back to `{}` for anything else.
+ */
+function parseRequestBody(bodyRaw: string, contentType: string): unknown {
+  try {
+    return JSON.parse(bodyRaw);
+  } catch { /* not JSON — fall through */ }
+
+  const ct = contentType.toLowerCase();
+  if (ct.includes('xml') || bodyRaw.trimStart().startsWith('<')) {
+    const xmlObj = parseXmlToObject(bodyRaw);
+    if (xmlObj) return xmlObj;
+  }
+
+  return {};
+}
+
 // ─── Body interpolation ───────────────────────────────────────────────────────
 
 /**
@@ -133,10 +224,10 @@ async function handleRequest(
     res.writeHead(204); res.end(); return;
   }
 
-  // Read request body before matching so scripts can inspect it
-  const bodyRaw = await readBody(req);
-  let bodyParsed: unknown = {};
-  try { bodyParsed = JSON.parse(bodyRaw); } catch { /* not JSON */ }
+  // Read request body before matching so scripts can inspect it.
+  // Parses JSON or XML into `request.body`; raw string stays in `request.bodyRaw`.
+  const bodyRaw    = await readBody(req);
+  const bodyParsed = parseRequestBody(bodyRaw, req.headers['content-type'] ?? '');
 
   // Always read from liveRoutes so edits apply without restart
   const routes = liveRoutes.get(serverId) ?? [];

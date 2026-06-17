@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "collections": [
+    "collections/basics.json",
+    "collections/data-extraction.json",
+    "collections/auth-mechanisms.json"
+  ],
+  "environments": [],
+  "activeEnvironmentId": null,
+  "mocks": [
+    "mocks/example-mock.mock.json"
+  ]
+}

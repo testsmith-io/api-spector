@@ -50,7 +50,7 @@ Access values from the incoming request directly in the body:
 |---|---|---|
 | `{{request.params.id}}` | URL path parameter `:id` | `"42"` |
 | `{{request.query.search}}` | Query string parameter `search` | `"laptop"` |
-| `{{request.body.email}}` | JSON request body field | `"user@example.com"` |
+| `{{request.body.email}}` | Request body field (JSON or XML) | `"user@example.com"` |
 | `{{request.method}}` | HTTP method | `"POST"` |
 | `{{request.path}}` | Request URL path | `"/products/42"` |
 | `{{request.headers.authorization}}` | Request header value | `"Bearer abc…"` |
@@ -74,6 +74,43 @@ A `GET /products/7?user=alice` call returns:
   "requestedBy": "alice"
 }
 ```
+
+### Reusing the request body (JSON & XML)
+
+`request.body` is the parsed request body, so you can echo values from the
+incoming request straight back into the response. JSON and XML are both parsed
+automatically — JSON first, then XML when the `Content-Type` contains `xml` or
+the body starts with `<`. Anything else leaves `request.body` as `{}` (the raw
+text is always available as `{{request.bodyRaw}}`).
+
+**JSON** — a `POST /signup` with body `{"email":"ada@example.com"}`:
+
+```json
+{ "createdId": "{{faker.string.uuid()}}", "email": "{{request.body.email}}" }
+```
+
+**XML** — XML is converted to a plain object that mirrors the document, so
+access works the same way. A `POST /order` with body:
+
+```xml
+<order><orderId>42</orderId><customer>Roy</customer></order>
+```
+
+and response body:
+
+```xml
+<ack><id>{{request.body.order.orderId}}</id><for>{{request.body.order.customer}}</for></ack>
+```
+
+returns `<ack><id>42</id><for>Roy</for></ack>`. Conversion rules:
+
+- A leaf element becomes its trimmed text — `request.body.order.orderId` → `"42"`.
+- Repeated tags become an array — `<item>a</item><item>b</item>` → `request.body.cart.item[1]` is `"b"`.
+- Attributes are exposed as `@name` keys — `<order id="7">` → `request.body.order['@id']`.
+- Namespaced tags keep their prefix, so use bracket access:
+  `request.body['soap:Envelope']['soap:Body']`.
+- The root element is preserved, so an `<order>` document is reached via
+  `request.body.order`.
 
 ### Faker.js
 
@@ -128,7 +165,7 @@ The script has access to:
 | `request.path` | `string` | URL path |
 | `request.params` | `object` | Path parameters extracted from the route pattern |
 | `request.query` | `object` | Query string parameters |
-| `request.body` | `object` | Parsed JSON body (or `{}` if not JSON) |
+| `request.body` | `object` | Parsed JSON or XML body (or `{}` if neither) |
 | `request.bodyRaw` | `string` | Raw request body string |
 | `request.headers` | `object` | Request headers |
 

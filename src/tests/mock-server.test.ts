@@ -16,10 +16,11 @@ async function hit(
   path: string,
   method = 'GET',
   body?: string,
+  contentType = 'application/json',
 ): Promise<{ status: number; text: string }> {
   const resp = await fetch(`http://127.0.0.1:${port}${path}`, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: body ? { 'Content-Type': contentType } : undefined,
     body,
   });
   return { status: resp.status, text: await resp.text() };
@@ -223,6 +224,80 @@ describe('mock server: body interpolation', () => {
     await startMock(mock);
     const parsed = JSON.parse((await hit(port, '/multi/foo/bar')).text);
     expect(parsed).toEqual({ a: 'foo', b: 'bar' });
+  });
+
+  it('reuses a value from a JSON request body', async () => {
+    const port = nextPort();
+    const mock = makeMock(port, [makeRoute({
+      method: 'POST', path: '/echo',
+      body: '{"email":"{{request.body.email}}"}',
+    })]);
+    cleanup.push(mock.id);
+    await startMock(mock);
+    const parsed = JSON.parse(
+      (await hit(port, '/echo', 'POST', '{"email":"a@b.com"}')).text,
+    );
+    expect(parsed.email).toBe('a@b.com');
+  });
+});
+
+// ─── XML request bodies ─────────────────────────────────────────────────────
+
+describe('mock server: XML request bodies', () => {
+  it('reuses a leaf value from an XML body (text/xml)', async () => {
+    const port = nextPort();
+    const mock = makeMock(port, [makeRoute({
+      method: 'POST', path: '/order',
+      headers: { 'Content-Type': 'application/xml' },
+      body: '<ack><id>{{request.body.order.orderId}}</id></ack>',
+    })]);
+    cleanup.push(mock.id);
+    await startMock(mock);
+    const xml = '<order><orderId>42</orderId><customer>Roy</customer></order>';
+    const res = await hit(port, '/order', 'POST', xml, 'text/xml');
+    expect(res.text).toBe('<ack><id>42</id></ack>');
+  });
+
+  it('parses XML detected by a leading "<" even without an xml content-type', async () => {
+    const port = nextPort();
+    const mock = makeMock(port, [makeRoute({
+      method: 'POST', path: '/x',
+      body: '{{request.body.root.name}}',
+    })]);
+    cleanup.push(mock.id);
+    await startMock(mock);
+    // content-type defaults to application/json, but the body is clearly XML
+    const res = await hit(port, '/x', 'POST', '<root><name>Ada</name></root>');
+    expect(res.text).toBe('Ada');
+  });
+
+  it('exposes namespaced SOAP elements via bracket access', async () => {
+    const port = nextPort();
+    const mock = makeMock(port, [makeRoute({
+      method: 'POST', path: '/soap',
+      headers: { 'Content-Type': 'text/xml' },
+      body: "{{request.body['soap:Envelope']['soap:Body'].GetPrice.item}}",
+    })]);
+    cleanup.push(mock.id);
+    await startMock(mock);
+    const envelope =
+      '<soap:Envelope><soap:Body><GetPrice><item>widget</item></GetPrice></soap:Body></soap:Envelope>';
+    const res = await hit(port, '/soap', 'POST', envelope, 'text/xml');
+    expect(res.text).toBe('widget');
+  });
+
+  it('maps repeated XML tags to an array', async () => {
+    const port = nextPort();
+    const mock = makeMock(port, [makeRoute({
+      method: 'POST', path: '/list',
+      headers: { 'Content-Type': 'application/xml' },
+      body: '{{request.body.cart.item[1]}}',
+    })]);
+    cleanup.push(mock.id);
+    await startMock(mock);
+    const xml = '<cart><item>a</item><item>b</item></cart>';
+    const res = await hit(port, '/list', 'POST', xml, 'application/xml');
+    expect(res.text).toBe('b');
   });
 });
 

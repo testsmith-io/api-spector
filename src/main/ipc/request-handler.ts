@@ -492,9 +492,8 @@ export function registerRequestHandler(ipc: IpcMain): void {
 
       const methodHasBody = !['GET', 'HEAD'].includes(req.method);
 
-      // Helper that adds Content-Type defaults and fires the actual request
-      const doFetch = async (overrideHeaders?: Headers): Promise<ReturnType<typeof fetch>> => {
-        const h = overrideHeaders ?? buildHeaders();
+      // Apply Content-Type / SOAPAction defaults that depend on the body mode.
+      const applyBodyHeaders = (h: Headers): Headers => {
         if (body !== undefined) {
           if (!h.has('content-type')) {
             if      (req.body.mode === 'json' || req.body.mode === 'graphql') h.set('Content-Type', 'application/json');
@@ -507,10 +506,21 @@ export function registerRequestHandler(ipc: IpcMain): void {
             h.set('SOAPAction', req.body.soap.soapAction);
           }
         }
-        // Capture what we're actually sending
+        return h;
+      };
+
+      // Snapshot the outgoing request for the UI / history panel.
+      const captureSent = (h: Headers): Record<string, string> => {
         const capturedHeaders: Record<string, string> = {};
         h.forEach((value, key) => { capturedHeaders[key] = value; });
         sentRequest = { method: req.method, url: finalUrl, headers: capturedHeaders, body: methodHasBody ? body : undefined };
+        return capturedHeaders;
+      };
+
+      // Helper that adds Content-Type defaults and fires the actual request
+      const doFetch = async (overrideHeaders?: Headers): Promise<ReturnType<typeof fetch>> => {
+        const h = applyBodyHeaders(overrideHeaders ?? buildHeaders());
+        captureSent(h);
         return fetch(finalUrl, {
           method:     req.method,
           headers:    h,
@@ -521,12 +531,20 @@ export function registerRequestHandler(ipc: IpcMain): void {
 
       let fetchResp: Awaited<ReturnType<typeof fetch>>;
 
-      // ── NTLM ──────────────────────────────────────────────────────────────
+      // ── NTLM 3-message handshake over one keep-alive connection ────────────
       if (req.auth.type === 'ntlm') {
-        // performNtlmRequest currently throws with a helpful TODO message
-        await performNtlmRequest(finalUrl, req.method, req.auth, vars);
-        // unreachable — silence TS
-        fetchResp = await doFetch();
+        const h = applyBodyHeaders(buildHeaders());
+        const capturedHeaders = captureSent(h);
+        fetchResp = await performNtlmRequest({
+          url:        finalUrl,
+          method:     req.method,
+          auth:       req.auth,
+          vars,
+          baseHeaders: capturedHeaders,
+          body:       methodHasBody ? body : undefined,
+          tls,
+          proxy,
+        }) as unknown as Awaited<ReturnType<typeof fetch>>;
       }
       // ── Digest two-round-trip ──────────────────────────────────────────────
       else if (req.auth.type === 'digest') {

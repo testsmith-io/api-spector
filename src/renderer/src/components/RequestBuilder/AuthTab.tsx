@@ -202,8 +202,8 @@ export function AuthTab({ request, onChange }: { request: ApiRequest; onChange: 
               />
             </div>
           </div>
-          <p className="text-surface-400 text-[10px] bg-yellow-950 border border-yellow-800 rounded px-2 py-1">
-            NTLM support is pending. Add <code>httpntlm</code> to dependencies to enable it.
+          <p className="text-surface-400 text-[10px] bg-surface-800 border border-surface-700 rounded px-2 py-1">
+            Uses NTLMv2 over a single keep-alive connection. Not supported through a proxy.
           </p>
         </div>
       )}

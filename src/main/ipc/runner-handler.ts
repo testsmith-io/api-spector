@@ -67,6 +67,8 @@ async function executeOne (
   localVars: Record<string, string>,
   dispatcher: ProxyAgent | Agent | undefined,
   piiMaskPatterns: string[],
+  proxy?: RunnerPayload['proxy'],
+  tls?: RunnerPayload['tls'],
 ): Promise<ExecuteOneResult> {
   // Defensive defaults — AI-generated collections may omit empty arrays
   if ( !req.headers ) req.headers = [];
@@ -172,8 +174,18 @@ async function executeOne (
     let fetchResp: Awaited<ReturnType<typeof fetch>>;
 
     if ( req.auth.type === 'ntlm' ) {
-      await performNtlmRequest( resolvedUrl, req.method, req.auth, vars );
-      fetchResp = await doFetch( headers ); // unreachable
+      const capturedHeaders: Record<string, string> = {};
+      headers.forEach( ( v, k ) => { capturedHeaders[k] = v; } );
+      fetchResp = await performNtlmRequest( {
+        url: resolvedUrl,
+        method: req.method,
+        auth: req.auth,
+        vars,
+        baseHeaders: capturedHeaders,
+        body: methodHasBody ? body : undefined,
+        tls,
+        proxy,
+      } ) as unknown as Awaited<ReturnType<typeof fetch>>;
     } else if ( req.auth.type === 'digest' ) {
       const probeFetch = ( url: string, init: Record<string, unknown> ) =>
         fetch( url, {
@@ -406,6 +418,8 @@ export function registerRunnerHandler ( ipc: IpcMain ): void {
         { ...runLocalVars, ...( item.dataRow ?? {} ) },
         dispatcher,
         piiMaskPatterns,
+        proxy,
+        tls,
       );
 
       runEnvVars = updatedEnvVars;

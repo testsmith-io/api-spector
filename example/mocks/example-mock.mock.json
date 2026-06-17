@@ -1,0 +1,210 @@
+{
+  "version": "1.0",
+  "id": "example-mock",
+  "name": "Example API mock",
+  "port": 19200,
+  "routes": [
+    {
+      "method": "ANY",
+      "statusCode": 200,
+      "headers": {},
+      "body": "",
+      "id": "echo",
+      "path": "/echo",
+      "description": "Mirrors back whatever auth the client sent (httpbin-style inspection).",
+      "script": "response.headers['Content-Type']='application/json';response.body=JSON.stringify({method:request.method,authorization:request.headers.authorization||null,apiKeyHeader:request.headers['x-api-key']||null,apiKeyQuery:request.query.apikey||null});"
+    },
+    {
+      "method": "GET",
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": "{\"authenticated\":true,\"scheme\":\"none\"}",
+      "id": "none",
+      "path": "/none",
+      "description": "No auth required — always 200."
+    },
+    {
+      "method": "GET",
+      "statusCode": 200,
+      "headers": {},
+      "body": "",
+      "id": "bearer",
+      "path": "/bearer",
+      "description": "Expects Authorization: Bearer mock-bearer-token-123",
+      "script": "if(request.headers.authorization==='Bearer mock-bearer-token-123'){response.headers['Content-Type']='application/json';response.body=JSON.stringify({authenticated:true,scheme:'bearer'});}else{response.statusCode=401;response.headers['Content-Type']='application/json';response.body=JSON.stringify({authenticated:false,scheme:'bearer',error:'invalid or missing credentials',got:request.headers.authorization||null});}"
+    },
+    {
+      "method": "GET",
+      "statusCode": 200,
+      "headers": {},
+      "body": "",
+      "id": "basic",
+      "path": "/basic",
+      "description": "Expects Basic auth for demo:p@ssw0rd",
+      "script": "if(request.headers.authorization==='Basic ZGVtbzpwQHNzdzByZA=='){response.headers['Content-Type']='application/json';response.body=JSON.stringify({authenticated:true,scheme:'basic',user:'demo'});}else{response.statusCode=401;response.headers['WWW-Authenticate']=\"Basic realm=\\\"mock-realm\\\"\";response.headers['Content-Type']='application/json';response.body=JSON.stringify({authenticated:false,scheme:'basic',error:'invalid or missing credentials',got:request.headers.authorization||null});}"
+    },
+    {
+      "method": "GET",
+      "statusCode": 200,
+      "headers": {},
+      "body": "",
+      "id": "apikey-header",
+      "path": "/apikey",
+      "description": "Expects header X-API-Key: mock-api-key-123",
+      "script": "if(request.headers['x-api-key']==='mock-api-key-123'){response.headers['Content-Type']='application/json';response.body=JSON.stringify({authenticated:true,scheme:'apikey-header'});}else{response.statusCode=401;response.headers['Content-Type']='application/json';response.body=JSON.stringify({authenticated:false,scheme:'apikey-header',error:'invalid or missing credentials',got:request.headers.authorization||null});}"
+    },
+    {
+      "method": "GET",
+      "statusCode": 200,
+      "headers": {},
+      "body": "",
+      "id": "apikey-query",
+      "path": "/apikey-query",
+      "description": "Expects query ?apikey=mock-api-key-123",
+      "script": "if(request.query.apikey==='mock-api-key-123'){response.headers['Content-Type']='application/json';response.body=JSON.stringify({authenticated:true,scheme:'apikey-query'});}else{response.statusCode=401;response.headers['Content-Type']='application/json';response.body=JSON.stringify({authenticated:false,scheme:'apikey-query',error:'invalid or missing credentials',got:request.headers.authorization||null});}"
+    },
+    {
+      "method": "GET",
+      "statusCode": 200,
+      "headers": {},
+      "body": "",
+      "id": "digest",
+      "path": "/digest",
+      "description": "Digest challenge-response. First request gets a 401 + WWW-Authenticate; the client recomputes and retries. The hash is not re-verified (no crypto in the sandbox) — this proves the flow runs end to end.",
+      "script": "if(!request.headers.authorization){response.statusCode=401;response.headers['WWW-Authenticate']='Digest realm=\"mock-realm\", qop=\"auth\", nonce=\"'+faker.string.alphanumeric(32)+'\", opaque=\"'+faker.string.alphanumeric(16)+'\"';response.headers['Content-Type']='application/json';response.body=JSON.stringify({authenticated:false,scheme:'digest',error:'challenge issued'});}else{response.headers['Content-Type']='application/json';response.body=JSON.stringify({authenticated:true,scheme:'digest',sent:request.headers.authorization});}"
+    },
+    {
+      "method": "GET",
+      "statusCode": 200,
+      "headers": {},
+      "body": "",
+      "id": "ntlm",
+      "path": "/ntlm",
+      "description": "NTLMv2 handshake. The first leg carries a short Type 1 token and gets a 401 + fixed Type 2 challenge; the client recomputes and resends a long Type 3 token, which we accept. We can't cryptographically verify the proof in the mock sandbox (no crypto/Buffer) — this proves the client-side handshake works end to end.",
+      "script": "var a=request.headers.authorization||'';if(a.length<100){response.statusCode=401;response.headers['WWW-Authenticate']='NTLM TlRMTVNTUAACAAAAAAAAAAAAAAAFgggAASNFZ4mrze8=';response.headers['Content-Type']='application/json';response.body=JSON.stringify({authenticated:false,scheme:'ntlm',error:'challenge issued'});}else{response.headers['Content-Type']='application/json';response.body=JSON.stringify({authenticated:true,scheme:'ntlm'});}"
+    },
+    {
+      "method": "POST",
+      "statusCode": 200,
+      "headers": {},
+      "body": "",
+      "id": "oauth-token",
+      "path": "/oauth/token",
+      "description": "OAuth2 token endpoint (client_credentials / password). Returns a Bearer token.",
+      "script": "response.headers['Content-Type']='application/json';response.body=JSON.stringify({access_token:'mock-oauth-'+faker.string.uuid(),token_type:'Bearer',expires_in:3600,scope:'read'});"
+    },
+    {
+      "method": "GET",
+      "statusCode": 200,
+      "headers": {},
+      "body": "",
+      "id": "oauth-protected",
+      "path": "/oauth/protected",
+      "description": "Protected resource. Accepts any Bearer token minted by /oauth/token (prefix mock-oauth-).",
+      "script": "if((request.headers.authorization||'').indexOf('Bearer mock-oauth-')===0){response.headers['Content-Type']='application/json';response.body=JSON.stringify({authenticated:true,scheme:'oauth2'});}else{response.statusCode=401;response.headers['Content-Type']='application/json';response.body=JSON.stringify({authenticated:false,scheme:'oauth2',error:'invalid or missing credentials',got:request.headers.authorization||null});}"
+    },
+    {
+      "method": "GET",
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": "[{\"id\":1,\"name\":\"Keyboard\",\"price\":49.99},{\"id\":2,\"name\":\"Mouse\",\"price\":19.99},{\"id\":3,\"name\":\"Monitor\",\"price\":199}]",
+      "id": "products-list",
+      "path": "/products",
+      "description": "List products (static JSON array)."
+    },
+    {
+      "method": "GET",
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": "{\"id\":{{request.params.id}},\"name\":\"Product {{request.params.id}}\",\"price\":42,\"inStock\":true}",
+      "id": "product-get",
+      "path": "/products/:id",
+      "description": "Fetch one product; echoes the path param into the body."
+    },
+    {
+      "method": "POST",
+      "statusCode": 200,
+      "headers": {},
+      "body": "",
+      "id": "product-create",
+      "path": "/products",
+      "description": "Create a product: 201, assigns an id, echoes the posted body.",
+      "script": "response.statusCode=201;response.headers['Content-Type']='application/json';var b=request.body||{};response.body=JSON.stringify(Object.assign({id:faker.number.int({min:1000,max:9999})},b,{createdAt:dayjs().toISOString()}));"
+    },
+    {
+      "method": "PUT",
+      "statusCode": 200,
+      "headers": {},
+      "body": "",
+      "id": "product-replace",
+      "path": "/products/:id",
+      "description": "Replace a product (PUT). Echoes id + body.",
+      "script": "response.headers['Content-Type']='application/json';var b=request.body||{};response.body=JSON.stringify(Object.assign({id:Number(request.params.id)},b,{updatedAt:dayjs().toISOString()}));"
+    },
+    {
+      "method": "PATCH",
+      "statusCode": 200,
+      "headers": {},
+      "body": "",
+      "id": "product-update",
+      "path": "/products/:id",
+      "description": "Partially update a product (PATCH).",
+      "script": "response.headers['Content-Type']='application/json';var b=request.body||{};response.body=JSON.stringify(Object.assign({id:Number(request.params.id),patched:true},b));"
+    },
+    {
+      "method": "DELETE",
+      "statusCode": 204,
+      "headers": {},
+      "body": "",
+      "id": "product-delete",
+      "path": "/products/:id",
+      "description": "Delete a product: 204 No Content."
+    },
+    {
+      "method": "GET",
+      "statusCode": 200,
+      "headers": {},
+      "body": "",
+      "id": "headers-echo",
+      "path": "/headers",
+      "description": "Echo back the request headers (lowercased keys).",
+      "script": "response.headers['Content-Type']='application/json';response.body=JSON.stringify(request.headers);"
+    },
+    {
+      "method": "GET",
+      "statusCode": 200,
+      "headers": {},
+      "body": "",
+      "id": "search",
+      "path": "/search",
+      "description": "Echo back the query parameters.",
+      "script": "response.headers['Content-Type']='application/json';response.body=JSON.stringify({query:request.query});"
+    },
+    {
+      "method": "POST",
+      "statusCode": 200,
+      "headers": {},
+      "body": "",
+      "id": "login",
+      "path": "/login",
+      "description": "Issue a session token (used by the data-extraction example).",
+      "script": "response.headers['Content-Type']='application/json';var u=(request.body&&request.body.username)||null;response.body=JSON.stringify({token:'tok-'+faker.string.uuid(),userId:faker.number.int({min:1,max:999}),user:u});"
+    },
+    {
+      "method": "GET",
+      "statusCode": 200,
+      "headers": {},
+      "body": "",
+      "id": "me",
+      "path": "/me",
+      "description": "Protected profile. Requires Authorization: Bearer tok-…",
+      "script": "var a=request.headers.authorization||'';response.headers['Content-Type']='application/json';if(a.indexOf('Bearer tok-')===0){response.body=JSON.stringify({id:42,name:'Demo User',email:'demo@example.com'});}else{response.statusCode=401;response.body=JSON.stringify({error:'missing or invalid token'});}"
+    }
+  ]
+}
