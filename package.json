@@ -1,7 +1,7 @@
 {
   "name": "@testsmith/api-spector",
   "productName": "API Spector",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Local-first API testing tool to inspect, test and mock APIs",
   "repository": {
     "type": "git",
@@ -24,6 +24,7 @@
   ],
   "scripts": {
     "dev": "electron-vite dev",
+    "dist": "npm run build && electron-builder",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "package": "electron-builder",
@@ -57,6 +58,7 @@
     "@vitest/coverage-v8": "^3.2.4",
     "jsdom": "^25.0.1",
     "autoprefixer": "^10.4.27",
+    "electron": "~31.7.0",
     "electron-builder": "^26.8.1",
     "electron-vite": "^5.0.0",
     "eslint": "^9.39.4",
@@ -79,7 +81,6 @@
     "ajv": "^8.18.0",
     "cm6-graphql": "^0.2.1",
     "dayjs": "^1.11.20",
-    "electron": "~31.7.0",
     "graphql": "^16.13.2",
     "immer": "^11.1.4",
     "js-yaml": "^4.1.1",
@@ -120,5 +121,21 @@
       "provider": "github",
       "releaseType": "draft"
     }
+  },
+  "mac": {
+    "category": "public.app-category.developer-tools",
+    "target": [
+      {
+        "target": "dmg",
+        "arch": [
+          "arm64",
+          "x64"
+        ]
+      }
+    ],
+    "identity": null
+  },
+  "win": {
+    "target": "nsis"
   }
 }
