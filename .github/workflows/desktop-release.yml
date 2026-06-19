@@ -1,8 +1,9 @@
 name: Build Desktop Apps
 
 # Builds the macOS and Windows executables and attaches them to the GitHub
-# Release that triggered the run. electron-builder uploads the artifacts via
-# the `build.publish` (github provider) config in package.json.
+# Release that triggered the run. Each binary is built on its native OS, then
+# uploaded explicitly to the triggering release (rather than relying on
+# electron-builder's auto-publish, which targets a draft release).
 on:
   release:
     types: [published]
@@ -15,8 +16,15 @@ jobs:
         include:
           - os: macos-latest
             name: macOS
+            args: --mac
+            files: |
+              dist/*.dmg
+              dist/*.zip
           - os: windows-latest
             name: Windows
+            args: --win
+            files: |
+              dist/*.exe
 
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
@@ -37,14 +45,12 @@ jobs:
       - name: Build renderer/main
         run: npm run build
 
-      - name: Package & publish (macOS)
-        if: matrix.os == 'macos-latest'
-        run: npx electron-builder --mac --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Package executable
+        run: npx electron-builder ${{ matrix.args }} --publish never
 
-      - name: Package & publish (Windows)
-        if: matrix.os == 'windows-latest'
-        run: npx electron-builder --win --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: ${{ matrix.files }}
+          fail_on_unmatched_files: true
