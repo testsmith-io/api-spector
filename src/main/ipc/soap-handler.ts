@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { type IpcMain } from 'electron';
+import { IPC } from '../../shared/ipc-channels';
+import { handleIpc } from './handle';
 import https from 'https';
 import http from 'http';
 import { DOMParser } from '@xmldom/xmldom';
@@ -34,38 +36,13 @@ function fetchUrl(url: string, headers: Record<string, string> = {}): Promise<st
 }
 
 // ─── Public types ────────────────────────────────────────────────────────────
+//
+// The WSDL metadata shapes are shared with the renderer (SoapEditor) and live
+// in src/shared/types/soap-wsdl.ts. Re-exported here so existing importers of
+// this module (e.g. main/wsdl/import.ts) keep working.
 
-export interface WsdlParam {
-  name: string
-  typeHint: string
-  children?: WsdlParam[]
-}
-
-export interface WsdlOperation {
-  name: string
-  /** Binding this operation is exposed by — useful when WSDL has both 1.1 and 1.2. */
-  binding?: string
-  soapAction?: string
-  soapVersion: '1.1' | '1.2'
-  /** Resolved endpoint from the matching <soap:address> / <soap12:address>. */
-  endpoint?: string
-  /** Ready-to-send envelope with parameter elements pre-stubbed. */
-  inputTemplate: string
-  /** Input message parameters resolved from the schema (empty if WSDL omits a schema). */
-  params?: WsdlParam[]
-}
-
-export interface WsdlEndpoint {
-  binding: string
-  address: string
-  soapVersion: '1.1' | '1.2'
-}
-
-export interface WsdlResult {
-  targetNamespace: string
-  endpoints: WsdlEndpoint[]
-  operations: WsdlOperation[]
-}
+import type { WsdlParam, WsdlOperation, WsdlEndpoint, WsdlResult } from '../../shared/types';
+export type { WsdlParam, WsdlOperation, WsdlEndpoint, WsdlResult };
 
 // ─── DOM helpers ─────────────────────────────────────────────────────────────
 
@@ -474,7 +451,7 @@ if (opName) {
 // ─── IPC handler ─────────────────────────────────────────────────────────────
 
 export function registerSoapHandlers(ipc: IpcMain): void {
-  ipc.handle('wsdl:fetch', async (_event, url: string, extraHeaders: Record<string, string> = {}): Promise<WsdlResult> => {
+  handleIpc(ipc, IPC.wsdl.fetch, async (_event, url: string, extraHeaders: Record<string, string> = {}): Promise<WsdlResult> => {
     // Lazy import so the test runner doesn't need electron + ajv on disk for
     // the soap-handler unit tests.
     const { validateWsdlFetchUrl } = await import('./ipc-validate');
@@ -485,7 +462,7 @@ export function registerSoapHandlers(ipc: IpcMain): void {
 
   // Import a WSDL — returns a ready-to-register Collection + MockServer.
   // Renderer is responsible for persisting them via the existing save flows.
-  ipc.handle('wsdl:import', async (_event, opts: { url?: string; xml?: string; name?: string; existingMockPorts?: number[] }) => {
+  handleIpc(ipc, IPC.wsdl.import, async (_event, opts: { url?: string; xml?: string; name?: string; existingMockPorts?: number[] }) => {
     const { validateWsdlImport } = await import('./ipc-validate');
     validateWsdlImport(opts);
     const { importWsdl } = await import('../wsdl/import');

@@ -1,7 +1,7 @@
 {
   "name": "@testsmith/api-spector",
   "productName": "API Spector",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Local-first API testing tool to inspect, test and mock APIs",
   "repository": {
     "type": "git",
@@ -32,8 +32,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:renderer": "vitest run --config vitest.renderer.config.ts",
-    "test:renderer:watch": "vitest --config vitest.renderer.config.ts",
+    "test:node": "vitest run --project node",
+    "test:renderer": "vitest run --project renderer",
+    "test:renderer:watch": "vitest --project renderer",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "build:icons": "node scripts/build-icons.mjs",

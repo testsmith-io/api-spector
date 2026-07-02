@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { type IpcMain } from 'electron';
-import { fetch, Headers, ProxyAgent, Agent } from 'undici';
-import { readFile } from 'fs/promises';
+import { IPC } from '../../shared/ipc-channels';
+import { handleIpc } from './handle';
 import type {
   SendRequestPayload,
   ResponsePayload,
@@ -15,67 +15,29 @@ import type {
 import { interpolate, buildUrl, buildEnvVars, mergeVars, buildDynamicVars } from '../interpolation';
 import { runScript } from '../script-runner';
 import { getGlobals, patchGlobals, persistGlobals } from '../globals-store';
-import {
-  buildAuthHeaders,
-  buildApiKeyParam,
-  performDigestAuth,
-  performNtlmRequest,
-  fetchOAuth2Token,
-} from '../auth-builder';
-import Ajv from 'ajv';
 import { buildProxyUri } from '../proxy-utils';
 import { validateSendRequestPayload } from './ipc-validate';
+import {
+  applyRequestDefaults,
+  buildDispatcher,
+  performHttpExchange,
+  maskPii,
+  maskHeaders,
+  buildSchemaTestResults,
+} from '../request-exec';
 
-// ─── PII masking ──────────────────────────────────────────────────────────────
+// The masking / schema / protocol-test helpers and the dispatcher builder
+// live in the shared execution core now; re-export them so existing import
+// sites (recorder, CLI, tests) keep working.
+export {
+  buildDispatcher,
+  maskPii,
+  maskHeaders,
+  buildSchemaTestResults,
+  buildProtocolFaultTests,
+} from '../request-exec';
 
-/**
- * Replace values of matching JSON fields and matching header names with
- * `[REDACTED]`.  `patterns` is a list of field/header name substrings to
- * match (case-insensitive).
- */
-export function maskPii(data: string, patterns: string[]): string {
-  if (!patterns.length) return data;
-  try {
-    const obj = JSON.parse(data);
-    const masked = maskObject(obj, patterns);
-    return JSON.stringify(masked);
-  } catch {
-    // Not JSON — return as-is (raw masking of non-JSON is out of scope)
-    return data;
-  }
-}
-
-function maskObject(obj: unknown, patterns: string[]): unknown {
-  if (Array.isArray(obj)) return obj.map(item => maskObject(item, patterns));
-  if (obj && typeof obj === 'object') {
-    const result: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
-      if (patterns.some(p => k.toLowerCase().includes(p.toLowerCase()))) {
-        result[k] = '[REDACTED]';
-      } else {
-        result[k] = maskObject(v, patterns);
-      }
-    }
-    return result;
-  }
-  return obj;
-}
-
-export function maskHeaders(headers: Record<string, string>, patterns: string[]): Record<string, string> {
-  if (!patterns.length) return headers;
-  // Always mask Authorization regardless of patterns
-  const alwaysMask = ['authorization', 'cookie', 'set-cookie'];
-  const result: Record<string, string> = {};
-  for (const [k, v] of Object.entries(headers)) {
-    const lower = k.toLowerCase();
-    if (alwaysMask.includes(lower) || patterns.some(p => lower.includes(p.toLowerCase()))) {
-      result[k] = '[REDACTED]';
-    } else {
-      result[k] = v;
-    }
-  }
-  return result;
-}
+// ─── Error diagnostics ────────────────────────────────────────────────────────
 
 function asObject(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' ? value as Record<string, unknown> : null;
@@ -148,166 +110,10 @@ function formatRequestError(
   return lines.join('\n');
 }
 
-// ─── Schema → TestResult adapter ──────────────────────────────────────────────
-
-const schemaAjv = new Ajv({ allErrors: true, strict: false });
-
-/**
- * Validate the response body against the request's standalone JSON Schema
- * (if any) and convert the result into TestResults so it shows up next to
- * post-script tests in the runner output.
- *
- * Independent of `request.contract` — this is the field edited in the
- * Schema tab.
- */
-export function buildSchemaTestResults(
-  schemaText: string | undefined,
-  body: string,
-): TestResult[] {
-  const trimmed = schemaText?.trim();
-  if (!trimmed) return [];
-
-  let schema: unknown;
-  try {
-    schema = JSON.parse(trimmed);
-  } catch {
-    return [{
-      name:   '[schema] body matches schema',
-      passed: false,
-      error:  'Schema is not valid JSON',
-    }];
-  }
-
-  let data: unknown;
-  try {
-    data = JSON.parse(body);
-  } catch {
-    return [{
-      name:   '[schema] body matches schema',
-      passed: false,
-      error:  'Response body is not valid JSON — cannot validate against schema',
-    }];
-  }
-
-  let validate;
-  try {
-    validate = schemaAjv.compile(schema as object);
-  } catch (e) {
-    return [{
-      name:   '[schema] body matches schema',
-      passed: false,
-      error:  `Schema compile error: ${e instanceof Error ? e.message : String(e)}`,
-    }];
-  }
-
-  if (validate(data)) {
-    return [{ name: '[schema] body matches schema', passed: true }];
-  }
-  return (validate.errors ?? []).map(err => ({
-    name:   `[schema] body${err.instancePath ? ` at ${err.instancePath}` : ''}`,
-    passed: false,
-    error:  err.message ?? 'Schema violation',
-  }));
-}
-
-// ─── Protocol-level "did the call succeed" tests ─────────────────────────────
-//
-// REST requests with no user-defined assertions stay 'skipped' — the runner
-// nudges the user to write an explicit check. SOAP and GraphQL are different:
-// HTTP 200 alone doesn't mean success (a SOAP service can return a Fault,
-// GraphQL can return a populated `errors` array), so we add a synthetic
-// pass/fail check based on the response shape. That promotes those requests
-// from 'skipped' to 'passed'/'failed' automatically.
-
-/** Returns synthetic test results for SOAP / GraphQL requests so the runner
- *  can mark them passed (no fault / no errors) or failed (fault / errors)
- *  without requiring a hand-written post-script. Returns `[]` for other body
- *  modes — REST keeps the existing "no tests = skipped" semantics. */
-export function buildProtocolFaultTests(
-  bodyMode: string | undefined,
-  body: string,
-): TestResult[] {
-  if (!body) return [];
-
-  if (bodyMode === 'soap') {
-    // SOAP 1.1 fault element name: `Fault`. SOAP 1.2 same (different ns).
-    // Match `<…:Fault` or `<Fault` (some servers omit the ns prefix on the
-    // root response). Case-insensitive to cover non-standard servers.
-    const isFault = /<(?:[\w-]+:)?Fault(?:\s|>)/i.test(body);
-    if (isFault) {
-      // Best-effort: extract the faultstring / Reason text for the error msg.
-      const reason = /<(?:[\w-]+:)?(?:faultstring|Text)[^>]*>([\s\S]*?)<\/(?:[\w-]+:)?(?:faultstring|Text)>/i.exec(body);
-      return [{
-        name:   '[soap] response is not a Fault',
-        passed: false,
-        error:  reason?.[1]?.trim() ?? 'SOAP Fault returned',
-      }];
-    }
-    return [{ name: '[soap] response is not a Fault', passed: true }];
-  }
-
-  if (bodyMode === 'graphql') {
-    let parsed: unknown;
-    try { parsed = JSON.parse(body); } catch { return []; } // not valid JSON, can't tell
-    const errors = (parsed as { errors?: unknown })?.errors;
-    if (Array.isArray(errors) && errors.length > 0) {
-      const first = errors[0] as { message?: string };
-      return [{
-        name:   '[graphql] response has no errors',
-        passed: false,
-        error:  first?.message ?? 'GraphQL response contained an `errors` array',
-      }];
-    }
-    return [{ name: '[graphql] response has no errors', passed: true }];
-  }
-
-  return [];
-}
-
-// ─── Build undici dispatcher (proxy + TLS) ────────────────────────────────────
-
-export async function buildDispatcher(
-  proxy?: SendRequestPayload['proxy'],
-  tls?: SendRequestPayload['tls'],
-): Promise<ProxyAgent | Agent | undefined> {
-  const connectOpts: Record<string, unknown> = {};
-  let hasTls = false;
-
-  if (tls) {
-    hasTls = true;
-    if (tls.rejectUnauthorized !== undefined) {
-      connectOpts['rejectUnauthorized'] = tls.rejectUnauthorized;
-    }
-    if (tls.caCertPath) {
-      try { connectOpts['ca'] = await readFile(tls.caCertPath); } catch { /* ignore missing */ }
-    }
-    if (tls.clientCertPath) {
-      try { connectOpts['cert'] = await readFile(tls.clientCertPath); } catch { /* ignore missing */ }
-    }
-    if (tls.clientKeyPath) {
-      try { connectOpts['key'] = await readFile(tls.clientKeyPath); } catch { /* ignore missing */ }
-    }
-  }
-
-  if (proxy?.url) {
-    return new ProxyAgent({
-      uri: proxyUri,
-      requestTls: proxyConnect,
-      proxyTls: proxyConnect,
-    } as ConstructorParameters<typeof ProxyAgent>[0]);
-  }
-
-  if (hasTls) {
-    return new Agent({ connect: connectOpts } as ConstructorParameters<typeof Agent>[0]);
-  }
-
-  return undefined;
-}
-
 // ─── IPC handler ─────────────────────────────────────────────────────────────
 
 export function registerRequestHandler(ipc: IpcMain): void {
-  ipc.handle('request:send', async (
+  handleIpc(ipc, IPC.request.send, async (
     _e,
     payload: SendRequestPayload,
   ): Promise<RequestExecutionResult> => {
@@ -324,11 +130,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
       tls,
       piiMaskPatterns = [],
     } = payload;
-    // Defensive defaults — AI-generated collections may omit empty arrays
-    if (!req.headers) req.headers = [];
-    if (!req.params) req.params = [];
-    if (!req.body) req.body = { mode: 'none' };
-    if (!req.auth) req.auth = { type: 'none' };
+    applyRequestDefaults(req);
 
     const start = Date.now();
 
@@ -433,166 +235,39 @@ export function registerRequestHandler(ipc: IpcMain): void {
       // Build dispatcher once — shared across digest/ntlm retries
       const dispatcher = await buildDispatcher(proxy, tls);
 
-      // For OAuth2: ensure we have a fresh token before building headers
-      if (req.auth.type === 'oauth2') {
-        const now = Date.now();
-        const tokenMissing = !req.auth.oauth2CachedToken;
-        const tokenExpired = req.auth.oauth2TokenExpiry ? req.auth.oauth2TokenExpiry <= now + 5000 : true;
-        if (tokenMissing || tokenExpired) {
-          const result = await fetchOAuth2Token(req.auth, vars);
-          req.auth.oauth2CachedToken = result.accessToken;
-          req.auth.oauth2TokenExpiry = result.expiresAt;
-        }
-      }
-
-      const authHeaders = await buildAuthHeaders(req.auth, vars);
-      const apiKeyParam = await buildApiKeyParam(req.auth, vars);
-
-      // Final URL with possible apikey query param
-      let finalUrl = resolvedUrl;
-      if (apiKeyParam) {
-        const sep = finalUrl.includes('?') ? '&' : '?';
-        finalUrl += `${sep}${encodeURIComponent(apiKeyParam.key)}=${encodeURIComponent(apiKeyParam.value)}`;
-      }
-
-      const buildHeaders = (): Headers => {
-        const h = new Headers();
-        for (const header of req.headers) {
-          if (header.enabled && header.key) {
-            h.set(interpolate(header.key, vars), interpolate(header.value, vars));
-          }
-        }
-        for (const [k, v] of Object.entries(authHeaders)) h.set(k, v);
-        return h;
-      };
-
-      let body: string | undefined;
-      if (req.body.mode === 'json' && req.body.json) {
-        body = interpolate(req.body.json, vars);
-      } else if (req.body.mode === 'form' && req.body.form) {
-        body = req.body.form
-          .filter(p => p.enabled && p.key)
-          .map(p => `${encodeURIComponent(interpolate(p.key, vars))}=${encodeURIComponent(interpolate(p.value, vars))}`)
-          .join('&');
-      } else if (req.body.mode === 'raw' && req.body.raw) {
-        body = interpolate(req.body.raw, vars);
-      } else if (req.body.mode === 'graphql' && req.body.graphql) {
-        const gql = req.body.graphql;
-        const gqlBody: Record<string, unknown> = { query: interpolate(gql.query, vars) };
-        const rawVars = gql.variables?.trim();
-        if (rawVars) {
-          try { gqlBody.variables = JSON.parse(interpolate(rawVars, vars)); } catch { /* keep out */ }
-        }
-        if (gql.operationName?.trim()) gqlBody.operationName = gql.operationName.trim();
-        body = JSON.stringify(gqlBody);
-      } else if (req.body.mode === 'soap' && req.body.soap) {
-        const soap = req.body.soap;
-        body = interpolate(soap.envelope, vars);
-      }
-
-      const methodHasBody = !['GET', 'HEAD'].includes(req.method);
-
-      // Apply Content-Type / SOAPAction defaults that depend on the body mode.
-      const applyBodyHeaders = (h: Headers): Headers => {
-        if (body !== undefined) {
-          if (!h.has('content-type')) {
-            if      (req.body.mode === 'json' || req.body.mode === 'graphql') h.set('Content-Type', 'application/json');
-            else if (req.body.mode === 'form')                                 h.set('Content-Type', 'application/x-www-form-urlencoded');
-            else if (req.body.mode === 'raw')                                  h.set('Content-Type', req.body.rawContentType ?? 'text/plain');
-            else if (req.body.mode === 'soap')                                 h.set('Content-Type', 'text/xml; charset=utf-8');
-          }
-          // SOAP requires SOAPAction header
-          if (req.body.mode === 'soap' && req.body.soap?.soapAction && !h.has('soapaction')) {
-            h.set('SOAPAction', req.body.soap.soapAction);
-          }
-        }
-        return h;
-      };
-
-      // Snapshot the outgoing request for the UI / history panel.
-      const captureSent = (h: Headers): Record<string, string> => {
-        const capturedHeaders: Record<string, string> = {};
-        h.forEach((value, key) => { capturedHeaders[key] = value; });
-        sentRequest = { method: req.method, url: finalUrl, headers: capturedHeaders, body: methodHasBody ? body : undefined };
-        return capturedHeaders;
-      };
-
-      // Helper that adds Content-Type defaults and fires the actual request
-      const doFetch = async (overrideHeaders?: Headers): Promise<ReturnType<typeof fetch>> => {
-        const h = applyBodyHeaders(overrideHeaders ?? buildHeaders());
-        captureSent(h);
-        return fetch(finalUrl, {
-          method:     req.method,
-          headers:    h,
-          body:       methodHasBody ? body : undefined,
-          dispatcher: dispatcher as Parameters<typeof fetch>[1] extends { dispatcher?: infer D } ? D : never,
-        } as Parameters<typeof fetch>[1]);
-      };
-
-      let fetchResp: Awaited<ReturnType<typeof fetch>>;
-
-      // ── NTLM 3-message handshake over one keep-alive connection ────────────
-      if (req.auth.type === 'ntlm') {
-        const h = applyBodyHeaders(buildHeaders());
-        const capturedHeaders = captureSent(h);
-        fetchResp = await performNtlmRequest({
-          url:        finalUrl,
-          method:     req.method,
-          auth:       req.auth,
-          vars,
-          baseHeaders: capturedHeaders,
-          body:       methodHasBody ? body : undefined,
-          tls,
-          proxy,
-        }) as unknown as Awaited<ReturnType<typeof fetch>>;
-      }
-      // ── Digest two-round-trip ──────────────────────────────────────────────
-      else if (req.auth.type === 'digest') {
-        // Thin fetch wrapper for the probe request (no body, just to get 401)
-        const probeFetch = async (url: string, init: Record<string, unknown>) => {
-          return fetch(url, {
-            ...(init as object),
-            dispatcher: dispatcher as Parameters<typeof fetch>[1] extends { dispatcher?: infer D } ? D : never,
-          } as Parameters<typeof fetch>[1]);
-        };
-
-        const digestHeader = await performDigestAuth(finalUrl, req.method, req.auth, vars, probeFetch);
-        const h = buildHeaders();
-        if (digestHeader) h.set('Authorization', digestHeader);
-        fetchResp = await doFetch(h);
-      }
-      // ── Normal ────────────────────────────────────────────────────────────
-      else {
-        fetchResp = await doFetch();
-      }
-
-      const responseBody = await fetchResp.text();
-      const durationMs   = Date.now() - start;
-      const rawResponseHeaders: Record<string, string> = {};
-      fetchResp.headers.forEach((value, key) => { rawResponseHeaders[key] = value; });
+      const exchange = await performHttpExchange({
+        req,
+        vars,
+        resolvedUrl,
+        dispatcher,
+        proxy,
+        tls,
+        onSent: sent => { sentRequest = sent; },
+      });
 
       // ── PII masking ────────────────────────────────────────────────────────
-      const maskedBody    = maskPii(responseBody, piiMaskPatterns);
-      const maskedHeaders = maskHeaders(rawResponseHeaders, piiMaskPatterns);
+      const maskedBody    = maskPii(exchange.responseBody, piiMaskPatterns);
+      const maskedHeaders = maskHeaders(exchange.rawHeaders, piiMaskPatterns);
+      const bodySize      = Buffer.byteLength(exchange.responseBody, 'utf8');
 
       response = {
-        status:     fetchResp.status,
-        statusText: fetchResp.statusText,
+        status:     exchange.status,
+        statusText: exchange.statusText,
         headers:    maskedHeaders,
         body:       maskedBody,
-        bodySize:   Buffer.byteLength(responseBody, 'utf8'),
-        durationMs,
+        bodySize,
+        durationMs: exchange.durationMs,
       };
       // Same shape but with the unmasked bytes — used only for feeding the
       // post-request script so `sp.response.json().access_token` returns the
       // real value, not "[REDACTED]".
       scriptResponse = {
-        status:     fetchResp.status,
-        statusText: fetchResp.statusText,
-        headers:    rawResponseHeaders,
-        body:       responseBody,
-        bodySize:   Buffer.byteLength(responseBody, 'utf8'),
-        durationMs,
+        status:     exchange.status,
+        statusText: exchange.statusText,
+        headers:    exchange.rawHeaders,
+        body:       exchange.responseBody,
+        bodySize,
+        durationMs: exchange.durationMs,
       };
     } catch (err) {
       const diagnostic = formatRequestError(err, {
@@ -689,7 +364,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
   // ── Hook script runner ─────────────────────────────────────────────────────
   // Runs an arbitrary script with caller-supplied variable context and returns
   // the updated variable scopes. Used by the GraphQL introspection hook.
-  ipc.handle('script:run-hook', async (
+  handleIpc(ipc, IPC.script.runHook, async (
     _e,
     payload: {
       script:         string

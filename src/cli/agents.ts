@@ -21,22 +21,8 @@
 
 import { readFile, writeFile, mkdir, stat } from 'fs/promises';
 import { join, dirname } from 'path';
-
-// ─── Color helpers ───────────────────────────────────────────────────────────
-
-const C = {
-  reset: '\x1b[0m',
-  bold: '\x1b[1m',
-  green: '\x1b[32m',
-  cyan: '\x1b[36m',
-  yellow: '\x1b[33m',
-  gray: '\x1b[90m',
-  red: '\x1b[31m',
-};
-
-function color ( text: string, ...codes: string[] ): string {
-  return codes.join( '' ) + text + C.reset;
-}
+// This CLI colours unconditionally (not TTY-gated), hence colorAlways.
+import { C, colorAlways as color } from './cli-common';
 
 // ─── Agent definitions ───────────────────────────────────────────────────────
 

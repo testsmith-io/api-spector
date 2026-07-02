@@ -10,6 +10,7 @@ import { collectAllTags, buildRunPlan, resolveInheritedAuthAndHeaders } from '..
 import { buildCliArgs, generateGitHub, generateAzure, generateGitLab } from '../../../../shared/ci-generators';
 import { getMethodColor } from '../../../../shared/colors';
 import { EmptyState } from '../common/EmptyState';
+import { Modal } from '../common/Modal';
 
 const { electron } = window;
 
@@ -207,28 +208,18 @@ export function RunnerModal() {
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-16"
-      onClick={closeRunner}
+    <Modal
+      onClose={closeRunner}
+      overlayClassName="bg-black/50 z-50 flex items-start justify-center pt-16"
+      panelClassName="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl flex flex-col w-[680px] max-h-[80vh]"
+      title={folderName ? `Run: ${folderName}` : `Run: ${colName}`}
+      subtitle={
+        <>
+          {folderName ? `Folder in ${colName}` : 'Full collection'}
+          {iterCount > 0 ? ` · ${iterCount} data iteration${iterCount !== 1 ? 's' : ''}` : ''}
+        </>
+      }
     >
-      <div
-        className="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl flex flex-col w-[680px] max-h-[80vh]"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-surface-800 flex-shrink-0">
-          <div>
-            <h2 className="text-sm font-semibold">
-              {folderName ? `Run: ${folderName}` : `Run: ${colName}`}
-            </h2>
-            <p className="text-[10px] text-surface-400 mt-0.5">
-              {folderName ? `Folder in ${colName}` : 'Full collection'}
-              {iterCount > 0 ? ` · ${iterCount} data iteration${iterCount !== 1 ? 's' : ''}` : ''}
-            </p>
-          </div>
-          <button onClick={closeRunner} className="text-surface-400 hover:text-[var(--text-primary)] text-lg leading-none">×</button>
-        </div>
-
         {/* Config — scrollable to handle tags + data + CI/CD */}
         <div className="px-4 py-3 border-b border-surface-800 flex flex-col gap-3 flex-shrink-0 overflow-y-auto max-h-[45vh]">
 
@@ -458,7 +449,6 @@ export function RunnerModal() {
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }

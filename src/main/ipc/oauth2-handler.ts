@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { type IpcMain, shell } from 'electron';
+import { IPC } from '../../shared/ipc-channels';
+import { handleIpc } from './handle';
 import { createServer, type IncomingMessage, type ServerResponse } from 'http';
 import type { AuthConfig } from '../../shared/types';
 import { getSecret } from './secret-handler';
@@ -11,7 +13,7 @@ import { interpolate } from '../interpolation';
 
 export function registerOAuth2Handlers(ipc: IpcMain): void {
   // ── oauth2:startFlow — authorization_code ──────────────────────────────────
-  ipc.handle('oauth2:startFlow', async (
+  handleIpc(ipc, IPC.oauth2.startFlow, async (
     _e,
     auth: AuthConfig,
     vars: Record<string, string>,
@@ -111,7 +113,7 @@ export function registerOAuth2Handlers(ipc: IpcMain): void {
   });
 
   // ── oauth2:refreshToken ────────────────────────────────────────────────────
-  ipc.handle('oauth2:refreshToken', async (
+  handleIpc(ipc, IPC.oauth2.refreshToken, async (
     _e,
     auth: AuthConfig,
     vars: Record<string, string>,

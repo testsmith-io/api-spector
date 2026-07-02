@@ -3,6 +3,7 @@
 
 import type { StateCreator } from 'zustand';
 import type { WsMessage } from '../../../../shared/types';
+import type { FullState } from '../index';
 
 // Cap each connection's buffer so a long-running socket can't OOM the
 // renderer. 1000 mirrors what most browsers' devtools keep around.
@@ -24,11 +25,12 @@ export interface WsSliceActions {
 
 export type WsSlice = WsSliceState & WsSliceActions
 
-// Generic enough that the parent store's full type doesn't matter — slices
-// that only mutate their own state can be typed against `WsSlice` alone.
-type ImmerStateCreator<T> = StateCreator<T, [['zustand/immer', never]], [], T>
-
-export const createWsSlice: ImmerStateCreator<WsSlice> = (set) => ({
+export const createWsSlice: StateCreator<
+  FullState,
+  [['zustand/immer', never]],
+  [],
+  WsSlice
+> = (set) => ({
   wsConnections: {},
 
   setWsStatus: (requestId, status, error) => set(s => {

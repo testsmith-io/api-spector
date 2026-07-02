@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { type IpcMain } from 'electron';
+import { IPC } from '../../shared/ipc-channels';
+import { handleIpc } from './handle';
 import type { safeStorage as SafeStorageType } from 'electron';
 import { pbkdf2Sync, createDecipheriv } from 'crypto';
 import { readFile, writeFile } from 'fs/promises';
@@ -56,7 +58,7 @@ function getSafeStorage(): typeof SafeStorageType | null {
 
 export function registerSecretHandlers(ipc: IpcMain): void {
   /** Returns whether the master password env var is currently set in this process. */
-  ipc.handle('secret:checkMasterKey', () => {
+  handleIpc(ipc, IPC.secret.checkMasterKey, () => {
     return { set: Boolean(process.env[MASTER_KEY_ENV]) };
   });
 
@@ -65,7 +67,7 @@ export function registerSecretHandlers(ipc: IpcMain): void {
    * This lasts for the lifetime of the Electron process. Users should also
    * export API_SPECTOR_MASTER_KEY in their shell profile for persistence.
    */
-  ipc.handle('secret:setMasterKey', (_e, value: string) => {
+  handleIpc(ipc, IPC.secret.setMasterKey, (_e, value: string) => {
     process.env[MASTER_KEY_ENV] = value;
   });
 
@@ -73,7 +75,7 @@ export function registerSecretHandlers(ipc: IpcMain): void {
    * Save a named secret to the OS-encrypted store.
    * The renderer calls this when the user clicks "Save" on a token/credential field.
    */
-  ipc.handle('secret:set', async (_e, ref: string, value: string) => {
+  handleIpc(ipc, IPC.secret.set, async (_e, ref: string, value: string) => {
     const ss = getSafeStorage();
     if (!ss || !ss.isEncryptionAvailable()) {
       throw new Error('OS encryption is not available — set the secret via environment variable instead');

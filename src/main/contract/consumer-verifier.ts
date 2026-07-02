@@ -12,6 +12,7 @@ import type {
 } from '../../shared/types';
 import { interpolate, buildUrl } from '../interpolation';
 import { buildAuthHeaders } from '../auth-builder';
+import { compileMatcherExample } from './matchers';
 
 // ─── Consumer contract verifier ───────────────────────────────────────────────
 //
@@ -20,6 +21,16 @@ import { buildAuthHeaders } from '../auth-builder';
 // response body JSON Schema.  We send the real request and assert the contract.
 
 const ajv = new Ajv({ allErrors: true, strict: false });
+
+/** True when a request carries at least one consumer expectation worth running. */
+export function hasContract(contract?: ContractExpectation): contract is ContractExpectation {
+  return !!contract && (
+    contract.statusCode !== undefined ||
+    !!contract.bodySchema ||
+    !!contract.bodyMatcher ||
+    !!contract.headers?.length
+  );
+}
 
 // ─── Pure validation (no HTTP) — exported for unit testing ───────────────────
 
@@ -66,7 +77,7 @@ export function validateConsumerResponse(
     }
   }
 
-  // ── Body schema ──
+  // ── Body schema (hand-written JSON Schema) ──
   if (contract.bodySchema?.trim()) {
     let schema: unknown;
     try {
@@ -78,35 +89,59 @@ export function validateConsumerResponse(
       });
       return violations;
     }
+    violations.push(...validateBody(schema, bodyText));
+  }
 
-    let data: unknown;
+  // ── Body matchers (Pact-style example) ──
+  // Compiled to a JSON Schema and validated the same way as bodySchema.
+  if (contract.bodyMatcher?.trim()) {
+    let example: unknown;
     try {
-      data = JSON.parse(bodyText);
+      example = JSON.parse(contract.bodyMatcher);
     } catch {
       violations.push({
         type:    'schema_violation',
-        message: 'Response body is not valid JSON — cannot validate against schema',
+        message: 'Contract bodyMatcher is not valid JSON',
       });
       return violations;
     }
+    violations.push(...validateBody(compileMatcherExample(example), bodyText));
+  }
 
-    try {
-      const validate = ajv.compile(schema as object);
-      if (!validate(data)) {
-        for (const err of validate.errors ?? []) {
-          violations.push({
-            type:    'schema_violation',
-            message: err.message ?? 'Schema violation',
-            path:    err.instancePath || '/',
-          });
-        }
+  return violations;
+}
+
+/** Validate a response body string against a JSON Schema, returning violations. */
+function validateBody(schema: unknown, bodyText: string): ContractViolation[] {
+  const violations: ContractViolation[] = [];
+
+  let data: unknown;
+  try {
+    data = JSON.parse(bodyText);
+  } catch {
+    violations.push({
+      type:    'schema_violation',
+      message: 'Response body is not valid JSON — cannot validate against schema',
+    });
+    return violations;
+  }
+
+  try {
+    const validate = ajv.compile(schema as object);
+    if (!validate(data)) {
+      for (const err of validate.errors ?? []) {
+        violations.push({
+          type:    'schema_violation',
+          message: err.message ?? 'Schema violation',
+          path:    err.instancePath || '/',
+        });
       }
-    } catch (e) {
-      violations.push({
-        type:    'schema_violation',
-        message: `Schema compile error: ${e instanceof Error ? e.message : String(e)}`,
-      });
     }
+  } catch (e) {
+    violations.push({
+      type:    'schema_violation',
+      message: `Schema compile error: ${e instanceof Error ? e.message : String(e)}`,
+    });
   }
 
   return violations;
@@ -185,9 +220,7 @@ export async function runConsumerContracts(
   const vars = { ...envVars, ...collectionVars };
   // Only run requests that have a contract with at least one expectation
   // and are not disabled
-  const contractRequests = requests.filter(r =>
-    !r.disabled && r.contract && (r.contract.statusCode !== undefined || r.contract.bodySchema || r.contract.headers?.length),
-  );
+  const contractRequests = requests.filter(r => !r.disabled && hasContract(r.contract));
 
   const start   = Date.now();
   const results = await Promise.all(contractRequests.map(r => executeContract(r, vars)));

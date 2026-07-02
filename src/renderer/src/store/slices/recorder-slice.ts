@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import type { StateCreator } from 'zustand';
+import type { FullState } from '../index';
 
 export interface RecorderSliceState {
   recorderOpen:         boolean
@@ -22,9 +23,12 @@ export interface RecorderSliceActions {
 
 export type RecorderSlice = RecorderSliceState & RecorderSliceActions
 
-type ImmerStateCreator<T> = StateCreator<T, [['zustand/immer', never]], [], T>
-
-export const createRecorderSlice: ImmerStateCreator<RecorderSlice> = (set) => ({
+export const createRecorderSlice: StateCreator<
+  FullState,
+  [['zustand/immer', never]],
+  [],
+  RecorderSlice
+> = (set) => ({
   recorderOpen:         false,
   recorderRunning:      false,
   recorderUpstream:     '',

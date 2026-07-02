@@ -3,6 +3,7 @@
 
 import type { StateCreator } from 'zustand';
 import type { RunRequestResult } from '../../../../shared/types';
+import type { FullState } from '../index';
 
 export interface RunnerSliceState {
   runnerModal: {
@@ -26,9 +27,12 @@ export interface RunnerSliceActions {
 
 export type RunnerSlice = RunnerSliceState & RunnerSliceActions
 
-type ImmerStateCreator<T> = StateCreator<T, [['zustand/immer', never]], [], T>
-
-export const createRunnerSlice: ImmerStateCreator<RunnerSlice> = ( set ) => ( {
+export const createRunnerSlice: StateCreator<
+  FullState,
+  [['zustand/immer', never]],
+  [],
+  RunnerSlice
+> = ( set ) => ( {
   runnerModal: { open: false, collectionId: null, folderId: null, filterTags: [] },
   runnerResults: [],
   runnerRunning: false,

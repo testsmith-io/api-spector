@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { useStore } from '../../store';
 import CodeMirror from '@uiw/react-codemirror';
 import { oneDark } from '@codemirror/theme-one-dark';
+import { Modal } from './Modal';
 
 const { electron } = window;
 
@@ -84,8 +85,12 @@ export function DocsGeneratorModal({ onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-surface-900 border border-surface-700 rounded-lg shadow-2xl w-[680px] max-h-[80vh] flex flex-col">
+    <Modal
+      onClose={onClose}
+      closeOnBackdrop={false}
+      overlayClassName="z-50 flex items-center justify-center bg-black/60"
+      panelClassName="bg-surface-900 border border-surface-700 rounded-lg shadow-2xl w-[680px] max-h-[80vh] flex flex-col"
+    >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-surface-800 flex-shrink-0">
           <span className="text-sm font-semibold text-white">Generate API Documentation</span>
@@ -200,7 +205,6 @@ export function DocsGeneratorModal({ onClose }: Props) {
             {generating ? 'Generating…' : 'Generate & Save'}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

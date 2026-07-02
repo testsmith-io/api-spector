@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import React, { useState } from 'react';
-import type { ApiRequest, AuthConfig, AuthPatch, Oauth2Auth } from '../../../../shared/types';
-import { VarInput } from '../common/VarInput';
+import type { ApiRequest, AuthConfig, Oauth2Auth } from '../../../../shared/types';
+import { AuthEditor, type AuthEditorPatch } from '../common/AuthEditor';
 
 const { electron } = window;
 
@@ -19,7 +19,7 @@ export function AuthTab({ request, onChange }: { request: ApiRequest; onChange: 
   const [oauth2Error, setOauth2Error]       = useState<string>('');
   const [oauth2RefreshToken, setOauth2RT]   = useState<string>('');
 
-  function setAuth(patch: AuthPatch) {
+  function setAuth(patch: AuthEditorPatch) {
     onChange({ auth: { ...auth, ...patch } as AuthConfig });
   }
 
@@ -94,165 +94,13 @@ export function AuthTab({ request, onChange }: { request: ApiRequest; onChange: 
   })();
 
   return (
-    <div className="flex flex-col gap-3 text-xs">
-      {/* Type selector */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-surface-400">Type:</span>
-        {AUTH_TYPES.map(t => (
-          <label key={t} className="flex items-center gap-1 cursor-pointer">
-            <input
-              type="radio"
-              value={t}
-              checked={auth.type === t}
-              onChange={() => setAuth({ type: t })}
-              className="accent-blue-500"
-            />
-            <span className={auth.type === t ? 'text-white' : 'text-surface-400'}>{t}</span>
-          </label>
-        ))}
-      </div>
-
-      {/* ── Bearer ── */}
-      {auth.type === 'bearer' && (
-        <BearerPanel
-          auth={auth}
-          secretValue={secretValue}
-          setSecretValue={setSecretValue}
-          saved={saved}
-          setAuth={setAuth}
-          saveSecret={saveSecret}
-        />
-      )}
-
-      {/* ── Basic ── */}
-      {auth.type === 'basic' && (
-        <BasicCredentialsFields
-          auth={auth}
-          secretValue={secretValue}
-          setSecretValue={setSecretValue}
-          saved={saved}
-          setAuth={setAuth}
-          saveSecret={saveSecret}
-          label="Basic Auth"
-        />
-      )}
-
-      {/* ── Digest ── */}
-      {auth.type === 'digest' && (
-        <BasicCredentialsFields
-          auth={auth}
-          secretValue={secretValue}
-          setSecretValue={setSecretValue}
-          saved={saved}
-          setAuth={setAuth}
-          saveSecret={saveSecret}
-          label="Digest Auth"
-          note="Digest uses a two-round-trip MD5 challenge-response. Username/password sent with first request to negotiate the challenge."
-        />
-      )}
-
-      {/* ── NTLM ── */}
-      {auth.type === 'ntlm' && (
-        <div className="flex flex-col gap-2">
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="text-surface-400">Username</label>
-              <input
-                value={auth.username ?? ''}
-                onChange={e => setAuth({ username: e.target.value })}
-                className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="text-surface-400">Password</label>
-              <div className="flex gap-1 mt-1">
-                <input
-                  type="password"
-                  value={secretValue}
-                  onChange={e => setSecretValue(e.target.value)}
-                  placeholder={auth.passwordSecretRef ? `Stored as "${auth.passwordSecretRef}"` : 'Password'}
-                  className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
-                />
-                <button
-                  onClick={() => saveSecret(auth.passwordSecretRef ?? 'NTLM_PASSWORD')}
-                  className="px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded transition-colors"
-                >
-                  {saved ? '✓' : 'Save'}
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="text-surface-400">Domain <span className="text-surface-600">(optional)</span></label>
-              <input
-                value={auth.ntlmDomain ?? ''}
-                onChange={e => setAuth({ ntlmDomain: e.target.value })}
-                placeholder="WORKGROUP"
-                className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="text-surface-400">Workstation <span className="text-surface-600">(optional)</span></label>
-              <input
-                value={auth.ntlmWorkstation ?? ''}
-                onChange={e => setAuth({ ntlmWorkstation: e.target.value })}
-                placeholder="MACHINE"
-                className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-          </div>
-          <p className="text-surface-400 text-[10px] bg-surface-800 border border-surface-700 rounded px-2 py-1">
-            Uses NTLMv2 over a single keep-alive connection. Not supported through a proxy.
-          </p>
-        </div>
-      )}
-
-      {/* ── API Key ── */}
-      {auth.type === 'apikey' && (
-        <div className="flex flex-col gap-1.5">
-          <div className="flex gap-2">
-            <div>
-              <label className="text-surface-400">Key name</label>
-              <input
-                value={auth.apiKeyName ?? 'X-API-Key'}
-                onChange={e => setAuth({ apiKeyName: e.target.value })}
-                className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="text-surface-400">In</label>
-              <select
-                value={auth.apiKeyIn ?? 'header'}
-                onChange={e => setAuth({ apiKeyIn: e.target.value as 'header' | 'query' })}
-                className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-              >
-                <option value="header">Header</option>
-                <option value="query">Query</option>
-              </select>
-            </div>
-            <div className="flex-1">
-              <label className="text-surface-400">Value</label>
-              <div className="flex gap-1 mt-1">
-                <input
-                  type="password"
-                  value={secretValue}
-                  onChange={e => setSecretValue(e.target.value)}
-                  placeholder={auth.apiKeySecretRef ? `Stored as "${auth.apiKeySecretRef}"` : 'API key value'}
-                  className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
-                />
-                <button
-                  onClick={() => saveSecret(auth.apiKeySecretRef ?? 'API_KEY')}
-                  className="px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded transition-colors"
-                >
-                  {saved ? '✓' : 'Save'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
+    <AuthEditor
+      auth={auth}
+      onChange={setAuth}
+      types={AUTH_TYPES}
+      secrets={{ secretValue, setSecretValue, saved, saveSecret }}
+      className="text-xs"
+    >
       {/* ── OAuth 2.0 ── */}
       {auth.type === 'oauth2' && (
         <div className="flex flex-col gap-2">
@@ -417,141 +265,6 @@ export function AuthTab({ request, onChange }: { request: ApiRequest; onChange: 
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-// ─── Shared username/password sub-component ───────────────────────────────────
-
-function BasicCredentialsFields({
-  auth,
-  secretValue,
-  setSecretValue,
-  saved,
-  setAuth,
-  saveSecret,
-  label,
-  note,
-}: {
-  auth: { username?: string; password?: string; passwordSecretRef?: string }
-  secretValue: string
-  setSecretValue: (v: string) => void
-  saved: boolean
-  setAuth: (p: AuthPatch) => void
-  saveSecret: (ref: string) => Promise<void>
-  label: string
-  note?: string
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      {label && <span className="text-surface-500 text-[10px] uppercase tracking-wide">{label}</span>}
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <label className="text-surface-400">Username</label>
-          <input
-            value={auth.username ?? ''}
-            onChange={e => setAuth({ username: e.target.value })}
-            className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-          />
-        </div>
-        <div className="flex-1">
-          <label className="text-surface-400">Password</label>
-          <div className="flex gap-1 mt-1">
-            <input
-              type="password"
-              value={secretValue}
-              onChange={e => setSecretValue(e.target.value)}
-              placeholder={auth.passwordSecretRef ? `Stored as "${auth.passwordSecretRef}"` : 'Password'}
-              className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
-            />
-            <button
-              onClick={() => saveSecret(auth.passwordSecretRef ?? 'API_PASSWORD')}
-              className="px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded transition-colors"
-            >
-              {saved ? '✓' : 'Save'}
-            </button>
-          </div>
-        </div>
-      </div>
-      <p className="text-surface-400 text-[10px]">
-        Password stored in OS keychain as{' '}
-        <input
-          value={auth.passwordSecretRef ?? 'API_PASSWORD'}
-          onChange={e => setAuth({ passwordSecretRef: e.target.value })}
-          className="inline bg-transparent border-b border-surface-700 focus:outline-none focus:border-blue-500 w-24"
-        />
-      </p>
-      {note && (
-        <p className="text-surface-600 text-[10px]">{note}</p>
-      )}
-    </div>
-  );
-}
-
-// ─── Bearer panel ─────────────────────────────────────────────────────────────
-
-function BearerPanel({
-  auth, secretValue, setSecretValue, saved, setAuth, saveSecret,
-}: {
-  auth: { token?: string; tokenSecretRef?: string }
-  secretValue: string
-  setSecretValue: (v: string) => void
-  saved: boolean
-  setAuth: (p: AuthPatch) => void
-  saveSecret: (ref: string) => Promise<void>
-}) {
-  const [keychainOpen, setKeychainOpen] = useState(!!auth.tokenSecretRef);
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-col gap-1">
-        <label className="text-surface-400">
-          Token{' '}
-          <span className="text-surface-500 text-[10px]">— supports {'{{variables}}'}</span>
-        </label>
-        <VarInput
-          value={auth.token ?? ''}
-          onChange={v => setAuth({ token: v })}
-          placeholder="{{token}}  or paste a raw token"
-          className="bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono text-xs"
-        />
-      </div>
-
-      <button
-        onClick={() => setKeychainOpen(o => !o)}
-        className="text-[10px] text-surface-500 hover:text-surface-300 text-left transition-colors w-fit"
-      >
-        {keychainOpen ? '▾' : '▸'} Store in OS keychain instead
-      </button>
-
-      {keychainOpen && (
-        <div className="flex flex-col gap-1 pl-3 border-l border-surface-800">
-          <p className="text-surface-500 text-[10px]">
-            Paste a raw token here to encrypt it in your OS keychain. Useful for static long-lived API tokens. Leave the value field above empty to use the keychain.
-          </p>
-          <div className="flex gap-2">
-            <input
-              type="password"
-              value={secretValue}
-              onChange={e => setSecretValue(e.target.value)}
-              placeholder={auth.tokenSecretRef ? `Stored as "${auth.tokenSecretRef}"` : 'Paste token'}
-              className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
-            />
-            <input
-              value={auth.tokenSecretRef ?? 'API_TOKEN'}
-              onChange={e => setAuth({ tokenSecretRef: e.target.value })}
-              placeholder="Keychain key"
-              className="w-32 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-            />
-            <button
-              onClick={() => saveSecret(auth.tokenSecretRef ?? 'API_TOKEN')}
-              className="px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded transition-colors"
-            >
-              {saved ? '✓' : 'Save'}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+    </AuthEditor>
   );
 }

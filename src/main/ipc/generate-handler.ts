@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { type IpcMain, dialog } from 'electron';
+import { IPC } from '../../shared/ipc-channels';
+import { handleIpc } from './handle';
 import { writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import JSZip from 'jszip';
@@ -12,10 +14,11 @@ import { generateSupertestTs }    from '../generators/supertest-ts';
 import { generateSupertestJs }    from '../generators/supertest-js';
 import { generateRestAssured }    from '../generators/rest-assured';
 import { generateKarate }         from '../generators/karate';
+import { generateHttpFile }       from '../generators/http-file';
 import type { GenerateOptions, GeneratedFile } from '../../shared/types';
 
 export function registerGenerateHandlers(ipc: IpcMain): void {
-  ipc.handle('generate:code', (_e, opts: GenerateOptions): GeneratedFile[] => {
+  handleIpc(ipc, IPC.generate.code, (_e, opts: GenerateOptions): GeneratedFile[] => {
     const { collection, environment, target } = opts;
     switch (target) {
       case 'robot_framework': return generateRobotFramework(collection, environment);
@@ -25,11 +28,12 @@ export function registerGenerateHandlers(ipc: IpcMain): void {
       case 'supertest_js':    return generateSupertestJs(collection, environment);
       case 'rest_assured':    return generateRestAssured(collection, environment);
       case 'karate':          return generateKarate(collection, environment);
+      case 'http_file':       return generateHttpFile(collection, environment);
       default:                throw new Error(`Unknown target: ${target}`);
     }
   });
 
-  ipc.handle('generate:save', async (_e, files: GeneratedFile[], outputDir: string) => {
+  handleIpc(ipc, IPC.generate.save, async (_e, files: GeneratedFile[], outputDir: string) => {
     for (const file of files) {
       const fullPath = join(outputDir, file.path);
       await mkdir(dirname(fullPath), { recursive: true });
@@ -37,7 +41,7 @@ export function registerGenerateHandlers(ipc: IpcMain): void {
     }
   });
 
-  ipc.handle('generate:saveZip', async (_e, files: GeneratedFile[], collectionName: string, target: string): Promise<boolean> => {
+  handleIpc(ipc, IPC.generate.saveZip, async (_e, files: GeneratedFile[], collectionName: string, target: string): Promise<boolean> => {
     const colSlug    = collectionName.replace(/\W+/g, '-').toLowerCase();
     const targetSlug = target.replace(/_/g, '-');
     const defaultName = `${colSlug}-${targetSlug}.zip`;

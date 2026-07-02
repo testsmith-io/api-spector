@@ -4,6 +4,7 @@
 import { useState, useMemo } from 'react';
 import { useStore } from '../../store';
 import type { ApiRequest } from '../../../../shared/types';
+import { Modal } from '../common/Modal';
 
 const { electron } = window;
 
@@ -226,11 +227,11 @@ export function SchemaSyncModal({
   // Preview screen (after spec is loaded)
   if (specEntries) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
-        <div
-          className="bg-surface-900 border border-surface-700 rounded-xl shadow-2xl w-[640px] max-h-[80vh] p-5 flex flex-col gap-4"
-          onClick={e => e.stopPropagation()}
-        >
+      <Modal
+        onClose={onClose}
+        overlayClassName="z-50 flex items-center justify-center bg-black/60"
+        panelClassName="bg-surface-900 border border-surface-700 rounded-xl shadow-2xl w-[640px] max-h-[80vh] p-5 flex flex-col gap-4"
+      >
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-surface-100">
               Sync schemas — {scopeLabel}
@@ -340,18 +341,17 @@ export function SchemaSyncModal({
               </button>
             </div>
           </div>
-        </div>
-      </div>
+      </Modal>
     );
   }
 
   // Source selection screen
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
-      <div
-        className="bg-surface-900 border border-surface-700 rounded-xl shadow-2xl w-[420px] p-5 flex flex-col gap-4"
-        onClick={e => e.stopPropagation()}
-      >
+    <Modal
+      onClose={onClose}
+      overlayClassName="z-50 flex items-center justify-center bg-black/60"
+      panelClassName="bg-surface-900 border border-surface-700 rounded-xl shadow-2xl w-[420px] p-5 flex flex-col gap-4"
+    >
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-surface-100">Sync schemas from OpenAPI</h2>
           <button onClick={onClose} className="text-surface-500 hover:text-surface-300 text-lg leading-none">×</button>
@@ -401,8 +401,7 @@ export function SchemaSyncModal({
             Cancel
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

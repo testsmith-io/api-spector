@@ -4,13 +4,12 @@
 import type { Collection, Environment, Folder, GeneratedFile } from '../../shared/types';
 import { resolveInheritedAuthAndHeaders, getAllApplicableHooks } from '../../shared/request-collection';
 import { parsePostScript, accessorToJsonPath } from './script-parser';
+import {
+  javaClass, toEnvVar as toEnvConst,
+  resolveEffectiveAuth, mergeHeaders, hasBody, getEnvBaseUrl, renderTree,
+} from './generator-utils';
 
 // ─── REST Assured (Java + JUnit 5 + Maven) generator ─────────────────────────
-
-function javaClass(name: string): string {
-  return name.replace(/[^\w\s]/g, ' ').split(/\s+/).filter(Boolean)
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
-}
 
 function javaMethod(name: string): string {
   const parts = name.replace(/[^\w\s]/g, ' ').split(/\s+/).filter(Boolean);
@@ -24,10 +23,6 @@ function javaTypeFor(expected?: string): string {
     case 'boolean': return 'Boolean.class';
     default:        return 'Object.class';
   }
-}
-
-function toEnvConst(key: string): string {
-  return key.replace(/\W+/g, '_').toUpperCase();
 }
 
 /** Replace {{var}} with System.getenv("VAR") ?? "" Java expression. */
@@ -119,9 +114,7 @@ function buildPom(collectionName: string): string {
 // ─── BaseTest.java ────────────────────────────────────────────────────────────
 
 function buildBaseTest(environment: Environment | null): string {
-  const baseUrl = environment?.variables.find(
-    v => ['base_url', 'baseurl', 'base-url'].includes(v.key.toLowerCase()) && !v.secret
-  )?.value ?? 'http://localhost:8080';
+  const baseUrl = getEnvBaseUrl(environment, 'http://localhost:8080');
 
   const secretVars = environment?.variables.filter(v => v.secret && v.secretRef) ?? [];
   const secretComments = secretVars.map(v =>
@@ -241,10 +234,9 @@ function buildTestClass(folderName: string, folder: Folder, collection: Collecti
 
     // Inherited auth + headers
     const inherited = resolveInheritedAuthAndHeaders(reqId, collection);
-    const effectiveAuth = req.auth.type !== 'none' ? req.auth : (inherited.auth ?? req.auth);
-    const allHeaders = [...inherited.headers.filter(h => h.enabled && h.key), ...req.headers.filter(h => h.enabled && h.key)];
+    const effectiveAuth = resolveEffectiveAuth(req, inherited);
+    const allHeaders = mergeHeaders(req, inherited);
     const enabledParams = req.params.filter(p => p.enabled && p.key);
-    const hasBody = req.body.mode !== 'none' && !['get', 'head'].includes(method);
 
     const lines: string[] = [];
     lines.push(`    @Test`);
@@ -277,7 +269,7 @@ function buildTestClass(folderName: string, folder: Folder, collection: Collecti
       lines.push(`            .queryParam("${p.key}", ${interpolateJava(p.value, sharedVars)})`);
     }
 
-    if (hasBody) {
+    if (hasBody(req)) {
       if (req.body.mode === 'json' && req.body.json) {
         // Inline the JSON body as a Java string. Escape quotes/newlines and
         // interpolate {{var}} tokens into shared-var references or getenv calls.
@@ -348,25 +340,6 @@ ${methods.join('\n\n')}
 }
 
 // ─── README ───────────────────────────────────────────────────────────────────
-
-function renderTree(paths: string[]): string {
-  interface Node { [k: string]: Node }
-  const root: Node = {};
-  for (const p of [...paths].sort()) {
-    let cur = root;
-    for (const part of p.split('/')) { cur = (cur[part] ??= {}); }
-  }
-  function render(node: Node, prefix = ''): string[] {
-    const entries = Object.entries(node);
-    return entries.flatMap(([name, children], i) => {
-      const last = i === entries.length - 1;
-      const lines = [`${prefix}${last ? '└── ' : '├── '}${name}`];
-      if (Object.keys(children).length) lines.push(...render(children, prefix + (last ? '    ' : '│   ')));
-      return lines;
-    });
-  }
-  return ['.', ...render(root)].join('\n');
-}
 
 function buildReadme(collectionName: string, filePaths: string[]): string {
   const tree = renderTree(filePaths);

@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../../store';
 import { MethodBadge } from './MethodBadge';
+import { Modal } from './Modal';
 
 export function CommandPalette() {
   const open               = useStore(s => s.commandPaletteOpen);
@@ -76,14 +77,11 @@ export function CommandPalette() {
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center pt-[20vh]"
-      onClick={() => setOpen(false)}
+    <Modal
+      onClose={() => setOpen(false)}
+      overlayClassName="bg-black/60 z-50 flex items-start justify-center pt-[20vh]"
+      panelClassName="w-[560px] bg-surface-900 border border-surface-700 rounded-xl shadow-2xl overflow-hidden"
     >
-      <div
-        className="w-[560px] bg-surface-900 border border-surface-700 rounded-xl shadow-2xl overflow-hidden"
-        onClick={e => e.stopPropagation()}
-      >
         {/* Search input */}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-surface-800">
           <svg className="w-4 h-4 text-surface-600 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -137,7 +135,6 @@ export function CommandPalette() {
             <span><kbd className="bg-surface-800 border border-surface-700 rounded px-1">↵</kbd> open</span>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -171,6 +171,13 @@ export function ContractResultsPanel() {
         </span>
         <span className="text-xs text-surface-500 ml-auto">{report.durationMs}ms</span>
         <button
+          onClick={() => window.electron.exportContractReportHtml(report)}
+          className="text-[11px] text-surface-500 hover:text-surface-200 transition-colors"
+          title="Export a self-contained HTML report"
+        >
+          Export HTML
+        </button>
+        <button
           onClick={() => clearReport(null)}
           className="text-[11px] text-surface-600 hover:text-surface-300 transition-colors"
           title="Clear results"

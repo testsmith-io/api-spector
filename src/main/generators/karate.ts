@@ -4,6 +4,7 @@
 import type { Collection, Environment, Folder, GeneratedFile, RequestBody } from '../../shared/types';
 import { resolveInheritedAuthAndHeaders, getAllApplicableHooks } from '../../shared/request-collection';
 import { parsePostScript, accessorToJsonPath } from './script-parser';
+import { javaClass, resolveEffectiveAuth, mergeHeaders, hasBody, getEnvBaseUrl, renderTree } from './generator-utils';
 
 // ─── Karate (Java + JUnit 5 + Maven) generator ───────────────────────────────
 //
@@ -19,11 +20,6 @@ import { parsePostScript, accessorToJsonPath } from './script-parser';
 //   https://github.com/karatelabs/karate
 
 // ─── Identifier helpers ──────────────────────────────────────────────────────
-
-function javaClass(name: string): string {
-  return name.replace(/[^\w\s]/g, ' ').split(/\s+/).filter(Boolean)
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
-}
 
 /** Karate-friendly variable name: lowerCamelCase, JS-safe identifier.
  *  Splits on any non-alphanumeric run (including `_` and `-`) and lowercases
@@ -161,9 +157,7 @@ function buildPom(collectionName: string): string {
 // ─── karate-config.js ────────────────────────────────────────────────────────
 
 function buildKarateConfig(environment: Environment | null): string {
-  const baseUrl = environment?.variables.find(
-    v => ['base_url', 'baseurl', 'base-url'].includes(v.key.toLowerCase()) && !v.secret
-  )?.value ?? 'http://localhost:8080';
+  const baseUrl = getEnvBaseUrl(environment, 'http://localhost:8080');
 
   // Every non-baseUrl env variable becomes a top-level config field. Plain
   // values keep their default; secrets/sensitive values come from
@@ -259,7 +253,7 @@ function buildBackground(folderId: string, collection: Collection): BackgroundBl
     for (const x of (h.headers ?? []).filter(x => x.enabled && x.key)) {
       lines.push(`  * header ${x.key} = ${interpolateKarate(x.value)}`);
     }
-    if (h.body.mode !== 'none' && !['get', 'head'].includes(method)) {
+    if (hasBody(h)) {
       for (const block of bodySteps(h.body, has)) {
         lines.push(`  * ${block[0]}`);
         for (let i = 1; i < block.length; i++) lines.push(block[i]);
@@ -391,11 +385,10 @@ function buildFeature(folderName: string, folder: Folder, collection: Collection
     usedTags.add(tag);
 
     const inherited = resolveInheritedAuthAndHeaders(reqId, collection);
-    const effectiveAuth = req.auth.type !== 'none' ? req.auth : (inherited.auth ?? req.auth);
-    const allHeaders = [...inherited.headers.filter(h => h.enabled && h.key), ...req.headers.filter(h => h.enabled && h.key)];
+    const effectiveAuth = resolveEffectiveAuth(req, inherited);
+    const allHeaders = mergeHeaders(req, inherited);
     const enabledParams = req.params.filter(p => p.enabled && p.key);
     const method = req.method.toLowerCase();
-    const hasBody = req.body.mode !== 'none' && !['get', 'head'].includes(method);
 
     const lines: string[] = [];
     lines.push(`@${tag}`);
@@ -432,7 +425,7 @@ function buildFeature(folderName: string, folder: Folder, collection: Collection
     for (const p of enabledParams) {
       setup.push([`param ${p.key} = ${interpolateKarate(p.value)}`]);
     }
-    if (hasBody) {
+    if (hasBody(req)) {
       const declared = new Set(allHeaders.map(h => h.key.toLowerCase()));
       const has = (n: string) => declared.has(n.toLowerCase());
       for (const block of bodySteps(req.body, has)) setup.push(block);
@@ -505,25 +498,6 @@ ${scenarios.join('\n\n')}
 }
 
 // ─── README ──────────────────────────────────────────────────────────────────
-
-function renderTree(paths: string[]): string {
-  interface Node { [k: string]: Node }
-  const root: Node = {};
-  for (const p of [...paths].sort()) {
-    let cur = root;
-    for (const part of p.split('/')) { cur = (cur[part] ??= {}); }
-  }
-  function render(node: Node, prefix = ''): string[] {
-    const entries = Object.entries(node);
-    return entries.flatMap(([name, children], i) => {
-      const last = i === entries.length - 1;
-      const lines = [`${prefix}${last ? '└── ' : '├── '}${name}`];
-      if (Object.keys(children).length) lines.push(...render(children, prefix + (last ? '    ' : '│   ')));
-      return lines;
-    });
-  }
-  return ['.', ...render(root)].join('\n');
-}
 
 function buildReadme(collectionName: string, filePaths: string[]): string {
   const tree = renderTree(filePaths);

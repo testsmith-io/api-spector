@@ -5,32 +5,10 @@ import React, { useEffect, useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { xml } from '@codemirror/lang-xml';
 import { oneDark } from '@codemirror/theme-one-dark';
-import type { ApiRequest, SoapBody } from '../../../../shared/types';
+import type { ApiRequest, SoapBody, WsdlParam, WsdlOperation, WsdlEndpoint } from '../../../../shared/types';
 import { contentTypeForSoap, withContentType } from '../../../../shared/soap';
 
 const { electron } = window;
-
-interface WsdlParam {
-  name: string
-  typeHint: string
-  children?: WsdlParam[]
-}
-
-interface WsdlOperation {
-  name: string
-  binding?: string
-  soapAction?: string
-  soapVersion: '1.1' | '1.2'
-  endpoint?: string
-  inputTemplate: string
-  params?: WsdlParam[]
-}
-
-interface WsdlEndpoint {
-  binding: string
-  address: string
-  soapVersion: '1.1' | '1.2'
-}
 
 interface Props {
   request: ApiRequest

@@ -3,6 +3,7 @@
 
 import type { StateCreator } from 'zustand';
 import type { HistoryEntry } from '../../../../shared/types';
+import type { FullState } from '../index';
 
 const HISTORY_CAP = 200;
 
@@ -18,9 +19,12 @@ export interface HistorySliceActions {
 
 export type HistorySlice = HistorySliceState & HistorySliceActions
 
-type ImmerStateCreator<T> = StateCreator<T, [['zustand/immer', never]], [], T>
-
-export const createHistorySlice: ImmerStateCreator<HistorySlice> = (set) => ({
+export const createHistorySlice: StateCreator<
+  FullState,
+  [['zustand/immer', never]],
+  [],
+  HistorySlice
+> = (set) => ({
   history: [],
   addHistoryEntry: (entry) => set(s => {
     s.history.unshift(entry);

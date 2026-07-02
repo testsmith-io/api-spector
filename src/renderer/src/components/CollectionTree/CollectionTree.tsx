@@ -2,13 +2,19 @@
 // SPDX-License-Identifier: MIT
 
 import React, { useState, useRef, useEffect, useContext, createContext } from 'react';
-import { createPortal } from 'react-dom';
 import { useStore } from '../../store';
 import type { Folder, Collection, ApiRequest } from '../../../../shared/types';
 import { FolderSettingsModal } from './FolderSettingsModal';
 import { CollectionSettingsModal } from './CollectionSettingsModal';
 import { SchemaSyncModal } from './SchemaSyncModal';
 import { RequestRow } from './RequestRow';
+import { InlineEdit } from '../common/InlineEdit';
+import { ConfirmDialog } from '../common/ConfirmDialog';
+import { DotsBtn } from '../common/ContextMenu';
+import {
+  PlayIcon, PlusIcon, FolderIcon, TagIcon, PencilIcon, TrashIcon, TableIcon,
+  CopyIcon, KeyIcon, ExpandAllIcon, CollapseAllIcon, SyncIcon, GearIcon,
+} from '../common/icons';
 
 // ─── Drag-and-drop context ────────────────────────────────────────────────────
 
@@ -22,51 +28,6 @@ export const DragCtx = createContext<{
   onDropRequest: ( destCollectionId: string, destFolderId: string, destIndex?: number ) => void
   onDropFolder: ( destCollectionId: string, destParentFolderId: string, destIndex?: number ) => void
 }>( { dragging: null, setDragging: () => { }, onDropRequest: () => { }, onDropFolder: () => { } } );
-
-// ─── Inline rename ────────────────────────────────────────────────────────────
-
-export function InlineEdit ( {
-  value, onCommit, onCancel, className = '', validate,
-}: {
-  value: string; onCommit: ( v: string ) => void; onCancel: () => void; className?: string
-  validate?: ( v: string ) => string | null
-} ) {
-  const [draft, setDraft] = useState( value );
-  const [error, setError] = useState<string | null>( null );
-  const ref = useRef<HTMLInputElement>( null );
-  useEffect( () => { ref.current?.select(); }, [] );
-
-  function tryCommit ( v: string ) {
-    const trimmed = v.trim();
-    if ( !trimmed ) { onCancel(); return; }
-    const err = validate?.( trimmed ) ?? null;
-    if ( err ) { setError( err ); setTimeout( () => ref.current?.focus(), 0 ); return; }
-    onCommit( trimmed );
-  }
-
-  return (
-    <div onClick={e => e.stopPropagation()}>
-      <input
-        ref={ref}
-        value={draft}
-        onChange={e => { setDraft( e.target.value ); setError( null ); }}
-        onBlur={() => tryCommit( draft )}
-        onKeyDown={e => {
-          if ( e.key === 'Enter' ) tryCommit( draft );
-          if ( e.key === 'Escape' ) onCancel();
-          e.stopPropagation();
-        }}
-        // Force the input's own text color so it's consistent regardless of
-        // the parent row's `text-surface-*` (folder rows are dimmer than
-        // request rows; without this, renaming a folder *looks* different
-        // from renaming a request).
-        className={`bg-surface-700 text-[var(--text-primary)] rounded px-1 focus:outline-none focus:ring-1 w-full ${error ? 'ring-1 ring-red-500 focus:ring-red-500' : 'focus:ring-blue-500'
-          } ${className}`}
-      />
-      {error && <p className="text-[10px] text-red-400 mt-0.5 px-1">{error}</p>}
-    </div>
-  );
-}
 
 // ─── Tag chips ────────────────────────────────────────────────────────────────
 
@@ -121,133 +82,6 @@ export function TagChips ( {
           placeholder="tag…"
         />
       ) : null}
-    </div>
-  );
-}
-
-// ─── Confirm dialog ───────────────────────────────────────────────────────────
-
-function ConfirmDialog ( { message, onConfirm, onCancel }: {
-  message: string
-  onConfirm: () => void
-  onCancel: () => void
-} ) {
-  return (
-    <div
-      className="fixed inset-0 bg-black/50 z-[300] flex items-center justify-center"
-      onClick={onCancel}
-    >
-      <div
-        className="bg-surface-900 border border-surface-700 rounded-lg shadow-2xl p-4 w-72 flex flex-col gap-4"
-        onClick={e => e.stopPropagation()}
-      >
-        <p className="text-sm text-white">{message}</p>
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={onCancel}
-            className="px-3 py-1.5 text-xs text-surface-400 hover:text-white transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="px-3 py-1.5 text-xs bg-red-700 hover:bg-red-600 rounded transition-colors"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Context menu ─────────────────────────────────────────────────────────────
-
-export type MenuItem =
-  | { type: 'item'; label: string; icon?: React.ReactNode; danger?: boolean; onClick: () => void }
-  | { type: 'separator' }
-  | { type: 'header'; label: string }
-
-function ContextMenu ( { items, x, y, onClose }: {
-  items: MenuItem[]
-  x: number
-  y: number
-  onClose: () => void
-} ) {
-  const ref = useRef<HTMLDivElement>( null );
-
-  useEffect( () => {
-    function handle ( e: MouseEvent ) {
-      if ( ref.current && !ref.current.contains( e.target as Node ) ) onClose();
-    }
-    document.addEventListener( 'mousedown', handle, true );
-    return () => document.removeEventListener( 'mousedown', handle, true );
-  }, [onClose] );
-
-  const [pos, setPos] = useState( { top: y, left: x } );
-  useEffect( () => {
-    if ( !ref.current ) return;
-    const rect = ref.current.getBoundingClientRect();
-    let left = x;
-    let top = y;
-    if ( left + rect.width > window.innerWidth ) left = x - rect.width;
-    if ( top + rect.height > window.innerHeight ) top = y - rect.height;
-    setPos( { top, left } );
-  }, [x, y] );
-
-  return createPortal(
-    <div
-      ref={ref}
-      style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
-      className="bg-surface-900 border border-surface-700 rounded-lg shadow-2xl py-1 min-w-[170px]"
-      onMouseDown={e => e.stopPropagation()}
-    >
-      {items.map( ( item, i ) =>
-        item.type === 'separator' ? (
-          <div key={i} className="border-t border-surface-700 my-1" />
-        ) : item.type === 'header' ? (
-          <div key={i} className="px-3 pt-2 pb-0.5 text-[10px] uppercase tracking-wider font-semibold text-surface-500 select-none">
-            {item.label}
-          </div>
-        ) : (
-          <button
-            key={i}
-            onClick={e => { e.stopPropagation(); item.onClick(); onClose(); }}
-            className={`w-full text-left flex items-center gap-2 px-3 py-1.5 text-xs transition-colors ${item.danger
-              ? 'text-red-400 hover:bg-surface-800 hover:text-red-300'
-              : 'text-[var(--text-primary)] hover:bg-surface-800'
-              }`}
-          >
-            {item.icon && <span className="w-3 h-3 shrink-0 flex items-center justify-center">{item.icon}</span>}
-            {item.label}
-          </button>
-        )
-      )}
-    </div>,
-    document.body
-  );
-}
-
-export function DotsBtn ( { items }: { items: MenuItem[] } ) {
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>( null );
-
-  return (
-    <div className="relative">
-      <button
-        onClick={e => {
-          e.stopPropagation();
-          if ( menu ) { setMenu( null ); return; }
-          const rect = ( e.currentTarget as HTMLElement ).getBoundingClientRect();
-          setMenu( { x: rect.right + 4, y: rect.top } );
-        }}
-        className="opacity-0 group-hover:opacity-100 px-1 py-0.5 rounded text-surface-400 hover:text-white hover:bg-surface-700 transition-all"
-        title="Options"
-      >
-        <DotsHorizontalIcon />
-      </button>
-      {menu && (
-        <ContextMenu items={items} x={menu.x} y={menu.y} onClose={() => setMenu( null )} />
-      )}
     </div>
   );
 }
@@ -771,106 +605,3 @@ function FolderContents ( {
   );
 }
 
-// ─── Micro icons ──────────────────────────────────────────────────────────────
-
-function DotsHorizontalIcon () {
-  return (
-    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-      <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zm6 0a2 2 0 11-4 0 2 2 0 014 0zm6 0a2 2 0 11-4 0 2 2 0 014 0z" />
-    </svg>
-  );
-}
-function PlayIcon () {
-  return (
-    <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-    </svg>
-  );
-}
-function PlusIcon () {
-  return (
-    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-    </svg>
-  );
-}
-export function TagIcon () {
-  return (
-    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A2 2 0 013 10V5a2 2 0 012-2z" />
-    </svg>
-  );
-}
-function FolderIcon ( { className = '' }: { className?: string } ) {
-  return (
-    <svg className={`w-3 h-3 ${className}`} fill="currentColor" viewBox="0 0 20 20">
-      <path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-    </svg>
-  );
-}
-export function PencilIcon () {
-  return (
-    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.768-6.768a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H8v-2.414a2 2 0 01.586-1.414z" />
-    </svg>
-  );
-}
-export function TrashIcon () {
-  return (
-    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0a1 1 0 00-1-1h-4a1 1 0 00-1 1m6 0H7" />
-    </svg>
-  );
-}
-function TableIcon () {
-  return (
-    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18M10 3v18M3 6a1 1 0 011-1h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6z" />
-    </svg>
-  );
-}
-export function CopyIcon () {
-  return (
-    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-    </svg>
-  );
-}
-function KeyIcon () {
-  return (
-    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a4 4 0 110 8 4 4 0 010-8zm-7 8l-1 1m0 0l-1 1m1-1l1 1M3 20l5-5" />
-    </svg>
-  );
-}
-function ExpandAllIcon () {
-  return (
-    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h8M4 18h16M15 15l3 3 3-3" />
-    </svg>
-  );
-}
-function CollapseAllIcon () {
-  return (
-    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h8M4 18h16M21 12l-3-3-3 3" />
-    </svg>
-  );
-}
-
-export function SyncIcon () {
-  return (
-    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M20.984 4.356v4.993" />
-    </svg>
-  );
-}
-
-function GearIcon () {
-  return (
-    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  );
-}

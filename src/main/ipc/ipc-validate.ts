@@ -126,7 +126,7 @@ interface ContractRunShape {
 export const validateContractRunPayload: (data: unknown) => asserts data is ContractRunShape = compile<ContractRunShape>({
   type: 'object',
   properties: {
-    mode:     { type: 'string', enum: ['consumer', 'provider', 'bidirectional'] },
+    mode:     { type: 'string', enum: ['consumer', 'provider', 'provider-live', 'bidirectional'] },
     requests: { type: 'array', items: apiRequestSchema },
     envVars:        stringMap,
     collectionVars: stringMap,
@@ -134,6 +134,8 @@ export const validateContractRunPayload: (data: unknown) => asserts data is Cont
     specPath:            { type: 'string' },
     specSnapshotRelPath: { type: 'string' },
     requestBaseUrl:      { type: 'string' },
+    providerBaseUrl:     { type: 'string' },
+    stateHandlerUrl:     { type: 'string' },
   },
   required: ['mode', 'requests'],
   additionalProperties: true,

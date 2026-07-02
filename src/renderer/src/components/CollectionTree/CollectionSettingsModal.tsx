@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: MIT
 
 import React, { useState } from 'react';
-import type { Collection, AuthConfig, AuthPatch, KeyValuePair } from '../../../../shared/types';
+import type { Collection, AuthConfig, KeyValuePair } from '../../../../shared/types';
 import { useStore } from '../../store';
 import { KVTable } from '../RequestBuilder/KVTable';
+import { Modal } from '../common/Modal';
+import { AuthEditor, type AuthEditorPatch } from '../common/AuthEditor';
 
 type ModalTab = 'auth' | 'headers' | 'tls'
-
-const AUTH_TYPES: AuthConfig['type'][] = ['none', 'bearer', 'basic', 'digest', 'ntlm', 'apikey'];
 
 interface Props {
   collection: Collection
@@ -32,7 +32,7 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
   const [clientKeyPath,      setClientKeyPath]       = useState(existing?.clientKeyPath ?? '');
   const [rejectUnauthorized, setRejectUnauthorized] = useState(existing?.rejectUnauthorized !== false);
 
-  function patchAuth(patch: AuthPatch) {
+  function patchAuth(patch: AuthEditorPatch) {
     setAuth(prev => ({ ...prev, ...patch } as AuthConfig));
   }
 
@@ -51,14 +51,11 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-16"
-      onClick={onClose}
+    <Modal
+      onClose={onClose}
+      overlayClassName="bg-black/50 z-50 flex items-start justify-center pt-16"
+      panelClassName="w-[600px] bg-surface-900 border border-surface-800 rounded-lg shadow-2xl flex flex-col max-h-[80vh]"
     >
-      <div
-        className="w-[600px] bg-surface-900 border border-surface-800 rounded-lg shadow-2xl flex flex-col max-h-[80vh]"
-        onClick={e => e.stopPropagation()}
-      >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-surface-800 shrink-0">
           <div>
@@ -88,7 +85,15 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
         {/* Content */}
         <div className="px-4 py-3 flex-1 overflow-y-auto text-xs">
           {activeTab === 'auth' && (
-            <CollectionAuthPanel auth={auth} onChange={patchAuth} />
+            <AuthEditor
+              auth={auth}
+              onChange={patchAuth}
+              intro={
+                <p className="text-[10px] text-surface-600">
+                  Auth configured here is inherited by all requests in this collection unless a folder or request overrides it with its own non-none auth type.
+                </p>
+              }
+            />
           )}
           {activeTab === 'headers' && (
             <KVTable
@@ -159,148 +164,6 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
             Cancel
           </button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Collection auth panel ────────────────────────────────────────────────────
-
-function CollectionAuthPanel({ auth, onChange }: { auth: AuthConfig; onChange: (p: AuthPatch) => void }) {
-  return (
-    <div className="flex flex-col gap-3">
-      <p className="text-[10px] text-surface-600">
-        Auth configured here is inherited by all requests in this collection unless a folder or request overrides it with its own non-none auth type.
-      </p>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-surface-400">Type:</span>
-        {AUTH_TYPES.map(t => (
-          <label key={t} className="flex items-center gap-1 cursor-pointer">
-            <input
-              type="radio"
-              value={t}
-              checked={auth.type === t}
-              onChange={() => onChange({ type: t })}
-              className="accent-blue-500"
-            />
-            <span className={auth.type === t ? 'text-white' : 'text-surface-400'}>{t}</span>
-          </label>
-        ))}
-      </div>
-
-      {auth.type === 'bearer' && (
-        <div className="flex flex-col gap-1">
-          <label className="text-surface-400">Token</label>
-          <input
-            value={auth.token ?? ''}
-            onChange={e => onChange({ token: e.target.value })}
-            placeholder="Bearer token"
-            className="bg-surface-800 border border-surface-700 rounded px-2 py-1 font-mono focus:outline-none focus:border-blue-500"
-          />
-        </div>
-      )}
-
-      {(auth.type === 'basic' || auth.type === 'digest') && (
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <label className="text-surface-400">Username</label>
-            <input
-              value={auth.username ?? ''}
-              onChange={e => onChange({ username: e.target.value })}
-              className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-            />
-          </div>
-          <div className="flex-1">
-            <label className="text-surface-400">Password</label>
-            <input
-              type="password"
-              value={auth.password ?? ''}
-              onChange={e => onChange({ password: e.target.value })}
-              className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 font-mono focus:outline-none focus:border-blue-500"
-            />
-          </div>
-        </div>
-      )}
-
-      {auth.type === 'ntlm' && (
-        <div className="flex flex-col gap-2">
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="text-surface-400">Username</label>
-              <input
-                value={auth.username ?? ''}
-                onChange={e => onChange({ username: e.target.value })}
-                className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="text-surface-400">Password</label>
-              <input
-                type="password"
-                value={auth.password ?? ''}
-                onChange={e => onChange({ password: e.target.value })}
-                className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 font-mono focus:outline-none focus:border-blue-500"
-              />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="text-surface-400">Domain</label>
-              <input
-                value={auth.ntlmDomain ?? ''}
-                onChange={e => onChange({ ntlmDomain: e.target.value })}
-                placeholder="WORKGROUP"
-                className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="text-surface-400">Workstation</label>
-              <input
-                value={auth.ntlmWorkstation ?? ''}
-                onChange={e => onChange({ ntlmWorkstation: e.target.value })}
-                placeholder="MACHINE"
-                className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {auth.type === 'apikey' && (
-        <div className="flex flex-col gap-1.5">
-          <div className="flex gap-2">
-            <div>
-              <label className="text-surface-400">Key name</label>
-              <input
-                value={auth.apiKeyName ?? 'X-API-Key'}
-                onChange={e => onChange({ apiKeyName: e.target.value })}
-                className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="text-surface-400">In</label>
-              <select
-                value={auth.apiKeyIn ?? 'header'}
-                onChange={e => onChange({ apiKeyIn: e.target.value as 'header' | 'query' })}
-                className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-              >
-                <option value="header">Header</option>
-                <option value="query">Query</option>
-              </select>
-            </div>
-            <div className="flex-1">
-              <label className="text-surface-400">Value</label>
-              <input
-                value={auth.apiKeyValue ?? ''}
-                onChange={e => onChange({ apiKeyValue: e.target.value })}
-                placeholder="API key value"
-                className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 font-mono focus:outline-none focus:border-blue-500"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </Modal>
   );
 }

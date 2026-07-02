@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import React, { useState } from 'react';
+import { Modal } from '../common/Modal';
 
 const { electron } = window;
 
@@ -46,14 +47,11 @@ export function MasterKeyModal({ onSuccess, onCancel }: Props) {
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center"
-      onClick={onCancel}
+    <Modal
+      onClose={onCancel}
+      overlayClassName="bg-black/60 z-[60] flex items-center justify-center"
+      panelClassName="bg-surface-900 border border-surface-700 rounded-lg shadow-2xl w-[500px] p-5 flex flex-col gap-4"
     >
-      <div
-        className="bg-surface-900 border border-surface-700 rounded-lg shadow-2xl w-[500px] p-5 flex flex-col gap-4"
-        onClick={e => e.stopPropagation()}
-      >
         <div>
           <h3 className="text-sm font-semibold">Master Password Required</h3>
           <p className="text-xs text-surface-400 mt-1">
@@ -116,7 +114,6 @@ export function MasterKeyModal({ onSuccess, onCancel }: Props) {
             Set Password &amp; Continue
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
