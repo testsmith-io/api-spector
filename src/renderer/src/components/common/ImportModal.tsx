@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Collection, ApiRequest, Folder, Environment, EnvVariable } from '../../../../shared/types';
 import { useStore } from '../../store';
 import { envRelPath } from '../../../../shared/naming-utils';
+import { Modal } from './Modal';
 
 const { electron } = window;
 
@@ -26,6 +27,7 @@ const OPTIONS: ImportOption[] = [
   { id: 'openapi',  label: 'OpenAPI',  description: 'JSON or YAML (v3.x)', supportsUrl: true },
   { id: 'insomnia', label: 'Insomnia', description: 'Export v4 JSON' },
   { id: 'bruno',    label: 'Bruno',    description: 'bruno.json collection file' },
+  { id: 'http',     label: 'HTTP file', description: '.http / .rest (REST Client)' },
 ];
 
 // ── Helpers to walk a parsed collection ─────────────────────────────────────
@@ -118,6 +120,7 @@ export function ImportModal({ onImport, onClose }: Props) {
       if (opt.id === 'openapi')  col = await electron.importOpenApi();
       if (opt.id === 'insomnia') col = await electron.importInsomnia();
       if (opt.id === 'bruno')    col = await electron.importBruno();
+      if (opt.id === 'http')     col = await electron.importHttpFile();
       if (!col) { setLoading(false); return; }
       if (opt.id === 'openapi') {
         enterPreview(col);
@@ -299,11 +302,11 @@ export function ImportModal({ onImport, onClose }: Props) {
 
   if (previewCol) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
-        <div
-          className="bg-surface-900 border border-surface-700 rounded-xl shadow-2xl w-[640px] max-h-[80vh] p-5 flex flex-col gap-4"
-          onClick={e => e.stopPropagation()}
-        >
+      <Modal
+        onClose={onClose}
+        overlayClassName="z-50 flex items-center justify-center bg-black/60"
+        panelClassName="bg-surface-900 border border-surface-700 rounded-xl shadow-2xl w-[640px] max-h-[80vh] p-5 flex flex-col gap-4"
+      >
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-surface-100">
               Import OpenAPI — {previewCol.name}
@@ -469,17 +472,16 @@ export function ImportModal({ onImport, onClose }: Props) {
               </button>
             </div>
           </div>
-        </div>
-      </div>
+      </Modal>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
-      <div
-        className="bg-surface-900 border border-surface-700 rounded-xl shadow-2xl w-[420px] p-5 flex flex-col gap-4"
-        onClick={e => e.stopPropagation()}
-      >
+    <Modal
+      onClose={onClose}
+      overlayClassName="z-50 flex items-center justify-center bg-black/60"
+      panelClassName="bg-surface-900 border border-surface-700 rounded-xl shadow-2xl w-[420px] p-5 flex flex-col gap-4"
+    >
         {/* Header */}
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-surface-100">Import Collection</h2>
@@ -555,8 +557,7 @@ export function ImportModal({ onImport, onClose }: Props) {
             {loading ? 'Importing…' : 'Choose File'}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

@@ -26,6 +26,8 @@ export function ContractPanel() {
   const [mode, setMode]               = useState<ContractMode>('consumer');
   const [specUrl, setSpecUrl]         = useState('');
   const [requestBaseUrl, setRequestBaseUrl] = useState('');
+  const [providerBaseUrl, setProviderBaseUrl] = useState('');
+  const [stateHandlerUrl, setStateHandlerUrl] = useState('');
   const [running, setRunning]         = useState(false);
   const [capturing, setCapturing]     = useState(false);
   const [error, setError]             = useState<string | null>(null);
@@ -37,8 +39,9 @@ export function ContractPanel() {
 
   const allRequests = Object.values(collections).flatMap(c => Object.values(c.data.requests));
   const contractRequests = allRequests.filter(r =>
-    r.contract && (r.contract.statusCode !== undefined || r.contract.bodySchema || r.contract.headers?.length),
+    r.contract && (r.contract.statusCode !== undefined || r.contract.bodySchema || r.contract.bodyMatcher || r.contract.headers?.length),
   );
+  const needsSpec = mode === 'provider' || mode === 'bidirectional';
   const collectionVars = activeCollId
     ? (collections[activeCollId]?.data.collectionVariables ?? {})
     : {};
@@ -51,9 +54,14 @@ export function ContractPanel() {
     : {};
 
   async function runContracts() {
-    // Either a live URL or a pinned snapshot is required for non-consumer modes.
-    if (mode !== 'consumer' && !specUrl.trim() && !activeSnapshotRelPath) {
+    // Spec-driven modes need a live URL or a pinned snapshot.
+    if (needsSpec && !specUrl.trim() && !activeSnapshotRelPath) {
       setError('Provide an OpenAPI spec URL or pick a pinned snapshot for provider / bi-directional mode.');
+      return;
+    }
+    // Live provider verification needs a provider base URL to replay against.
+    if (mode === 'provider-live' && !providerBaseUrl.trim()) {
+      setError('Provide a provider base URL (e.g. http://localhost:3000) to replay contracts against.');
       return;
     }
     setRunning(true);
@@ -62,7 +70,7 @@ export function ContractPanel() {
     try {
       const requests = mode === 'provider'
         ? allRequests          // provider validates ALL requests against spec
-        : contractRequests;     // consumer / bidirectional only runs requests with contracts
+        : contractRequests;     // consumer / provider-live / bidirectional only run requests with contracts
       const result = await electron.runContracts({
         mode,
         requests,
@@ -71,6 +79,8 @@ export function ContractPanel() {
         specUrl:             specUrl.trim() || undefined,
         specSnapshotRelPath: activeSnapshotRelPath ?? undefined,
         requestBaseUrl:      requestBaseUrl.trim() || undefined,
+        providerBaseUrl:     providerBaseUrl.trim() || undefined,
+        stateHandlerUrl:     stateHandlerUrl.trim() || undefined,
       });
       setReport(result);
     } catch (e) {
@@ -120,15 +130,20 @@ export function ContractPanel() {
       <div className="flex flex-col gap-3 px-3 py-3 border-b border-surface-800 flex-shrink-0">
         {/* Mode tabs */}
         <div className="flex gap-1 bg-surface-800 rounded-lg p-0.5">
-          {(['consumer', 'provider', 'bidirectional'] as ContractMode[]).map(m => (
+          {([
+            ['consumer', 'Consumer'],
+            ['provider', 'Provider'],
+            ['provider-live', 'Live'],
+            ['bidirectional', 'Bi-dir'],
+          ] as [ContractMode, string][]).map(([m, label]) => (
             <button
               key={m}
               onClick={() => { setMode(m); setReport(null); }}
-              className={`flex-1 py-1 text-[10px] font-semibold rounded capitalize transition-colors ${
+              className={`flex-1 py-1 text-[10px] font-semibold rounded transition-colors ${
                 mode === m ? 'bg-blue-600 text-white' : 'text-surface-400 hover:text-surface-200'
               }`}
             >
-              {m === 'bidirectional' ? 'Bi-dir' : m}
+              {label}
             </button>
           ))}
         </div>
@@ -139,11 +154,47 @@ export function ContractPanel() {
             ? 'Sends requests to the real provider and validates each response against the contract defined in the Contract tab.'
             : mode === 'provider'
             ? 'Static analysis — validates that your requests conform to the provider\'s published OpenAPI spec (no HTTP calls).'
+            : mode === 'provider-live'
+            ? 'Replays each contract against a running provider, seeding provider states first. The real provider verification.'
             : 'Checks static schema compatibility between consumer contracts and provider spec, then verifies live responses.'}
         </p>
 
+        {/* Provider base URL + state handler (provider-live) */}
+        {mode === 'provider-live' && (
+          <div className="flex flex-col gap-2">
+            <div>
+              <label className="text-[10px] text-surface-500 uppercase tracking-wider font-medium block mb-1">
+                Provider base URL
+              </label>
+              <input
+                value={providerBaseUrl}
+                onChange={e => setProviderBaseUrl(e.target.value)}
+                placeholder="http://localhost:3000"
+                className="w-full text-xs bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
+              />
+              <p className="text-[10px] text-surface-600 mt-1 leading-relaxed">
+                Each request is rebased onto this origin before being replayed against the live provider.
+              </p>
+            </div>
+            <div>
+              <label className="text-[10px] text-surface-500 uppercase tracking-wider font-medium block mb-1">
+                State handler URL <span className="normal-case text-surface-600">(optional)</span>
+              </label>
+              <input
+                value={stateHandlerUrl}
+                onChange={e => setStateHandlerUrl(e.target.value)}
+                placeholder="http://localhost:3000/_pact/provider-states"
+                className="w-full text-xs bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
+              />
+              <p className="text-[10px] text-surface-600 mt-1 leading-relaxed">
+                Before each interaction we POST {'{ state, action }'} here so the provider can be seeded into a known state (Pact <code>given</code>).
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Spec source (provider / bidirectional) */}
-        {mode !== 'consumer' && (
+        {needsSpec && (
           <div className="flex flex-col gap-2">
             {/* Snapshot picker */}
             <div>
@@ -236,7 +287,9 @@ export function ContractPanel() {
           </span>
           <button
             onClick={runContracts}
-            disabled={running || (mode !== 'consumer' && !specUrl.trim() && !activeSnapshotRelPath)}
+            disabled={running
+              || (needsSpec && !specUrl.trim() && !activeSnapshotRelPath)
+              || (mode === 'provider-live' && !providerBaseUrl.trim())}
             className="px-3 py-1 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors font-medium"
           >
             {running ? 'Running…' : 'Run'}

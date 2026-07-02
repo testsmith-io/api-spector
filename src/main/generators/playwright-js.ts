@@ -4,71 +4,17 @@
 import type { Collection, Environment, Folder, GeneratedFile, ApiRequest } from '../../shared/types';
 import { resolveInheritedAuthAndHeaders, getAllApplicableHooks } from '../../shared/request-collection';
 import { parsePostScript } from './script-parser';
+import {
+  slug, toEnvVar, interpolateEnvVars as interpolatePath, renderJsValue, buildNameMap,
+  resolveEffectiveAuth, mergeHeaders, hasBody, getEnvBaseUrl, renderTree,
+} from './generator-utils';
 
 // ─── Playwright JavaScript generator ─────────────────────────────────────────
-
-function slug(name: string): string {
-  return name.replace(/\W+/g, '-').toLowerCase().replace(/^-|-$/g, '');
-}
-
-function toEnvVar(key: string): string {
-  return key.replace(/\W+/g, '_').toUpperCase();
-}
-
-function interpolatePath(value: string, sharedVars: Set<string> = new Set()): string {
-  return value.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
-    const envKey = toEnvVar(key.trim());
-    return sharedVars.has(envKey) ? `\${${envKey}}` : `\${process.env.${envKey} ?? ''}`;
-  });
-}
-
-function buildNameMap(folder: Folder, requests: Collection['requests']): Map<string, string> {
-  const map  = new Map<string, string>();
-  const used = new Set<string>();
-  for (const id of folder.requestIds) {
-    const req = requests[id];
-    if (!req) continue;
-    const base = req.name;
-    let name = base;
-    if (used.has(name)) {
-      let i = 2;
-      while (used.has(`${base} ${i}`)) i++;
-      name = `${base} ${i}`;
-    }
-    used.add(name);
-    map.set(id, name);
-  }
-  return map;
-}
-
-function renderJsValue(value: unknown, indent: string, sharedVars: Set<string> = new Set()): string {
-  const next = indent + '  ';
-  if (value === null) return 'null';
-  if (typeof value === 'boolean' || typeof value === 'number') return String(value);
-  if (typeof value === 'string') {
-    if (value.includes('{{')) {
-      return '`' + interpolatePath(value, sharedVars) + '`';
-    }
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) {
-    if (!value.length) return '[]';
-    return `[\n${value.map(v => next + renderJsValue(v, next, sharedVars)).join(',\n')},\n${indent}]`;
-  }
-  if (typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>);
-    if (!entries.length) return '{}';
-    return `{\n${entries.map(([k, v]) => `${next}${k}: ${renderJsValue(v, next, sharedVars)}`).join(',\n')},\n${indent}}`;
-  }
-  return JSON.stringify(value);
-}
 
 // ─── playwright.config.js ─────────────────────────────────────────────────────
 
 function buildPlaywrightConfig(environment: Environment | null): string {
-  const baseUrl = environment?.variables.find(
-    v => ['base_url', 'baseurl', 'base-url'].includes(v.key.toLowerCase()) && !v.secret
-  )?.value ?? 'http://localhost:3000';
+  const baseUrl = getEnvBaseUrl(environment, 'http://localhost:3000');
 
   return `// @ts-check
 const { defineConfig } = require('@playwright/test');
@@ -184,8 +130,8 @@ function buildSpec(folderName: string, folder: Folder, collection: Collection, n
 
     // Auth + headers (including inherited from collection/folder)
     const inherited = resolveInheritedAuthAndHeaders(reqId, collection);
-    const effectiveAuth = req.auth.type !== 'none' ? req.auth : (inherited.auth ?? req.auth);
-    const allHeaders = [...inherited.headers.filter(h => h.enabled && h.key), ...req.headers.filter(h => h.enabled && h.key)];
+    const effectiveAuth = resolveEffectiveAuth(req, inherited);
+    const allHeaders = mergeHeaders(req, inherited);
 
     const headerEntries: string[] = [];
     if (effectiveAuth.type === 'bearer') {
@@ -222,8 +168,7 @@ function buildSpec(folderName: string, folder: Folder, collection: Collection, n
       optionParts.push(`      params: { ${pairs} }`);
     }
 
-    const hasBody = req.body.mode !== 'none' && !['get', 'head'].includes(method);
-    if (hasBody && req.body.mode === 'json' && req.body.json) {
+    if (hasBody(req) && req.body.mode === 'json' && req.body.json) {
       try {
         const rendered = renderJsValue(JSON.parse(req.body.json), '      ', sharedVars);
         optionParts.push(`      data: ${rendered}`);
@@ -302,25 +247,6 @@ function buildPackageJson(collectionName: string): string {
       dotenv:            '^16.4.0',
     },
   }, null, 2) + '\n';
-}
-
-function renderTree(paths: string[]): string {
-  interface Node { [k: string]: Node }
-  const root: Node = {};
-  for (const p of [...paths].sort()) {
-    let cur = root;
-    for (const part of p.split('/')) { cur = (cur[part] ??= {}); }
-  }
-  function render(node: Node, prefix = ''): string[] {
-    const entries = Object.entries(node);
-    return entries.flatMap(([name, children], i) => {
-      const last = i === entries.length - 1;
-      const lines = [`${prefix}${last ? '└── ' : '├── '}${name}`];
-      if (Object.keys(children).length) lines.push(...render(children, prefix + (last ? '    ' : '│   ')));
-      return lines;
-    });
-  }
-  return ['.', ...render(root)].join('\n');
 }
 
 function buildReadme(collectionName: string, filePaths: string[]): string {

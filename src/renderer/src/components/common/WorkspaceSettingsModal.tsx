@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../../store';
+import { Modal } from './Modal';
 
 const { electron } = window;
 
@@ -102,25 +103,12 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
   ];
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-16"
-      onClick={onClose}
+    <Modal
+      onClose={onClose}
+      overlayClassName="bg-black/50 z-50 flex items-start justify-center pt-16"
+      panelClassName="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl w-[560px] flex flex-col max-h-[80vh]"
+      title="Workspace Settings"
     >
-      <div
-        className="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl w-[560px] flex flex-col max-h-[80vh]"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-surface-800 flex-shrink-0">
-          <h2 className="text-sm font-semibold">Workspace Settings</h2>
-          <button
-            onClick={onClose}
-            className="text-surface-400 hover:text-[var(--text-primary)] text-lg leading-none"
-          >
-            ×
-          </button>
-        </div>
-
         {/* Tabs */}
         <div className="flex border-b border-surface-800 flex-shrink-0 px-4">
           {tabs.map(t => (
@@ -351,7 +339,6 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
             Cancel
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

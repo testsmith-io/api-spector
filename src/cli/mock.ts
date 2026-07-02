@@ -16,87 +16,15 @@
  *   --help               Show this message
  */
 
-import { readFile, stat, readdir } from 'fs/promises';
-import { join, dirname, resolve } from 'path';
-import type { Workspace, MockServer, MockHit } from '../shared/types';
+import type { Workspace, MockHit } from '../shared/types';
 import { startMock, stopAll, setHitCallback } from '../main/mock-server';
-
-// ─── ANSI helpers ─────────────────────────────────────────────────────────────
-
-const C = {
-  reset:  '\x1b[0m',
-  bold:   '\x1b[1m',
-  green:  '\x1b[32m',
-  red:    '\x1b[31m',
-  yellow: '\x1b[33m',
-  cyan:   '\x1b[36m',
-  gray:   '\x1b[90m',
-  white:  '\x1b[97m',
-};
-
-function color(str: string, ...codes: string[]): string {
-  return process.stdout.isTTY ? codes.join('') + str + C.reset : str;
-}
-
-// ─── Arg parsing ──────────────────────────────────────────────────────────────
-
-function parseArgs(argv: string[]): Record<string, string | boolean | string[]> {
-  const args: Record<string, string | boolean | string[]> = {};
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (!arg.startsWith('--')) continue;
-    const key  = arg.slice(2);
-    const next = argv[i + 1];
-    if (!next || next.startsWith('--')) {
-      args[key] = true;
-    } else {
-      // --name can be repeated
-      if (key === 'name') {
-        const prev = args[key];
-        args[key] = Array.isArray(prev) ? [...prev, next] : [next];
-      } else {
-        args[key] = next;
-      }
-      i++;
-    }
-  }
-  return args;
-}
-
-// ─── File loading ─────────────────────────────────────────────────────────────
-
-async function resolveWorkspacePath(wsPath: string): Promise<string> {
-  const s = await stat(wsPath);
-  if (!s.isDirectory()) return wsPath;
-  const entries = await readdir(wsPath);
-  const spector = entries.find(e => e.endsWith('.spector'));
-  if (!spector) throw new Error(`No .spector workspace file found in directory: ${wsPath}`);
-  return join(wsPath, spector);
-}
-
-async function loadWorkspace(wsPath: string): Promise<{ workspace: Workspace; dir: string }> {
-  const resolved = await resolveWorkspacePath(wsPath);
-  const raw = await readFile(resolved, 'utf8');
-  return { workspace: JSON.parse(raw), dir: dirname(resolve(resolved)) };
-}
-
-async function loadMocks(workspace: Workspace, dir: string): Promise<MockServer[]> {
-  const mocks: MockServer[] = [];
-  for (const relPath of workspace.mocks ?? []) {
-    try {
-      const raw = await readFile(join(dir, relPath), 'utf8');
-      mocks.push(JSON.parse(raw));
-    } catch {
-      console.warn(color(`  [warn] Could not load mock: ${relPath}`, C.yellow));
-    }
-  }
-  return mocks;
-}
+import { C, color, parseArgs, loadWorkspace, loadMocks } from './cli-common';
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
+  // --name can be repeated
+  const args = parseArgs(process.argv.slice(2), ['name']);
 
   if (args.help) {
     console.log(
@@ -124,7 +52,8 @@ async function main() {
     process.exit(1);
   }
 
-  const allMocks = await loadMocks(workspace, wsDir);
+  const allMocks = await loadMocks(workspace, wsDir,
+    relPath => console.warn(color(`  [warn] Could not load mock: ${relPath}`, C.yellow)));
 
   if (allMocks.length === 0) {
     console.error(color('  No mock servers defined in this workspace.', C.yellow));

@@ -8,7 +8,7 @@ import type {
   ContractViolation,
 } from '../../shared/types';
 import { loadSpec, resolveSchema, findOperation } from './provider-verifier';
-import { validateConsumerResponse } from './consumer-verifier';
+import { validateConsumerResponse, hasContract } from './consumer-verifier';
 import { fetch, Headers } from 'undici';
 import { interpolate, buildUrl } from '../interpolation';
 import { buildAuthHeaders } from '../auth-builder';
@@ -191,9 +191,7 @@ export async function runBidirectional(
   const start = Date.now();
 
   // Only requests that have a consumer contract and are not disabled
-  const contractRequests = requests.filter(r =>
-    !r.disabled && r.contract && (r.contract.statusCode !== undefined || r.contract.bodySchema || r.contract.headers?.length),
-  );
+  const contractRequests = requests.filter(r => !r.disabled && hasContract(r.contract));
 
   const results: ContractResult[] = await Promise.all(contractRequests.map(async req => {
     const url        = buildUrl(req.url, req.params, vars);

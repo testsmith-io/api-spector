@@ -1,12 +1,14 @@
 # Contract Testing
 
-Contract testing verifies that a consumer (your API collection) and a provider (the real API) agree on a shared contract: the expected status codes, response headers, and response body shapes. API Spector supports three modes: **Consumer**, **Provider**, and **Bi-directional**.
+Contract testing verifies that a consumer (your API collection) and a provider (the real API) agree on a shared contract: the expected status codes, response headers, and response body shapes. API Spector supports four modes: **Consumer**, **Provider**, **Provider (live)**, and **Bi-directional**.
 
 Think of it as **who owns the definition of "correct"**.
 
+> **New in this release:** live provider verification with provider states, Pact-style flexible matchers, Pact file import/export, HTML reports, and a local `can-i-deploy` gate. The CLI side of all of this is covered in **[Contract Testing (CLI)](../cli/contract-testing.md)**.
+
 ---
 
-## The Three Modes
+## The Four Modes
 
 ### Consumer mode
 
@@ -41,6 +43,28 @@ You need the spec URL. You do not need to define any contract on your requests.
 5. No HTTP call is made, so you can run this without a live server.
 
 > **Note:** Provider mode validates your *requests* against the spec, not the responses. It answers "am I calling the API correctly?" not "is the API returning what I expect?"
+
+---
+
+### Provider (live) mode
+
+This is the real **Pact-style provider verification**. Instead of static analysis, it takes the contracts you defined on your requests and **replays them against a really-running provider**, asserting that the live responses satisfy each contract. It is the answer to "does this build of the provider actually honour the consumer's expectations?"
+
+Two things make it different from Consumer mode:
+
+1. **Provider base URL.** Every request is rebased onto the origin you supply (e.g. `http://localhost:3000`), keeping its path and query. This lets the same contracts verify any environment — local, staging, a PR preview — without editing request URLs.
+2. **Provider states.** Before each interaction, the tool can seed the provider into a known state (Pact's `given(...)`). You list the required states on the request's contract, and point the run at a **state handler URL**. Before each interaction the tool POSTs `{ state, action: "setup" }` to that URL; afterwards it POSTs `{ state, action: "teardown" }`.
+
+**When to use:** Provider-side CI. The provider team runs this against a freshly built service to confirm it still satisfies every consumer contract before shipping.
+
+**Workflow:**
+1. Define contracts on your requests (status, headers, body schema or matchers).
+2. (Optional) On each request's Contract tab, list the provider states it depends on.
+3. Open the Contracts panel, select **Live**, and enter the **Provider base URL**.
+4. (Optional) Enter a **State handler URL** if any contract declares provider states.
+5. Click **Run**. A `PROVIDER STATE FAILED` violation means a required state could not be seeded (handler missing, unreachable, or non-2xx).
+
+> **Tip:** The state handler is a small endpoint you add to your provider (often only in test builds) that puts the database/fixtures into the named state. It mirrors Pact's "state change URL" exactly, so an existing Pact provider-states endpoint works as-is.
 
 ---
 
@@ -116,6 +140,22 @@ Paste a JSON Schema (draft-07) the response body must satisfy.
 
 **↓ Contract** in the response viewer captures status, `content-type`, and an inferred body schema all at once and jumps straight to the Contract tab.
 
+### Body matchers (Pact-style)
+
+A plain JSON Schema can be brittle — it either pins exact values or you hand-write `type` constraints everywhere. As an alternative you can supply a **body matcher**: an *example* document where any node can be relaxed with a matcher. This mirrors Pact's `like` / `eachLike` / `term` matchers and is what Pact files import into.
+
+The default is **exact match**; wrap a value in a matcher to loosen it:
+
+| Matcher | Meaning |
+|---------|---------|
+| `like(x)` | Value must be the same **type** as `x` (recurses into objects/arrays) |
+| `eachLike(x, min)` | An **array** whose every item matches `like(x)`, with at least `min` items |
+| `regex(re, eg)` | A **string** matching the regular expression `re` |
+| `integer()` / `decimal()` | Numeric type matching |
+| `datetime()` / `date()` / `time()` | A string in the corresponding format |
+
+Matchers compile to JSON Schema under the hood, so they validate through the same engine as a hand-written schema and produce the same `SCHEMA VIOLATION` results. A body matcher and a body schema can both be set; both are checked. See **[Pact Compatibility & Matchers](../reference/pact-compatibility.md)** for the on-disk format and full matcher list.
+
 ---
 
 ## Reading the results
@@ -143,18 +183,23 @@ Failed requests appear first. Each card is expandable and shows:
 
 Expanding a card shows each violation with its type, path, message, and expected/actual values.
 
+### Export an HTML report
+
+Click **Export HTML** in the results bar to save a **self-contained HTML report** (inline styles, no external assets). It opens straight from disk and is ideal as a CI artifact or to share with teammates — the same report the CLI produces with `--html`. See **[Contract Testing (CLI) → Reports](../cli/contract-testing.md#reports)**.
+
 ---
 
 ## Violation reference
 
 | Type | Meaning | Modes |
 |------|---------|-------|
-| `STATUS MISMATCH` | Response status did not match expected | Consumer, Bi-dir |
-| `SCHEMA VIOLATION` | Response body failed JSON Schema validation | Consumer, Bi-dir |
-| `MISSING HEADER` | Required header absent or wrong value | Consumer, Bi-dir |
+| `STATUS MISMATCH` | Response status did not match expected | Consumer, Provider (live), Bi-dir |
+| `SCHEMA VIOLATION` | Response body failed JSON Schema / matcher validation | Consumer, Provider (live), Bi-dir |
+| `MISSING HEADER` | Required header absent or wrong value | Consumer, Provider (live), Bi-dir |
 | `REQUEST BODY INVALID` | Request body violates spec schema, or required query param missing | Provider, Bi-dir |
 | `UNKNOWN PATH` | No matching operation in spec for this method and URL | Provider, Bi-dir |
 | `SCHEMA INCOMPATIBLE` | Consumer's expected response schema conflicts with provider spec | Bi-dir |
+| `PROVIDER STATE FAILED` | A required provider state could not be seeded before replay | Provider (live) |
 
 ---
 
@@ -162,6 +207,9 @@ Expanding a card shows each violation with its type, path, message, and expected
 
 - **Start with Consumer mode** before you have a spec. It requires no setup beyond sending a request once.
 - **Provider mode needs no live server.** Run it in CI to detect spec drift before deployment.
+- **Provider (live) mode is for the provider's CI.** Point it at a freshly built service to prove it still satisfies every consumer contract before shipping.
+- **Use matchers instead of exact bodies** when only the *shape* matters — they survive changing IDs, timestamps, and counts.
 - **Bi-dir without a body schema** skips the static compatibility check and runs only live verification.
-- **Environment variables** are substituted before validation in all three modes, so `{{BASE_URL}}` in URLs and request bodies is resolved automatically.
+- **Environment variables** are substituted before validation in every mode, so `{{BASE_URL}}` in URLs and request bodies is resolved automatically.
 - **`UNKNOWN PATH` in Provider mode** often means the request URL points at a different host than what the spec documents. The path itself (`/status`) is what matters, not the hostname.
+- **Everything here runs headless too.** See **[Contract Testing (CLI)](../cli/contract-testing.md)** for CI gating, Pact import/export, and reports.

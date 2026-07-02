@@ -4,23 +4,12 @@
 import type { Collection, Environment, Folder, GeneratedFile } from '../../shared/types';
 import { resolveInheritedAuthAndHeaders, getAllApplicableHooks } from '../../shared/request-collection';
 import { parsePostScript } from './script-parser';
+import {
+  slug, toEnvVar, interpolateEnvVars as interpolateValue,
+  resolveEffectiveAuth, mergeHeaders, hasBody, getEnvBaseUrl, renderTree,
+} from './generator-utils';
 
 // ─── Supertest + Jest JavaScript generator ────────────────────────────────────
-
-function slug(name: string): string {
-  return name.replace(/\W+/g, '-').toLowerCase().replace(/^-|-$/g, '');
-}
-
-function toEnvVar(key: string): string {
-  return key.replace(/\W+/g, '_').toUpperCase();
-}
-
-function interpolateValue(value: string, sharedVars: Set<string> = new Set()): string {
-  return value.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
-    const envKey = toEnvVar(key.trim());
-    return sharedVars.has(envKey) ? `\${${envKey}}` : `\${process.env.${envKey} ?? ''}`;
-  });
-}
 
 function buildJestConfig(): string {
   return `\
@@ -34,9 +23,7 @@ module.exports = {
 }
 
 function buildClient(environment: Environment | null): string {
-  const baseUrl = environment?.variables.find(
-    v => ['base_url', 'baseurl', 'base-url'].includes(v.key.toLowerCase()) && !v.secret
-  )?.value ?? 'http://localhost:3000';
+  const baseUrl = getEnvBaseUrl(environment, 'http://localhost:3000');
 
   const secretVars = environment?.variables.filter(v => v.secret && v.secretRef) ?? [];
   const envComments = secretVars.map(v => `# ${toEnvVar(v.key)}=<from keychain>`).join('\n');
@@ -122,10 +109,9 @@ function buildTestFile(folderName: string, folder: Folder, collection: Collectio
 
     // Inherited auth + headers
     const inherited = resolveInheritedAuthAndHeaders(reqId, collection);
-    const effectiveAuth = req.auth.type !== 'none' ? req.auth : (inherited.auth ?? req.auth);
-    const allHeaders = [...inherited.headers.filter(h => h.enabled && h.key), ...req.headers.filter(h => h.enabled && h.key)];
+    const effectiveAuth = resolveEffectiveAuth(req, inherited);
+    const allHeaders = mergeHeaders(req, inherited);
     const enabledParams = req.params.filter(p => p.enabled && p.key);
-    const hasBody = req.body.mode !== 'none' && !['get', 'head'].includes(method);
 
     const lines: string[] = [];
     lines.push(`  it('${nameMap.get(reqId)}', async () => {`);
@@ -151,7 +137,7 @@ function buildTestFile(folderName: string, folder: Folder, collection: Collectio
       lines.push(`      .query({ ${pairs} })`);
     }
 
-    if (hasBody) {
+    if (hasBody(req)) {
       if (req.body.mode === 'json') {
         const jsonBody = req.body.json ?? '{}';
         if (jsonBody.includes('{{')) {
@@ -225,25 +211,6 @@ function buildPackageJson(collectionName: string): string {
       supertest: '^7.0.0',
     },
   }, null, 2) + '\n';
-}
-
-function renderTree(paths: string[]): string {
-  interface Node { [k: string]: Node }
-  const root: Node = {};
-  for (const p of [...paths].sort()) {
-    let cur = root;
-    for (const part of p.split('/')) { cur = (cur[part] ??= {}); }
-  }
-  function render(node: Node, prefix = ''): string[] {
-    const entries = Object.entries(node);
-    return entries.flatMap(([name, children], i) => {
-      const last = i === entries.length - 1;
-      const lines = [`${prefix}${last ? '└── ' : '├── '}${name}`];
-      if (Object.keys(children).length) lines.push(...render(children, prefix + (last ? '    ' : '│   ')));
-      return lines;
-    });
-  }
-  return ['.', ...render(root)].join('\n');
 }
 
 function buildReadme(collectionName: string, filePaths: string[]): string {

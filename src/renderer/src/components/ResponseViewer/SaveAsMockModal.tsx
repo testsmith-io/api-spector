@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useStore } from '../../store';
 import type { MockRoute, ResponsePayload } from '../../../../shared/types';
+import { Modal } from '../common/Modal';
 
 const { electron } = window;
 
@@ -84,16 +85,13 @@ export function SaveAsMockModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-20">
-      <div
-        className="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl w-[520px] flex flex-col"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-surface-800">
-          <h2 className="text-sm font-semibold">Save as mock route</h2>
-          <button onClick={onClose} className="text-surface-400 hover:text-[var(--text-primary)] text-lg leading-none">×</button>
-        </div>
-
+    <Modal
+      onClose={onClose}
+      closeOnBackdrop={false}
+      overlayClassName="bg-black/50 z-50 flex items-start justify-center pt-20"
+      panelClassName="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl w-[520px] flex flex-col"
+      title="Save as mock route"
+    >
         <div className="px-4 py-4 flex flex-col gap-3 text-xs overflow-y-auto max-h-[70vh]">
 
           {/* Server selection */}
@@ -185,7 +183,6 @@ export function SaveAsMockModal({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

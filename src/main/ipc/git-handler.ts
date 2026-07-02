@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { type IpcMain } from 'electron';
+import { IPC } from '../../shared/ipc-channels';
+import { handleIpc } from './handle';
 import { simpleGit } from 'simple-git';
 import { writeFile, mkdir, stat } from 'fs/promises';
 import { join, dirname } from 'path';
@@ -16,7 +18,7 @@ function git() {
 
 export function registerGitHandlers(ipc: IpcMain): void {
 
-  ipc.handle('git:isRepo', async () => {
+  handleIpc(ipc, IPC.git.isRepo, async () => {
     // Check the workspace directory itself — NOT `git rev-parse --git-dir`,
     // which walks up the directory tree and may pick up an ancestor repo
     // (e.g. a `~/.git` dotfiles repo). When that happens, every subsequent
@@ -33,7 +35,7 @@ export function registerGitHandlers(ipc: IpcMain): void {
     }
   });
 
-  ipc.handle('git:init', async () => {
+  handleIpc(ipc, IPC.git.init, async () => {
     await git().init();
     // Ensure secrets / generated artifacts aren't committed when the user
     // initializes git on an existing workspace that pre-dates the auto-write.
@@ -41,7 +43,7 @@ export function registerGitHandlers(ipc: IpcMain): void {
     if (dir) await ensureGitignore(dir);
   });
 
-  ipc.handle('git:status', async (): Promise<GitStatus> => {
+  handleIpc(ipc, IPC.git.status, async (): Promise<GitStatus> => {
     const result = await git().status();
     return {
       staged:     result.staged.map(f => ({ path: f, status: resolveStatus(result, f, true) })),
@@ -57,49 +59,49 @@ export function registerGitHandlers(ipc: IpcMain): void {
     };
   });
 
-  ipc.handle('git:resolveOurs', async (_e, filePath: string) => {
+  handleIpc(ipc, IPC.git.resolveOurs, async (_e, filePath: string) => {
     const g = git();
     await g.checkout(['--ours', '--', filePath]);
     await g.add([filePath]);
   });
 
-  ipc.handle('git:resolveTheirs', async (_e, filePath: string) => {
+  handleIpc(ipc, IPC.git.resolveTheirs, async (_e, filePath: string) => {
     const g = git();
     await g.checkout(['--theirs', '--', filePath]);
     await g.add([filePath]);
   });
 
-  ipc.handle('git:markResolved', async (_e, filePath: string) => {
+  handleIpc(ipc, IPC.git.markResolved, async (_e, filePath: string) => {
     await git().add([filePath]);
   });
 
-  ipc.handle('git:diff', async (_e, filePath?: string): Promise<string> => {
+  handleIpc(ipc, IPC.git.diff, async (_e, filePath?: string): Promise<string> => {
     if (filePath) return git().diff(['--', filePath]);
     return git().diff();
   });
 
-  ipc.handle('git:diffStaged', async (_e, filePath?: string): Promise<string> => {
+  handleIpc(ipc, IPC.git.diffStaged, async (_e, filePath?: string): Promise<string> => {
     if (filePath) return git().diff(['--cached', '--', filePath]);
     return git().diff(['--cached']);
   });
 
-  ipc.handle('git:stage', async (_e, paths: string[]) => {
+  handleIpc(ipc, IPC.git.stage, async (_e, paths: string[]) => {
     await git().add(paths);
   });
 
-  ipc.handle('git:unstage', async (_e, paths: string[]) => {
+  handleIpc(ipc, IPC.git.unstage, async (_e, paths: string[]) => {
     await git().reset(['HEAD', '--', ...paths]);
   });
 
-  ipc.handle('git:stageAll', async () => {
+  handleIpc(ipc, IPC.git.stageAll, async () => {
     await git().add(['.']);
   });
 
-  ipc.handle('git:commit', async (_e, message: string) => {
+  handleIpc(ipc, IPC.git.commit, async (_e, message: string) => {
     await git().commit(message);
   });
 
-  ipc.handle('git:log', async (_e, limit = 50): Promise<GitCommit[]> => {
+  handleIpc(ipc, IPC.git.log, async (_e, limit: number = 50): Promise<GitCommit[]> => {
     const result = await git().log({ maxCount: limit });
     return result.all.map(c => ({
       hash:    c.hash,
@@ -111,7 +113,7 @@ export function registerGitHandlers(ipc: IpcMain): void {
     }));
   });
 
-  ipc.handle('git:branches', async (): Promise<GitBranch[]> => {
+  handleIpc(ipc, IPC.git.branches, async (): Promise<GitBranch[]> => {
     // The previous implementation passed a `--format=…` arg but then read
     // `result.all` (which simple-git doesn't honor when --format is set),
     // so upstream/ahead/behind were silently dropped. Run the format flag
@@ -150,7 +152,7 @@ export function registerGitHandlers(ipc: IpcMain): void {
     return branches;
   });
 
-  ipc.handle('git:checkout', async (_e, branch: string, create: boolean) => {
+  handleIpc(ipc, IPC.git.checkout, async (_e, branch: string, create: boolean) => {
     if (create) {
       await git().checkoutLocalBranch(branch);
       return;
@@ -178,16 +180,16 @@ export function registerGitHandlers(ipc: IpcMain): void {
     await git().checkout(branch);
   });
 
-  ipc.handle('git:deleteBranch', async (_e, name: string, force = false) => {
+  handleIpc(ipc, IPC.git.deleteBranch, async (_e, name: string, force: boolean = false) => {
     // simple-git's deleteLocalBranch wraps `git branch -d` (-D when force).
     await git().deleteLocalBranch(name, force);
   });
 
-  ipc.handle('git:pull', async () => {
+  handleIpc(ipc, IPC.git.pull, async () => {
     await git().pull();
   });
 
-  ipc.handle('git:push', async (_e, setUpstream: boolean) => {
+  handleIpc(ipc, IPC.git.push, async (_e, setUpstream: boolean) => {
     if (setUpstream) {
       const status = await git().status();
       await git().push(['--set-upstream', 'origin', status.current ?? 'main']);
@@ -196,24 +198,24 @@ export function registerGitHandlers(ipc: IpcMain): void {
     }
   });
 
-  ipc.handle('git:remotes', async (): Promise<GitRemote[]> => {
+  handleIpc(ipc, IPC.git.remotes, async (): Promise<GitRemote[]> => {
     const result = await git().getRemotes(true);
     return result.map(r => ({ name: r.name, url: r.refs.fetch || r.refs.push || '' }));
   });
 
-  ipc.handle('git:addRemote', async (_e, name: string, url: string) => {
+  handleIpc(ipc, IPC.git.addRemote, async (_e, name: string, url: string) => {
     await git().addRemote(name, url);
   });
 
-  ipc.handle('git:setRemoteUrl', async (_e, name: string, url: string) => {
+  handleIpc(ipc, IPC.git.setRemoteUrl, async (_e, name: string, url: string) => {
     await git().remote(['set-url', name, url]);
   });
 
-  ipc.handle('git:removeRemote', async (_e, name: string) => {
+  handleIpc(ipc, IPC.git.removeRemote, async (_e, name: string) => {
     await git().removeRemote(name);
   });
 
-  ipc.handle('git:writeCiFile', async (_e, relPath: string, content: string) => {
+  handleIpc(ipc, IPC.git.writeCiFile, async (_e, relPath: string, content: string) => {
     const wsDir = getWorkspaceDir();
     if (!wsDir) throw new Error('No workspace open');
     const fullPath = join(wsDir, relPath);

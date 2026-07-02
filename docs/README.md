@@ -12,6 +12,7 @@
 - **CLI:** run test collections and start mock servers from the terminal or CI/CD pipelines
 - **Encrypted secrets:** AES-256-GCM encryption with a master password, never stored in plain text
 - **Mock servers:** define and run HTTP mock servers with per-route delay and status control
+- **Contract testing:** consumer, provider, live provider verification (with provider states), and bi-directional modes; Pact-style matchers, Pact file import/export, a local `can-i-deploy` gate, and HTML/JUnit reports
 - **Code generation:** export collections as Robot Framework or Playwright test suites
 - **Variable interpolation:** `{{variable}}` syntax across URLs, headers, bodies, and scripts
 - **Scripting:** pre-request and post-response JavaScript with `pm`-compatible API

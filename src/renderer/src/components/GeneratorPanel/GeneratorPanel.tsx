@@ -23,6 +23,7 @@ const TARGETS: TargetDef[] = [
   { id: 'supertest_js',    label: 'Supertest JS',    description: 'Jest + Supertest JavaScript tests' },
   { id: 'rest_assured',    label: 'REST Assured',    description: 'Java + JUnit 5 + Maven pom.xml' },
   { id: 'karate',          label: 'Karate',          description: 'Karate feature files + JUnit 5 runner + Maven' },
+  { id: 'http_file',       label: 'HTTP file',       description: '.http / .rest file (VSCode REST Client / IntelliJ)' },
 ];
 
 export function GeneratorPanel() {

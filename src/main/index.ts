@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell } from 'electron';
+import { IPC } from '../shared/ipc-channels';
+import { handleIpc } from './ipc/handle';
 
 // Managed / locked-down machines (corporate Windows with EDR software, or
 // Linux with user-namespaces disabled) can hit "permission denied" with
@@ -153,7 +155,7 @@ app.whenReady().then(async () => {
   registerContractHandlers(ipcMain);
   registerGitHandlers(ipcMain);
   registerRecordHandlers(ipcMain, () => BrowserWindow.getAllWindows()[0]?.webContents ?? null);
-  ipcMain.handle('shell:openExternal', (_e, url: string) => shell.openExternal(url));
+  handleIpc(ipcMain, IPC.shell.openExternal, (_e, url: string) => shell.openExternal(url));
 
   createWindow();
 

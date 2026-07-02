@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import type { StateCreator } from 'zustand';
-import type { ContractReport, ContractSnapshot, Workspace } from '../../../../shared/types';
+import type { ContractReport, ContractSnapshot } from '../../../../shared/types';
+import type { FullState } from '../index';
 
 export interface ContractSlice {
   /** Latest run only — there is no run history. */
@@ -18,13 +19,10 @@ export interface ContractSlice {
   setActiveContractSnapshot: (relPath: string | null) => void
 }
 
-/** This slice mutates `workspace.contracts` when snapshots are added/removed,
- *  so its `set` callback needs visibility into the parent state's `workspace`
- *  field. The parent type encoded structurally below. */
-export type ContractSliceParent = ContractSlice & { workspace: Workspace | null }
-
+// This slice mutates `workspace.contracts` when snapshots are added/removed,
+// so its `set` callback is typed against the full store state.
 export const createContractSlice: StateCreator<
-  ContractSliceParent,
+  FullState,
   [['zustand/immer', never]],
   [],
   ContractSlice

@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { useStore } from '../../store';
 import type { EnvVariable } from '../../../../shared/types';
 import { MasterKeyModal } from './MasterKeyModal';
+import { Modal } from '../common/Modal';
 import { envRelPath } from '../../../../shared/naming-utils';
 
 const { electron } = window;
@@ -210,14 +211,12 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
         />
       )}
 
-      <div
-        className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
-        onClick={onClose}
+      <Modal
+        onClose={onClose}
+        closeOnEscape={pendingEncryptIdx === null}
+        overlayClassName="bg-black/50 z-50 flex items-center justify-center"
+        panelClassName="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl flex w-[780px] max-h-[80vh]"
       >
-        <div
-          className="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl flex w-[780px] max-h-[80vh]"
-          onClick={e => e.stopPropagation()}
-        >
           {/* Sidebar */}
           <div className="w-44 border-r border-surface-800 flex flex-col flex-shrink-0">
             <div className="px-3 py-2 text-xs font-semibold text-surface-400 uppercase tracking-wider border-b border-surface-800">
@@ -477,8 +476,7 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
               </button>
             </div>
           )}
-        </div>
-      </div>
+      </Modal>
     </>
   );
 }

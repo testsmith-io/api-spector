@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { type IpcMain, type IpcMainInvokeEvent } from 'electron';
+import { IPC } from '../../shared/ipc-channels';
+import { handleIpc } from './handle';
 import WebSocket from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import type { WsMessage } from '../../shared/types';
@@ -21,7 +23,7 @@ export function closeAllWsConnections(): void {
 
 export function registerWsHandlers(ipc: IpcMain): void {
   // ws:connect — open a new WebSocket connection
-  ipc.handle('ws:connect', async (event: IpcMainInvokeEvent, requestId: string, url: string, headers: Record<string, string>) => {
+  handleIpc(ipc, IPC.ws.connect, async (event: IpcMainInvokeEvent, requestId: string, url: string, headers: Record<string, string>) => {
     // Close any existing connection for this requestId
     const existing = connections.get(requestId);
     if (existing) {
@@ -30,14 +32,14 @@ export function registerWsHandlers(ipc: IpcMain): void {
     }
 
     // Notify renderer: connecting
-    event.sender.send('ws:status', { requestId, status: 'connecting' });
+    event.sender.send(IPC.ws.status, { requestId, status: 'connecting' });
 
     const ws = new WebSocket(url, { headers });
 
     connections.set(requestId, ws);
 
     ws.on('open', () => {
-      event.sender.send('ws:status', { requestId, status: 'connected' });
+      event.sender.send(IPC.ws.status, { requestId, status: 'connected' });
     });
 
     ws.on('message', (data: WebSocket.RawData) => {
@@ -47,22 +49,22 @@ export function registerWsHandlers(ipc: IpcMain): void {
         data: data.toString(),
         timestamp: Date.now(),
       };
-      event.sender.send('ws:message', { requestId, message });
+      event.sender.send(IPC.ws.message, { requestId, message });
     });
 
     ws.on('error', (err: Error) => {
-      event.sender.send('ws:status', { requestId, status: 'error', error: err.message });
+      event.sender.send(IPC.ws.status, { requestId, status: 'error', error: err.message });
       connections.delete(requestId);
     });
 
     ws.on('close', () => {
-      event.sender.send('ws:status', { requestId, status: 'disconnected' });
+      event.sender.send(IPC.ws.status, { requestId, status: 'disconnected' });
       connections.delete(requestId);
     });
   });
 
   // ws:send — send a text message on an existing connection
-  ipc.handle('ws:send', async (_event: IpcMainInvokeEvent, requestId: string, data: string) => {
+  handleIpc(ipc, IPC.ws.send, async (_event: IpcMainInvokeEvent, requestId: string, data: string) => {
     const ws = connections.get(requestId);
     if (!ws || ws.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket is not connected');
@@ -71,7 +73,7 @@ export function registerWsHandlers(ipc: IpcMain): void {
   });
 
   // ws:disconnect — close a connection
-  ipc.handle('ws:disconnect', async (_event: IpcMainInvokeEvent, requestId: string) => {
+  handleIpc(ipc, IPC.ws.disconnect, async (_event: IpcMainInvokeEvent, requestId: string) => {
     const ws = connections.get(requestId);
     if (ws) {
       ws.close();

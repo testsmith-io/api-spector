@@ -23,18 +23,9 @@ import {
   startRecorder, stopRecorder, setRecorderHitCallback, entriesToMockServer,
 } from '../main/recorder';
 import type { RecordedEntry } from '../shared/types';
+import { C, color, parseArgs } from './cli-common';
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
-
-const C = {
-  reset:  '\x1b[0m', bold: '\x1b[1m', dim: '\x1b[2m',
-  green:  '\x1b[32m', red: '\x1b[31m', yellow: '\x1b[33m',
-  cyan:   '\x1b[36m', gray: '\x1b[90m', white: '\x1b[97m',
-};
-
-function color(str: string, ...codes: string[]): string {
-  return process.stdout.isTTY ? codes.join('') + str + C.reset : str;
-}
 
 function methodBadge(method: string): string {
   const m = method.toUpperCase();
@@ -43,34 +34,11 @@ function methodBadge(method: string): string {
   return color(m.padEnd(7), c, C.bold);
 }
 
-// ─── Arg parsing ──────────────────────────────────────────────────────────────
-
-function parseArgs(argv: string[]): Record<string, string | boolean | string[]> {
-  const args: Record<string, string | boolean | string[]> = {};
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (!arg.startsWith('--')) continue;
-    const key  = arg.slice(2);
-    const next = argv[i + 1];
-    if (!next || next.startsWith('--')) {
-      args[key] = true;
-    } else {
-      if (key === 'mask' || key === 'ignore') {
-        const existing = args[key];
-        args[key] = Array.isArray(existing) ? [...existing, next] : [next];
-      } else {
-        args[key] = next;
-      }
-      i++;
-    }
-  }
-  return args;
-}
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
+  // --mask and --ignore can be repeated
+  const args = parseArgs(process.argv.slice(2), ['mask', 'ignore']);
 
   if (args.help) {
     console.log(

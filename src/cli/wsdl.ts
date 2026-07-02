@@ -16,29 +16,14 @@
  * the matching response envelope by SOAPAction / operation element.
  */
 
-import { readFile, writeFile, readdir, stat, mkdir } from 'fs/promises';
-import { join, dirname, resolve } from 'path';
+import { writeFile, mkdir } from 'fs/promises';
+import { dirname, resolve } from 'path';
 import https from 'https';
 import http from 'http';
-import type { Workspace, MockServer } from '../shared/types';
+import type { Workspace } from '../shared/types';
 import { parseWsdl } from '../main/ipc/soap-handler';
 import { importWsdl, defaultCollectionRelPath, defaultMockRelPath } from '../main/wsdl/import';
-
-// ─── Arg parsing (shared shape with other CLI entry points) ──────────────────
-
-function parseArgs(argv: string[]): Record<string, string | boolean> {
-  const args: Record<string, string | boolean> = {};
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith('--')) {
-      const key = arg.slice(2);
-      const next = argv[i + 1];
-      if (!next || next.startsWith('--')) { args[key] = true; }
-      else { args[key] = next; i++; }
-    }
-  }
-  return args;
-}
+import { parseArgs, loadWorkspace, loadMocks } from './cli-common';
 
 // ─── HTTP fetch (no electron dep — works in plain node) ──────────────────────
 
@@ -54,23 +39,6 @@ function fetchUrl(url: string): Promise<string> {
     req.on('error', rejectP);
     req.setTimeout(15000, () => { req.destroy(); rejectP(new Error('WSDL fetch timed out')); });
   });
-}
-
-// ─── Workspace loading (shared pattern with other CLI commands) ──────────────
-
-async function resolveWorkspacePath(wsPath: string): Promise<string> {
-  const s = await stat(wsPath);
-  if (!s.isDirectory()) return wsPath;
-  const entries = await readdir(wsPath);
-  const spector = entries.find(e => e.endsWith('.spector'));
-  if (!spector) throw new Error(`No .spector workspace file found in directory: ${wsPath}`);
-  return join(wsPath, spector);
-}
-
-async function loadWorkspace(wsPath: string): Promise<{ workspace: Workspace; dir: string; file: string }> {
-  const resolved = await resolveWorkspacePath(wsPath);
-  const raw = await readFile(resolved, 'utf8');
-  return { workspace: JSON.parse(raw), dir: dirname(resolve(resolved)), file: resolved };
 }
 
 async function ensureDir(dir: string): Promise<void> {
@@ -113,15 +81,8 @@ async function cmdDescribe(args: Record<string, string | boolean>): Promise<void
 }
 
 async function loadExistingMockPorts(workspace: Workspace, dir: string): Promise<number[]> {
-  const ports: number[] = [];
-  for (const relPath of workspace.mocks ?? []) {
-    try {
-      const raw = await readFile(join(dir, relPath), 'utf8');
-      const m = JSON.parse(raw) as MockServer;
-      if (typeof m.port === 'number') ports.push(m.port);
-    } catch { /* ignore */ }
-  }
-  return ports;
+  const mocks = await loadMocks(workspace, dir); // unreadable files silently ignored
+  return mocks.map(m => m.port).filter((p): p is number => typeof p === 'number');
 }
 
 async function cmdImportCollection(args: Record<string, string | boolean>): Promise<void> {

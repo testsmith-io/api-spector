@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { type IpcMain, dialog, app } from 'electron';
+import { IPC } from '../../shared/ipc-channels';
+import { handleIpc } from './handle';
 import { readFile, writeFile, mkdir, readdir, unlink } from 'fs/promises';
 import { join, dirname, resolve, basename } from 'path';
 import type { Collection, Environment, Workspace } from '../../shared/types';
@@ -214,7 +216,7 @@ function defaultWorkspaceName(): string {
 }
 
 export function registerFileHandlers(ipc: IpcMain): void {
-  ipc.handle('file:openWorkspace', async () => {
+  handleIpc(ipc, IPC.file.openWorkspace, async () => {
     const result = await dialog.showOpenDialog({
       title: 'Open Workspace',
       defaultPath: dialogStartDir(),
@@ -231,7 +233,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     return { workspace: JSON.parse(raw) as Workspace, workspacePath: wsPath };
   });
 
-  ipc.handle('file:newWorkspace', async () => {
+  handleIpc(ipc, IPC.file.newWorkspace, async () => {
     // When launched from the CLI in a specific folder, default the save
     // dialog to that folder with a workspace name derived from the folder
     // basename (e.g. /tmp/my-tests → my-tests.spector). The user can still
@@ -278,7 +280,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     return { workspace: ws, workspacePath: result.filePath };
   });
 
-  ipc.handle('file:saveWorkspace', async (_e, ws: Workspace) => {
+  handleIpc(ipc, IPC.file.saveWorkspace, async (_e, ws: Workspace) => {
     if (!workspaceFile) return;
     await atomicWrite(workspaceFile, JSON.stringify(ws, null, 2));
     // Backfill the editor file-association for workspaces created before this
@@ -286,26 +288,26 @@ export function registerFileHandlers(ipc: IpcMain): void {
     if (workspaceDir) await ensureVscodeFileAssociation(workspaceDir);
   });
 
-  ipc.handle('file:loadCollection', async (_e, relPath: string) => {
+  handleIpc(ipc, IPC.file.loadCollection, async (_e, relPath: string) => {
     if (!workspaceDir) throw new Error('No workspace open');
     const raw = await readFile(resolve(workspaceDir, relPath), 'utf8');
     return JSON.parse(raw) as Collection;
   });
 
-  ipc.handle('file:saveCollection', async (_e, relPath: string, col: Collection) => {
+  handleIpc(ipc, IPC.file.saveCollection, async (_e, relPath: string, col: Collection) => {
     if (!workspaceDir) throw new Error('No workspace open');
     const fullPath = resolve(workspaceDir, relPath);
     await mkdir(dirname(fullPath), { recursive: true });
     await atomicWrite(fullPath, JSON.stringify(col, null, 2));
   });
 
-  ipc.handle('file:loadEnvironment', async (_e, relPath: string) => {
+  handleIpc(ipc, IPC.file.loadEnvironment, async (_e, relPath: string) => {
     if (!workspaceDir) throw new Error('No workspace open');
     const raw = await readFile(resolve(workspaceDir, relPath), 'utf8');
     return JSON.parse(raw) as Environment;
   });
 
-  ipc.handle('file:saveEnvironment', async (_e, relPath: string, env: Environment) => {
+  handleIpc(ipc, IPC.file.saveEnvironment, async (_e, relPath: string, env: Environment) => {
     if (!workspaceDir) throw new Error('No workspace open');
     const fullPath = resolve(workspaceDir, relPath);
     await mkdir(dirname(fullPath), { recursive: true });
@@ -315,7 +317,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
   /** Delete a workspace-relative file (collection, environment, mock, …).
    *  Constrained to the workspace dir so a malicious renderer can't trick us
    *  into wiping files elsewhere. Idempotent — missing files are not an error. */
-  ipc.handle('file:deleteWorkspaceFile', async (_e, relPath: string) => {
+  handleIpc(ipc, IPC.file.deleteWorkspaceFile, async (_e, relPath: string) => {
     if (!workspaceDir) throw new Error('No workspace open');
     const fullPath = resolve(workspaceDir, relPath);
     // Reject any path that escapes the workspace dir (`..`, absolute paths
@@ -332,7 +334,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     }
   });
 
-  ipc.handle('dialog:pickDir', async () => {
+  handleIpc(ipc, IPC.dialog.pickDir, async () => {
     const result = await dialog.showOpenDialog({
       title: 'Select Output Directory',
       properties: ['openDirectory', 'createDirectory']
@@ -340,7 +342,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     return result.canceled ? null : result.filePaths[0];
   });
 
-  ipc.handle('results:save', async (_e, content: string, defaultName: string) => {
+  handleIpc(ipc, IPC.results.save, async (_e, content: string, defaultName: string) => {
     const ext = defaultName.endsWith('.xml') ? 'xml' : defaultName.endsWith('.html') ? 'html' : 'json';
     const allFilters = [
       { name: 'JSON',     extensions: ['json'] },
@@ -360,14 +362,14 @@ export function registerFileHandlers(ipc: IpcMain): void {
   });
 
   // ── Globals ──────────────────────────────────────────────────────────────
-  ipc.handle('globals:get', () => getGlobals());
+  handleIpc(ipc, IPC.globals.get, () => getGlobals());
 
-  ipc.handle('globals:set', async (_e, patch: Record<string, string>) => {
+  handleIpc(ipc, IPC.globals.set, async (_e, patch: Record<string, string>) => {
     setGlobals(patch);
     await persistGlobals();
   });
 
-  ipc.handle('file:closeWorkspace', async () => {
+  handleIpc(ipc, IPC.file.closeWorkspace, async () => {
     workspaceDir  = null;
     workspaceFile = null;
     // Clear so the app shows the welcome screen on next launch. If the user-data
@@ -378,7 +380,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     });
   });
 
-  ipc.handle('file:getLastWorkspace', async () => {
+  handleIpc(ipc, IPC.file.getLastWorkspace, async () => {
     // Launch order of preference:
     //   1. The CLI's launch cwd (set by bin/cli.js as API_SPECTOR_LAUNCH_CWD).
     //      If that folder contains a `.spector` file, open it. If the folder

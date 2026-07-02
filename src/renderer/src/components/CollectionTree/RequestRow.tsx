@@ -5,14 +5,10 @@ import React, { useContext, useState } from 'react';
 import type { ApiRequest } from '../../../../shared/types';
 import { MethodBadge } from '../common/MethodBadge';
 import { SchemaSyncModal } from './SchemaSyncModal';
-import {
-  DragCtx,
-  type MenuItem,
-  InlineEdit,
-  TagChips,
-  DotsBtn,
-  PencilIcon, CopyIcon, TagIcon, SyncIcon, TrashIcon,
-} from './CollectionTree';
+import { DragCtx, TagChips } from './CollectionTree';
+import { InlineEdit } from '../common/InlineEdit';
+import { type MenuItem, DotsBtn } from '../common/ContextMenu';
+import { PencilIcon, CopyIcon, TagIcon, SyncIcon, TrashIcon } from '../common/icons';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 

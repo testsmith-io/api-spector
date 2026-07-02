@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { type IpcMain } from 'electron';
+import { IPC } from '../../shared/ipc-channels';
+import { handleIpc } from './handle';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import type { MockServer } from '../../shared/types';
@@ -10,24 +12,24 @@ import type { MockRoute } from '../../shared/types';
 import { getWorkspaceDir } from './file-handler';
 
 export function registerMockHandlers(ipc: IpcMain): void {
-  ipc.handle('mock:start', async (e, server: MockServer) => {
-    setHitCallback(hit => e.sender.send('mock:hit', hit));
+  handleIpc(ipc, IPC.mock.start, async (e, server: MockServer) => {
+    setHitCallback(hit => e.sender.send(IPC.mock.hit, hit));
     await startMock(server);
   });
 
-  ipc.handle('mock:stop', async (_e, id: string) => {
+  handleIpc(ipc, IPC.mock.stop, async (_e, id: string) => {
     await stopMock(id);
   });
 
-  ipc.handle('mock:isRunning', (_e, id: string) => isRunning(id));
+  handleIpc(ipc, IPC.mock.isRunning, (_e, id: string) => isRunning(id));
 
-  ipc.handle('mock:updateRoutes', (_e, id: string, routes: MockRoute[]) => {
+  handleIpc(ipc, IPC.mock.updateRoutes, (_e, id: string, routes: MockRoute[]) => {
     updateMockRoutes(id, routes);
   });
 
-  ipc.handle('mock:runningIds', () => getRunningIds());
+  handleIpc(ipc, IPC.mock.runningIds, () => getRunningIds());
 
-  ipc.handle('file:saveMock', async (_e, relPath: string, server: MockServer) => {
+  handleIpc(ipc, IPC.file.saveMock, async (_e, relPath: string, server: MockServer) => {
     const wsDir = getWorkspaceDir();
     if (!wsDir) throw new Error('No workspace open');
     const fullPath = join(wsDir, relPath);
@@ -35,7 +37,7 @@ export function registerMockHandlers(ipc: IpcMain): void {
     await writeFile(fullPath, JSON.stringify(server, null, 2), 'utf8');
   });
 
-  ipc.handle('file:loadMock', async (_e, relPath: string) => {
+  handleIpc(ipc, IPC.file.loadMock, async (_e, relPath: string) => {
     const wsDir = getWorkspaceDir();
     if (!wsDir) throw new Error('No workspace open');
     const raw = await readFile(join(wsDir, relPath), 'utf8');

@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { type IpcMain } from 'electron';
+import { IPC } from '../../shared/ipc-channels';
+import { handleIpc } from './handle';
 import type { Collection, ApiRequest, Folder, SentRequest, ResponsePayload } from '../../shared/types';
 
 // ─── Payload types ────────────────────────────────────────────────────────────
@@ -355,7 +357,7 @@ ${body}
 // ─── IPC handler ─────────────────────────────────────────────────────────────
 
 export function registerDocsHandlers(ipc: IpcMain): void {
-  ipc.handle('docs:generate', async (_event, payload: DocsPayload): Promise<string> => {
+  handleIpc(ipc, IPC.docs.generate, async (_event, payload: DocsPayload): Promise<string> => {
     if (payload.format === 'html') {
       return generateHtml(payload);
     }

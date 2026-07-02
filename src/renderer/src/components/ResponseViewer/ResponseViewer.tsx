@@ -17,6 +17,7 @@ import { RequestPanel } from './RequestPanel';
 import { ConsolePanel } from './ConsolePanel';
 import { prettyJson, prettyXml } from './utils/formatters';
 import { appendSnippetToScript } from '../RequestBuilder/scriptAppend';
+import { useToast } from '../common/Toast';
 
 const { electron } = window;
 
@@ -48,8 +49,8 @@ export function ResponseViewer() {
   const [diffMode, setDiffMode] = useState(false);
   const [showMockModal, setShowMockModal] = useState(false);
   const [bodyView, setBodyView] = useState<'tree' | 'raw'>('raw');
-  const [assertToast, setAssertToast] = useState(false);
-  const [contractToast, setContractToast] = useState(false);
+  const assertToast = useToast(2500);
+  const contractToast = useToast(2500);
 
   async function saveAsContract() {
     if (!response || !requestId || !activeTabId) return;
@@ -68,8 +69,7 @@ export function ResponseViewer() {
       },
     });
     setTabRequestTab(activeTabId, 'contract');
-    setContractToast(true);
-    setTimeout(() => setContractToast(false), 2500);
+    contractToast.show('✓ Contract saved', true);
   }
 
   function handleAssert(snippet: string) {
@@ -88,8 +88,7 @@ export function ResponseViewer() {
     // insert — fold the Quick Inserts sidebar so it doesn't crowd the editor
     // they're now looking at. They can reopen it with the Snippets toggle.
     state.setQuickInsertsOpen(false);
-    setAssertToast(true);
-    setTimeout(() => setAssertToast(false), 2500);
+    assertToast.show('✓ Assertion added', true);
   }
 
   if (isSending) {
@@ -176,11 +175,11 @@ export function ResponseViewer() {
 
         <div className="ml-auto flex items-center gap-1 shrink-0">
           {/* Toasts */}
-          {assertToast && (
-            <span className="text-[10px] text-emerald-400 font-medium px-1">✓ Assertion added</span>
+          {assertToast.toast && (
+            <span className="text-[10px] text-emerald-400 font-medium px-1">{assertToast.toast.msg}</span>
           )}
-          {contractToast && (
-            <span className="text-[10px] text-blue-400 font-medium px-1">✓ Contract saved</span>
+          {contractToast.toast && (
+            <span className="text-[10px] text-blue-400 font-medium px-1">{contractToast.toast.msg}</span>
           )}
 
           {/* Tree / Raw toggle — only for body tab with JSON or XML */}

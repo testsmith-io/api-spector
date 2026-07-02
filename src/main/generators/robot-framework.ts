@@ -4,6 +4,7 @@
 import type { ApiRequest, Collection, Environment, EnvVariable, Folder, GeneratedFile } from '../../shared/types';
 import { resolveInheritedAuthAndHeaders } from '../../shared/request-collection';
 import { parsePostScript, accessorToJsonPath } from './script-parser';
+import { resolveEffectiveAuth, mergeHeaders, hasBody, renderTree } from './generator-utils';
 
 // ─── Robot Framework generator ────────────────────────────────────────────────
 
@@ -124,8 +125,7 @@ function buildKeywordsFile(
 
       // Body
       const { body } = req;
-      const hasBody = body.mode !== 'none' && !['GET', 'HEAD'].includes(req.method);
-      if (hasBody && body.mode === 'json' && body.json) {
+      if (hasBody(req) && body.mode === 'json' && body.json) {
         const bodyPairs = jsonToRfDictPairs(body.json, varMap);
         if (bodyPairs !== null) {
           lines.push(`    VAR    &{body}    ${bodyPairs}`);
@@ -135,7 +135,7 @@ function buildKeywordsFile(
       }
 
       const callArgs: string[] = [];
-      if (hasBody && body.mode === 'json') callArgs.push('json=${body}');
+      if (hasBody(req) && body.mode === 'json') callArgs.push('json=${body}');
 
       lines.push(`    \${response}=    ${method}    ${url}`);
       if (callArgs.length) lines.push(`    ...    ${callArgs.join('    ')}`);
@@ -172,8 +172,8 @@ function buildKeywordsFile(
 
       // ── Collect header pairs (inherited auth + custom) ─────────────────────
       const inherited = resolveInheritedAuthAndHeaders(reqId, collection);
-      const effectiveAuth = req.auth.type !== 'none' ? req.auth : (inherited.auth ?? req.auth);
-      const allHeaders = [...inherited.headers.filter(h => h.enabled && h.key), ...req.headers.filter(h => h.enabled && h.key)];
+      const effectiveAuth = resolveEffectiveAuth(req, inherited);
+      const allHeaders = mergeHeaders(req, inherited);
 
       const headerPairs: string[] = [];
 
@@ -220,8 +220,7 @@ function buildKeywordsFile(
 
       // ── Request body ────────────────────────────────────────────────────────
       const { body } = req;
-      const hasBody  = body.mode !== 'none' && !['GET', 'HEAD'].includes(req.method);
-      if (hasBody && body.mode === 'json' && body.json) {
+      if (hasBody(req) && body.mode === 'json' && body.json) {
         const bodyPairs = jsonToRfDictPairs(body.json, varMap);
         if (bodyPairs !== null) {
           lines.push(`    VAR    &{body}    ${bodyPairs}`);
@@ -233,9 +232,9 @@ function buildKeywordsFile(
       // ── HTTP call ───────────────────────────────────────────────────────────
       const method   = req.method.charAt(0) + req.method.slice(1).toLowerCase();
       const callArgs: string[] = [];
-      if (headerPairs.length)                  callArgs.push('headers=${headers}');
-      if (enabledParams.length)                callArgs.push('params=${params}');
-      if (hasBody && body.mode === 'json')     callArgs.push('json=${body}');
+      if (headerPairs.length)                    callArgs.push('headers=${headers}');
+      if (enabledParams.length)                  callArgs.push('params=${params}');
+      if (hasBody(req) && body.mode === 'json')  callArgs.push('json=${body}');
 
       lines.push(`    \${response}=    ${method}    ${url}`);
       if (callArgs.length) {
@@ -349,25 +348,6 @@ function buildTestSuite(
 }
 
 // ─── README ───────────────────────────────────────────────────────────────────
-
-function renderTree(paths: string[]): string {
-  interface Node { [k: string]: Node }
-  const root: Node = {};
-  for (const p of [...paths].sort()) {
-    let cur = root;
-    for (const part of p.split('/')) { cur = (cur[part] ??= {}); }
-  }
-  function render(node: Node, prefix = ''): string[] {
-    const entries = Object.entries(node);
-    return entries.flatMap(([name, children], i) => {
-      const last = i === entries.length - 1;
-      const lines = [`${prefix}${last ? '└── ' : '├── '}${name}`];
-      if (Object.keys(children).length) lines.push(...render(children, prefix + (last ? '    ' : '│   ')));
-      return lines;
-    });
-  }
-  return ['.', ...render(root)].join('\n');
-}
 
 function buildReadme(collectionName: string, filePaths: string[]): string {
   const tree = renderTree(filePaths);
