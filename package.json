@@ -1,7 +1,7 @@
 {
   "name": "@testsmith/api-spector",
   "productName": "API Spector",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Local-first API testing tool to inspect, test and mock APIs",
   "repository": {
     "type": "git",
@@ -59,7 +59,6 @@
     "@vitest/coverage-v8": "^3.2.4",
     "jsdom": "^25.0.1",
     "autoprefixer": "^10.4.27",
-    "electron": "~31.7.0",
     "electron-builder": "^26.8.1",
     "electron-vite": "^5.0.0",
     "eslint": "^9.39.4",
@@ -95,6 +94,9 @@
     "uuid": "^9.0.0",
     "ws": "^8.20.0",
     "zustand": "^5.0.12"
+  },
+  "optionalDependencies": {
+    "electron": "~31.7.0"
   },
   "build": {
     "appId": "com.apispector.app",
