@@ -57,3 +57,7 @@ npm update -g @testsmith/api-spector
 ```bash
 npm uninstall -g @testsmith/api-spector
 ```
+
+## Problems launching the UI?
+
+On corporate machines the Electron binary download or extraction is sometimes blocked by proxies, TLS inspection, or antivirus. Since 0.3.4 the launcher repairs itself when possible; when it can't, see [Troubleshooting: the UI won't start](getting-started/troubleshooting.md).

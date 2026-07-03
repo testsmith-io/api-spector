@@ -2,6 +2,7 @@
 
 - **Getting Started**
   - [Installation](getting-started/installation.md)
+  - [Troubleshooting](getting-started/troubleshooting.md)
 
 - **GUI**
   - [Collections & Requests](gui/collections.md)

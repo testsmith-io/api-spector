@@ -13,6 +13,9 @@ Local-first API testing tool. Inspect, test and mock APIs. Secrets stay on your 
 npm install -g @testsmith/api-spector
 ```
 
+> UI not starting after install (common on corporate machines — proxies, antivirus)?
+> See [Troubleshooting: the UI won't start](docs/getting-started/troubleshooting.md).
+
 ## Usage
 
 ### GUI
