@@ -132,3 +132,29 @@ export function renderTree(paths: string[]): string {
   }
   return ['.', ...render(root)].join('\n');
 }
+
+// ─── Per-framework method support ─────────────────────────────────────────────
+//
+// Verbs beyond the classic set (notably QUERY, RFC 10008) are not first-class
+// in every client library. Each generator either falls back to that library's
+// generic-request form or skips the request with a visible note.
+
+/** Verb helpers that exist on Playwright's APIRequestContext. Anything else
+ *  (QUERY, OPTIONS, …) must go through `request.fetch()` with an explicit
+ *  `method` option. */
+export const PLAYWRIGHT_VERBS = ['get', 'post', 'put', 'patch', 'delete', 'head'];
+
+/** Verb helpers supertest exposes. QUERY has no supertest equivalent — callers
+ *  should skip those requests with a note. */
+export const SUPERTEST_VERBS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'];
+
+/** REST Assured call suffix: verb helper when one exists, generic
+ *  `.request("VERB", path)` otherwise. */
+export function restAssuredCall(method: string, pathArg: string): string {
+  const verbs = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'];
+  return verbs.includes(method) ? `.${method}(${pathArg})` : `.request("${method.toUpperCase()}", ${pathArg})`;
+}
+
+/** Keywords provided by robotframework-requests. QUERY is not among them —
+ *  callers should emit a WARN + skip for those requests. */
+export const ROBOT_REQUESTS_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];

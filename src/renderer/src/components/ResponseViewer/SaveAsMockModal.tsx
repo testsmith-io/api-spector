@@ -138,7 +138,7 @@ export function SaveAsMockModal({ onClose }: { onClose: () => void }) {
               className="bg-surface-800 border border-surface-700 rounded px-2 py-1 font-bold text-[11px] focus:outline-none focus:border-blue-500"
               style={{ color: 'var(--text-primary)' }}
             >
-              {['ANY', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].map(m => (
+              {['ANY', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'QUERY'].map(m => (
                 <option key={m} value={m}>{m}</option>
               ))}
             </select>

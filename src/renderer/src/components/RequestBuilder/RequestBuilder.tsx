@@ -17,7 +17,7 @@ import { WebSocketPanel } from '../WebSocket/WebSocketPanel';
 
 const { electron } = window;
 
-const METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+const METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'QUERY'];
 
 const METHOD_COLORS: Record<string, string> = {
   GET:     'text-emerald-400',
@@ -27,6 +27,7 @@ const METHOD_COLORS: Record<string, string> = {
   DELETE:  'text-red-400',
   HEAD:    'text-purple-400',
   OPTIONS: 'text-gray-400',
+  QUERY:   'text-teal-400',
 };
 
 interface Props {

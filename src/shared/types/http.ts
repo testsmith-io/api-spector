@@ -3,7 +3,9 @@
 
 // ─── Core data model ─────────────────────────────────────────────────────────
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS'
+// QUERY (RFC 10008): safe + idempotent like GET, but carries the query in a
+// request body — the body and its Content-Type are mandatory per the RFC.
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'QUERY'
 
 export interface KeyValuePair {
   key: string

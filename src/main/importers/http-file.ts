@@ -16,7 +16,7 @@ import type {
 // (`@name = value`) become collection variables; `{{$dynamic}}` system variables
 // are mapped onto API Spector's equivalents.
 
-const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'QUERY'];
 
 /** REST Client / IntelliJ dynamic variables → API Spector dynamic variables.
  *  Shared with the exporter (reverse direction) so a round-trip stays stable. */

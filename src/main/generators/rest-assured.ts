@@ -6,7 +6,7 @@ import { resolveInheritedAuthAndHeaders, getAllApplicableHooks } from '../../sha
 import { parsePostScript, accessorToJsonPath } from './script-parser';
 import {
   javaClass, toEnvVar as toEnvConst,
-  resolveEffectiveAuth, mergeHeaders, hasBody, getEnvBaseUrl, renderTree,
+  resolveEffectiveAuth, mergeHeaders, hasBody, getEnvBaseUrl, renderTree, restAssuredCall,
 } from './generator-utils';
 
 // ─── REST Assured (Java + JUnit 5 + Maven) generator ─────────────────────────
@@ -181,7 +181,7 @@ function buildTestClass(folderName: string, folder: Folder, collection: Collecti
         const escaped = h.body.json.replace(/"/g, '\\"').replace(/\n/g, '\\n');
         lines.push(`            .body("${escaped}")`);
       }
-      lines.push(`            .when().${method}("${path}");`);
+      lines.push(`            .when()${restAssuredCall(method, `"${path}"`)};`);
       for (const e of parsed.extractions) {
         const jp = accessorToJsonPath(e.accessor);
         const varName = toEnvConst(e.varName);
@@ -189,7 +189,7 @@ function buildTestClass(folderName: string, folder: Folder, collection: Collecti
         lines.push(`        ${varName} = hookResponse.jsonPath().getString("${jp}");`);
       }
     } else {
-      lines.push(`        given().spec(requestSpec).when().${method}("${path}");`);
+      lines.push(`        given().spec(requestSpec).when()${restAssuredCall(method, `"${path}"`)};`);
     }
     return lines;
   }
@@ -279,7 +279,7 @@ function buildTestClass(folderName: string, folder: Folder, collection: Collecti
     }
 
     lines.push(`        .when()`);
-    lines.push(`            .${method}(${javaPath})`);
+    lines.push(`            ${restAssuredCall(method, javaPath)}`);
     lines.push(`        .then()`);
 
     const parsed = parsePostScript(req.postRequestScript);

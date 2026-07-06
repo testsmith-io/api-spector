@@ -234,7 +234,8 @@ function buildAuth(security: any[], securitySchemes: any): AuthConfig {
   return { type: 'none' };
 }
 
-const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'] as const;
+// 'query' is an OpenAPI 3.2+ operation (HTTP QUERY, RFC 10008)
+const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'query'] as const;
 
 function buildCollection(spec: any): Collection {
   const info = spec.info ?? {};

@@ -4,7 +4,7 @@
 import type { ApiRequest, Collection, Environment, EnvVariable, Folder, GeneratedFile } from '../../shared/types';
 import { resolveInheritedAuthAndHeaders } from '../../shared/request-collection';
 import { parsePostScript, accessorToJsonPath } from './script-parser';
-import { resolveEffectiveAuth, mergeHeaders, hasBody, renderTree } from './generator-utils';
+import { resolveEffectiveAuth, mergeHeaders, hasBody, renderTree, ROBOT_REQUESTS_METHODS } from './generator-utils';
 
 // ─── Robot Framework generator ────────────────────────────────────────────────
 
@@ -123,6 +123,14 @@ function buildKeywordsFile(
       lines.push(kwName);
       lines.push(`    [Documentation]    Hook: ${req.hookType} — ${req.name}`);
 
+      // robotframework-requests has no keyword for QUERY (RFC 10008)
+      if (!ROBOT_REQUESTS_METHODS.includes(req.method)) {
+        lines.push(`    Log    ${req.method} is not supported by robotframework-requests — hook skipped    WARN`);
+        lines.push(`    RETURN    \${None}`);
+        lines.push('');
+        continue;
+      }
+
       // Body
       const { body } = req;
       if (hasBody(req) && body.mode === 'json' && body.json) {
@@ -169,6 +177,14 @@ function buildKeywordsFile(
 
       lines.push(kwName);
       lines.push(`    [Documentation]    ${req.description || req.name}`);
+
+      // robotframework-requests has no keyword for QUERY (RFC 10008)
+      if (!ROBOT_REQUESTS_METHODS.includes(req.method)) {
+        lines.push(`    Log    ${req.method} is not supported by robotframework-requests — request skipped    WARN`);
+        lines.push(`    RETURN    \${None}`);
+        lines.push('');
+        continue;
+      }
 
       // ── Collect header pairs (inherited auth + custom) ─────────────────────
       const inherited = resolveInheritedAuthAndHeaders(reqId, collection);

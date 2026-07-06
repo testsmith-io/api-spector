@@ -346,3 +346,64 @@ describe( 'generateKarate', () => {
     expect( feature.content ).toMatch( /And path 'users'/ );
   } );
 } );
+
+// ─── QUERY method (RFC 10008) ────────────────────────────────────────────────
+
+/** A collection with a single QUERY request carrying a JSON body. */
+function makeQueryCollection (): Collection {
+  return {
+    version: '1.0',
+    id: 'col-query',
+    name: 'Query API',
+    description: '',
+    rootFolder: {
+      id: 'root', name: 'root', description: '', folders: [],
+      requestIds: ['q1'],
+    },
+    requests: {
+      q1: {
+        id: 'q1', name: 'Search pets', method: 'QUERY', url: 'http://a.test/pets',
+        headers: [], params: [], auth: { type: 'none' },
+        body: { mode: 'json', json: '{"species": "cat"}' },
+      },
+    },
+  };
+}
+
+describe( 'QUERY method support (RFC 10008)', () => {
+  const queryCollection = makeQueryCollection();
+
+  it( 'playwright falls back to request.fetch with a method option', () => {
+    const files = generatePlaywright( queryCollection, null );
+    const spec = files.find( f => f.path.endsWith( '.spec.ts' ) );
+    expect( spec?.content ).toContain( "request.fetch(" );
+    expect( spec?.content ).toContain( "method: 'QUERY'" );
+    expect( spec?.content ).not.toContain( 'request.query(' );
+  } );
+
+  it( 'rest-assured uses the generic request("QUERY", ...) form', () => {
+    const files = generateRestAssured( queryCollection, null );
+    const java = files.find( f => f.path.endsWith( '.java' ) && f.content.includes( 'QUERY' ) );
+    expect( java?.content ).toContain( '.request("QUERY", ' );
+  } );
+
+  it( 'karate emits method query', () => {
+    const files = generateKarate( queryCollection, null );
+    const feature = files.find( f => f.path.endsWith( '.feature' ) );
+    expect( feature?.content ).toContain( 'method query' );
+  } );
+
+  it( 'supertest skips QUERY requests with a visible note', () => {
+    const files = generateSupertestTs( queryCollection, null );
+    const spec = files.find( f => f.path.includes( '.test.' ) || f.path.includes( '.spec.' ) );
+    expect( spec?.content ).toContain( 'it.skip(' );
+    expect( spec?.content ).toContain( 'QUERY' );
+  } );
+
+  it( 'robot framework skips QUERY with a WARN log', () => {
+    const files = generateRobotFramework( queryCollection, null );
+    const robot = files.map( f => f.content ).join( '\n' );
+    expect( robot ).toContain( 'not supported by robotframework-requests' );
+    expect( robot ).not.toContain( '${response}=    Query' );
+  } );
+} );

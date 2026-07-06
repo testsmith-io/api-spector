@@ -6,7 +6,7 @@ import { resolveInheritedAuthAndHeaders, getAllApplicableHooks } from '../../sha
 import { parsePostScript } from './script-parser';
 import {
   slug, toEnvVar, interpolateEnvVars as interpolateValue,
-  resolveEffectiveAuth, mergeHeaders, hasBody, getEnvBaseUrl, renderTree,
+  resolveEffectiveAuth, mergeHeaders, hasBody, getEnvBaseUrl, renderTree, SUPERTEST_VERBS,
 } from './generator-utils';
 
 // ─── Supertest + Jest TypeScript generator ────────────────────────────────────
@@ -81,6 +81,10 @@ function buildTestFile(folderName: string, folder: Folder, collection: Collectio
   function buildSupertestHookLines(h: typeof beforeAllH[0]): string[] {
     const lines: string[] = [`    // ${h.name}`];
     const method = h.method.toLowerCase();
+    if (!SUPERTEST_VERBS.includes(method)) {
+      lines.push(`    // ${h.method} (RFC 10008) is not supported by supertest -- hook skipped`);
+      return lines;
+    }
     const path = h.url.replace(/^https?:\/\/[^/]+/, '') || '/';
     const parsed = parsePostScript(h.postRequestScript);
     if (parsed.extractions.length > 0) {
@@ -126,6 +130,13 @@ function buildTestFile(folderName: string, folder: Folder, collection: Collectio
     const enabledParams = req.params.filter(p => p.enabled && p.key);
 
     const lines: string[] = [];
+    if (!SUPERTEST_VERBS.includes(method)) {
+      lines.push(`  // ${req.method} (RFC 10008) is not supported by supertest`);
+      lines.push(`  it.skip('${nameMap.get(reqId)} [${req.method} unsupported]', () => {});`);
+      lines.push('');
+      tests.push(...lines);
+      continue;
+    }
     lines.push(`  it('${nameMap.get(reqId)}', async () => {`);
     lines.push(`    const res = await api`);
     lines.push(`      .${method}(\`${path}\`)`);

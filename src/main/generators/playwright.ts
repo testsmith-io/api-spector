@@ -6,7 +6,7 @@ import { resolveInheritedAuthAndHeaders, getAllApplicableHooks } from '../../sha
 import { parsePostScript } from './script-parser';
 import {
   slug, toEnvVar, interpolateEnvVars as interpolatePath, renderJsValue, buildNameMap,
-  resolveEffectiveAuth, mergeHeaders, hasBody, getEnvBaseUrl, renderTree,
+  resolveEffectiveAuth, mergeHeaders, hasBody, getEnvBaseUrl, renderTree, PLAYWRIGHT_VERBS,
 } from './generator-utils';
 
 // ─── Playwright TypeScript generator ─────────────────────────────────────────
@@ -69,7 +69,14 @@ function buildHookLines(req: ApiRequest, sharedVars: Set<string>): string[] {
       optionParts.push(`data: ${renderJsValue(JSON.parse(req.body.json), '        ')}`);
     } catch { /* skip */ }
   }
+  // Non-standard verbs (e.g. QUERY, RFC 10008) go through fetch() with an
+  // explicit method option — APIRequestContext has no helper for them.
+  const nativeVerb = PLAYWRIGHT_VERBS.includes(method);
+  if (!nativeVerb) optionParts.unshift(`method: '${req.method}'`);
   const opts = optionParts.length ? `, { ${optionParts.join(', ')} }` : '';
+  const hookCall = nativeVerb
+    ? `request.${method}(${pathExpr}${opts})`
+    : `request.fetch(${pathExpr}${opts})`;
 
   const lines: string[] = [];
   lines.push(`    // ${req.name}`);
@@ -77,7 +84,7 @@ function buildHookLines(req: ApiRequest, sharedVars: Set<string>): string[] {
   // Parse post-script for variable extractions
   const parsed = parsePostScript(req.postRequestScript);
   if (parsed.extractions.length > 0) {
-    lines.push(`    const hookResponse = await request.${method}(${pathExpr}${opts});`);
+    lines.push(`    const hookResponse = await ${hookCall};`);
     lines.push(`    const hookJson = await hookResponse.json();`);
     for (const e of parsed.extractions) {
       const jsonPath = e.accessor.replace(/^json\.?/, '');
@@ -87,7 +94,7 @@ function buildHookLines(req: ApiRequest, sharedVars: Set<string>): string[] {
       lines.push(`    ${varName} = String(${expr});`);
     }
   } else {
-    lines.push(`    await request.${method}(${pathExpr}${opts});`);
+    lines.push(`    await ${hookCall};`);
   }
 
   return lines;
@@ -203,13 +210,20 @@ function buildSpec(folderName: string, folder: Folder, collection: Collection, n
       }
     }
 
+    // Non-standard verbs (e.g. QUERY, RFC 10008) go through fetch() with an
+    // explicit method option — APIRequestContext has no helper for them.
+    const nativeVerb = PLAYWRIGHT_VERBS.includes(method);
+    if (!nativeVerb) optionParts.unshift(`      method: '${req.method}'`);
     const optionsStr = optionParts.length ? `, {\n${optionParts.join(',\n')},\n    }` : '';
+    const callExpr = nativeVerb
+      ? `request.${method}(${pathExpr}${optionsStr})`
+      : `request.fetch(${pathExpr}${optionsStr})`;
 
     // Parse post-request script for assertions + variable extractions
     const parsed = parsePostScript(req.postRequestScript);
     const lines: string[] = [
       `  test('${testName}', async ({ request }) => {`,
-      `    const response = await request.${method}(${pathExpr}${optionsStr});`,
+      `    const response = await ${callExpr};`,
     ];
 
     // If there are JSON assertions or extractions, parse the body

@@ -59,7 +59,7 @@ function parseKv(blockContent: string | null): Record<string, string> {
   return result;
 }
 
-const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'] as const;
+const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'query'] as const;
 type _BruMethod = typeof HTTP_METHODS[number]
 
 export function parseBruFile(content: string, fileName: string): ApiRequest {
