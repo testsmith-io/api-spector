@@ -277,3 +277,7 @@ See [Mock Servers CLI](../cli/mock.md).
 - `ANY` matches all HTTP methods
 - Path parameters (`:id`) are captured and available as `request.params.id`
 - Unmatched requests return `404`
+
+## QUERY method support
+
+Mock routes can match the `QUERY` method (RFC 10008). Note: mock servers started **inside the desktop app** currently reject incoming QUERY requests — the app's embedded Node runtime (Node 20) predates QUERY support in Node's HTTP parser. Mock servers started from the CLI (`api-spector mock`) accept QUERY on Node 22 or newer. Sending QUERY requests from the app works regardless.

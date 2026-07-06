@@ -17,7 +17,7 @@ import {
 
 const { electron } = window;
 
-const METHODS_PLUS_ANY = ['ANY', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
+const METHODS_PLUS_ANY = ['ANY', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'QUERY'] as const;
 
 // ─── Route row ────────────────────────────────────────────────────────────────
 

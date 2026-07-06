@@ -128,3 +128,28 @@ describe('round-trip: import → export → import', () => {
     expect(create.body.json).toContain('"name": "Fluffy"');
   });
 });
+
+describe('QUERY method (RFC 10008)', () => {
+  const HTTP_QUERY = `### searchPets
+QUERY {{baseUrl}}/pets
+Content-Type: application/json
+
+{"species": "cat"}
+`;
+
+  it('imports a QUERY request with its body', () => {
+    const col = parseHttpFile(HTTP_QUERY, 'query-sample');
+    const req = reqByName(col, 'searchPets');
+    expect(req.method).toBe('QUERY');
+    expect(req.body.mode).toBe('json');
+    expect(req.body.json).toContain('"species"');
+  });
+
+  it('round-trips QUERY through export → import', () => {
+    const first = parseHttpFile(HTTP_QUERY, 'query-sample');
+    const [file] = generateHttpFile(first, null);
+    expect(file.content).toContain('QUERY {{baseUrl}}/pets');
+    const second = parseHttpFile(file.content, 'query-sample');
+    expect(reqByName(second, 'searchPets').method).toBe('QUERY');
+  });
+});
