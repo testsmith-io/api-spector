@@ -2,7 +2,7 @@
 
 API Spector interoperates with the [Pact](https://docs.pact.io/) ecosystem: it imports and exports standard Pact files and supports Pact-style matchers. This page documents the matcher format and how it maps to and from Pact `matchingRules`.
 
-> **Is Pact open or commercial?** The Pact *specification*, the consumer/provider libraries, the standalone CLI tools, and the self-hostable Pact Broker are **open source (MIT)**. Only the hosted **PactFlow** broker is commercial. Importing/exporting pact files depends only on the open format. The two features PactFlow charges for — bi-directional contract testing and `can-i-deploy` — have local equivalents built in (see [Contract Testing](../gui/contract-testing.md) and the [CLI gate](../cli/contract-testing.md#can-i-deploy--the-deployment-gate)).
+> **Is Pact open or commercial?** The Pact *specification*, the consumer/provider libraries, the standalone CLI tools, and the self-hostable Pact Broker are **open source (MIT)**. Only the hosted **PactFlow** broker is commercial. Importing/exporting pact files depends only on the open format. The two features PactFlow charges for (bi-directional contract testing and `can-i-deploy`) have local equivalents built in; see the full [PactFlow comparison](contract-testing-types.md#how-this-compares-to-pactflow).
 
 ---
 
@@ -61,11 +61,15 @@ When importing/exporting pact files, matchers are translated to and from Pact's 
 | `{ "match": "regex", "regex": … }` | `regex` |
 | `{ "match": "integer" }` | `integer` |
 | `{ "match": "number" }` / `decimal` | `decimal` |
+| `{ "match": "boolean" }` | `boolean` |
+| `{ "match": "null" }` | `null` |
 | `{ "match": "datetime", "format": … }` | `datetime` |
 | `{ "match": "date" }` / `time` | `date` / `time` |
 | `{ "match": "equality" }` / unsupported | exact match (no matcher) |
 
 Supported JSONPath forms: `$`, `$.a.b`, `$.a[0].b`, and the `$.a[*].b` wildcard.
+
+Round-trip notes: `string` matchers export as `{ "match": "type" }` (semantically equivalent for a string example, so they re-import as `type`); `number` and `decimal` both export as `decimal`. Everything else round-trips to the same matcher kind.
 
 ---
 

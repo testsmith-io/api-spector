@@ -57,6 +57,7 @@ function ruleToMatcher(value: unknown, rule: RuleMatcher): unknown {
     case 'number':
     case 'decimal':  return { [MATCH_KEY]: 'decimal', value } satisfies MatcherNode;
     case 'boolean':  return { [MATCH_KEY]: 'boolean', value } satisfies MatcherNode;
+    case 'null':     return { [MATCH_KEY]: 'null', value: null } satisfies MatcherNode;
     case 'datetime':
     case 'timestamp':return { [MATCH_KEY]: 'datetime', value, format: rule.format } satisfies MatcherNode;
     case 'date':     return { [MATCH_KEY]: 'date', value } satisfies MatcherNode;
@@ -268,8 +269,14 @@ export function exampleToPactBody(node: unknown): { body: unknown; rules: Record
           rules[path] = { matchers: [{ match: 'decimal' }] };
           return n.value ?? 0;
         case 'boolean':
-          rules[path] = { matchers: [{ match: 'type' }] };
+          rules[path] = { matchers: [{ match: 'boolean' }] };
           return n.value ?? false;
+        case 'string':
+          rules[path] = { matchers: [{ match: 'type' }] };
+          return n.value ?? '';
+        case 'null':
+          rules[path] = { matchers: [{ match: 'null' }] };
+          return null;
         case 'datetime':
         case 'timestamp':
           rules[path] = { matchers: [{ match: 'datetime', format: n.format }] };

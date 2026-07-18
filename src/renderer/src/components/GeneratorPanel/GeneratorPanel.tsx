@@ -3,6 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../../store';
+import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
 import CodeMirror from '@uiw/react-codemirror';
 import { oneDark } from '@codemirror/theme-one-dark';
 import type { GeneratedFile, GenerateTarget } from '../../../../shared/types';
@@ -62,7 +63,7 @@ export function GeneratorPanel() {
     setSelectedFile(null);
     try {
       const col = collections[selectedCollectionId]?.data;
-      const env = activeEnvironmentId ? environments[activeEnvironmentId]?.data ?? null : null;
+      const env = resolveEnvironmentById(environments, activeEnvironmentId);
       const generated = await electron.generateCode({ collection: col, environment: env, target });
       setFiles(generated);
       setSelectedFile(generated[0]?.path ?? null);

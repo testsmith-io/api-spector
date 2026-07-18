@@ -40,6 +40,7 @@ import {
 } from '../main/request-exec';
 import { buildJsonReport, buildJUnitReport, buildHtmlReport } from '../shared/report';
 import { buildRunPlan, resolveInheritedAuthAndHeaders } from '../shared/request-collection';
+import { selectEnvironment } from '../shared/environments';
 import {
   C, color, parseArgs,
   loadWorkspace, loadCollections, loadEnvironments,
@@ -66,7 +67,7 @@ function printResult(r: RunRequestResult, verbose: boolean) {
   if (r.testResults?.length) {
     for (const t of r.testResults) {
       const ti = t.passed ? color('  ✓', C.green) : color('  ✗', C.red);
-      console.log(`${ti} ${t.name}${t.error ? color(` — ${t.error}`, C.red) : ''}`);
+      console.log(`${ti} ${t.name}${t.error ? color(` - ${t.error}`, C.red) : ''}`);
     }
   }
   if (r.error) console.log(color(`     Error: ${r.error}`, C.red));
@@ -124,13 +125,15 @@ async function main() {
   });
   const environments = await loadEnvironments(workspace, wsDir);
 
-  // Resolve environment
-  const env = envName
-    ? environments.find(e => e.name.toLowerCase() === envName.toLowerCase()) ?? null
-    : null;
+  // Resolve environment: --environment flag, else the workspace's default
+  // environment (settings.defaultEnvironment). Inheritance chains
+  // (`extends`) are merged by selectEnvironment.
+  const env = selectEnvironment(workspace, environments, envName);
 
   if (envName && !env) {
     console.warn(color(`Warning: environment "${envName}" not found. Running without environment.`, C.yellow));
+  } else if (!envName && workspace.settings?.defaultEnvironment && !env) {
+    console.warn(color(`Warning: default environment "${workspace.settings.defaultEnvironment}" not found. Running without environment.`, C.yellow));
   }
 
   // Print header — include the package version (injected by electron-vite's

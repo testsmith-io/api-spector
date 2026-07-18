@@ -343,7 +343,7 @@ ${methods.join('\n\n')}
 
 function buildReadme(collectionName: string, filePaths: string[]): string {
   const tree = renderTree(filePaths);
-  return `# ${collectionName} — API Tests (REST Assured + JUnit 5)
+  return `# ${collectionName} - API Tests (REST Assured + JUnit 5)
 
 ## Project structure
 

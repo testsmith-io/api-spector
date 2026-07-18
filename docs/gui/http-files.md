@@ -40,11 +40,11 @@ What gets mapped:
 | Wrapped `?a=1` / `&b=2` lines | Folded into the request URL |
 | `Header: value` lines | Request headers |
 | `Authorization: Bearer …` | Lifted into structured **bearer** auth |
-| Request body (after the blank line) | Body — `json`, form, or raw by `Content-Type` |
+| Request body (after the blank line) | Body: `json`, form, or raw by `Content-Type` |
 | `@name = value` | Collection variables |
 | `{{$guid}}`, `{{$timestamp}}`, … | Mapped to API Spector [dynamic variables](../reference/faker.md) |
 
-Requests import into a flat collection (the format has no folders). IntelliJ pre-request / response-handler script blocks (`< {% … %}`, `> {% … %}`) are stripped on import — script translation isn't supported yet.
+Requests import into a flat collection (the format has no folders). IntelliJ pre-request / response-handler script blocks (`< {% … %}`, `> {% … %}`) are stripped on import; script translation isn't supported yet.
 
 ---
 
@@ -58,7 +58,7 @@ Requests import into a flat collection (the format has no folders). IntelliJ pre
 - A `Content-Type` header is added automatically when a body needs one and the request doesn't already set it.
 - API Spector dynamic variables are mapped back to REST Client names (e.g. `{{$uuid}}` → `{{$guid}}`).
 
-> **Secrets are never written.** Environment variables marked as secret are omitted from the exported `@` declarations — reference them by name and supply the value in your editor.
+> **Secrets are never written.** Environment variables marked as secret are omitted from the exported `@` declarations. Reference them by name and supply the value in your editor.
 
 ---
 
@@ -66,8 +66,8 @@ Requests import into a flat collection (the format has no folders). IntelliJ pre
 
 Import → export → import is stable for the common surface (requests, methods, URLs, headers, bearer auth, bodies, and variables). Some things don't survive a round-trip because the format can't express them:
 
-- **Folders** — the format is flat, so nested structure is lost on export.
-- **Scripts** — pre-request / post-response scripts aren't serialised.
-- **`{{$randomInt min max}}`** — imports as `{{$randomInt}}` (arguments dropped), since API Spector's dynamic variable takes no range.
+- **Folders**: the format is flat, so nested structure is lost on export.
+- **Scripts**: pre-request / post-response scripts aren't serialised.
+- **`{{$randomInt min max}}`** imports as `{{$randomInt}}` (arguments dropped), since API Spector's dynamic variable takes no range.
 
 For a lossless, structured contract format, use [Pact import/export](../reference/pact-compatibility.md) or keep the native `.spector` collection under Git.

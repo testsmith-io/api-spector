@@ -40,7 +40,7 @@ function atomicWrite(path: string, data: string): Promise<void> {
  *    `settings.json` is part of the workspace contract)
  */
 export const SPECTOR_GITIGNORE = [
-  '# API Spector — never commit secrets',
+  '# API Spector - never commit secrets',
   '*.secrets',
   '.env',
   '.env.local',
@@ -81,7 +81,7 @@ function readmeContents(workspaceFileName: string): string {
     `# API tests`,
     ``,
     `This folder is an [API Spector](https://github.com/testsmith-io/api-spector) workspace.`,
-    `Everything here is plain JSON — diff it, commit it, review it like any other code.`,
+    `Everything here is plain JSON - diff it, commit it, review it like any other code.`,
     ``,
     `## Layout`,
     ``,
@@ -123,7 +123,7 @@ function readmeContents(workspaceFileName: string): string {
     `## A note on secrets`,
     ``,
     `Secret values (passwords, OAuth client secrets, API keys) are stored in your`,
-    `OS keychain — **not** in this folder. Environment files only reference the`,
+    `OS keychain - **not** in this folder. Environment files only reference the`,
     `keychain entry by name, so it's safe to commit them.`,
     ``,
   ].join('\n');

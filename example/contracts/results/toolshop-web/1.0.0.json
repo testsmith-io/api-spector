@@ -1,0 +1,45 @@
+{
+  "pacticipant": "toolshop-web",
+  "version": "1.0.0",
+  "recordedAt": "2026-07-12T14:02:15.078Z",
+  "passed": true,
+  "report": {
+    "mode": "consumer",
+    "total": 3,
+    "passed": 3,
+    "failed": 0,
+    "results": [
+      {
+        "requestId": "list-brands",
+        "requestName": "List brands",
+        "method": "GET",
+        "url": "https://api.practicesoftwaretesting.com/brands",
+        "passed": true,
+        "violations": [],
+        "durationMs": 157,
+        "actualStatus": 200
+      },
+      {
+        "requestId": "list-products",
+        "requestName": "List products (paginated)",
+        "method": "GET",
+        "url": "https://api.practicesoftwaretesting.com/products",
+        "passed": true,
+        "violations": [],
+        "durationMs": 163,
+        "actualStatus": 200
+      },
+      {
+        "requestId": "category-tree",
+        "requestName": "Category tree",
+        "method": "GET",
+        "url": "https://api.practicesoftwaretesting.com/categories/tree",
+        "passed": true,
+        "violations": [],
+        "durationMs": 159,
+        "actualStatus": 200
+      }
+    ],
+    "durationMs": 163
+  }
+}

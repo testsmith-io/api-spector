@@ -19,7 +19,7 @@ Click the **</>** button in the top toolbar to open the code generator panel.
 | Supertest JS | JavaScript | Jest + Supertest tests |
 | REST Assured | Java | JUnit 5 + Maven `pom.xml` |
 | Karate | Java | Karate feature files + JUnit 5 runner + Maven |
-| HTTP file | — | `.http` / `.rest` file (VSCode REST Client / IntelliJ) — see [HTTP Files](http-files.md) |
+| HTTP file | n/a | `.http` / `.rest` file (VSCode REST Client / IntelliJ); see [HTTP Files](http-files.md) |
 
 ## Generate
 

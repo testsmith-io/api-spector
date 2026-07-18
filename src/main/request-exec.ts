@@ -127,7 +127,7 @@ export function buildSchemaTestResults(
     return [{
       name:   '[schema] body matches schema',
       passed: false,
-      error:  'Response body is not valid JSON — cannot validate against schema',
+      error:  'Response body is not valid JSON - cannot validate against schema',
     }];
   }
 
@@ -463,7 +463,7 @@ export function syntheticHttpFailure(status: number, statusText: string): TestRe
   return {
     name: `HTTP status ${status} ${statusText}`.trim(),
     passed: false,
-    error: `Request returned ${status} — no assertion was defined to verify the status code.`,
+    error: `Request returned ${status} - no assertion was defined to verify the status code.`,
   };
 }
 
@@ -657,15 +657,15 @@ export class HookSkipTracker {
     if (isHook) {
       if (hookType === 'beforeAll') {
         if ((scopeAncestors ?? []).some(id => this.failedScopes.has(id))) {
-          return 'Skipped — outer scope hook failed';
+          return 'Skipped - outer scope hook failed';
         }
       } else if (hookType === 'before') {
         const allScopes = [...(scopeAncestors ?? []), scopeId].filter(Boolean) as string[];
         if (allScopes.some(id => this.failedScopes.has(id))) {
-          return 'Skipped — scope hook failed';
+          return 'Skipped - scope hook failed';
         }
         if (mainRequestId && this.skipRequests.has(mainRequestId)) {
-          return 'Skipped — before hook failed';
+          return 'Skipped - before hook failed';
         }
       }
       // after / afterAll: never skip
@@ -673,10 +673,10 @@ export class HookSkipTracker {
     }
     const allScopes = [...(scopeAncestors ?? []), scopeId].filter(Boolean) as string[];
     if (allScopes.some(id => this.failedScopes.has(id))) {
-      return 'Skipped — beforeAll hook failed';
+      return 'Skipped - beforeAll hook failed';
     }
     if (this.skipRequests.has(item.request.id)) {
-      return 'Skipped — before hook failed';
+      return 'Skipped - before hook failed';
     }
     return undefined;
   }

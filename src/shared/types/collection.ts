@@ -120,6 +120,10 @@ export interface Environment {
   id: string
   name: string
   variables: EnvVariable[]
+  /** Name of a parent environment to inherit variables from. The child's own
+   *  variables win on key collisions. Chains are allowed (base <- staging <-
+   *  staging-eu); cycles are ignored past the first repeat. */
+  extends?: string
 }
 
 // ─── Workspace ────────────────────────────────────────────────────────────────
@@ -139,6 +143,14 @@ export interface Workspace {
     }
     tls?: TlsSettings
     piiMaskPatterns?: string[]
+    /** URL of a served contract dashboard (`contract report --serve`). Used
+     *  only for the "Open dashboard" link in the contract results panel —
+     *  the app never sends data to it; results travel via the workspace
+     *  files / git. */
+    dashboardUrl?: string
+    /** Name of the environment CLI runs use when no --environment flag is
+     *  given, and the app activates when no environment is selected yet. */
+    defaultEnvironment?: string
     /** UI appearance — previously in localStorage, now travels with the workspace */
     theme?: 'dark' | 'light' | 'system'
     zoom?: number

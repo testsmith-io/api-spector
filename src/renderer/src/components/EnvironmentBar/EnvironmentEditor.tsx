@@ -7,6 +7,7 @@ import type { EnvVariable } from '../../../../shared/types';
 import { MasterKeyModal } from './MasterKeyModal';
 import { Modal } from '../common/Modal';
 import { envRelPath } from '../../../../shared/naming-utils';
+import { resolveEnvironmentChain } from '../../../../shared/environments';
 
 const { electron } = window;
 
@@ -88,6 +89,29 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
 
   const envList = Object.values(environments);
   const env = selectedId ? environments[selectedId]?.data ?? null : null;
+
+  // Inheritance summary for the selected environment: which parents its
+  // extends chain resolves through, and how many variables come from them.
+  const allEnvDatas = envList.map(e => e.data);
+  let inheritSummary: string | null = null;
+  if (env?.extends) {
+    const parentNames: string[] = [];
+    const seen = new Set<string>([env.name]);
+    let parentName: string | undefined = env.extends;
+    while (parentName && !seen.has(parentName)) {
+      const parent = allEnvDatas.find(e => e.name === parentName);
+      if (!parent) break;
+      parentNames.push(parent.name);
+      seen.add(parent.name);
+      parentName = parent.extends;
+    }
+    if (parentNames.length > 0) {
+      const ownKeys = new Set(env.variables.map(v => v.key));
+      const resolved = resolveEnvironmentChain(env, allEnvDatas);
+      const inheritedCount = resolved.variables.filter(v => !ownKeys.has(v.key)).length;
+      inheritSummary = `Inherits ${inheritedCount} variable${inheritedCount === 1 ? '' : 's'} from ${parentNames.join(', ')}`;
+    }
+  }
 
   function handleDelete(id: string) {
     deleteEnvironment(id);
@@ -280,6 +304,28 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                   <button onClick={onClose} className="text-surface-400 hover:text-white text-lg leading-none">×</button>
                 </div>
                 {nameError && <p className="text-[10px] text-red-400 mt-1">{nameError}</p>}
+
+                {/* Extends: inherit variables from another environment */}
+                <div className="flex items-center gap-2 mt-2">
+                  <label className="text-[10px] uppercase tracking-wider text-surface-400 font-medium shrink-0">
+                    Extends
+                  </label>
+                  <select
+                    value={env.extends ?? ''}
+                    onChange={e => updateEnvironment(env.id, { ...env, extends: e.target.value || undefined })}
+                    className="bg-surface-800 border border-surface-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="">(none)</option>
+                    {envList
+                      .filter(({ data: other }) => other.id !== env.id)
+                      .map(({ data: other }) => (
+                        <option key={other.id} value={other.name}>{other.name}</option>
+                      ))}
+                  </select>
+                </div>
+                {inheritSummary && (
+                  <p className="text-[10px] text-surface-400 mt-1">{inheritSummary}</p>
+                )}
               </div>
 
               {/* Variables table */}
@@ -410,9 +456,9 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                               <button
                                 onClick={() => cycleSource(idx)}
                                 title={
-                                  mode === 'plain'     ? 'Plain text — click to switch to encrypted secret'  :
-                                  mode === 'encrypted' ? 'Encrypted secret — click to switch to env var ref' :
-                                                         'OS env var reference — click to switch to plain text'
+                                  mode === 'plain'     ? 'Plain text - click to switch to encrypted secret'  :
+                                  mode === 'encrypted' ? 'Encrypted secret - click to switch to env var ref' :
+                                                         'OS env var reference - click to switch to plain text'
                                 }
                                 className="flex items-center justify-center gap-1 px-1.5 py-0.5 rounded border transition-colors text-[10px] font-medium w-16 shrink-0 border-surface-700 hover:border-surface-500"
                               >
@@ -443,11 +489,11 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                   Use <code className="text-surface-200">{'{{variable_name}}'}</code> in URLs, headers, and body.
                 </p>
                 <p className="text-[10px] text-surface-400">
-                  <span className="text-amber-400">🔒 Encrypted</span> — AES-256-GCM, key from{' '}
+                  <span className="text-amber-400">🔒 Encrypted</span>: AES-256-GCM, key from{' '}
                   <code className="text-surface-200">API_SPECTOR_MASTER_KEY</code>.
                 </p>
                 <p className="text-[10px] text-surface-400">
-                  <span className="text-blue-400">$ Env var</span> — read from{' '}
+                  <span className="text-blue-400">$ Env var</span>: read from{' '}
                   <code className="text-surface-200">process.env</code> at send-time. Ideal for CI/CD.
                 </p>
               </div>

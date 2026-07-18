@@ -265,7 +265,7 @@ function buildPackageJson(collectionName: string): string {
 
 function buildReadme(collectionName: string, filePaths: string[]): string {
   const tree = renderTree([...filePaths, '.env.local']);
-  return `# ${collectionName} — API Tests (Playwright JavaScript)
+  return `# ${collectionName} - API Tests (Playwright JavaScript)
 
 ## Project structure
 
@@ -273,7 +273,7 @@ function buildReadme(collectionName: string, filePaths: string[]): string {
 ${tree}
 \`\`\`
 
-> \`.env.local\` is git-ignored — fill in your secrets before running.
+> \`.env.local\` is git-ignored - fill in your secrets before running.
 
 ## Setup
 

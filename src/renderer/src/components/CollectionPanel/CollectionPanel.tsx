@@ -156,7 +156,7 @@ export function CollectionPanel() {
         {activeTab === 'data' && (
           <div className="flex flex-col gap-3 text-xs">
             <p className="text-surface-600 text-[11px]">
-              Define variables here — each row runs the entire collection once with those values injected.
+              Define variables here - each row runs the entire collection once with those values injected.
               Columns become <code className="text-surface-500">{'{{variable}}'}</code> placeholders.
             </p>
 
@@ -168,7 +168,7 @@ export function CollectionPanel() {
               <button
                 onClick={() => csvFileRef.current?.click()}
                 className="px-2.5 py-1 bg-surface-700 hover:bg-surface-600 rounded transition-colors"
-                title="Import CSV — first row is column headers"
+                title="Import CSV - first row is column headers"
               >↑ Import CSV</button>
               {hasColumns && iterCount > 0 && (
                 <button onClick={exportCSV} className="px-2.5 py-1 bg-surface-700 hover:bg-surface-600 rounded transition-colors">↓ Export CSV</button>
@@ -180,7 +180,7 @@ export function CollectionPanel() {
             {hasColumns && (
               <p className="text-surface-500">
                 {iterCount === 0
-                  ? 'No rows yet — add rows or import a CSV.'
+                  ? 'No rows yet - add rows or import a CSV.'
                   : `${iterCount} iteration${iterCount !== 1 ? 's' : ''} · columns: ${ds.columns.join(', ')}`}
               </p>
             )}
@@ -229,7 +229,7 @@ export function CollectionPanel() {
                     {iterCount === 0 && (
                       <tr>
                         <td colSpan={ds.columns.length + 2} className="px-2 py-3 text-surface-600 text-center">
-                          No rows — click "+ Row" or import a CSV
+                          No rows - click "+ Row" or import a CSV
                         </td>
                       </tr>
                     )}

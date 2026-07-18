@@ -24,6 +24,8 @@ api-spector run --workspace ./my-workspace.spector
 
 ## Examples
 
+Without `--environment`, the run uses the workspace's default environment when one is set (Workspace Settings, General tab). Environment `extends` chains are resolved automatically.
+
 Run with an environment:
 
 ```bash
@@ -70,7 +72,7 @@ api-spector run --workspace ./project.spector --bail
   ✓  GET      Get users  200  45ms
   ✓  POST     Create user  201  112ms
   ✗  DELETE   Delete user  404  23ms
-     ✗ status should be 200 — Expected 200 to equal 404
+     ✗ status should be 200 - Expected 200 to equal 404
 
   3 passed · 1 failed · 4 total · 180ms
 ```

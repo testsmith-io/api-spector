@@ -203,7 +203,7 @@ function listAgents (): void {
 
 function printHelp (): void {
   console.log( `
-  ${color( 'api-spector agents', C.bold )} — manage AI agent configurations
+  ${color( 'api-spector agents', C.bold )} - manage AI agent configurations
 
   ${color( 'Commands:', C.bold )}
     agents init <name>    Scaffold agent instruction files in the current directory

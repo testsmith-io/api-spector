@@ -60,7 +60,7 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-surface-800 shrink-0">
           <div>
             <h2 className="text-sm font-semibold">Collection settings</h2>
-            <p className="text-[10px] text-surface-600 mt-0.5">{collection.name} — auth and headers inherited by all requests in this collection</p>
+            <p className="text-[10px] text-surface-600 mt-0.5">{collection.name} - auth and headers inherited by all requests in this collection</p>
           </div>
           <button onClick={onClose} className="text-surface-400 hover:text-white text-lg leading-none">×</button>
         </div>

@@ -5,15 +5,23 @@ import type { StateCreator } from 'zustand';
 import type { ContractReport, ContractSnapshot } from '../../../../shared/types';
 import type { FullState } from '../index';
 
+/** Context of the last run, used to fill in the exported HTML report header. */
+export interface ContractRunMeta {
+  spec?: string
+  provider?: string
+}
+
 export interface ContractSlice {
   /** Latest run only — there is no run history. */
   lastContractReport: ContractReport | null
+  /** Spec/provider labels from the run that produced lastContractReport. */
+  lastContractRunMeta: ContractRunMeta | null
   /** Pinned spec snapshots, keyed by their workspace-relative path. */
   contractSnapshots: Record<string, ContractSnapshot>
   /** When set, contract runs use this snapshot's spec instead of a live URL. */
   activeContractSnapshotRelPath: string | null
 
-  setLastContractReport: (r: ContractReport | null) => void
+  setLastContractReport: (r: ContractReport | null, meta?: ContractRunMeta) => void
   loadContractSnapshot: (relPath: string, snapshot: ContractSnapshot) => void
   removeContractSnapshot: (relPath: string) => void
   setActiveContractSnapshot: (relPath: string | null) => void
@@ -28,10 +36,14 @@ export const createContractSlice: StateCreator<
   ContractSlice
 > = (set) => ({
   lastContractReport: null,
+  lastContractRunMeta: null,
   contractSnapshots: {},
   activeContractSnapshotRelPath: null,
 
-  setLastContractReport: (r) => set(s => { s.lastContractReport = r; }),
+  setLastContractReport: (r, meta) => set(s => {
+    s.lastContractReport = r;
+    s.lastContractRunMeta = r ? (meta ?? null) : null;
+  }),
 
   loadContractSnapshot: (relPath, snapshot) => set(s => {
     s.contractSnapshots[relPath] = snapshot;

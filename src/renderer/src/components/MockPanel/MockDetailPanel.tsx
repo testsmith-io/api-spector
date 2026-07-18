@@ -299,7 +299,7 @@ function HitRow({ hit, matched }: { hit: MockHit; matched: MockRoute | undefined
         <span className="w-32 shrink-0 truncate text-surface-600 text-xs font-sans" title={matched?.description ?? matched?.path ?? ''}>
           {unmatched
             ? <span className="text-red-400">no match</span>
-            : (matched?.description || matched?.path || '—')}
+            : (matched?.description || matched?.path || '-')}
         </span>
         <span className={`w-12 text-right shrink-0 text-xs ${
           hit.status < 300 ? 'text-emerald-400' :

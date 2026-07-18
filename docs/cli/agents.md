@@ -1,6 +1,6 @@
 # AI Agents
 
-API Spector ships with built-in support for AI-powered test generation. The `agents` CLI command scaffolds instruction files for popular AI coding tools, enabling them to generate functional test plans and OWASP security tests directly from your OpenAPI spec.
+API Spector ships with built-in support for AI-powered test generation. The `agents` CLI command scaffolds instruction files for popular AI coding tools, so they can generate functional test plans and OWASP security tests directly from your OpenAPI spec.
 
 ## Quick start
 
@@ -65,8 +65,8 @@ In Claude Code, type `/skills` to confirm they appear:
 ❯ /skills
 
 Skills:
-  api-spector-functional-tests  — Generate functional tests from OpenAPI
-  api-spector-security-tests    — Generate OWASP API Top 10 security tests
+  api-spector-functional-tests  - Generate functional tests from OpenAPI
+  api-spector-security-tests    - Generate OWASP API Top 10 security tests
 ```
 
 ### Generate functional tests
@@ -101,12 +101,12 @@ Use {{user_a_token}} as attacker, {{user_b_token}} as victim, {{admin_token}} fo
 ```
 
 Claude Code will generate a security test collection organized by OWASP category:
-- **BOLA** — User A accessing User B's resources
-- **Broken Auth** — missing/invalid/expired tokens
-- **Mass Assignment** — injecting forbidden fields (role, is_admin)
-- **Injection** — SQL, XSS, NoSQL payloads in input fields
-- **Function-Level Auth** — admin endpoints with regular tokens
-- **Security Config** — security headers, error verbosity, CORS
+- **BOLA**: User A accessing User B's resources
+- **Broken Auth**: missing/invalid/expired tokens
+- **Mass Assignment**: injecting forbidden fields (role, is_admin)
+- **Injection**: SQL, XSS, NoSQL payloads in input fields
+- **Function-Level Auth**: admin endpoints with regular tokens
+- **Security Config**: security headers, error verbosity, CORS
 
 Each test request comes pre-filled with the attack payload and a post-request script that asserts the API blocks the attack.
 
@@ -116,27 +116,27 @@ After running the functional test skill, you get a collection like:
 
 ```
 Auth / Login/
-├── [beforeAll] Login as admin     — POST /users/login → extracts {{access_token}}
-├── [beforeAll] Login as customer  — POST /users/login → extracts {{customer_token}}
+├── [beforeAll] Login as admin     - POST /users/login → extracts {{access_token}}
+├── [beforeAll] Login as customer  - POST /users/login → extracts {{customer_token}}
 
 Users/
-├── POST /users/register — valid data           → expects 201, validates response fields
-├── POST /users/register — missing email         → expects 422, checks error message
-├── POST /users/register — invalid email format  → expects 422
-├── POST /users/register — weak password         → expects 422
-├── POST /users/login — valid credentials        → expects 200, validates access_token
-├── POST /users/login — invalid credentials      → expects 401
-├── GET /users/me — authenticated                → expects 200, extracts user ID
-├── GET /users/me — no auth                      → expects 401
-├── GET /users — admin lists users               → expects 200, validates array
-├── GET /users — no auth                         → expects 401
+├── POST /users/register - valid data           → expects 201, validates response fields
+├── POST /users/register - missing email         → expects 422, checks error message
+├── POST /users/register - invalid email format  → expects 422
+├── POST /users/register - weak password         → expects 422
+├── POST /users/login - valid credentials        → expects 200, validates access_token
+├── POST /users/login - invalid credentials      → expects 401
+├── GET /users/me - authenticated                → expects 200, extracts user ID
+├── GET /users/me - no auth                      → expects 401
+├── GET /users - admin lists users               → expects 200, validates array
+├── GET /users - no auth                         → expects 401
 └── ...
 
 Products/
-├── GET /products — list                         → expects 200, extracts product_id
-├── GET /products — paginated                    → expects 200, validates page size
-├── POST /products — valid data                  → expects 201
-├── POST /products — missing name                → expects 422
+├── GET /products - list                         → expects 200, extracts product_id
+├── GET /products - paginated                    → expects 200, validates page size
+├── POST /products - valid data                  → expects 201
+├── POST /products - missing name                → expects 422
 └── ...
 ```
 
@@ -205,7 +205,7 @@ For ChatGPT, Claude.ai, or any web-based LLM:
 2. Paste your OpenAPI spec (or the relevant endpoints)
 3. Ask: "Generate API Spector test scripts for each endpoint"
 
-The scripting reference teaches the LLM the `sp.*` API, assertion chains, variable scopes, and hook patterns — everything it needs to produce correct scripts.
+The scripting reference teaches the LLM the `sp.*` API, assertion chains, variable scopes, and hook patterns: everything it needs to produce correct scripts.
 
 ## Re-running is safe
 
@@ -232,7 +232,7 @@ $ api-spector agents init claude
 
 ## Customizing the skills
 
-The skill files and documentation are plain markdown — you can edit them after initialization. Common customizations:
+The skill files and documentation are plain markdown, so you can edit them after initialization. Common customizations:
 
 - **Add your API's business rules** to the functional testing guide so the AI generates domain-specific tests
 - **Add your auth flow** to the security testing guide so the AI uses the correct login endpoints

@@ -1,4 +1,4 @@
-# API Spector — Scripting Reference
+# API Spector: Scripting Reference
 
 This document describes the scripting API available in API Spector's pre-request and post-request scripts. Use this as a reference when generating test scripts.
 
@@ -134,7 +134,7 @@ Requests can be designated as lifecycle hooks within their folder:
 
 Hooks from parent folders wrap child folders (outer-to-inner for before, inner-to-outer for after).
 
-Common pattern — login hook:
+A common pattern is a login hook:
 
 ```javascript
 // Post-request script on a beforeAll hook that calls POST /login:

@@ -69,7 +69,7 @@ export function buildCollectionFromWsdl(name: string, parsed: WsdlResult): {
     version: '1.0',
     id: uuidv4(),
     name,
-    description: `Imported from WSDL — ${parsed.endpoints[0]?.address ?? parsed.targetNamespace}`,
+    description: `Imported from WSDL - ${parsed.endpoints[0]?.address ?? parsed.targetNamespace}`,
     rootFolder: {
       id: uuidv4(),
       name: 'root',
@@ -123,7 +123,7 @@ export function buildMockFromWsdl(name: string, parsed: WsdlResult, existingPort
       statusCode: 200,
       headers: { 'Content-Type': contentTypeForSoap(version) },
       body: '',
-      description: `SOAP ${version} — dispatched per operation`,
+      description: `SOAP ${version} - dispatched per operation`,
       script: buildMockDispatchScript(opMap),
       // Externalized so workspace JSON stays compact: the dispatch script reads
       // these via the script-runner's `metadata` context binding instead of

@@ -46,7 +46,7 @@ export const SNIPPET_GROUPS: SnippetGroup[] = [
     ],
   },
   {
-    group: 'Variables — Get',
+    group: 'Variables - Get',
     items: [
       {
         label: 'Get variable',
@@ -67,7 +67,7 @@ export const SNIPPET_GROUPS: SnippetGroup[] = [
     ],
   },
   {
-    group: 'Variables — Set',
+    group: 'Variables - Set',
     items: [
       {
         label: 'Save token from response (use in next requests)',
@@ -92,7 +92,7 @@ export const SNIPPET_GROUPS: SnippetGroup[] = [
     ],
   },
   {
-    group: 'Variables — Clear',
+    group: 'Variables - Clear',
     items: [
       {
         label: 'Clear variable',

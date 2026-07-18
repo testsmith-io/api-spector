@@ -74,7 +74,7 @@ async function cmdDescribe(args: Record<string, string | boolean>): Promise<void
   for (const op of parsed.operations) {
     const name = op.name.slice(0, 37).padEnd(37);
     const ver  = op.soapVersion.padEnd(5);
-    const sa   = (op.soapAction ?? '—').slice(0, 30);
+    const sa   = (op.soapAction ?? '-').slice(0, 30);
     console.log(`  ${name} ${ver} ${sa}`);
   }
   console.log('');

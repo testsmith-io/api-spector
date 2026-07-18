@@ -60,7 +60,7 @@ export function WelcomeScreen() {
 
       <p className="text-surface-400 text-xs max-w-xs">
         A workspace is a <code className="text-surface-500">.spector</code> file.
-        Commit it and your collections to Git — secrets are stored in your OS keychain, never on disk.
+        Commit it and your collections to Git - secrets are stored in your OS keychain, never on disk.
       </p>
     </div>
   );

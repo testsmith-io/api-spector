@@ -1,0 +1,126 @@
+{
+  "version": "1.0",
+  "id": "contract-testing",
+  "name": "Contract testing (Toolshop API)",
+  "description": "Consumer contracts against the public Toolshop demo API (practicesoftwaretesting.com). Works with all four contract modes; see example/README.md.",
+  "rootFolder": {
+    "id": "root",
+    "name": "root",
+    "description": "",
+    "folders": [
+      {
+        "id": "folder-contracts",
+        "name": "Toolshop contracts",
+        "description": "",
+        "folders": [],
+        "requestIds": [
+          "list-brands",
+          "71f8c426-7ed4-4988-8abd-d0a30a206c4b",
+          "list-products",
+          "category-tree"
+        ]
+      }
+    ],
+    "requestIds": []
+  },
+  "requests": {
+    "list-brands": {
+      "id": "list-brands",
+      "name": "List brands",
+      "method": "GET",
+      "url": "{{TOOLSHOP_URL}}/brands",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Pact-style body matcher: every brand must have string id/name and a slug matching ^[a-z0-9-]+$.",
+      "protocol": "http",
+      "contract": {
+        "statusCode": 200,
+        "headers": [
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "required": true
+          }
+        ],
+        "bodyMatcher": "{\"__match\": \"eachLike\", \"value\": {\"id\": {\"__match\": \"string\", \"value\": \"01KXB6M4EBFAZ6A52GYP7GNF7E\"}, \"name\": {\"__match\": \"string\", \"value\": \"ForgeFlex Tools\"}, \"slug\": {\"__match\": \"regex\", \"regex\": \"^[a-z0-9-]+$\", \"value\": \"forgeflex-tools\"}}, \"min\": 1}"
+      }
+    },
+    "list-products": {
+      "id": "list-products",
+      "name": "List products (paginated)",
+      "method": "GET",
+      "url": "{{TOOLSHOP_URL}}/products?page=2",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Hand-written JSON Schema: pagination envelope plus required product fields.",
+      "protocol": "http",
+      "contract": {
+        "statusCode": 200,
+        "bodySchema": "{\n  \"type\": \"object\",\n  \"required\": [\n    \"current_page\",\n    \"data\",\n    \"total\",\n    \"per_page\"\n  ],\n  \"properties\": {\n    \"current_page\": {\n      \"type\": \"integer\"\n    },\n    \"per_page\": {\n      \"type\": \"integer\"\n    },\n    \"total\": {\n      \"type\": \"integer\"\n    },\n    \"data\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"required\": [\n          \"id\",\n          \"name\",\n          \"price\",\n          \"in_stock\"\n        ],\n        \"properties\": {\n          \"id\": {\n            \"type\": \"string\"\n          },\n          \"name\": {\n            \"type\": \"string\"\n          },\n          \"price\": {\n            \"type\": \"number\"\n          },\n          \"in_stock\": {\n            \"type\": \"boolean\"\n          }\n        }\n      }\n    }\n  }\n}"
+      }
+    },
+    "category-tree": {
+      "id": "category-tree",
+      "name": "Category tree",
+      "method": "GET",
+      "url": "{{TOOLSHOP_URL}}/categories/tree",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Matcher example incl. a null matcher (parent_id) and a type matcher for the nested array.",
+      "protocol": "http",
+      "contract": {
+        "statusCode": 200,
+        "bodyMatcher": "{\"__match\": \"eachLike\", \"value\": {\"id\": {\"__match\": \"string\", \"value\": \"01KXB6M4Q8XYZ0000000000000\"}, \"name\": {\"__match\": \"string\", \"value\": \"Hand Tools\"}, \"slug\": {\"__match\": \"regex\", \"regex\": \"^[a-z0-9-]+$\", \"value\": \"hand-tools\"}, \"parent_id\": {\"__match\": \"null\"}, \"sub_categories\": {\"__match\": \"type\", \"value\": []}}, \"min\": 1}"
+      }
+    },
+    "71f8c426-7ed4-4988-8abd-d0a30a206c4b": {
+      "id": "71f8c426-7ed4-4988-8abd-d0a30a206c4b",
+      "name": "List brands (copy)",
+      "method": "POST",
+      "url": "{{TOOLSHOP_URL}}/brands",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "json",
+        "json": "{\n  \"name\": \"some name\",\n  \"slug\": \"xyz\"\n}"
+      },
+      "description": "Pact-style body matcher: every brand must have string id/name and a slug matching ^[a-z0-9-]+$.",
+      "protocol": "http",
+      "contract": {
+        "statusCode": 200,
+        "headers": [
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "required": true
+          }
+        ],
+        "bodyMatcher": "{\"__match\": \"eachLike\", \"value\": {\"id\": {\"__match\": \"string\", \"value\": \"01KXB6M4EBFAZ6A52GYP7GNF7E\"}, \"name\": {\"__match\": \"string\", \"value\": \"ForgeFlex Tools\"}, \"slug\": {\"__match\": \"regex\", \"regex\": \"^[a-z0-9-]+$\", \"value\": \"forgeflex-tools\"}}, \"min\": 1}"
+      }
+    }
+  },
+  "collectionVariables": {
+    "TOOLSHOP_URL": "https://api.practicesoftwaretesting.com"
+  }
+}

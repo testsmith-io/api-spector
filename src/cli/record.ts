@@ -76,7 +76,7 @@ async function main() {
   await startRecorder({ upstream, port, maskHeaders: extraMask, ignoreHeaders: extraIgnore });
 
   console.log('');
-  console.log(color('  API Spector — Record Proxy', C.bold, C.white));
+  console.log(color('  API Spector - Record Proxy', C.bold, C.white));
   console.log(color(`  Upstream:  ${upstream}`, C.gray));
   console.log(color(`  Listening: http://localhost:${port}`, C.cyan));
   console.log(color(`  Output:    ${outputDir}`, C.gray));
@@ -98,7 +98,7 @@ async function main() {
     const sessionPath = join(outputDir, `session-${slug}.recording.json`);
     await writeFile(sessionPath, JSON.stringify(session, null, 2), 'utf8');
 
-    const mockName   = `Recorded — ${new URL(upstream).hostname} ${slug}`;
+    const mockName   = `Recorded - ${new URL(upstream).hostname} ${slug}`;
     const mockServer = entriesToMockServer(session.entries, upstream, mockName, port);
     const mockPath   = join(outputDir, `session-${slug}.mock.json`);
     await writeFile(mockPath, JSON.stringify(mockServer, null, 2), 'utf8');

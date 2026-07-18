@@ -110,7 +110,7 @@ export function SchemaTab({ request, onChange }: Props) {
         </div>
       </div>
       <p className="text-[10px] text-surface-600">
-        Standalone schema for ad-hoc validation. Independent of the contract — edits here don&apos;t affect it.
+        Standalone schema for ad-hoc validation. Independent of the contract - edits here don&apos;t affect it.
       </p>
 
       {/* Schema editor */}
@@ -152,10 +152,10 @@ export function SchemaTab({ request, onChange }: Props) {
             : 'bg-red-900/20 border-red-700'
         }`}>
           {result.valid ? (
-            <span className="text-emerald-400 font-semibold">Valid — response matches the schema.</span>
+            <span className="text-emerald-400 font-semibold">Valid: response matches the schema.</span>
           ) : (
             <div className="flex flex-col gap-1.5">
-              <span className="text-red-400 font-semibold">Invalid — {result.errors.length} error{result.errors.length !== 1 ? 's' : ''}</span>
+              <span className="text-red-400 font-semibold">Invalid: {result.errors.length} error{result.errors.length !== 1 ? 's' : ''}</span>
               {result.errors.map((e, i) => (
                 <div key={i} className="flex gap-2 text-red-300">
                   <span className="text-red-500 font-mono shrink-0">{e.instancePath || '/'}</span>

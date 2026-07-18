@@ -142,3 +142,36 @@ describe('can-i-deploy results store', () => {
     }
   });
 });
+
+// ─── Environment / deployment tracking ────────────────────────────────────────
+
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir as osTmpdir } from 'node:os';
+import { join as pjoin } from 'node:path';
+import { recordDeployment, listEnvironments, canIDeploy as canIDeployEnv } from '../main/contract/results-store';
+
+describe('deployment tracking', () => {
+  it('records, replaces, and lists deployments per environment', async () => {
+    const dir = await mkdtemp(pjoin(osTmpdir(), 'spector-env-'));
+    const r1 = await recordDeployment(dir, 'prod', 'web-app', '1.0.0', '2026-07-01T10:00:00Z');
+    expect(r1.previous).toBeUndefined();
+
+    const r2 = await recordDeployment(dir, 'prod', 'web-app', '1.1.0', '2026-07-02T10:00:00Z');
+    expect(r2.previous?.version).toBe('1.0.0');
+
+    await recordDeployment(dir, 'staging', 'mobile-app', '2.0.0', '2026-07-03T10:00:00Z');
+
+    const envs = await listEnvironments(dir);
+    expect(envs.map(e => e.name)).toEqual(['prod', 'staging']);
+    expect(envs[0].deployed['web-app'].version).toBe('1.1.0');
+    expect(envs[1].deployed['mobile-app'].version).toBe('2.0.0');
+  });
+
+  it('can-i-deploy reports the currently deployed version for the target env', async () => {
+    const dir = await mkdtemp(pjoin(osTmpdir(), 'spector-env-'));
+    await recordDeployment(dir, 'prod', 'web-app', '1.0.0', '2026-07-01T10:00:00Z');
+    const verdict = await canIDeployEnv(dir, 'web-app', '1.1.0', 'prod');
+    expect(verdict.deployable).toBe(false); // no recorded verification: fail closed
+    expect(verdict.currentlyDeployed?.version).toBe('1.0.0');
+  });
+});

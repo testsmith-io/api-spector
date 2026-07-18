@@ -9,6 +9,7 @@ import { buildJsonReport, buildJUnitReport, buildHtmlReport } from '../../../../
 import { collectAllTags, buildRunPlan, resolveInheritedAuthAndHeaders } from '../../../../shared/request-collection';
 import { buildCliArgs, generateGitHub, generateAzure, generateGitLab } from '../../../../shared/ci-generators';
 import { getMethodColor } from '../../../../shared/colors';
+import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
 import { EmptyState } from '../common/EmptyState';
 import { Modal } from '../common/Modal';
 
@@ -155,7 +156,7 @@ export function RunnerModal() {
       });
     }
 
-    const env = selectedEnvId ? environments[selectedEnvId]?.data ?? null : null;
+    const env = resolveEnvironmentById(environments, selectedEnvId || null);
 
     setRunnerResults(items.map(item => ({
       requestId:      item.request.id,
@@ -232,7 +233,7 @@ export function RunnerModal() {
                 onChange={e => setSelectedEnvId(e.target.value)}
                 className="text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
               >
-                <option value="">— No environment —</option>
+                <option value="">(no environment)</option>
                 {Object.values(environments).map(({ data: env }) => (
                   <option key={env.id} value={env.id}>{env.name}</option>
                 ))}

@@ -221,3 +221,24 @@ describe('validateRequestAgainstSpec — request body', () => {
     expect(violations.every(v => v.type !== 'request_body_invalid')).toBe(true);
   });
 });
+
+// ─── runProviderVerification: collection variables resolve in URLs ───────────
+
+import { runProviderVerification } from '../main/contract/provider-verifier';
+
+describe('runProviderVerification with collection variables', () => {
+  it('resolves {{vars}} from collectionVars when matching spec paths', async () => {
+    const paths = Object.keys((spec as { paths: Record<string, unknown> }).paths);
+    const firstPath = paths[0];
+    const req: ApiRequest = {
+      id: 'r1', name: 'via collection var', method: 'GET',
+      url: `{{API_URL}}/v1${firstPath}`,   // fixture's server base path is /v1
+      headers: [], params: [], auth: { type: 'none' }, body: { mode: 'none' },
+    };
+    const report = await runProviderVerification(
+      [req], {}, { API_URL: 'https://api.example.com' }, undefined, _FIXTURE,
+    );
+    const unknownPath = report.results[0].violations.filter(v => v.type === 'unknown_path');
+    expect(unknownPath).toHaveLength(0);
+  });
+});

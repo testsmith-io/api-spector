@@ -201,17 +201,19 @@ export function validateRequestAgainstSpec(
 export async function runProviderVerification(
   requests:         ApiRequest[],
   envVars:          Record<string, string>,
+  collectionVars:   Record<string, string> = {},
   specUrl?:         string,
   specPath?:        string,
   requestBaseUrl?:  string,
 ): Promise<ContractReport> {
   const spec  = await loadSpec(specUrl, specPath) as Record<string, unknown>;
+  const vars  = { ...envVars, ...collectionVars };
   const start = Date.now();
 
   const activeRequests = requests.filter(r => !r.disabled);
   const results: ContractResult[] = activeRequests.map(req => {
-    const violations = validateRequestAgainstSpec(spec, req, envVars, requestBaseUrl);
-    const url = req.url.replace(/\{\{([^}]+)\}\}/g, (_, k: string) => envVars[k] ?? `{{${k}}}`);
+    const violations = validateRequestAgainstSpec(spec, req, vars, requestBaseUrl);
+    const url = req.url.replace(/\{\{([^}]+)\}\}/g, (_, k: string) => vars[k] ?? `{{${k}}}`);
     return {
       requestId:   req.id,
       requestName: req.name,

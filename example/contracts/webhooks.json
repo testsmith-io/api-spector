@@ -1,0 +1,10 @@
+{
+  "webhooks": [
+    {
+      "name": "notify CI",
+      "url": "http://127.0.0.1:18094/trigger",
+      "events": ["result-recorded", "deployment-recorded"],
+      "headers": { "Authorization": "Bearer $SPECTOR_HOOK_TOKEN" }
+    }
+  ]
+}

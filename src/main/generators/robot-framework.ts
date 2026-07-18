@@ -61,14 +61,14 @@ function buildNameMap(root: Folder, requests: Collection['requests']): Map<strin
 function buildVariablesFile(environment: Environment | null): string {
   const lines = ['*** Variables ***'];
   if (!environment) {
-    lines.push('# No environment — add your variables here');
+    lines.push('# No environment - add your variables here');
     lines.push('${BASE_URL}    http://localhost:8080');
     return lines.join('\n') + '\n';
   }
   for (const v of environment.variables) {
     if (!v.enabled) continue;
     if (v.secret) {
-      lines.push(`# ${envVar(v.key)} — stored in OS keychain, never hardcoded`);
+      lines.push(`# ${envVar(v.key)} - stored in OS keychain, never hardcoded`);
     } else {
       lines.push(`${robotVar(v.key)}    ${v.value}`);
     }
@@ -121,11 +121,11 @@ function buildKeywordsFile(
       const method = req.method.charAt(0) + req.method.slice(1).toLowerCase();
 
       lines.push(kwName);
-      lines.push(`    [Documentation]    Hook: ${req.hookType} — ${req.name}`);
+      lines.push(`    [Documentation]    Hook: ${req.hookType} - ${req.name}`);
 
       // robotframework-requests has no keyword for QUERY (RFC 10008)
       if (!ROBOT_REQUESTS_METHODS.includes(req.method)) {
-        lines.push(`    Log    ${req.method} is not supported by robotframework-requests — hook skipped    WARN`);
+        lines.push(`    Log    ${req.method} is not supported by robotframework-requests - hook skipped    WARN`);
         lines.push(`    RETURN    \${None}`);
         lines.push('');
         continue;
@@ -180,7 +180,7 @@ function buildKeywordsFile(
 
       // robotframework-requests has no keyword for QUERY (RFC 10008)
       if (!ROBOT_REQUESTS_METHODS.includes(req.method)) {
-        lines.push(`    Log    ${req.method} is not supported by robotframework-requests — request skipped    WARN`);
+        lines.push(`    Log    ${req.method} is not supported by robotframework-requests - request skipped    WARN`);
         lines.push(`    RETURN    \${None}`);
         lines.push('');
         continue;
@@ -367,7 +367,7 @@ function buildTestSuite(
 
 function buildReadme(collectionName: string, filePaths: string[]): string {
   const tree = renderTree(filePaths);
-  return `# ${collectionName} — API Tests (Robot Framework)
+  return `# ${collectionName} - API Tests (Robot Framework)
 
 ## Project structure
 
@@ -376,7 +376,7 @@ ${tree}
 \`\`\`
 
 > Secrets are read from OS environment variables (e.g. \`%{API_TOKEN}\`).
-> Never hardcode secrets — export them in your shell or CI environment.
+> Never hardcode secrets - export them in your shell or CI environment.
 
 ## Setup
 

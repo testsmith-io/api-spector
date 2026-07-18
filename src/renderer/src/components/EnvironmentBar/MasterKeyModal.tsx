@@ -12,11 +12,11 @@ const EXAMPLES = [
     code: (pw: string) => `export API_SPECTOR_MASTER_KEY="${pw || '<your-password>'}"`,
   },
   {
-    label: 'Windows — PowerShell profile',
+    label: 'Windows - PowerShell profile',
     code: (pw: string) => `$env:API_SPECTOR_MASTER_KEY = "${pw || '<your-password>'}"`,
   },
   {
-    label: 'Windows — Command Prompt (permanent)',
+    label: 'Windows - Command Prompt (permanent)',
     code: (pw: string) => `setx API_SPECTOR_MASTER_KEY "${pw || '<your-password>'}"`,
   },
 ];

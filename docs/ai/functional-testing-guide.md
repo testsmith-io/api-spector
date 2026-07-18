@@ -1,6 +1,6 @@
-# API Spector — Functional API Testing Guide
+# API Spector: Functional API Testing Guide
 
-Use this guide to generate comprehensive functional test cases for REST APIs. Each endpoint should be tested across multiple categories.
+Use this guide to generate functional test cases for REST APIs. Each endpoint should be tested across multiple categories.
 
 ## Test categories per endpoint
 
@@ -64,10 +64,10 @@ sp.test('returns 422 when email is missing', function() {
 Use descriptive names that include the endpoint and expected behavior:
 
 ```javascript
-sp.test('POST /users — valid data returns 201', function() { ... });
-sp.test('POST /users — missing email returns 422', function() { ... });
-sp.test('GET /users/:id — non-existent ID returns 404', function() { ... });
-sp.test('GET /users — unauthorized returns 401', function() { ... });
+sp.test('POST /users - valid data returns 201', function() { ... });
+sp.test('POST /users - missing email returns 422', function() { ... });
+sp.test('GET /users/:id - non-existent ID returns 404', function() { ... });
+sp.test('GET /users - unauthorized returns 401', function() { ... });
 ```
 
 ## Variable extraction pattern

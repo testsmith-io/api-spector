@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { useStore } from '../../store';
 import type { ApiRequest, HttpMethod, KeyValuePair, RunRequestResult } from '../../../../shared/types';
 import { getHooksForRequest } from '../../../../shared/request-collection';
+import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
 import { ParamsTab } from './ParamsTab';
 import { VarInput } from '../common/VarInput';
 import { HeadersTab } from './HeadersTab';
@@ -14,6 +15,7 @@ import { ScriptsTab } from './ScriptsTab';
 import { SchemaTab } from './SchemaTab';
 import { ContractTab } from './ContractTab';
 import { WebSocketPanel } from '../WebSocket/WebSocketPanel';
+import { FuzzModal } from './FuzzModal';
 
 const { electron } = window;
 
@@ -27,7 +29,7 @@ const METHOD_COLORS: Record<string, string> = {
   DELETE:  'text-red-400',
   HEAD:    'text-purple-400',
   OPTIONS: 'text-gray-400',
-  QUERY:   'text-teal-400',
+  QUERY:   'text-fuchsia-400',
 };
 
 interface Props {
@@ -76,6 +78,7 @@ export function RequestBuilder({ request }: Props) {
   }
 
   const [editingName, setEditingName] = useState(false);
+  const [showFuzz, setShowFuzz] = useState(false);
   const [runHooks, setRunHooks] = useState(() => localStorage.getItem('runHooks') !== 'false');
 
   function toggleRunHooks() {
@@ -97,7 +100,7 @@ export function RequestBuilder({ request }: Props) {
     setTabHookResults(activeTabId, null);
     const collectedHookResults: RunRequestResult[] = [];
     try {
-      const activeEnv = activeEnvironmentId ? environments[activeEnvironmentId]?.data ?? null : null;
+      const activeEnv = resolveEnvironmentById(environments, activeEnvironmentId);
       const sessionVars = useStore.getState().sessionVars;
       const tls = collectionTls
         ? { ...workspaceSettings?.tls, ...collectionTls }
@@ -137,9 +140,9 @@ export function RequestBuilder({ request }: Props) {
         try {
           // Re-read the environment each iteration — a prior hook may have
           // updated it via sp.environment.set() or sp.variables.set().
-          const hookEnv = activeEnvironmentId
-            ? useStore.getState().environments[activeEnvironmentId]?.data ?? null
-            : null;
+          const hookEnv = resolveEnvironmentById(
+            useStore.getState().environments, activeEnvironmentId,
+          );
           const hookSessionVars = useStore.getState().sessionVars;
           const r = await electron.sendRequest({
             ...basePayload,
@@ -179,9 +182,9 @@ export function RequestBuilder({ request }: Props) {
       // Re-read the environment from the store — before hooks may have updated
       // it via sp.environment.set() (e.g. extracting a token), and the original
       // snapshot in basePayload would be stale.
-      const freshEnv = activeEnvironmentId
-        ? useStore.getState().environments[activeEnvironmentId]?.data ?? null
-        : null;
+      const freshEnv = resolveEnvironmentById(
+        useStore.getState().environments, activeEnvironmentId,
+      );
       const freshSessionVars = useStore.getState().sessionVars;
       const result = await electron.sendRequest({
         ...basePayload,
@@ -210,9 +213,9 @@ export function RequestBuilder({ request }: Props) {
       for (const hook of hooks.after) {
         const start = Date.now();
         try {
-          const hookEnv = activeEnvironmentId
-            ? useStore.getState().environments[activeEnvironmentId]?.data ?? null
-            : null;
+          const hookEnv = resolveEnvironmentById(
+            useStore.getState().environments, activeEnvironmentId,
+          );
           const hookSessionVars = useStore.getState().sessionVars;
           const r = await electron.sendRequest({
             ...basePayload,
@@ -328,7 +331,7 @@ export function RequestBuilder({ request }: Props) {
               if (activeTabId) setTabRequestTab(activeTabId, 'body');
             }}
             className={`px-2 py-1.5 transition-colors ${isSoap ? 'bg-amber-700 text-amber-100' : 'text-surface-500 hover:text-white'}`}
-            title="SOAP — endpoint and method are derived from the WSDL"
+            title="SOAP - endpoint and method are derived from the WSDL"
           >
             SOAP
           </button>
@@ -377,7 +380,7 @@ export function RequestBuilder({ request }: Props) {
           <>
             <button
               onClick={toggleRunHooks}
-              title={runHooks ? 'Hooks enabled — click to disable' : 'Hooks disabled — click to enable'}
+              title={runHooks ? 'Hooks enabled - click to disable' : 'Hooks disabled - click to enable'}
               className={`px-2 py-1.5 rounded text-xs font-medium transition-colors border ${
                 runHooks
                   ? 'border-violet-500 text-violet-400 hover:bg-violet-500/10'
@@ -396,6 +399,8 @@ export function RequestBuilder({ request }: Props) {
           </>
         )}
       </div>
+
+      {showFuzz && <FuzzModal request={request} onClose={() => setShowFuzz(false)} />}
 
       {/* WS Panel (takes over the full remaining area) */}
       {isWs ? (
@@ -422,6 +427,14 @@ export function RequestBuilder({ request }: Props) {
                 )}
               </button>
             ))}
+            <button
+              onClick={() => setShowFuzz(true)}
+              disabled={!request.url}
+              title="Fuzz this request with malformed inputs (opens a dialog; nothing is sent until you confirm)"
+              className="ml-auto my-1 self-center px-2 py-0.5 rounded text-[11px] border border-surface-700 text-surface-500 hover:text-fuchsia-400 hover:border-fuchsia-500 transition-colors disabled:opacity-40"
+            >
+              fuzz
+            </button>
           </div>
 
           {/* Tab content */}

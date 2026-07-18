@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../../store';
+import { useActiveEnvironment } from '../../hooks/useActiveEnvironment';
 import { EnvironmentEditor } from './EnvironmentEditor';
 import { MasterKeyModal } from './MasterKeyModal';
 
@@ -15,8 +16,11 @@ export function EnvironmentBar({ inline = false }: { inline?: boolean }) {
   const [showEditor, setShowEditor] = useState(false);
   const [pendingEnvId, setPendingEnvId] = useState<string | null>(null);
 
+  const defaultEnvName = useStore(s => s.workspace?.settings?.defaultEnvironment);
+
   const envList = Object.values(environments);
-  const activeEnv = activeEnvironmentId ? environments[activeEnvironmentId]?.data : null;
+  // Resolved through the extends chain so the var count includes inherited vars.
+  const activeEnv = useActiveEnvironment();
   const varCount = activeEnv?.variables.filter(v => v.enabled).length ?? 0;
 
   async function handleEnvChange(id: string | null) {
@@ -53,7 +57,11 @@ export function EnvironmentBar({ inline = false }: { inline?: boolean }) {
       >
         <option value="">No env</option>
         {envList.map(({ data: env }) => (
-          <option key={env.id} value={env.id}>{env.name}</option>
+          <option key={env.id} value={env.id}>
+            {defaultEnvName && env.name.toLowerCase() === defaultEnvName.toLowerCase()
+              ? `${env.name} (default)`
+              : env.name}
+          </option>
         ))}
       </select>
 

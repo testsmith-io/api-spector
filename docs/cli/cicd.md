@@ -293,10 +293,10 @@ Use tags on requests in the GUI to control what runs where:
 | `slow` | Exclude from PR gates with `--tags smoke,regression` |
 
 ```bash
-# PR gate — fast
+# PR gate - fast
 api-spector run --workspace ./project.spector --tags smoke --bail
 
-# Nightly — full
+# Nightly - full
 api-spector run --workspace ./project.spector --tags regression,smoke
 ```
 

@@ -334,7 +334,7 @@ export async function fetchOAuth2Token(
     throw new Error('authorization_code flow requires the oauth2:startFlow IPC call from the renderer.');
   }
   if (flow === 'implicit') {
-    throw new Error('implicit flow cannot be performed server-side — tokens must be obtained via the browser redirect.');
+    throw new Error('implicit flow cannot be performed server-side - tokens must be obtained via the browser redirect.');
   }
 
   const tokenUrl = interpolate(auth.oauth2TokenUrl ?? '', vars);

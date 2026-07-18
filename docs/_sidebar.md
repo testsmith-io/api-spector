@@ -20,9 +20,11 @@
   - [Mock Servers](cli/mock.md)
   - [Contract Testing](cli/contract-testing.md)
   - [Pipeline Integration](cli/cicd.md)
+  - [Docker](cli/docker.md)
   - [AI Agents](cli/agents.md)
 
 - **Reference**
+  - [Contract Testing Types](reference/contract-testing-types.md)
   - [Variables & Scopes](reference/variables.md)
   - [Faker: Dynamic Test Data](reference/faker.md)
   - [Scripting API](reference/scripting.md)

@@ -28,7 +28,7 @@ export const DYNAMIC_VAR_NAMES: string[] = [
 ];
 
 const DYNAMIC_VAR_INFO: Record<string, string> = {
-  $uuid:            'Random UUID v4 — generated fresh each send',
+  $uuid:            'Random UUID v4 - generated fresh each send',
   $timestamp:       'Current Unix timestamp in milliseconds',
   $isoTimestamp:    'Current date/time as ISO 8601 string',
   $randomInt:       'Random integer between 0 and 1000',
@@ -73,7 +73,7 @@ const SP_RESPONSE_MEMBERS: Completion[] = [
   { label: 'statusText',   type: 'property', detail: 'string', info: 'Status text only' },
   { label: 'responseTime', type: 'property', detail: 'number', info: 'Request duration in ms' },
   { label: 'responseSize', type: 'property', detail: 'number', info: 'Body size in bytes' },
-  { label: 'headers',      type: 'property',                   info: 'Response headers — use .get(name) or .toObject()' },
+  { label: 'headers',      type: 'property',                   info: 'Response headers - use .get(name) or .toObject()' },
   { label: 'json',         type: 'function', detail: '()',     info: 'Parse body as JSON and return it' },
   { label: 'text',         type: 'function', detail: '()',     info: 'Return body as a raw string' },
 ];
@@ -560,7 +560,7 @@ export function mockBodyCompletionExtension(pathParamNames: string[] = [], varNa
 const RESPONSE_MEMBERS: Completion[] = [
   { label: 'statusCode', type: 'property', detail: 'number', info: 'HTTP status code to send' },
   { label: 'body',       type: 'property', detail: 'string', info: 'Response body string (overrides template)' },
-  { label: 'headers',    type: 'property', detail: 'object', info: 'Response headers — modify with response.headers["X-Foo"] = "bar"' },
+  { label: 'headers',    type: 'property', detail: 'object', info: 'Response headers - modify with response.headers["X-Foo"] = "bar"' },
 ];
 
 const REQUEST_SCRIPT_MEMBERS: Completion[] = [

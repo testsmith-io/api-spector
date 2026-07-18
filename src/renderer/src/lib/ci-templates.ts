@@ -117,7 +117,7 @@ ${secretHint}  - script: ${runCmd}
 `;
   }
 
-  return `# Unsupported platform — adapt as needed\n# ${runCmd}\n`;
+  return `# Unsupported platform - adapt as needed\n# ${runCmd}\n`;
 }
 
 export function ciFilePath(platform: CiPlatform): string {

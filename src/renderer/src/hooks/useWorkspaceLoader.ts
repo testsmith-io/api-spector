@@ -47,6 +47,22 @@ export function useWorkspaceLoader() {
       } catch { /* ignore */ }
     }
 
+    // Activate the workspace's default environment when nothing (valid) is
+    // active. The active id persists in localStorage, so it may point at an
+    // environment from another workspace; treat that the same as none.
+    {
+      const state = useStore.getState();
+      const activeId = state.activeEnvironmentId;
+      const activeIsValid = activeId !== null && Boolean(state.environments[activeId]);
+      const defaultName = ws.settings?.defaultEnvironment;
+      if (!activeIsValid && defaultName) {
+        const match = Object.values(state.environments).find(
+          e => e.data.name.toLowerCase() === defaultName.toLowerCase(),
+        );
+        if (match) state.setActiveEnvironment(match.data.id);
+      }
+    }
+
     for (const relPath of (ws.mocks ?? [])) {
       try {
         const mockData = await electron.loadMock(relPath);

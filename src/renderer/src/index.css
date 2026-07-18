@@ -155,21 +155,31 @@ body {
 
 /* ─── Light mode: semantic status colors ────────────────────────────────────── */
 /* Red — errors, failures */
+:root.light .text-red-200 { color: #7f1d1d !important; }   /* red-900  */
 :root.light .text-red-300 { color: #b91c1c !important; }   /* red-700  */
 :root.light .text-red-400 { color: #dc2626 !important; }   /* red-600  */
 :root.light .text-red-500 { color: #991b1b !important; }   /* red-800  */
 :root.light .bg-red-900\/30 { background-color: #fee2e2 !important; }  /* red-100  */
 :root.light .bg-red-900\/20 { background-color: #fef2f2 !important; }  /* red-50   */
+:root.light .bg-red-900\/50 { background-color: #fee2e2 !important; }  /* red-100  */
+:root.light .bg-red-950\/20 { background-color: #fef2f2 !important; }  /* red-50   */
+:root.light .bg-red-950\/30 { background-color: #fee2e2 !important; }  /* red-100  */
+:root.light .bg-red-950\/50 { background-color: #fecaca !important; }  /* red-200  */
 :root.light .border-red-700 { border-color: #fca5a5 !important; }      /* red-300  */
 :root.light .border-red-800 { border-color: #fca5a5 !important; }      /* red-300  */
+:root.light .border-red-800\/50 { border-color: #fca5a5 !important; }  /* red-300  */
+:root.light .border-red-800\/60 { border-color: #fca5a5 !important; }  /* red-300  */
 
 /* Emerald — success, passed tests, diff additions */
 :root.light .text-emerald-300 { color: #15803d !important; }  /* green-700 */
 :root.light .text-emerald-400 { color: #16a34a !important; }  /* green-600 */
 :root.light .bg-emerald-900\/20 { background-color: #f0fdf4 !important; }  /* green-50  */
 :root.light .bg-emerald-900\/30 { background-color: #dcfce7 !important; }  /* green-100 */
+:root.light .bg-emerald-900\/50 { background-color: #dcfce7 !important; }  /* green-100 */
+:root.light .bg-emerald-950\/30 { background-color: #dcfce7 !important; }  /* green-100 */
 :root.light .border-emerald-800 { border-color: #86efac !important; }      /* green-300 */
 :root.light .border-emerald-700 { border-color: #86efac !important; }      /* green-300 */
+:root.light .border-emerald-800\/50 { border-color: #86efac !important; }  /* green-300 */
 
 /* Amber — warnings, auth badges */
 :root.light .text-amber-300 { color: #b45309 !important; }  /* amber-700 */

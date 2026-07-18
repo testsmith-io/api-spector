@@ -133,6 +133,8 @@ export const IPC = {
     listSnapshots:    'contract:listSnapshots',
     loadSnapshot:     'contract:loadSnapshot',
     deleteSnapshot:   'contract:deleteSnapshot',
+    recordResult:     'contract:recordResult',
+    fuzz:             'contract:fuzz',
   },
 
   // ─── Script hooks ──────────────────────────────────────────────────────────

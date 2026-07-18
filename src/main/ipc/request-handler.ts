@@ -342,7 +342,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
       combinedTestResults.push({
         name:   `HTTP status ${response.status} ${response.statusText}`.trim(),
         passed: false,
-        error:  `Request returned ${response.status} — no assertion was defined to verify the status code.`,
+        error:  `Request returned ${response.status} - no assertion was defined to verify the status code.`,
       });
     }
 
