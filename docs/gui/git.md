@@ -1,6 +1,6 @@
 # Git Integration
 
-The **Git** panel lets you stage, commit, push, pull, and manage branches without leaving the app. It works on the workspace directory — the same folder that holds your collections, environments, and mock servers.
+The **Git** panel lets you stage, commit, push, pull, and manage branches without leaving the app. It works on the workspace directory: the same folder that holds your collections, environments, and mock servers.
 
 ## Open the Git panel
 
@@ -16,7 +16,7 @@ Shows the current working-tree state, grouped into three sections.
 
 When a merge or pull produces conflicts, a red banner appears at the top:
 
-> ⚠ 3 merge conflicts — resolve below before committing
+> ⚠ 3 merge conflicts - resolve below before committing
 
 Conflicted files are listed in a **Conflicts** section with three resolution buttons that appear on hover:
 
@@ -32,14 +32,14 @@ After resolving all conflicts the files move into the **Staged** section, ready 
 
 Click any conflicted file to open the diff viewer. Conflict markers are highlighted:
 
-- `<<<<<<<` — red, marks the start of your changes
-- `=======` — amber, separates the two versions
-- `>>>>>>>` — blue, marks the end of the incoming changes
+- `<<<<<<<` (red) marks the start of your changes
+- `=======` (amber) separates the two versions
+- `>>>>>>>` (blue) marks the end of the incoming changes
 
 ### Staged / Changes
 
-- **Staged** — files added to the index. Click a file to diff it. Hover to unstage individual files or use **Unstage all**.
-- **Changes** — modified, deleted, and untracked files. Click to diff, hover to stage individual files or use **Stage all**.
+- **Staged**: files added to the index. Click a file to diff it. Hover to unstage individual files or use **Unstage all**.
+- **Changes**: modified, deleted, and untracked files. Click to diff, hover to stage individual files or use **Stage all**.
 
 ### Commit
 

@@ -21,7 +21,7 @@ Each route has:
 | Path | URL path, supports Express-style params like `/users/:id` |
 | Status code | HTTP response status |
 | Headers | Response headers as key/value pairs |
-| Body | Response body — supports `{{expression}}` interpolation (see below) |
+| Body | Response body; supports `{{expression}}` interpolation (see below) |
 | Delay | Optional delay in ms before responding |
 | Description | Optional note |
 | Pre-response script | JavaScript that runs before the response is sent (see below) |
@@ -55,7 +55,7 @@ Access values from the incoming request directly in the body:
 | `{{request.path}}` | Request URL path | `"/products/42"` |
 | `{{request.headers.authorization}}` | Request header value | `"Bearer abc…"` |
 
-**Example** — route `/products/:id`, response body:
+**Example**: route `/products/:id`, response body:
 
 ```json
 {
@@ -79,17 +79,17 @@ A `GET /products/7?user=alice` call returns:
 
 `request.body` is the parsed request body, so you can echo values from the
 incoming request straight back into the response. JSON and XML are both parsed
-automatically — JSON first, then XML when the `Content-Type` contains `xml` or
+automatically: JSON first, then XML when the `Content-Type` contains `xml` or
 the body starts with `<`. Anything else leaves `request.body` as `{}` (the raw
 text is always available as `{{request.bodyRaw}}`).
 
-**JSON** — a `POST /signup` with body `{"email":"ada@example.com"}`:
+**JSON**: a `POST /signup` with body `{"email":"ada@example.com"}`:
 
 ```json
 { "createdId": "{{faker.string.uuid()}}", "email": "{{request.body.email}}" }
 ```
 
-**XML** — XML is converted to a plain object that mirrors the document, so
+**XML**: XML is converted to a plain object that mirrors the document, so
 access works the same way. A `POST /order` with body:
 
 ```xml
@@ -104,9 +104,9 @@ and response body:
 
 returns `<ack><id>42</id><for>Roy</for></ack>`. Conversion rules:
 
-- A leaf element becomes its trimmed text — `request.body.order.orderId` → `"42"`.
-- Repeated tags become an array — `<item>a</item><item>b</item>` → `request.body.cart.item[1]` is `"b"`.
-- Attributes are exposed as `@name` keys — `<order id="7">` → `request.body.order['@id']`.
+- A leaf element becomes its trimmed text: `request.body.order.orderId` → `"42"`.
+- Repeated tags become an array: `<item>a</item><item>b</item>` → `request.body.cart.item[1]` is `"b"`.
+- Attributes are exposed as `@name` keys: `<order id="7">` → `request.body.order['@id']`.
 - Namespaced tags keep their prefix, so use bracket access:
   `request.body['soap:Envelope']['soap:Body']`.
 - The root element is preserved, so an `<order>` document is reached via
@@ -152,7 +152,7 @@ The script has access to:
 | Variable | Description |
 |---|---|
 | `request` | Incoming request (read-only) |
-| `response` | Outgoing response draft — mutate to change what is sent |
+| `response` | Outgoing response draft; mutate to change what is sent |
 | `faker` | Faker.js instance |
 | `dayjs` | Day.js |
 | `console.log(...)` | Logs to the main-process console |
@@ -218,13 +218,13 @@ response.body = JSON.stringify(items)
 
 ## Traffic recorder
 
-The recorder sits between your application and a real API, captures every request/response pair, and turns them into mock routes — so you can replay them offline without hitting the real service.
+The recorder sits between your application and a real API, captures every request/response pair, and turns them into mock routes, so you can replay them offline without hitting the real service.
 
 ### Start recording
 
 1. In the **Mocks** sidebar, expand the **Recorder** section
 2. Enter the **Upstream URL** (the real API your app talks to, e.g. `https://api.example.com`)
-3. Set a **Local port** (default 8787) — point your app at `http://localhost:<port>` instead of the real API
+3. Set a **Local port** (default 8787), then point your app at `http://localhost:<port>` instead of the real API
 4. Click **⏺ Start recording**
 
 The recorder proxies every request to the upstream and stores the full request/response pair.
@@ -234,10 +234,10 @@ The recorder proxies every request to the upstream and stores the full request/r
 ### Stop and import
 
 1. Click **■ Stop** in the recorder panel header
-2. Review the captured requests in the list — click any row to inspect headers and bodies
+2. Review the captured requests in the list; click any row to inspect headers and bodies
 3. Choose a destination from the **Import to** dropdown:
-   - **New mock server** — creates a fresh server pre-populated with the recorded routes
-   - An existing mock server — appends the new routes to it
+   - **New mock server** creates a fresh server pre-populated with the recorded routes
+   - An existing mock server appends the new routes to it
 4. Click **⧉ Import**
 
 ### Deduplication
@@ -247,7 +247,7 @@ When the same endpoint (`METHOD + path`) appears multiple times in a recording, 
 - The **first successful (2xx) response** is used
 - If no 2xx response was recorded for that endpoint, the last recorded response is used
 
-When importing into an **existing** mock server, routes whose `METHOD + path` already exist are **skipped** — existing routes are never overwritten.
+When importing into an **existing** mock server, routes whose `METHOD + path` already exist are **skipped**; existing routes are never overwritten.
 
 ### CLI recorder
 
@@ -280,4 +280,4 @@ See [Mock Servers CLI](../cli/mock.md).
 
 ## QUERY method support
 
-Mock routes can match the `QUERY` method (RFC 10008). Note: mock servers started **inside the desktop app** currently reject incoming QUERY requests — the app's embedded Node runtime (Node 20) predates QUERY support in Node's HTTP parser. Mock servers started from the CLI (`api-spector mock`) accept QUERY on Node 22 or newer. Sending QUERY requests from the app works regardless.
+Mock routes can match the `QUERY` method (RFC 10008). Note: mock servers started **inside the desktop app** currently reject incoming QUERY requests, because the app's embedded Node runtime (Node 20) predates QUERY support in Node's HTTP parser. Mock servers started from the CLI (`api-spector mock`) accept QUERY on Node 22 or newer. Sending QUERY requests from the app works regardless.

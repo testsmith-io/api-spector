@@ -1,0 +1,9 @@
+{
+  "name": "prod",
+  "deployed": {
+    "toolshop-web": {
+      "version": "1.2.0",
+      "recordedAt": "2026-07-12T22:44:22.278Z"
+    }
+  }
+}

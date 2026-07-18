@@ -79,9 +79,9 @@ faker.company.buzzPhrase()       // "leverage agile frameworks"
 ### Date & Time
 
 ```js
-faker.date.recent()              // Date object — last 7 days
-faker.date.past()                // Date object — last year
-faker.date.future()              // Date object — next year
+faker.date.recent()              // Date object - last 7 days
+faker.date.past()                // Date object - last year
+faker.date.future()              // Date object - next year
 faker.date.between({ from: '2024-01-01', to: '2024-12-31' })
 faker.date.birthdate({ min: 18, max: 65, mode: 'age' })
 ```

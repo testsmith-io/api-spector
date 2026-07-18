@@ -235,7 +235,7 @@ export function entriesToMockServer(
       statusCode:  e.response.status,
       headers:     respHeaders,
       body:        e.response.binary
-        ? `[binary — recorded from ${upstream}${e.request.path}]`
+        ? `[binary - recorded from ${upstream}${e.request.path}]`
         : (e.response.body ?? ''),
       description: `Recorded from ${upstream} at ${e.timestamp}`,
     });

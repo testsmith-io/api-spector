@@ -9,6 +9,7 @@ import type {
 } from '../../shared/types';
 import { loadSpec, resolveSchema, findOperation } from './provider-verifier';
 import { validateConsumerResponse, hasContract } from './consumer-verifier';
+import { compileMatcherExample } from './matchers';
 import { fetch, Headers } from 'undici';
 import { interpolate, buildUrl } from '../interpolation';
 import { buildAuthHeaders } from '../auth-builder';
@@ -48,26 +49,39 @@ export function checkSchemaCompatibility(
   if (!consumerSchema || !providerSchema) return violations;
 
   // ── Root type mismatch ──
-  const cType = consumerSchema['type'] as string | undefined;
-  const pType = providerSchema['type'] as string | undefined;
+  // `type` may be a union (JSON Schema array form, e.g. ["string","null"]) and
+  // OpenAPI 3.0 expresses nullability as `nullable: true` — normalize both so
+  // a consumer expecting `null` is compatible with a provider's `string|null`.
+  const typesOf = (s: Record<string, unknown>): string[] => {
+    const t = s['type'];
+    const list = Array.isArray(t)
+      ? t.filter((x): x is string => typeof x === 'string')
+      : typeof t === 'string' ? [t] : [];
+    if (s['nullable'] === true && !list.includes('null')) list.push('null');
+    return list;
+  };
+  const cTypes = typesOf(consumerSchema);
+  const pTypes = typesOf(providerSchema);
 
-  if (cType && pType && cType !== pType) {
-    // integer is compatible with number
-    const ok = (cType === 'integer' && pType === 'number') || (cType === 'number' && pType === 'integer');
+  if (cTypes.length && pTypes.length) {
+    // integer is compatible with number (both directions)
+    const compatible = (ct: string, pt: string): boolean =>
+      ct === pt || (ct === 'integer' && pt === 'number') || (ct === 'number' && pt === 'integer');
+    const ok = cTypes.every(ct => pTypes.some(pt => compatible(ct, pt)));
     if (!ok) {
       violations.push({
         type:     'schema_incompatible',
-        message:  `Type mismatch${path ? ` at "${path}"` : ''}: consumer expects "${cType}", provider offers "${pType}"`,
+        message:  `Type mismatch${path ? ` at "${path}"` : ''}: consumer expects "${cTypes.join(',')}", provider offers "${pTypes.join(',')}"`,
         path:     path || '/',
-        expected: cType,
-        actual:   pType,
+        expected: cTypes.join(','),
+        actual:   pTypes.join(','),
       });
       return violations;  // no point checking properties if root type differs
     }
   }
 
   // ── Array items ──
-  if (cType === 'array' || Array.isArray(consumerSchema['items'])) {
+  if (cTypes.includes('array') || Array.isArray(consumerSchema['items'])) {
     const cItems = consumerSchema['items'] as Record<string, unknown> | undefined;
     const pItems = providerSchema['items'] as Record<string, unknown> | undefined;
     if (cItems && pItems) {
@@ -77,7 +91,7 @@ export function checkSchemaCompatibility(
   }
 
   // ── Object properties ──
-  if (cType === 'object' || consumerSchema['properties']) {
+  if (cTypes.includes('object') || consumerSchema['properties']) {
     const cProps    = (consumerSchema['properties'] as Record<string, unknown>) ?? {};
     const pProps    = (providerSchema['properties'] as Record<string, unknown>) ?? {};
     const cRequired = (consumerSchema['required'] as string[]) ?? [];
@@ -198,10 +212,18 @@ export async function runBidirectional(
     const violations: ContractViolation[] = [];
 
     // ── 1. Static schema compatibility check ──
+    // The consumer's expected shape comes from bodySchema when present, else
+    // from the Pact-style bodyMatcher example (compiled to a type-only JSON
+    // Schema — compatibility cares about shape, not exact values).
     const expectedStatus = req.contract!.statusCode ?? 200;
-    const consumerSchema = req.contract!.bodySchema
-      ? (() => { try { return JSON.parse(req.contract!.bodySchema!) as Record<string, unknown>; } catch { return null; } })()
-      : null;
+    let consumerSchema: Record<string, unknown> | null = null;
+    if (req.contract!.bodySchema) {
+      try { consumerSchema = JSON.parse(req.contract!.bodySchema) as Record<string, unknown>; } catch { /* invalid JSON — skip static check */ }
+    } else if (req.contract!.bodyMatcher?.trim()) {
+      try {
+        consumerSchema = compileMatcherExample(JSON.parse(req.contract!.bodyMatcher), false) as Record<string, unknown>;
+      } catch { /* invalid JSON — skip static check */ }
+    }
 
     if (consumerSchema) {
       const providerSchema = getProviderResponseSchema(spec, req, vars, expectedStatus, requestBaseUrl);

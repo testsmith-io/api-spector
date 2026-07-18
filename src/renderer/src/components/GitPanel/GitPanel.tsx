@@ -180,7 +180,7 @@ function ChangesTab({ status, onRefresh }: { status: GitStatus; onRefresh: () =>
 
       {status.conflicted.length > 0 && (
         <div className="mx-3 mt-2 px-2 py-1.5 rounded text-[11px] bg-red-900/20 text-red-300 border border-red-800/40 flex-shrink-0">
-          ⚠ {status.conflicted.length} merge conflict{status.conflicted.length !== 1 ? 's' : ''} — resolve below before committing
+          ⚠ {status.conflicted.length} merge conflict{status.conflicted.length !== 1 ? 's' : ''} - resolve below before committing
         </div>
       )}
 
@@ -557,7 +557,7 @@ function BranchesTab({ onRefresh }: { onRefresh: () => void }) {
               key={b.name}
               onClick={() => checkout(b.name, false)}
               className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-surface-400 hover:bg-surface-800/50 hover:text-surface-200 transition-colors"
-              title="Click to check out — creates a local tracking branch if needed"
+              title="Click to check out - creates a local tracking branch if needed"
             >
               <span className="w-3" />
               <span className="font-mono truncate">{b.name}</span>
@@ -732,7 +732,7 @@ function CiTab() {
             onChange={e => setEnvId(e.target.value)}
             className="bg-surface-800 border border-surface-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500"
           >
-            <option value="">— none —</option>
+            <option value="">(none)</option>
             {envList.map(e => (
               <option key={e.data.id} value={e.data.id}>{e.data.name}</option>
             ))}

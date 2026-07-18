@@ -1,11 +1,15 @@
-name: Publish to npm
+name: Publish release
 
+# Runs when a GitHub Release is published. Publishes the npm package and the
+# CLI Docker image. The two jobs are independent, so a hiccup in one (for
+# example npm provenance signing) does not block the other.
 on:
   release:
     types: [published]
 
 jobs:
-  publish:
+  npm:
+    name: Publish to npm
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -37,3 +41,45 @@ jobs:
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  docker:
+    name: Publish Docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Requires repo secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN
+      # (a Docker Hub access token for the testsmith org).
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Derive tags from the release tag: the exact version, the major.minor
+      # rolling tag, and `latest` for non-prereleases. Mirrors the manual
+      # scripts/docker-build.sh convention (testsmith/api-spector).
+      - name: Derive image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: testsmith/api-spector
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ !github.event.release.prerelease }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: production
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

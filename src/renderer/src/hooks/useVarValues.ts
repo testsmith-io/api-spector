@@ -2,17 +2,19 @@
 // SPDX-License-Identifier: MIT
 
 import { useStore } from '../store';
+import { useActiveEnvironment } from './useActiveEnvironment';
 
 /**
  * Returns a map of varName → resolved display value for the current scope.
  * Encrypted secrets show ••••••••, env-ref vars show $VARNAME.
  */
 export function useVarValues(): Record<string, string> {
-  const activeEnvironmentId = useStore(s => s.activeEnvironmentId);
   const activeCollectionId  = useStore(s => s.activeCollectionId);
-  const environments        = useStore(s => s.environments);
   const collections         = useStore(s => s.collections);
   const globals             = useStore(s => s.globals);
+  // Active environment resolved through its extends chain, so inherited
+  // variables display exactly like the environment's own.
+  const activeEnv           = useActiveEnvironment();
 
   const result: Record<string, string> = { ...globals };
 
@@ -21,16 +23,14 @@ export function useVarValues(): Record<string, string> {
     Object.assign(result, colVars);
   }
 
-  if (activeEnvironmentId) {
-    for (const v of environments[activeEnvironmentId]?.data.variables ?? []) {
-      if (!v.enabled || !v.key) continue;
-      if (v.secret && v.secretEncrypted) {
-        result[v.key] = '••••••••';
-      } else if (v.envRef) {
-        result[v.key] = `$${v.envRef}`;
-      } else {
-        result[v.key] = v.value;
-      }
+  for (const v of activeEnv?.variables ?? []) {
+    if (!v.enabled || !v.key) continue;
+    if (v.secret && v.secretEncrypted) {
+      result[v.key] = '••••••••';
+    } else if (v.envRef) {
+      result[v.key] = `$${v.envRef}`;
+    } else {
+      result[v.key] = v.value;
     }
   }
 

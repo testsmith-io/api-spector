@@ -4,18 +4,10 @@
 import { useState } from 'react';
 import { useStore } from '../../store';
 import type { ContractResult, ContractViolation } from '../../../../shared/types';
+import { getMethodColor } from '../../../../shared/colors';
+import { Toast, useToast } from '../common/Toast';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const METHOD_COLOR: Record<string, string> = {
-  GET:     'text-emerald-400',
-  POST:    'text-blue-400',
-  PUT:     'text-amber-400',
-  PATCH:   'text-orange-400',
-  DELETE:  'text-red-400',
-  HEAD:    'text-purple-400',
-  OPTIONS: 'text-gray-400',
-};
 
 function statusColor(code: number): string {
   const d = String(code)[0];
@@ -84,7 +76,7 @@ function ResultCard({ result }: { result: ContractResult }) {
         </span>
 
         {/* Method */}
-        <span className={`shrink-0 text-xs font-bold font-mono w-14 ${METHOD_COLOR[result.method] ?? 'text-gray-400'}`}>
+        <span className={`shrink-0 text-xs font-bold font-mono w-14 ${getMethodColor(result.method)}`}>
           {result.method}
         </span>
 
@@ -138,7 +130,39 @@ function ResultCard({ result }: { result: ContractResult }) {
 
 export function ContractResultsPanel() {
   const report      = useStore(s => s.lastContractReport);
+  const runMeta     = useStore(s => s.lastContractRunMeta);
   const clearReport = useStore(s => s.setLastContractReport);
+  const activeCollId = useStore(s => s.activeCollectionId);
+  const collections  = useStore(s => s.collections);
+  const dashboardUrl = useStore(s => s.workspace?.settings?.dashboardUrl);
+
+  const [recordOpen, setRecordOpen]   = useState(false);
+  const [pacticipant, setPacticipant] = useState('');
+  const [version, setVersion]         = useState('');
+  const [saving, setSaving]           = useState(false);
+  const { toast, show: showToast }    = useToast();
+
+  async function recordRun() {
+    if (!report) return;
+    if (!pacticipant.trim() || !version.trim()) {
+      showToast('Pacticipant and version are required to record.', false);
+      return;
+    }
+    setSaving(true);
+    try {
+      await window.electron.recordContractResult({
+        pacticipant: pacticipant.trim(),
+        version: version.trim(),
+        report,
+      });
+      showToast(`Recorded ${pacticipant.trim()}@${version.trim()} for the dashboard and can-i-deploy.`, true);
+      setRecordOpen(false);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : String(e), false);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (!report) {
     return (
@@ -170,8 +194,31 @@ export function ContractResultsPanel() {
           {modeLabel}
         </span>
         <span className="text-xs text-surface-500 ml-auto">{report.durationMs}ms</span>
+        {dashboardUrl && (
+          <button
+            onClick={() => window.electron.openExternal(dashboardUrl)}
+            className="text-[11px] text-surface-500 hover:text-surface-200 transition-colors"
+            title={`Open the contract dashboard (${dashboardUrl})`}
+          >
+            Open dashboard
+          </button>
+        )}
         <button
-          onClick={() => window.electron.exportContractReportHtml(report)}
+          onClick={() => {
+            if (!recordOpen && !pacticipant) {
+              setPacticipant(activeCollId ? collections[activeCollId]?.data.name ?? '' : '');
+            }
+            setRecordOpen(o => !o);
+          }}
+          className="text-[11px] text-surface-500 hover:text-surface-200 transition-colors"
+          title="Record this run for the contract dashboard and can-i-deploy gate"
+        >
+          Record
+        </button>
+        <button
+          onClick={() => window.electron.exportContractReportHtml(report, {
+            spec: runMeta?.spec, provider: runMeta?.provider,
+          })}
           className="text-[11px] text-surface-500 hover:text-surface-200 transition-colors"
           title="Export a self-contained HTML report"
         >
@@ -185,6 +232,35 @@ export function ContractResultsPanel() {
           Clear
         </button>
       </div>
+
+      {/* ── Record form ── */}
+      {recordOpen && (
+        <div className="flex items-center gap-2 px-6 py-2 border-b border-surface-800 bg-surface-900/60 flex-shrink-0">
+          <input
+            value={pacticipant}
+            onChange={e => setPacticipant(e.target.value)}
+            placeholder="pacticipant (e.g. web-app)"
+            className="bg-surface-800 border border-surface-700 rounded px-2 py-1 text-xs w-48 focus:outline-none focus:border-blue-500"
+          />
+          <input
+            value={version}
+            onChange={e => setVersion(e.target.value)}
+            placeholder="version (e.g. 1.4.0)"
+            className="bg-surface-800 border border-surface-700 rounded px-2 py-1 text-xs w-32 focus:outline-none focus:border-blue-500"
+          />
+          <button
+            onClick={recordRun}
+            disabled={saving}
+            className="text-[11px] px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold disabled:opacity-50 transition-colors"
+          >
+            {saving ? 'Recording...' : 'Record result'}
+          </button>
+          <span className="text-[10px] text-surface-500">
+            Writes to contracts/results/ in the workspace; the dashboard picks it up on refresh.
+          </span>
+        </div>
+      )}
+      <Toast toast={toast} />
 
       {/* ── Results list ── */}
       <div className="flex-1 overflow-y-auto min-h-0 p-6">

@@ -10,7 +10,7 @@ export const METHOD_COLORS: Record<string, string> = {
   DELETE:  'text-red-400',
   HEAD:    'text-purple-400',
   OPTIONS: 'text-surface-400',
-  QUERY:   'text-teal-400',
+  QUERY:   'text-fuchsia-400',
   ANY:     'text-surface-400',
 };
 

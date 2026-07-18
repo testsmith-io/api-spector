@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import type { ApiRequest } from '../../shared/types';
+import type { ApiRequest, FuzzReport } from '../../shared/types';
 import { useStore } from './store';
 import { useAutoSave } from './hooks/useAutoSave';
 import { useWorkspaceLoader } from './hooks/useWorkspaceLoader';
@@ -20,6 +20,7 @@ import { MockDetailPanel } from './components/MockPanel/MockDetailPanel';
 import { RecorderPanel } from './components/MockPanel/RecorderPanel';
 import { ContractPanel } from './components/ContractPanel/ContractPanel';
 import { ContractResultsPanel } from './components/ContractPanel/ContractResultsPanel';
+import { FuzzResultsPanel } from './components/ContractPanel/FuzzResultsPanel';
 import { GitDiffPane } from './components/GitPanel/GitDiffPane';
 import { GitPanel } from './components/GitPanel/GitPanel';
 import { CommandPalette } from './components/common/CommandPalette';
@@ -127,6 +128,7 @@ const TAB_METHOD_COLORS: Record<string, string> = {
   DELETE: 'text-red-400',
   HEAD: 'text-purple-400',
   OPTIONS: 'text-gray-400',
+  QUERY: 'text-fuchsia-400',
 };
 
 // Memoized tab row — prevents every tab from re-rendering when only one tab's
@@ -206,6 +208,9 @@ export default function App () {
   const setWsStatus = useStore( s => s.setWsStatus );
   const addWsMessage = useStore( s => s.addWsMessage );
 
+  // Fuzz report is lifted here (not in the contract store) so the parent can pick
+  // which results panel to render for the contracts sidebar tab.
+  const [fuzzReport, setFuzzReport] = useState<FuzzReport | null>( null );
   const [sidebarOpen, setSidebarOpen] = useState( true );
   const [responseOpen, setResponseOpen] = useState( false );
   const [docsModalOpen, setDocsModalOpen] = useState( false );
@@ -421,7 +426,7 @@ export default function App () {
                   sidebarTab === 'history' ? <HistoryPanel /> :
                     sidebarTab === 'mocks' ? <MockPanel /> :
                       sidebarTab === 'git' ? <GitPanel /> :
-                        <ContractPanel />}
+                        <ContractPanel fuzzReport={fuzzReport} setFuzzReport={setFuzzReport} />}
               </aside>
               {/* Sidebar resize handle */}
               <div
@@ -518,8 +523,10 @@ export default function App () {
                 <GitDiffPane />
               </div>
             ) : sidebarTab === 'contracts' ? (
-              <div className="flex-1 min-h-0">
-                <ContractResultsPanel />
+              <div className="flex-1 min-h-0 flex flex-col">
+                {fuzzReport
+                  ? <FuzzResultsPanel report={fuzzReport} onClear={() => setFuzzReport( null )} />
+                  : <ContractResultsPanel />}
               </div>
             ) : sidebarTab === 'mocks' && recorderRunning ? (
               <div className="flex-1 min-h-0">
@@ -527,7 +534,7 @@ export default function App () {
                   defaultTargetMockId={recorderTargetMockId}
                   onClose={() => setRecorderRunning(false)}
                   onImportMock={async (session, targetMockId) => {
-                    const name = `Recorded — ${new URL(session.upstream).hostname}`;
+                    const name = `Recorded - ${new URL(session.upstream).hostname}`;
                     const newRoutes = await electron.recordToMock(session.entries, session.upstream, name, session.port);
 
                     if (targetMockId) {

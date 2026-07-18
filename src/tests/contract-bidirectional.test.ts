@@ -254,3 +254,54 @@ describe('checkSchemaCompatibility — edge cases', () => {
     expect(violations[0].type).toBe('schema_incompatible');
   });
 });
+
+// ─── Matcher-based consumer schemas (bodyMatcher static compatibility) ───────
+
+import { compileMatcherExample } from '../main/contract/matchers';
+
+describe('checkSchemaCompatibility with compiled matcher examples', () => {
+  it('a matcher-only contract compiles to a schema the compat check accepts', () => {
+    const consumerSchema = compileMatcherExample(
+      { id: { __match: 'integer', value: 1 }, name: { __match: 'type', value: 'Fluffy' } },
+      false,
+    ) as Record<string, unknown>;
+    const providerSchema = {
+      type: 'object',
+      properties: { id: { type: 'integer' }, name: { type: 'string' }, extra: { type: 'boolean' } },
+    };
+    noViolations(consumerSchema, providerSchema);
+  });
+
+  it('flags a required matcher field missing from the provider schema', () => {
+    const consumerSchema = compileMatcherExample(
+      { id: { __match: 'integer', value: 1 }, missing: { __match: 'type', value: 'x' } },
+      false,
+    ) as Record<string, unknown>;
+    const providerSchema = { type: 'object', properties: { id: { type: 'integer' } } };
+    const violations = compat(consumerSchema, providerSchema);
+    expect(violations.length).toBeGreaterThan(0);
+    expect(violations[0].type).toBe('schema_incompatible');
+    expect(violations[0].message).toContain('missing');
+  });
+});
+
+describe('checkSchemaCompatibility with union / nullable types', () => {
+  it('consumer null is compatible with provider ["string","null"]', () => {
+    noViolations({ type: 'null' }, { type: ['string', 'null'] });
+  });
+
+  it('consumer null is compatible with OpenAPI 3.0 nullable string', () => {
+    noViolations({ type: 'null' }, { type: 'string', nullable: true });
+  });
+
+  it('consumer string is compatible with provider ["string","null"]', () => {
+    noViolations({ type: 'string' }, { type: ['string', 'null'] });
+  });
+
+  it('fails when no consumer type fits the provider union', () => {
+    const violations = compat({ type: 'integer' }, { type: ['string', 'null'] });
+    expect(violations).toHaveLength(1);
+    expect(violations[0].type).toBe('schema_incompatible');
+    expect(violations[0].actual).toBe('string,null');
+  });
+});

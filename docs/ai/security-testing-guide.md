@@ -1,17 +1,17 @@
-# API Spector — Security API Testing Guide (OWASP API Top 10)
+# API Spector: Security API Testing Guide (OWASP API Top 10)
 
 Use this guide to generate security test cases based on the OWASP API Security Top 10 (2023). Each test case should use the API Spector `sp.*` scripting API.
 
 ## Prerequisites
 
 Security tests typically require multiple user identities:
-- **User A** (attacker) — a regular user trying to access resources they shouldn't
-- **User B** (victim) — the owner of the resources being targeted
-- **Admin** — for testing admin-only endpoints with regular credentials
+- **User A** (attacker): a regular user trying to access resources they shouldn't
+- **User B** (victim): the owner of the resources being targeted
+- **Admin**: for testing admin-only endpoints with regular credentials
 
 Store tokens in environment variables: `{{user_a_token}}`, `{{user_b_token}}`, `{{admin_token}}`
 
-## API1:2023 — Broken Object-Level Authorization (BOLA)
+## API1:2023 - Broken Object-Level Authorization (BOLA)
 
 **What to test**: Can User A access User B's resources by changing the ID?
 
@@ -34,7 +34,7 @@ sp.test('[BOLA] cannot delete other user order', function() {
 
 **For each endpoint with an ID parameter**: create a request where User A tries to access User B's resource.
 
-## API2:2023 — Broken Authentication
+## API2:2023 - Broken Authentication
 
 **What to test**: Authentication bypass, weak tokens, missing validation.
 
@@ -55,9 +55,9 @@ sp.test('[AUTH] expired token returns 401', function() {
 });
 ```
 
-## API3:2023 — Broken Object Property-Level Authorization
+## API3:2023 - Broken Object Property-Level Authorization
 
-**What to test**: Mass assignment — can a user set fields they shouldn't?
+**What to test**: Mass assignment. Can a user set fields they shouldn't?
 
 ```javascript
 // Request: PUT /users/{{user_a_id}} with body including role: "admin"
@@ -81,7 +81,7 @@ sp.test('[MASS-ASSIGN] cannot create admin user', function() {
 
 **For each write endpoint**: include fields that shouldn't be user-settable (role, is_admin, balance, permissions).
 
-## API4:2023 — Unrestricted Resource Consumption
+## API4:2023 - Unrestricted Resource Consumption
 
 **What to test**: Rate limits, pagination abuse, large payloads.
 
@@ -102,7 +102,7 @@ sp.test('[RESOURCE] rejects oversized payload', function() {
 });
 ```
 
-## API5:2023 — Broken Function-Level Authorization
+## API5:2023 - Broken Function-Level Authorization
 
 **What to test**: Admin endpoints accessible by regular users.
 
@@ -120,7 +120,7 @@ sp.test('[FUNC-AUTH] user cannot delete other users', function() {
 
 **For each endpoint**: determine the expected minimum role and test with a lower-privilege token.
 
-## API6:2023 — Unrestricted Access to Sensitive Business Flows
+## API6:2023 - Unrestricted Access to Sensitive Business Flows
 
 **What to test**: Business logic abuse.
 
@@ -132,7 +132,7 @@ sp.test('[BIZ-FLOW] duplicate order is rejected', function() {
 });
 ```
 
-## API7:2023 — Server-Side Request Forgery (SSRF)
+## API7:2023 - Server-Side Request Forgery (SSRF)
 
 **What to test**: URL parameters that the server fetches.
 
@@ -148,12 +148,12 @@ sp.test('[SSRF] internal URL is blocked', function() {
 
 **For each endpoint that accepts a URL parameter**: test with internal addresses.
 
-## API8:2023 — Security Misconfiguration
+## API8:2023 - Security Misconfiguration
 
 **What to test**: Headers, error verbosity, CORS.
 
 ```javascript
-// Any endpoint — check security headers
+// Any endpoint: check security headers
 sp.test('[CONFIG] has security headers', function() {
   sp.expect(sp.response.headers.get('x-content-type-options')).to.equal('nosniff');
   // Optional: check for other headers
@@ -161,7 +161,7 @@ sp.test('[CONFIG] has security headers', function() {
   // sp.expect(sp.response.headers.get('strict-transport-security')).to.not.equal(null);
 });
 
-// Invalid endpoint — check that error doesn't leak stack traces
+// Invalid endpoint: check that error doesn't leak stack traces
 sp.test('[CONFIG] error response does not expose stack trace', function() {
   const body = sp.response.text();
   sp.expect(body).to.not.include("at Object.");
@@ -169,7 +169,7 @@ sp.test('[CONFIG] error response does not expose stack trace', function() {
   sp.expect(body).to.not.include("Exception in thread");
 });
 
-// OPTIONS request — check CORS
+// OPTIONS request: check CORS
 sp.test('[CONFIG] CORS does not allow *', function() {
   const allow = sp.response.headers.get('access-control-allow-origin');
   if (allow) {
@@ -178,7 +178,7 @@ sp.test('[CONFIG] CORS does not allow *', function() {
 });
 ```
 
-## API9:2023 — Improper Inventory Management
+## API9:2023 - Improper Inventory Management
 
 **What to test**: Deprecated or undocumented endpoints still accessible.
 
@@ -186,7 +186,7 @@ This is best tested by comparing the spec against actual behavior:
 - Hit known deprecated endpoints → should return 404 or 410
 - Hit versioned paths (v1 when v2 is current) → should be blocked or redirected
 
-## API10:2023 — Unsafe Consumption of APIs
+## API10:2023 - Unsafe Consumption of APIs
 
 **What to test**: Injection through fields that the API passes downstream.
 
@@ -226,8 +226,8 @@ When generating security tests, organize by OWASP category:
 ```
 Security/
 ├── BOLA/
-│   ├── [BOLA] GET /users/:id — access other user
-│   ├── [BOLA] PUT /orders/:id — modify other user order
+│   ├── [BOLA] GET /users/:id - access other user
+│   ├── [BOLA] PUT /orders/:id - modify other user order
 │   └── ...
 ├── Auth/
 │   ├── [AUTH] No token

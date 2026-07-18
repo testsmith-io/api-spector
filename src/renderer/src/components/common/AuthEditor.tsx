@@ -413,7 +413,7 @@ function BearerPanel({
       <div className="flex flex-col gap-1">
         <label className="text-surface-400">
           Token{' '}
-          <span className="text-surface-500 text-[10px]">— supports {'{{variables}}'}</span>
+          <span className="text-surface-500 text-[10px]">- supports {'{{variables}}'}</span>
         </label>
         <VarInput
           value={auth.token ?? ''}

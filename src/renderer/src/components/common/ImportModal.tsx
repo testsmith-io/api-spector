@@ -309,7 +309,7 @@ export function ImportModal({ onImport, onClose }: Props) {
       >
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-surface-100">
-              Import OpenAPI — {previewCol.name}
+              Import OpenAPI - {previewCol.name}
             </h2>
             <button
               onClick={onClose}

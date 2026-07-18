@@ -234,7 +234,7 @@ export function SchemaSyncModal({
       >
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-surface-100">
-              Sync schemas — {scopeLabel}
+              Sync schemas - {scopeLabel}
             </h2>
             <button onClick={onClose} className="text-surface-500 hover:text-surface-300 text-lg leading-none">×</button>
           </div>
@@ -359,7 +359,7 @@ export function SchemaSyncModal({
 
         <p className="text-xs text-surface-400">
           Load an OpenAPI spec to update response schemas on existing requests.
-          Matching uses HTTP method + URL path. Only schemas are touched — URLs,
+          Matching uses HTTP method + URL path. Only schemas are touched - URLs,
           params, headers, auth, and scripts are preserved.
         </p>
 

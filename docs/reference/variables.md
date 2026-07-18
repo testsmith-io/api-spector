@@ -1,5 +1,7 @@
 # Variables: Scopes and Precedence
 
+> Environments may extend other environments (see [Environment inheritance](../gui/environments.md#environment-inheritance)). Inheritance is resolved first, producing one flat set of environment variables; the scope precedence below then applies to that resolved set.
+
 API Spector has four variable scopes. Understanding how they relate lets you share data between requests, across collections, and across sessions.
 
 ## The four scopes
@@ -59,7 +61,7 @@ Set via the **Environment Editor** in the GUI. Scoped to one environment file. S
 ```
 BASE_URL    = https://api.staging.example.com
 API_VERSION = v2
-AUTH_TOKEN  = (secret — encrypted)
+AUTH_TOKEN  = (secret, encrypted)
 ```
 
 **Read/write from scripts:**
@@ -218,7 +220,7 @@ Switch environments in the top bar to point the whole collection at a different 
 ### Override an environment variable for one request
 
 ```js
-// Pre-request script — temporarily use a different base URL for this request only
+// Pre-request script: temporarily use a different base URL for this request only
 sp.variables.set('BASE_URL', 'https://api.other-service.com')
 ```
 

@@ -145,3 +145,32 @@ function compileMatcherExampleInput() {
     tags: { __match: 'eachLike', value: '', min: 1 },
   };
 }
+
+describe('exampleToPactBody — boolean / string / null matcher rules', () => {
+  it('emits match:boolean for boolean matchers', () => {
+    const { body, rules } = exampleToPactBody({ active: { __match: 'boolean', value: true } });
+    expect(rules['$.active']).toEqual({ matchers: [{ match: 'boolean' }] });
+    expect((body as Record<string, unknown>).active).toBe(true);
+  });
+
+  it('emits match:type for string matchers', () => {
+    const { rules } = exampleToPactBody({ name: { __match: 'string', value: 'Fluffy' } });
+    expect(rules['$.name']).toEqual({ matchers: [{ match: 'type' }] });
+  });
+
+  it('emits match:null for null matchers', () => {
+    const { body, rules } = exampleToPactBody({ gone: { __match: 'null' } });
+    expect(rules['$.gone']).toEqual({ matchers: [{ match: 'null' }] });
+    expect((body as Record<string, unknown>).gone).toBeNull();
+  });
+
+  it('round-trips boolean and null matchers through matchingRules', () => {
+    const { body, rules } = exampleToPactBody({
+      active: { __match: 'boolean', value: true },
+      gone:   { __match: 'null' },
+    });
+    const restored = bodyWithMatchers(body, { body: rules }) as Record<string, Record<string, unknown>>;
+    expect(restored.active['__match']).toBe('boolean');
+    expect(restored.gone['__match']).toBe('null');
+  });
+});

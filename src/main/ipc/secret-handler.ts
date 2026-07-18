@@ -78,7 +78,7 @@ export function registerSecretHandlers(ipc: IpcMain): void {
   handleIpc(ipc, IPC.secret.set, async (_e, ref: string, value: string) => {
     const ss = getSafeStorage();
     if (!ss || !ss.isEncryptionAvailable()) {
-      throw new Error('OS encryption is not available — set the secret via environment variable instead');
+      throw new Error('OS encryption is not available - set the secret via environment variable instead');
     }
     secretStore[ref] = ss.encryptString(value).toString('base64');
     await persistSecretStore();

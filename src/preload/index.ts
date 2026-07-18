@@ -23,6 +23,7 @@ import type {
   ApiRequest,
   ContractRunPayload,
   ContractReport,
+  FuzzReport,
   ContractSnapshot,
   GitStatus,
   GitCommit,
@@ -234,6 +235,24 @@ const api = {
     ipcRenderer.invoke(IPC.contract.loadSnapshot, relPath) as Promise<ContractSnapshot>,
   deleteContractSnapshot: (relPath: string) =>
     ipcRenderer.invoke(IPC.contract.deleteSnapshot, relPath) as Promise<void>,
+  recordContractResult: (opts: { pacticipant: string; version: string; report: ContractReport }) =>
+    ipcRenderer.invoke(IPC.contract.recordResult, opts) as Promise<{ file: string }>,
+  fuzzContracts: (payload: {
+    requests: ApiRequest[]
+    envVars: Record<string, string>
+    collectionVars?: Record<string, string>
+    specUrl?: string
+    specSnapshotRelPath?: string
+    providerBaseUrl?: string
+    requestBaseUrl?: string
+    casesPerOperation?: number
+    seed?: number
+    includeWrites?: boolean
+    strictStatus?: boolean
+    checkResponses?: boolean
+    trace?: boolean
+  }): Promise<FuzzReport> =>
+    ipcRenderer.invoke(IPC.contract.fuzz, payload) as Promise<FuzzReport>,
 
   // ─── Script hooks ─────────────────────────────────────────────────────────
   runScriptHook: (payload: {

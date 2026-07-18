@@ -19,6 +19,23 @@ Use the **Env** dropdown in the top bar to switch the active environment. All re
 
 ![](../assets/environment-selector.png)
 
+## Environment inheritance
+
+An environment can extend another one. Set the **Extends** dropdown in the environment editor to a parent environment: the child inherits every parent variable and overrides the ones it redefines. Chains work (`base` extended by `staging` extended by `staging-eu`), and the editor shows how many variables are inherited.
+
+Typical use: put shared values (hosts, timeouts, common headers) in a `base` environment, and keep per-stage environments small: only the values that actually differ.
+
+Inheritance applies everywhere the environment is used: sending requests, the collection runner, contract runs, code generation, and variable autocompletion. The CLI resolves the same chains, so `--environment staging` behaves identically in CI.
+
+## Default environment
+
+Workspace Settings (General tab) can name a **default environment**. Two things use it:
+
+- CLI runs without an `--environment` flag (`api-spector run`, `api-spector contract run`) fall back to it.
+- When the app opens a workspace and no environment is selected yet, it activates the default.
+
+The environment picker marks it with "(default)". The setting is stored in the workspace file, so it travels through git with the project.
+
 ## Variable types
 
 ### Plain text

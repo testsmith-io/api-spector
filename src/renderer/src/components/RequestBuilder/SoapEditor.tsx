@@ -293,8 +293,8 @@ export function SoapEditor({ request, onChange }: Props) {
               {!soap.operationName && !soap.soapAction && (
                 <div className="text-[10px] text-surface-500">
                   {soap.wsdlUrl?.trim()
-                    ? 'WSDL not loaded — the saved envelope below is still sent on Send.'
-                    : 'No WSDL — hand-crafted SOAP envelope.'}
+                    ? 'WSDL not loaded - the saved envelope below is still sent on Send.'
+                    : 'No WSDL - hand-crafted SOAP envelope.'}
                 </div>
               )}
             </div>
@@ -327,7 +327,7 @@ export function SoapEditor({ request, onChange }: Props) {
           <p className="text-xs text-surface-400">Paste a WSDL URL above and click <em>Fetch WSDL</em>.</p>
           <p className="text-[10px] text-surface-600 max-w-sm">
             The endpoint, SOAP version, Content-Type header, and per-operation envelope are
-            derived from the WSDL — you only pick the operation and fill the parameters.
+            derived from the WSDL - you only pick the operation and fill the parameters.
           </p>
         </div>
       )}

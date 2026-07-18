@@ -1,14 +1,14 @@
 # Contract Testing
 
-Contract testing verifies that a consumer (your API collection) and a provider (the real API) agree on a shared contract: the expected status codes, response headers, and response body shapes. API Spector supports four modes: **Consumer**, **Provider**, **Provider (live)**, and **Bi-directional**.
+Contract testing verifies that a consumer (your API collection) and a provider (the real API) agree on a shared contract: the expected status codes, response headers, and response body shapes. API Spector supports five modes: **Consumer**, **Provider**, **Provider (live)**, **Bi-directional**, and **Fuzz**.
 
-Think of it as **who owns the definition of "correct"**.
+Think of it as **who owns the definition of "correct"**. For how these modes map to the industry terms (consumer-driven, provider-driven, and bi-directional contract testing) and how to choose between them, see **[Contract Testing Types](../reference/contract-testing-types.md)**.
 
 > **New in this release:** live provider verification with provider states, Pact-style flexible matchers, Pact file import/export, HTML reports, and a local `can-i-deploy` gate. The CLI side of all of this is covered in **[Contract Testing (CLI)](../cli/contract-testing.md)**.
 
 ---
 
-## The Four Modes
+## The Modes
 
 ### Consumer mode
 
@@ -52,7 +52,7 @@ This is the real **Pact-style provider verification**. Instead of static analysi
 
 Two things make it different from Consumer mode:
 
-1. **Provider base URL.** Every request is rebased onto the origin you supply (e.g. `http://localhost:3000`), keeping its path and query. This lets the same contracts verify any environment — local, staging, a PR preview — without editing request URLs.
+1. **Provider base URL.** Every request is rebased onto the origin you supply (e.g. `http://localhost:3000`), keeping its path and query. This lets the same contracts verify any environment (local, staging, a PR preview) without editing request URLs.
 2. **Provider states.** Before each interaction, the tool can seed the provider into a known state (Pact's `given(...)`). You list the required states on the request's contract, and point the run at a **state handler URL**. Before each interaction the tool POSTs `{ state, action: "setup" }` to that URL; afterwards it POSTs `{ state, action: "teardown" }`.
 
 **When to use:** Provider-side CI. The provider team runs this against a freshly built service to confirm it still satisfies every consumer contract before shipping.
@@ -68,11 +68,24 @@ Two things make it different from Consumer mode:
 
 ---
 
+### Fuzz mode
+
+Fuzz mode generates malformed variants of your request bodies and query parameters (from a pinned spec or the request's own values), sends them to a provider base URL, and lists responses that crash (5xx) or accept invalid input. Set the provider base URL, optionally pick a spec or snapshot, choose how many cases per operation and a seed (runs are deterministic), and toggle "Include write methods" to fuzz POST/PUT/PATCH/DELETE. Each finding shows the single field it mutated and a request you can copy and replay. See [Fuzzing](../cli/contract-testing.md#fuzzing) for the full option reference.
+
+There are two ways to fuzz:
+
+- **Per request:** the **fuzz** button next to Send fuzzes just that one request, using its own URL, auth, and environment. This is the quick way to hammer an endpoint you are building. Pick a pinned spec in the dialog for richer inputs, or fuzz the request body as it stands. Because it targets the request's own URL, point the request at a staging environment or a mock before fuzzing write methods.
+- **Whole workspace:** Fuzz mode in the Contracts panel sweeps every request against a provider base URL and produces a report suitable for CI. This is the batch form of the same engine.
+
+Both share the seeded, single-fault engine, so a finding always names one mutated field and reproduces from its seed.
+
+Turn on **Record all cases** in either dialog to see every request the fuzzer sent, not just the findings: a table of each mutated body with its field, mutation, and HTTP status. It is on by default for a per-request run (you are inspecting one endpoint) and off for the workspace sweep (where it can be large).
+
 ### Bi-directional mode
 
 This combines both sides in a single run.
 
-**Step 1: Static schema compatibility check.** The response body schema you defined in the Contract tab is compared against the response schema documented in the provider's OpenAPI spec. Every field you *require* must exist in the provider schema with a compatible type. Extra provider fields are always allowed. No HTTP call needed for this step.
+**Step 1: Static schema compatibility check.** The response body schema you defined in the Contract tab is compared against the response schema documented in the provider's OpenAPI spec. If the contract uses body matchers instead of a schema, the matcher example is compiled to a type-level schema and compared the same way. Every field you *require* must exist in the provider schema with a compatible type. Extra provider fields are always allowed. No HTTP call needed for this step.
 
 **Step 2: Live consumer verification.** The real request is sent and validated exactly as in Consumer mode.
 
@@ -142,7 +155,7 @@ Paste a JSON Schema (draft-07) the response body must satisfy.
 
 ### Body matchers (Pact-style)
 
-A plain JSON Schema can be brittle — it either pins exact values or you hand-write `type` constraints everywhere. As an alternative you can supply a **body matcher**: an *example* document where any node can be relaxed with a matcher. This mirrors Pact's `like` / `eachLike` / `term` matchers and is what Pact files import into.
+A plain JSON Schema can be brittle: it either pins exact values or you hand-write `type` constraints everywhere. As an alternative you can supply a **body matcher**: an *example* document where any node can be relaxed with a matcher. This mirrors Pact's `like` / `eachLike` / `term` matchers and is what Pact files import into.
 
 The default is **exact match**; wrap a value in a matcher to loosen it:
 
@@ -152,6 +165,7 @@ The default is **exact match**; wrap a value in a matcher to loosen it:
 | `eachLike(x, min)` | An **array** whose every item matches `like(x)`, with at least `min` items |
 | `regex(re, eg)` | A **string** matching the regular expression `re` |
 | `integer()` / `decimal()` | Numeric type matching |
+| `boolean()` / `string()` | Boolean / any-string type matching |
 | `datetime()` / `date()` / `time()` | A string in the corresponding format |
 
 Matchers compile to JSON Schema under the hood, so they validate through the same engine as a hand-written schema and produce the same `SCHEMA VIOLATION` results. A body matcher and a body schema can both be set; both are checked. See **[Pact Compatibility & Matchers](../reference/pact-compatibility.md)** for the on-disk format and full matcher list.
@@ -183,9 +197,20 @@ Failed requests appear first. Each card is expandable and shows:
 
 Expanding a card shows each violation with its type, path, message, and expected/actual values.
 
+### Record a run for the dashboard
+
+**Record** in the results bar saves the run under `contracts/results/<pacticipant>/<version>.json` in the workspace, exactly like the CLI's `contract run --record`. Give it a pacticipant name (defaults to the active collection) and a version. Recorded runs power two things:
+
+- the [contract dashboard](../cli/contract-testing.md#serving-the-dashboard) (`contract report --serve`, also available as a [docker container](../cli/docker.md#the-contract-dashboard)) - refresh the page after recording and the new cell appears
+- the [`can-i-deploy` gate](../cli/contract-testing.md#can-i-deploy-the-deployment-gate)
+
+Commit the results folder to git to share them with the team.
+
+If you set a **Dashboard URL** in Workspace Settings (Contracts tab), an **Open dashboard** button appears in the results bar linking straight to your served dashboard. The URL is view-only: recorded results reach the dashboard through the workspace files, never through that URL.
+
 ### Export an HTML report
 
-Click **Export HTML** in the results bar to save a **self-contained HTML report** (inline styles, no external assets). It opens straight from disk and is ideal as a CI artifact or to share with teammates — the same report the CLI produces with `--html`. See **[Contract Testing (CLI) → Reports](../cli/contract-testing.md#reports)**.
+Click **Export HTML** in the results bar to save a **self-contained HTML report** (inline styles, no external assets). It opens straight from disk and works well as a CI artifact or to share with teammates. It is the same report the CLI produces with `--html`. See **[Contract Testing (CLI) → Reports](../cli/contract-testing.md#reports)**.
 
 ---
 
@@ -208,7 +233,7 @@ Click **Export HTML** in the results bar to save a **self-contained HTML report*
 - **Start with Consumer mode** before you have a spec. It requires no setup beyond sending a request once.
 - **Provider mode needs no live server.** Run it in CI to detect spec drift before deployment.
 - **Provider (live) mode is for the provider's CI.** Point it at a freshly built service to prove it still satisfies every consumer contract before shipping.
-- **Use matchers instead of exact bodies** when only the *shape* matters — they survive changing IDs, timestamps, and counts.
+- **Use matchers instead of exact bodies** when only the *shape* matters; they survive changing IDs, timestamps, and counts.
 - **Bi-dir without a body schema** skips the static compatibility check and runs only live verification.
 - **Environment variables** are substituted before validation in every mode, so `{{BASE_URL}}` in URLs and request bodies is resolved automatically.
 - **`UNKNOWN PATH` in Provider mode** often means the request URL points at a different host than what the spec documents. The path itself (`/status`) is what matters, not the hostname.

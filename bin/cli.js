@@ -27,7 +27,7 @@ const COMMANDS = {
 
 function printHelp() {
   console.log('')
-  console.log('  API Spector — local-first API testing tool')
+  console.log('  API Spector - local-first API testing tool')
   console.log('')
   console.log('  Usage:')
   console.log('    api-spector ui                            Launch the app')
@@ -58,7 +58,7 @@ if (cmd === '--help' || cmd === '-h') {
 
 const command = COMMANDS[cmd]
 if (!command) {
-  console.error(`API Spector — unknown command: "${cmd}"`)
+  console.error(`API Spector - unknown command: "${cmd}"`)
   printHelp()
   process.exit(1)
 }
@@ -144,7 +144,7 @@ function tryRepairElectron() {
   const zip = findCachedElectronZip(version)
   if (!zip) return 'no-zip'
 
-  console.error(`  Electron ${version} was already downloaded — repairing the`)
+  console.error(`  Electron ${version} was already downloaded - repairing the`)
   console.error('  installation from the local cache...')
   const distDir = path.join(electronDir, 'dist')
   try { fs.rmSync(distDir, { recursive: true, force: true }) } catch { /* best effort */ }
@@ -180,6 +180,10 @@ const TROUBLESHOOTING_URL =
 
 // ui: spawn electron with the app dir
 if (command.runner === 'electron') {
+  // Immediate feedback: on machines where antivirus scans Electron's binary
+  // at every launch (common on managed Windows), the window can take 10-30 s
+  // to appear — without this line the command looks hung.
+  console.log('Launching API Spector...')
   let loaded = loadElectron()
   let failedZip = null
 
@@ -194,7 +198,7 @@ if (command.runner === 'electron') {
 
   if (loaded.status !== 'ok') {
     console.error('')
-    console.error('  API Spector — failed to launch the UI.')
+    console.error('  API Spector - failed to launch the UI.')
     console.error('')
     if (loaded.status === 'not-installed') {
       console.error('  The electron package is not installed alongside API Spector.')
@@ -221,7 +225,7 @@ if (command.runner === 'electron') {
       if (failedZip) {
         console.error('  Electron\'s binary is missing. A downloaded copy exists at')
         console.error(`    ${failedZip}`)
-        console.error('  but it could not be extracted — the file may be corrupt (delete')
+        console.error('  but it could not be extracted - the file may be corrupt (delete')
         console.error('  it and reinstall), or antivirus is blocking the extraction.')
       } else {
         console.error('  Electron is installed, but its platform binary is missing and no')
@@ -231,7 +235,7 @@ if (command.runner === 'electron') {
         console.error('  Common causes on corporate machines:')
         console.error('')
         console.error('    - Proxy blocks github.com downloads. Note: npm\'s proxy settings')
-        console.error('      do NOT apply to electron\'s downloader — it needs:')
+        console.error('      do NOT apply to electron\'s downloader - it needs:')
         console.error('        ELECTRON_GET_USE_PROXY=1')
         console.error('        GLOBAL_AGENT_HTTPS_PROXY=http://your-proxy:port')
         console.error('      then: npm install -D @testsmith/api-spector --force')
@@ -241,7 +245,7 @@ if (command.runner === 'electron') {
         console.error('        NODE_EXTRA_CA_CERTS=/path/to/corporate-root-ca.pem')
         console.error('')
         console.error('    - ELECTRON_SKIP_BINARY_DOWNLOAD=1 set machine-wide (some IT')
-        console.error('      images do this) — unset it and reinstall.')
+        console.error('      images do this) - unset it and reinstall.')
       }
       console.error('')
       console.error('  Manual fix (works without any of the above): download')

@@ -88,7 +88,7 @@ export function HookResultsPanel({ results }: { results: RunRequestResult[] }) {
                       <div key={ti} className={`flex items-center gap-1.5 ${t.passed ? 'text-emerald-400' : 'text-red-400'}`}>
                         <span>{t.passed ? '✓' : '✗'}</span>
                         <span>{t.name}</span>
-                        {t.error && <span className="text-surface-500 text-[10px]">— {t.error}</span>}
+                        {t.error && <span className="text-surface-500 text-[10px]">- {t.error}</span>}
                       </div>
                     ))}
                     {r.consoleOutput?.map((line, li) => (

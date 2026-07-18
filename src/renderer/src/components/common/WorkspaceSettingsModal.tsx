@@ -10,11 +10,12 @@ const { electron } = window;
 const DEFAULT_PII_PATTERNS = ['authorization', 'password', 'token', 'secret', 'api-key', 'x-api-key'];
 const ZOOM_STEPS = [0.75, 0.90, 1.0, 1.10, 1.25, 1.50];
 
-type SettingsTab = 'appearance' | 'proxy' | 'tls' | 'privacy'
+type SettingsTab = 'general' | 'appearance' | 'proxy' | 'tls' | 'privacy' | 'contracts'
 
 export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
   const workspace = useStore(s => s.workspace);
   const updateWorkspaceSettings = useStore(s => s.updateWorkspaceSettings);
+  const environments = useStore(s => s.environments);
 
   // Appearance (applied live — theme/zoom changes preview instantly)
   const theme   = useStore(s => s.theme);
@@ -24,7 +25,10 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
 
   const existing = workspace?.settings ?? {};
 
-  const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+
+  // General state
+  const [defaultEnvironment, setDefaultEnvironment] = useState(existing.defaultEnvironment ?? '');
 
   // Proxy state
   const [proxyUrl,      setProxyUrl]      = useState(existing.proxy?.url ?? '');
@@ -38,6 +42,9 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
   const [rejectUnauthorized, setRejectUnauthorized] = useState(
     existing.tls?.rejectUnauthorized !== false, // default true
   );
+
+  // Contracts state
+  const [dashboardUrl, setDashboardUrl] = useState(existing.dashboardUrl ?? '');
 
   // Privacy state
   const [patterns, setPatterns] = useState<string[]>(
@@ -80,6 +87,12 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
 
     settings.piiMaskPatterns = patterns;
 
+    if (dashboardUrl.trim()) settings.dashboardUrl = dashboardUrl.trim();
+    else delete settings.dashboardUrl;
+
+    if (defaultEnvironment) settings.defaultEnvironment = defaultEnvironment;
+    else delete settings.defaultEnvironment;
+
     updateWorkspaceSettings(settings);
 
     const updated = useStore.getState().workspace;
@@ -96,10 +109,12 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
   }
 
   const tabs: { id: SettingsTab; label: string }[] = [
+    { id: 'general',    label: 'General' },
     { id: 'appearance', label: 'Appearance' },
     { id: 'proxy',      label: 'Proxy' },
     { id: 'tls',        label: 'TLS / Certificates' },
     { id: 'privacy',    label: 'Privacy' },
+    { id: 'contracts',  label: 'Contracts' },
   ];
 
   return (
@@ -128,6 +143,30 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
 
         {/* Tab content */}
         <div className="flex-1 overflow-y-auto px-4 py-4 text-xs flex flex-col gap-4">
+          {activeTab === 'general' && (
+            <>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">
+                  Default environment
+                </label>
+                <select
+                  value={defaultEnvironment}
+                  onChange={e => setDefaultEnvironment(e.target.value)}
+                  className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">(none)</option>
+                  {Object.values(environments).map(({ data: env }) => (
+                    <option key={env.id} value={env.name}>{env.name}</option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-surface-600 text-[11px]">
+                CLI runs without --environment use this environment, and the app selects it
+                when no environment is active.
+              </p>
+            </>
+          )}
+
           {activeTab === 'appearance' && (
             <>
               <div className="flex flex-col gap-1">
@@ -227,6 +266,28 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
                   />
                 </div>
               </div>
+            </>
+          )}
+
+          {activeTab === 'contracts' && (
+            <>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">
+                  Dashboard URL (optional)
+                </label>
+                <input
+                  value={dashboardUrl}
+                  onChange={e => setDashboardUrl(e.target.value)}
+                  placeholder="http://localhost:8080"
+                  className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
+                />
+              </div>
+              <p className="text-surface-600 text-[11px]">
+                Where your contract dashboard is served (api-spector contract report --serve,
+                locally or as a docker container). Adds an "Open dashboard" link to the contract
+                results panel. The link is view-only: recorded results reach the dashboard through
+                the workspace files, not through this URL.
+              </p>
             </>
           )}
 

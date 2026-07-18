@@ -9,6 +9,7 @@ import { buildClientSchema, parse as parseGql, print as printGql, type Introspec
 import { graphql as cm6Graphql } from 'cm6-graphql';
 import type { ApiRequest, GraphQLBody } from '../../../../shared/types';
 import { useStore } from '../../store';
+import { useActiveEnvironment } from '../../hooks/useActiveEnvironment';
 import {
   type GqlField,
   type GqlType,
@@ -213,9 +214,10 @@ export function GraphQLEditor({ request, onChange }: Props) {
   // For introspection hook: build plain env/collection/globals maps.
   // Read reactively from the store so edits to variables are picked up
   // without needing to switch environments.
-  const activeEnvironmentId = useStore(s => s.activeEnvironmentId);
   const activeCollectionId  = useStore(s => s.activeCollectionId);
-  const envData        = useStore(s => activeEnvironmentId ? s.environments[activeEnvironmentId]?.data : null);
+  // Resolved through the extends inheritance chain so inherited variables
+  // participate in introspection just like at send time.
+  const envData        = useActiveEnvironment();
   const colVarsData    = useStore(s => activeCollectionId ? s.collections[activeCollectionId]?.data.collectionVariables : null);
   const globals        = useStore(s => s.globals);
   const hookVars = useMemo(() => {

@@ -114,7 +114,7 @@ export function RecorderPanel({ onImportMock, onClose, defaultTargetMockId }: Pr
                     onChange={e => setImportTarget(e.target.value)}
                     className="bg-surface-800 border border-surface-700 rounded px-2 py-1 text-[11px] text-surface-200 focus:outline-none focus:border-blue-500"
                   >
-                    <option value="new">— New mock server —</option>
+                    <option value="new">(new mock server)</option>
                     {mockList.map(entry => (
                       <option key={entry.data.id} value={entry.data.id}>
                         {entry.data.name}
@@ -217,7 +217,7 @@ function EntryDetail({ entry }: { entry: RecordedEntry }) {
 
   const prettyBody = (raw: string | null): string => {
     if (!raw) return '';
-    if (raw.startsWith('base64:')) return '[binary content — base64 encoded]';
+    if (raw.startsWith('base64:')) return '[binary content - base64 encoded]';
     try { return JSON.stringify(JSON.parse(raw), null, 2); } catch { return raw; }
   };
 
@@ -285,7 +285,7 @@ function EntryDetail({ entry }: { entry: RecordedEntry }) {
           )}
           {entry.response.binary && (
             <p className="text-[10px] text-yellow-400">
-              Binary response — body stored as base64
+              Binary response - body stored as base64
             </p>
           )}
         </div>

@@ -188,7 +188,7 @@ export function ResponseViewer() {
               <button
                 onClick={() => setBodyView('tree')}
                 className={`px-2 py-0.5 text-[10px] transition-colors ${bodyView === 'tree' ? 'bg-surface-700 text-white' : 'text-surface-600 hover:text-white'}`}
-                title="Interactive tree view — click values to add assertions"
+                title="Interactive tree view - click values to add assertions"
               >
                 Tree
               </button>

@@ -121,7 +121,7 @@ function validateBody(schema: unknown, bodyText: string): ContractViolation[] {
   } catch {
     violations.push({
       type:    'schema_violation',
-      message: 'Response body is not valid JSON — cannot validate against schema',
+      message: 'Response body is not valid JSON - cannot validate against schema',
     });
     return violations;
   }

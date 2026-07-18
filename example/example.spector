@@ -3,11 +3,19 @@
   "collections": [
     "collections/basics.json",
     "collections/data-extraction.json",
-    "collections/auth-mechanisms.json"
+    "collections/auth-mechanisms.json",
+    "collections/contract-testing.json"
   ],
   "environments": [],
   "activeEnvironmentId": null,
   "mocks": [
     "mocks/example-mock.mock.json"
-  ]
+  ],
+  "contracts": [
+    "contracts/toolshop-api-5-0-0-18efc664.contract.json",
+    "contracts/toolshop-api-v4-4-0-0-2ba215dd.contract.json"
+  ],
+  "settings": {
+    "theme": "light"
+  }
 }

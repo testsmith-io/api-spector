@@ -3,6 +3,7 @@
 
 import { useMemo } from 'react';
 import { useStore } from '../store';
+import { useActiveEnvironment } from './useActiveEnvironment';
 import { DYNAMIC_VAR_NAMES } from '../components/RequestBuilder/atCompletions';
 
 // Regex to extract keys from sp.*.set("key", ...) calls in scripts
@@ -19,12 +20,12 @@ function extractScriptVarNames(script: string | undefined): string[] {
 
 /** Returns all variable names visible in the current request scope (env + collection + globals + script-defined). */
 export function useVarNames(): string[] {
-  const activeEnvironmentId = useStore(s => s.activeEnvironmentId);
   const activeCollectionId  = useStore(s => s.activeCollectionId);
-  const environments        = useStore(s => s.environments);
   const collections         = useStore(s => s.collections);
   const globals             = useStore(s => s.globals);
   const sessionVars         = useStore(s => s.sessionVars);
+  // Resolved through the extends chain so inherited variables autocomplete too.
+  const activeEnv           = useActiveEnvironment();
 
   return useMemo(() => {
     const names = new Set<string>();
@@ -48,15 +49,13 @@ export function useVarNames(): string[] {
       }
     }
 
-    // Environment variables
-    if (activeEnvironmentId) {
-      const envVars = environments[activeEnvironmentId]?.data.variables ?? [];
-      envVars.filter(v => v.enabled && v.key).forEach(v => names.add(v.key));
-    }
+    // Environment variables (including ones inherited via extends)
+    const envVars = activeEnv?.variables ?? [];
+    envVars.filter(v => v.enabled && v.key).forEach(v => names.add(v.key));
 
     return [...DYNAMIC_VAR_NAMES, ...Array.from(names).sort()];
   }, [
-    activeEnvironmentId, activeCollectionId,
-    environments, collections, globals, sessionVars,
+    activeEnv, activeCollectionId,
+    collections, globals, sessionVars,
   ]);
 }

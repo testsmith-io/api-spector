@@ -1,0 +1,9 @@
+{
+  "name": "staging",
+  "deployed": {
+    "toolshop-web": {
+      "version": "2.0.0",
+      "recordedAt": "2026-07-12T22:58:08.702Z"
+    }
+  }
+}

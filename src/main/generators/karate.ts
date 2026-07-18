@@ -501,10 +501,10 @@ ${scenarios.join('\n\n')}
 
 function buildReadme(collectionName: string, filePaths: string[]): string {
   const tree = renderTree(filePaths);
-  return `# ${collectionName} — API Tests (Karate + JUnit 5)
+  return `# ${collectionName} - API Tests (Karate + JUnit 5)
 
 Karate is a BDD-flavoured API test framework that uses Gherkin feature files
-(no glue code) — see https://docs.karatelabs.io for the full reference.
+(no glue code) - see https://docs.karatelabs.io for the full reference.
 
 ## Project structure
 

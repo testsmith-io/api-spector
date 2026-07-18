@@ -49,6 +49,10 @@ export interface ContractResult {
   violations: ContractViolation[]
   durationMs?: number
   actualStatus?: number
+  /** Failing interaction whose contract has never passed before (Pact's
+   *  "pending pact"). Reported but not counted as a blocking failure when the
+   *  run allows pending contracts. */
+  pending?: boolean
 }
 
 export interface ContractReport {
@@ -58,6 +62,76 @@ export interface ContractReport {
   failed: number
   results: ContractResult[]
   durationMs: number
+  /** Number of failing-but-pending interactions (excluded from `failed`). */
+  pending?: number
+}
+
+// ─── Spec-driven fuzzing ──────────────────────────────────────────────────────
+
+/** Where a fuzzed input was injected and how, so a finding is diagnosable. */
+export interface FuzzMutation {
+  /** e.g. "body.email", "query.limit", "path.id" */
+  target: string
+  /** Short label of the mutation kind, e.g. "type:string→number", "missing-required". */
+  kind: string
+  /** Human-readable description of what was changed. */
+  description: string
+}
+
+export type FuzzOracle = 'never-5xx' | 'accepted-invalid' | 'undocumented-status' | 'response-schema'
+
+export interface FuzzFinding {
+  /** Which oracle rule the response broke. */
+  oracle: FuzzOracle
+  message: string
+  /** HTTP status the fuzzed request produced (0 = transport error). */
+  status: number
+  /** The single mutation applied to the baseline for this case. */
+  mutation: FuzzMutation
+  /** Fully-resolved request as sent, so the case can be replayed. */
+  request: { method: string; url: string; headers: Record<string, string>; body?: string }
+  /** Truncated response body for context. */
+  responseSample?: string
+}
+
+/** One executed case, recorded only when trace mode is on. Lets you see every
+ *  malformed request the fuzzer sent, not just the ones that broke an oracle. */
+export interface FuzzCaseTrace {
+  mutation: FuzzMutation
+  /** HTTP status produced (0 = transport error). */
+  status: number
+  /** Whether this case produced a finding. */
+  finding: boolean
+  request: { method: string; url: string; body?: string }
+  /** Truncated response body the case produced. */
+  responseSample?: string
+}
+
+export interface FuzzTargetResult {
+  requestId: string
+  requestName: string
+  method: string
+  url: string
+  /** Number of mutated cases sent for this operation. */
+  cases: number
+  findings: FuzzFinding[]
+  /** Every executed case (trace mode only). Undefined when trace was off. */
+  trace?: FuzzCaseTrace[]
+}
+
+export interface FuzzReport {
+  /** How inputs were generated and how responses were judged. */
+  inputSource: 'spec' | 'request'
+  oracleUsesContracts: boolean
+  seed: number
+  totalCases: number
+  totalFindings: number
+  results: FuzzTargetResult[]
+  durationMs: number
+  /** Requests skipped because they mutate and writes were not opted into. */
+  skippedWrites: number
+  /** Requests skipped because there was nothing to fuzz (no body / no schema). */
+  skippedNoBody: number
 }
 
 export interface ContractRunPayload {

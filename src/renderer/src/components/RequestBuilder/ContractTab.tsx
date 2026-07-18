@@ -63,7 +63,7 @@ export function ContractTab({ request, onChange }: Props) {
           : 'bg-surface-800 border-surface-700 text-surface-500'
       }`}>
         <span className={`w-2 h-2 rounded-full ${hasContract ? 'bg-blue-400' : 'bg-surface-600'}`} />
-        {hasContract ? 'Contract defined — will be verified in Contract panel' : 'No contract defined yet'}
+        {hasContract ? 'Contract defined - will be verified in Contract panel' : 'No contract defined yet'}
       </div>
 
       {/* Expected status code */}

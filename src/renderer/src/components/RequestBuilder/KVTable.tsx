@@ -73,8 +73,8 @@ export function KVTable({ rows, onChange, keyPlaceholder = 'Key', valuePlacehold
                 value={row.paramType ?? 'query'}
                 onChange={e => update(idx, { paramType: e.target.value as 'query' | 'path' })}
                 title={(row.paramType ?? 'query') === 'path'
-                  ? 'Path variable — substituted into the URL via {{name}}'
-                  : 'Query string parameter — appended as ?key=value'}
+                  ? 'Path variable - substituted into the URL via {{name}}'
+                  : 'Query string parameter - appended as ?key=value'}
                 className={`flex-shrink-0 text-[10px] bg-surface-800 border border-surface-700 rounded px-1.5 py-1 focus:outline-none focus:border-blue-500 font-mono ${
                   (row.paramType ?? 'query') === 'path' ? 'text-violet-400' : 'text-surface-400'
                 }`}

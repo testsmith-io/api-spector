@@ -1,0 +1,12 @@
+node_modules
+out
+dist
+build
+.git
+.github
+docs
+coverage
+*.md
+presentation-*.svg
+slides.md
+.claude

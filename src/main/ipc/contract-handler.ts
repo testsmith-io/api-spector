@@ -13,6 +13,8 @@ import { runConsumerContracts }   from '../contract/consumer-verifier';
 import { runProviderVerification } from '../contract/provider-verifier';
 import { runLiveProviderVerification } from '../contract/provider-live-verifier';
 import { runBidirectional }       from '../contract/bidirectional';
+import { recordResult }           from '../contract/results-store';
+import { runFuzz, type FuzzOptions, type FuzzRunResult } from '../contract/fuzz';
 import { inferSchemaFromJson }    from '../contract/schema-inferrer';
 import { reportToHtml, type ReportMeta } from '../contract/html-report';
 import {
@@ -26,7 +28,7 @@ import { validateContractRunPayload } from './ipc-validate';
  *  doesn't need to change. Returns `{ specPath }` to feed back into the payload. */
 async function resolveSnapshotSpec(relPath: string): Promise<{ specPath: string }> {
   const dir = getWorkspaceDir();
-  if (!dir) throw new Error('No workspace open — cannot resolve snapshot.');
+  if (!dir) throw new Error('No workspace open - cannot resolve snapshot.');
   const snap = await loadSnapshot(dir, relPath);
   const tmp = join(tmpdir(), `api-spector-${randomUUID()}.${snap.format === 'yaml' ? 'yaml' : 'json'}`);
   await writeFile(tmp, snap.spec, 'utf8');
@@ -49,7 +51,7 @@ export function registerContractHandlers(ipc: IpcMain): void {
       case 'consumer':
         return runConsumerContracts(requests, envVars, collectionVars);
       case 'provider':
-        return runProviderVerification(requests, envVars, specUrl, specPath, requestBaseUrl);
+        return runProviderVerification(requests, envVars, collectionVars, specUrl, specPath, requestBaseUrl);
       case 'provider-live':
         return runLiveProviderVerification(requests, envVars, collectionVars, providerBaseUrl, stateHandlerUrl);
       case 'bidirectional':
@@ -85,7 +87,7 @@ export function registerContractHandlers(ipc: IpcMain): void {
     opts: { specUrl?: string; specPath?: string; name?: string },
   ): Promise<{ relPath: string; snapshot: ContractSnapshot }> => {
     const dir = getWorkspaceDir();
-    if (!dir) throw new Error('No workspace open — cannot capture snapshot.');
+    if (!dir) throw new Error('No workspace open - cannot capture snapshot.');
     const snapshot = await captureSnapshot(dir, opts);
     const relPath  = relPathOf(snapshot);
     if (!relPath) throw new Error('Snapshot created but relPath was not attached.');
@@ -111,5 +113,37 @@ export function registerContractHandlers(ipc: IpcMain): void {
     const dir = getWorkspaceDir();
     if (!dir) return;
     await deleteSnapshot(dir, relPath);
+  });
+
+  // Spec-driven fuzzing: generate malformed request variants, send them, and
+  // report responses that crash (5xx) or accept invalid input. Reuses the same
+  // snapshot resolution as contract runs.
+  handleIpc(ipc, IPC.contract.fuzz, async (
+    _e,
+    payload: Omit<FuzzOptions, 'onProgress'> & { specSnapshotRelPath?: string },
+  ): Promise<FuzzRunResult> => {
+    let { specUrl, specPath } = payload;
+    if (payload.specSnapshotRelPath) {
+      const resolved = await resolveSnapshotSpec(payload.specSnapshotRelPath);
+      specPath = resolved.specPath;
+      specUrl = undefined;
+    }
+    return runFuzz({ ...payload, specUrl, specPath });
+  });
+
+  // Persist a run for the dashboard / can-i-deploy gate — same results-store
+  // the CLI's `contract run --record` writes to, so GUI-recorded runs show up
+  // in `contract report --serve` (and the docker dashboard) on refresh.
+  handleIpc(ipc, IPC.contract.recordResult, async (
+    _e,
+    opts: { pacticipant: string; version: string; report: ContractReport },
+  ): Promise<{ file: string }> => {
+    const dir = getWorkspaceDir();
+    if (!dir) throw new Error('No workspace open — cannot record result.');
+    const pacticipant = opts.pacticipant?.trim();
+    const version = opts.version?.trim();
+    if (!pacticipant || !version) throw new Error('Pacticipant and version are required.');
+    const file = await recordResult(dir, pacticipant, version, opts.report, new Date().toISOString());
+    return { file };
   });
 }

@@ -13,7 +13,7 @@ Local-first API testing tool. Inspect, test and mock APIs. Secrets stay on your 
 npm install -g @testsmith/api-spector
 ```
 
-> UI not starting after install (common on corporate machines — proxies, antivirus)?
+> UI not starting after install (common on corporate machines: proxies, antivirus)?
 > See [Troubleshooting: the UI won't start](docs/getting-started/troubleshooting.md).
 
 ## Usage
@@ -121,6 +121,6 @@ npm run package
 
 ## License
 
-API Spector is released under the [MIT License](LICENSE) — free to use, modify, and distribute, including for commercial purposes.
+API Spector is released under the [MIT License](LICENSE): free to use, modify, and distribute, including for commercial purposes.
 
 Copyright (c) 2024-2026 Testsmith.io

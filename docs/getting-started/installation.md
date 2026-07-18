@@ -22,7 +22,7 @@ api-spector --help
 Expected output:
 
 ```
-  API Spector — local-first API testing tool
+  API Spector - local-first API testing tool
 
   Usage:
     api-spector ui                            Launch the app

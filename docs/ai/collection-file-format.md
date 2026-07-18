@@ -1,4 +1,4 @@
-# API Spector — Collection File Format
+# API Spector: Collection File Format
 
 Collections are stored as `.spector` JSON files. This document describes the format so AI tools can read and modify collections programmatically.
 
@@ -57,11 +57,11 @@ Collections are stored as `.spector` JSON files. This document describes the for
 
 ### Body modes
 
-- `"none"` — no body
-- `"json"` — `body.json` contains the JSON string
-- `"form"` — `body.form` is an array of `{ key, value, enabled }` pairs
-- `"raw"` — `body.raw` contains raw text, `body.rawContentType` is the MIME type
-- `"graphql"` — `body.graphql` has `{ query, variables, operationName }`
+- `"none"`: no body
+- `"json"`: `body.json` contains the JSON string
+- `"form"`: `body.form` is an array of `{ key, value, enabled }` pairs
+- `"raw"`: `body.raw` contains raw text, `body.rawContentType` is the MIME type
+- `"graphql"`: `body.graphql` has `{ query, variables, operationName }`
 
 ## Folder structure
 
@@ -78,7 +78,7 @@ Collections are stored as `.spector` JSON files. This document describes the for
 }
 ```
 
-Folders can nest. Each folder can define auth and headers that are inherited by all requests within it (overridable at the request level). The root folder is synthetic (name "root") — its subfolders are the visible top-level groups.
+Folders can nest. Each folder can define auth and headers that are inherited by all requests within it (overridable at the request level). The root folder is synthetic (name "root"); its subfolders are the visible top-level groups.
 
 ## Environment files
 
