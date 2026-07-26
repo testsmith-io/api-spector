@@ -57,9 +57,8 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Derive tags from the release tag: the exact version, the major.minor
-      # rolling tag, and `latest` for non-prereleases. Mirrors the manual
-      # scripts/docker-build.sh convention (testsmith/api-spector).
+      # Derive tags from the release tag: the exact version, plus `latest` for
+      # non-prereleases. Mirrors scripts/docker-build.sh (version + latest).
       - name: Derive image tags
         id: meta
         uses: docker/metadata-action@v5
@@ -67,7 +66,6 @@ jobs:
           images: testsmith/api-spector
           tags: |
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable=${{ !github.event.release.prerelease }}
 
       - name: Set up Buildx

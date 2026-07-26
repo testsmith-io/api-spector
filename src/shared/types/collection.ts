@@ -151,6 +151,9 @@ export interface Workspace {
     /** Name of the environment CLI runs use when no --environment flag is
      *  given, and the app activates when no environment is selected yet. */
     defaultEnvironment?: string
+    /** Persist request/response history to `history.json` in the workspace dir
+     *  (gitignored) so it survives restarts. Off by default. */
+    persistHistory?: boolean
     /** UI appearance — previously in localStorage, now travels with the workspace */
     theme?: 'dark' | 'light' | 'system'
     zoom?: number

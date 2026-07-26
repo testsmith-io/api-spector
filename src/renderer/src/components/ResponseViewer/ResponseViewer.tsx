@@ -18,10 +18,13 @@ import { ConsolePanel } from './ConsolePanel';
 import { prettyJson, prettyXml } from './utils/formatters';
 import { appendSnippetToScript } from '../RequestBuilder/scriptAppend';
 import { useToast } from '../common/Toast';
+import { ContextMenu } from '../common/ContextMenu';
+import { Modal } from '../common/Modal';
+import { validateHttpSemantics } from '../../../../shared/http-semantics';
 
 const { electron } = window;
 
-type RespTab = 'body' | 'headers' | 'tests' | 'console' | 'request'
+type RespTab = 'body' | 'headers' | 'tests' | 'console' | 'request' | 'history' | 'http'
 
 export function ResponseViewer() {
   const activeTab = useStore(s => s.tabs.find(t => t.id === s.activeTabId));
@@ -37,7 +40,33 @@ export function ResponseViewer() {
   const sentRequest = activeTab?.lastSentRequest ?? null;
   const hookResults = activeTab?.lastHookResults ?? null;
   const requestId = activeTab?.requestId ?? null;
+  const setTabResponse = useStore(s => s.setTabResponse);
+  const history = useStore(s => s.history);
+  const activeEnvironmentId = useStore(s => s.activeEnvironmentId);
+  const environments = useStore(s => s.environments);
+  const upsertEnvVar = useStore(s => s.upsertEnvVar);
   const [tab, setTab] = useState<RespTab>('body');
+
+  // Past responses for THIS request (Bruno-style per-request history).
+  const requestHistory = requestId ? history.filter(e => e.request.id === requestId) : [];
+
+  // HTTP semantics: passive RFC conformance check on the current response.
+  const httpFindings = response && !response.error
+    ? validateHttpSemantics({
+        method: sentRequest?.method ?? 'GET',
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+        body: response.body,
+        bodySize: response.bodySize,
+      })
+    : [];
+  const httpErrors = httpFindings.filter(x => x.severity === 'error').length;
+
+  // Right-click a response header to create an environment variable from it.
+  const [headerMenu, setHeaderMenu] = useState<{ x: number; y: number; key: string; value: string } | null>(null);
+  const [varDialog, setVarDialog] = useState<{ name: string; value: string } | null>(null);
+  const activeEnvName = activeEnvironmentId ? environments[activeEnvironmentId]?.data.name : undefined;
 
   // Auto-switch to Console when a script error occurs
   useEffect(() => {
@@ -133,6 +162,8 @@ export function ResponseViewer() {
     { id: 'headers', label: 'Headers' },
     { id: 'tests', label: 'Tests', badge: totalCount > 0 ? `${passedCount}/${totalCount}` : undefined },
     { id: 'console', label: 'Console', badge: hasScriptError ? '!' : consoleCount > 0 ? consoleCount : undefined, error: hasScriptError },
+    { id: 'history', label: 'History', badge: requestHistory.length > 0 ? requestHistory.length : undefined },
+    { id: 'http', label: 'HTTP', badge: httpFindings.length > 0 ? (httpErrors > 0 ? '!' : httpFindings.length) : undefined, error: httpErrors > 0 },
   ];
 
   return (
@@ -270,7 +301,15 @@ export function ResponseViewer() {
             <table className="w-full text-xs px-4 py-2">
               <tbody>
                 {Object.entries(response.headers).map(([k, v]) => (
-                  <tr key={k} className="border-b border-surface-800">
+                  <tr
+                    key={k}
+                    className="border-b border-surface-800 hover:bg-surface-800/40"
+                    onContextMenu={e => {
+                      e.preventDefault();
+                      setHeaderMenu({ x: e.clientX, y: e.clientY, key: k, value: v });
+                    }}
+                    title="Right-click to create an environment variable"
+                  >
                     <td className="py-1.5 px-4 text-surface-400 font-mono w-56 align-top">{k}</td>
                     <td className="py-1.5 px-4 text-white font-mono break-all">{v}</td>
                   </tr>
@@ -284,8 +323,134 @@ export function ResponseViewer() {
           <ConsolePanel scriptResult={scriptResult} />
         ) : tab === 'request' ? (
           <RequestPanel sentRequest={sentRequest} />
+        ) : tab === 'http' ? (
+          <div className="flex-1 min-h-0 overflow-y-auto p-4">
+            {httpFindings.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
+                <span className="text-2xl">✓</span>
+                <p className="text-sm text-emerald-400">Conforms to HTTP semantics</p>
+                <p className="text-xs text-surface-500 max-w-sm">No violations of the HTTP specification (RFC 9110/9111) in this response. This check is automatic and needs no test or spec.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2 max-w-3xl">
+                {httpFindings.map((find, i) => {
+                  const tone = find.severity === 'error' ? 'border-red-800/60 bg-red-950/20'
+                    : find.severity === 'warning' ? 'border-amber-800/50 bg-amber-950/20'
+                    : 'border-surface-700 bg-surface-800/40';
+                  const label = find.severity === 'error' ? 'text-red-400'
+                    : find.severity === 'warning' ? 'text-amber-400' : 'text-surface-400';
+                  return (
+                    <div key={i} className={`border-l-2 rounded-r px-3 py-2 ${tone}`}>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${label}`}>{find.severity}</span>
+                        <span className="text-[10px] font-mono text-surface-500 bg-surface-900 px-1.5 py-0.5 rounded">{find.rule}</span>
+                        {find.ref && <span className="text-[10px] text-surface-600 ml-auto">{find.ref}</span>}
+                      </div>
+                      <p className="text-xs text-surface-200 mt-1">{find.message}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : tab === 'history' ? (
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            {requestHistory.length === 0 ? (
+              <p className="text-xs text-surface-500 text-center p-8">
+                No past responses for this request yet. Each send is recorded here.
+              </p>
+            ) : (
+              <div className="flex flex-col">
+                {requestHistory.map(entry => (
+                  <button
+                    key={entry.id}
+                    onClick={() => { if (activeTabId) setTabResponse(activeTabId, entry.response, entry.scriptResult ?? null); }}
+                    className="flex items-center gap-3 px-4 py-2 border-b border-surface-800 hover:bg-surface-800/50 text-left transition-colors"
+                  >
+                    <span className={`text-xs font-bold font-mono shrink-0 w-8 ${getStatusColor(entry.response.status)}`}>
+                      {entry.response.status || 'ERR'}
+                    </span>
+                    <span className="text-xs text-surface-400 shrink-0">{entry.response.durationMs}ms</span>
+                    <span className="text-[11px] text-surface-500 shrink-0">{(entry.response.bodySize / 1024).toFixed(1)} KB</span>
+                    {entry.environmentName && (
+                      <span className="text-[10px] bg-surface-800 text-surface-400 px-1.5 py-0.5 rounded shrink-0">{entry.environmentName}</span>
+                    )}
+                    <span className="text-[11px] text-surface-500 ml-auto shrink-0">
+                      {new Date(entry.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         ) : null}
       </div>
+
+      {/* Header right-click: create environment variable */}
+      {headerMenu && (
+        <ContextMenu
+          x={headerMenu.x}
+          y={headerMenu.y}
+          onClose={() => setHeaderMenu(null)}
+          items={[
+            { type: 'header', label: headerMenu.key },
+            activeEnvironmentId
+              ? {
+                  type: 'item',
+                  label: `Create variable in "${activeEnvName}"`,
+                  onClick: () => {
+                    setVarDialog({ name: headerMenu.key.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, ''), value: headerMenu.value });
+                    setHeaderMenu(null);
+                  },
+                }
+              : { type: 'header', label: 'Select an environment first' },
+          ]}
+        />
+      )}
+
+      {/* Name the new environment variable */}
+      {varDialog && (
+        <Modal onClose={() => setVarDialog(null)} title="Create environment variable" panelClassName="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl w-[420px]">
+          <div className="flex flex-col gap-3 p-4">
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Variable name</span>
+              <input
+                autoFocus
+                value={varDialog.name}
+                onChange={e => setVarDialog(d => d && { ...d, name: e.target.value })}
+                className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 text-sm font-mono focus:outline-none focus:border-blue-500"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Value</span>
+              <input
+                value={varDialog.value}
+                onChange={e => setVarDialog(d => d && { ...d, value: e.target.value })}
+                className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 text-sm font-mono focus:outline-none focus:border-blue-500"
+              />
+            </label>
+            <p className="text-[11px] text-surface-500">
+              Saved to {activeEnvName ? `"${activeEnvName}"` : 'the active environment'}. Use it as <code className="text-surface-300">{'{{'}{varDialog.name || 'name'}{'}}'}</code>.
+            </p>
+            <div className="flex justify-end gap-2 mt-1">
+              <button onClick={() => setVarDialog(null)} className="px-3 py-1.5 text-xs text-surface-400 hover:text-surface-200 transition-colors">Cancel</button>
+              <button
+                onClick={() => {
+                  if (activeEnvironmentId && varDialog.name.trim()) {
+                    upsertEnvVar(activeEnvironmentId, varDialog.name.trim(), varDialog.value);
+                    assertToast.show(`✓ Saved {{${varDialog.name.trim()}}}`, true);
+                  }
+                  setVarDialog(null);
+                }}
+                disabled={!varDialog.name.trim()}
+                className="px-3 py-1.5 text-xs rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold disabled:opacity-50 transition-colors"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

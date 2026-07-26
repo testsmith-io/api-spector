@@ -29,6 +29,8 @@ export const IPC = {
     deleteWorkspaceFile: 'file:deleteWorkspaceFile',
     saveMock:            'file:saveMock',
     loadMock:            'file:loadMock',
+    loadHistory:         'file:loadHistory',
+    saveHistory:         'file:saveHistory',
   },
 
   // ─── Native dialogs ────────────────────────────────────────────────────────

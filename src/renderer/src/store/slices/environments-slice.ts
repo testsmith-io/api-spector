@@ -23,6 +23,10 @@ export interface EnvironmentsSliceActions {
   loadEnvironment: (relPath: string, data: Environment) => void
   setActiveEnvironment: (id: string | null) => void
   updateEnvironment: (id: string, data: Environment) => void
+  /** Set a plain (non-secret) variable on an environment, updating it if the
+   *  key exists or appending it otherwise, then persist the env to disk.
+   *  Used by "create environment variable" UI (e.g. from a response header). */
+  upsertEnvVar: (envId: string, key: string, value: string) => void
   addEnvironment: () => void
   duplicateEnvironment: (id: string) => void
   deleteEnvironment: (id: string) => void
@@ -52,6 +56,22 @@ export const createEnvironmentsSlice: StateCreator<
   updateEnvironment: (id, data) => set(s => {
     if (s.environments[id]) s.environments[id].data = data;
   }),
+
+  upsertEnvVar: (envId, key, value) => {
+    set(s => {
+      const env = s.environments[envId]?.data;
+      if (!env) return;
+      const existing = env.variables.find(v => v.key === key && !v.secret);
+      if (existing) existing.value = value;
+      else env.variables.push({ key, value, enabled: true });
+    });
+    const entry = get().environments[envId];
+    if (entry) {
+      window.electron.saveEnvironment(entry.relPath, entry.data).catch((err: unknown) => {
+        console.warn('upsertEnvVar: could not save environment', entry.relPath, err);
+      });
+    }
+  },
 
   addEnvironment: () => set(s => {
     const existingNames = Object.values(s.environments).map(e => e.data.name);

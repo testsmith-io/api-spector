@@ -29,6 +29,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
 
   // General state
   const [defaultEnvironment, setDefaultEnvironment] = useState(existing.defaultEnvironment ?? '');
+  const [persistHistory, setPersistHistory] = useState(existing.persistHistory ?? false);
 
   // Proxy state
   const [proxyUrl,      setProxyUrl]      = useState(existing.proxy?.url ?? '');
@@ -93,10 +94,19 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
     if (defaultEnvironment) settings.defaultEnvironment = defaultEnvironment;
     else delete settings.defaultEnvironment;
 
+    if (persistHistory) settings.persistHistory = true;
+    else delete settings.persistHistory;
+
     updateWorkspaceSettings(settings);
 
     const updated = useStore.getState().workspace;
     if (updated) await electron.saveWorkspace(updated);
+
+    // Capture the current in-memory history right away when persistence is
+    // switched on, so what is already on screen is saved, not just future sends.
+    if (persistHistory) {
+      await electron.saveHistory(useStore.getState().history).catch(() => { /* best effort */ });
+    }
     onClose();
   }
 
@@ -164,6 +174,22 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
                 CLI runs without --environment use this environment, and the app selects it
                 when no environment is active.
               </p>
+
+              <label className="flex items-start gap-2 mt-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={persistHistory}
+                  onChange={e => setPersistHistory(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-surface-200">Persist request history</span>
+                  <span className="text-surface-600 text-[11px]">
+                    Save history to history.json in the workspace folder so it survives restarts.
+                    The file is gitignored. Off by default; history stays in memory otherwise.
+                  </span>
+                </span>
+              </label>
             </>
           )}
 
