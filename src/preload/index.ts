@@ -24,6 +24,7 @@ import type {
   ContractRunPayload,
   ContractReport,
   FuzzReport,
+  HistoryEntry,
   ContractSnapshot,
   GitStatus,
   GitCommit,
@@ -62,6 +63,10 @@ const api = {
    *  just from the workspace manifest. */
   deleteWorkspaceFile: (relPath: string): Promise<void> =>
     ipcRenderer.invoke(IPC.file.deleteWorkspaceFile, relPath),
+  loadHistory: (): Promise<HistoryEntry[]> =>
+    ipcRenderer.invoke(IPC.file.loadHistory) as Promise<HistoryEntry[]>,
+  saveHistory: (entries: HistoryEntry[]): Promise<void> =>
+    ipcRenderer.invoke(IPC.file.saveHistory, entries),
 
   // ─── HTTP execution ────────────────────────────────────────────────────────
   sendRequest: (payload: SendRequestPayload): Promise<RequestExecutionResult> =>

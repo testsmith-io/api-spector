@@ -64,6 +64,9 @@ export const SPECTOR_GITIGNORE = [
   'results.html',
   'coverage/',
   '',
+  '# Local session history (opt-in persistence)',
+  'history.json',
+  '',
   '# OS / editor',
   '.DS_Store',
   'Thumbs.db',
@@ -332,6 +335,24 @@ export function registerFileHandlers(ipc: IpcMain): void {
       // callers can fire-and-forget without worrying about double-deletes.
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     }
+  });
+
+  // Opt-in session-history persistence: a plain JSON array in the workspace
+  // dir (gitignored). Load returns [] when the file is absent or unreadable.
+  handleIpc(ipc, IPC.file.loadHistory, async (): Promise<unknown[]> => {
+    if (!workspaceDir) return [];
+    try {
+      const raw = await readFile(join(workspaceDir, 'history.json'), 'utf8');
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
+
+  handleIpc(ipc, IPC.file.saveHistory, async (_e, entries: unknown[]): Promise<void> => {
+    if (!workspaceDir) return;
+    await writeFile(join(workspaceDir, 'history.json'), JSON.stringify(entries, null, 2), 'utf8');
   });
 
   handleIpc(ipc, IPC.dialog.pickDir, async () => {

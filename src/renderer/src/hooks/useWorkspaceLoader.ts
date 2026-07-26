@@ -33,6 +33,16 @@ export function useWorkspaceLoader() {
     if (ws.settings?.theme) setTheme(ws.settings.theme);
     if (typeof ws.settings?.zoom === 'number') setZoom(ws.settings.zoom);
 
+    // Restore persisted session history when the workspace opts in.
+    if (ws.settings?.persistHistory) {
+      try {
+        const entries = await electron.loadHistory();
+        useStore.getState().setHistory(entries);
+      } catch { /* no history file yet */ }
+    } else {
+      useStore.getState().setHistory([]);
+    }
+
     for (const colPath of ws.collections) {
       try {
         const col: Collection = await electron.loadCollection(colPath);

@@ -4,7 +4,10 @@
 import React, { useState } from 'react';
 import { useStore } from '../../store';
 import type { HistoryEntry } from '../../../../shared/types';
+import { historyToHar } from '../../../../shared/har';
 import { MethodBadge } from '../common/MethodBadge';
+
+const { electron } = window;
 
 const STATUS_COLOR: Record<string, string> = {
   '2': 'text-emerald-400',
@@ -36,6 +39,8 @@ export function HistoryPanel() {
   const clearHistory = useStore(s => s.clearHistory);
   const activeTabId = useStore(s => s.activeTabId);
   const setTabResponse = useStore(s => s.setTabResponse);
+  const setActiveRequest = useStore(s => s.setActiveRequest);
+  const collections = useStore(s => s.collections);
   const [selected, setSelected] = useState<HistoryEntry | null>(null);
   const [search, setSearch] = useState('');
 
@@ -59,9 +64,23 @@ export function HistoryPanel() {
     }
   }
 
+  async function downloadHar() {
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    await electron.saveResults(historyToHar(history), `api-spector-history-${stamp}.har`);
+  }
+
   function open(entry: HistoryEntry) {
     setSelected(entry);
-    if (activeTabId) {
+    // Bring the request into the middle pane so it can be replayed, not just
+    // its response. If the request still exists in a collection, open/switch
+    // to its tab and load the historical response there. If it was deleted,
+    // fall back to showing the response in whatever tab is active.
+    const stillExists = Object.values(collections).some(c => entry.request.id in c.data.requests);
+    if (stillExists) {
+      setActiveRequest(entry.request.id);
+      const tabId = useStore.getState().activeTabId;
+      if (tabId) setTabResponse(tabId, entry.response, entry.scriptResult ?? null);
+    } else if (activeTabId) {
       setTabResponse(activeTabId, entry.response, entry.scriptResult ?? null);
     }
   }
@@ -77,13 +96,22 @@ export function HistoryPanel() {
           className="flex-1 bg-surface-800 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
         {history.length > 0 && (
-          <button
-            onClick={() => { clearHistory(); setSelected(null); }}
-            className="text-xs text-surface-400 hover:text-red-400 transition-colors px-1"
-            title="Clear all history"
-          >
-            Clear
-          </button>
+          <>
+            <button
+              onClick={downloadHar}
+              className="text-xs text-surface-400 hover:text-surface-100 transition-colors px-1"
+              title="Download history as a HAR file"
+            >
+              HAR
+            </button>
+            <button
+              onClick={() => { clearHistory(); setSelected(null); }}
+              className="text-xs text-surface-400 hover:text-red-400 transition-colors px-1"
+              title="Clear all history"
+            >
+              Clear
+            </button>
+          </>
         )}
       </div>
 
