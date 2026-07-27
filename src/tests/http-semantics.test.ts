@@ -23,9 +23,44 @@ describe('validateHttpSemantics', () => {
     expect(rules(r)).toEqual([]);
   });
 
-  it('flags a body on 204 and 304', () => {
-    expect(rules(res({ status: 204, body: 'x', bodySize: 1, headers: { date: 'n' } }))).toContain('no-body-204');
-    expect(rules(res({ status: 304, body: 'x', bodySize: 1, headers: { date: 'n' } }))).toContain('no-body-304');
+  it('flags 204/205/304 that declare a body via Content-Length (body is stripped by the client)', () => {
+    // Real clients discard the body for these statuses; the tell is Content-Length.
+    expect(rules(res({ status: 204, body: '', bodySize: 0, headers: { date: 'n', 'content-length': '62' } }))).toContain('no-body-204');
+    expect(rules(res({ status: 205, body: '', bodySize: 0, headers: { date: 'n', 'content-length': '65' } }))).toContain('no-body-205');
+    expect(rules(res({ status: 304, body: '', bodySize: 0, headers: { date: 'n', 'content-length': '64' } }))).toContain('no-body-304');
+    // Well-behaved bodiless responses (no Content-Length) are clean.
+    expect(rules(res({ status: 204, headers: { date: 'n' } }))).not.toContain('no-body-204');
+    expect(rules(res({ status: 304, headers: { date: 'n', etag: '"x"' } }))).not.toContain('no-body-304');
+  });
+
+  it('does not double-report a bodiless status as a Content-Length mismatch', () => {
+    expect(rules(res({ status: 205, body: '', bodySize: 0, headers: { date: 'n', 'content-length': '65' } })))
+      .not.toContain('content-length-mismatch');
+  });
+
+  it('flags a 1xx with a declared body', () => {
+    expect(rules(res({ status: 100, headers: { 'content-length': '10' } }))).toContain('no-body-1xx');
+  });
+
+  it('flags 206 without Content-Range (error) and 416 without it (warning)', () => {
+    const r206 = validateHttpSemantics(res({ status: 206, headers: { date: 'n', 'content-type': 'application/json' }, body: '{}', bodySize: 2 }));
+    expect(r206.find(x => x.rule === '206-no-content-range')?.severity).toBe('error');
+    const r416 = validateHttpSemantics(res({ status: 416, headers: { date: 'n' } }));
+    expect(r416.find(x => x.rule === '416-no-content-range')?.severity).toBe('warning');
+    // With Content-Range present, no finding.
+    expect(rules(res({ status: 206, headers: { date: 'n', 'content-range': 'bytes 0-1/10', 'content-type': 'application/json' }, body: '{}', bodySize: 2 }))).not.toContain('206-no-content-range');
+  });
+
+  it('flags malformed XML when a checkXml parser is supplied', () => {
+    const badXml = '<a><b></a>';
+    const check = (body: string) => body === badXml ? false : true;
+    const findings = validateHttpSemantics(
+      res({ status: 200, headers: { date: 'n', 'content-type': 'application/xml' }, body: badXml, bodySize: badXml.length }),
+      { checkXml: check },
+    );
+    expect(findings.map(x => x.rule)).toContain('xml-invalid');
+    // Without a checker, XML is not structurally validated (stays dependency-free).
+    expect(rules(res({ status: 200, headers: { date: 'n', 'content-type': 'application/xml' }, body: badXml, bodySize: badXml.length }))).not.toContain('xml-invalid');
   });
 
   it('flags a HEAD response with a body', () => {
