@@ -7,7 +7,8 @@ import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
 import { xml } from '@codemirror/lang-xml';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { getStatusColor } from '../../../../shared/colors';
+import { getStatusColor, getMethodColor } from '../../../../shared/colors';
+import type { HistoryEntry } from '../../../../shared/types';
 import { InteractiveBody } from './InteractiveBody';
 import { HookResultsPanel } from './HookResultsPanel';
 import { SaveAsMockModal } from './SaveAsMockModal';
@@ -23,6 +24,88 @@ import { Modal } from '../common/Modal';
 import { validateHttpSemantics } from '../../../../shared/http-semantics';
 
 const { electron } = window;
+
+/** XML well-formedness via the browser's native DOMParser. Injected into the
+ *  HTTP-semantics check and used for the body parse-error indicator. */
+function xmlWellFormed(body: string): boolean {
+  try {
+    const doc = new DOMParser().parseFromString(body, 'application/xml');
+    return doc.getElementsByTagName('parsererror').length === 0;
+  } catch {
+    return true; // cannot check: do not flag
+  }
+}
+
+function requestBodyText(body: HistoryEntry['request']['body']): string {
+  switch (body?.mode) {
+    case 'json': return body.json ?? '';
+    case 'raw': return body.raw ?? '';
+    case 'graphql': return body.graphql?.query ?? '';
+    case 'soap': return body.soap?.envelope ?? '';
+    case 'form': return (body.form ?? []).filter(p => p.enabled && p.key).map(p => `${p.key}=${p.value}`).join('\n');
+    default: return '';
+  }
+}
+
+function KVBlock({ label, rows }: { label: string; rows: [string, string][] }) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[9px] uppercase tracking-wider text-surface-600 font-medium">{label}</span>
+      {rows.map(([k, v]) => (
+        <div key={k} className="flex gap-2 font-mono text-[10px]">
+          <span className="text-surface-500 shrink-0">{k}:</span>
+          <span className="text-surface-300 break-all">{v}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** One history entry, expandable to show the full request and response.
+ *  Loading brings the response back into the main viewer. */
+function HistoryTabRow({ entry, onLoad }: { entry: HistoryEntry; onLoad: () => void }) {
+  const [open, setOpen] = useState(false);
+  const reqBody = requestBodyText(entry.request.body);
+  return (
+    <div className="border-b border-surface-800">
+      <div className="flex items-center gap-3 px-4 py-2 hover:bg-surface-800/40">
+        <button onClick={() => setOpen(o => !o)} className="text-surface-600 text-xs w-3 shrink-0">{open ? '▾' : '▸'}</button>
+        <span className={`text-[10px] font-bold font-mono shrink-0 w-10 ${getMethodColor(entry.request.method)}`}>{entry.request.method}</span>
+        <span className={`text-xs font-bold font-mono shrink-0 w-8 ${getStatusColor(entry.response.status)}`}>{entry.response.status || 'ERR'}</span>
+        <span className="text-xs text-surface-400 shrink-0">{entry.response.durationMs}ms</span>
+        <span className="text-[11px] text-surface-500 shrink-0">{(entry.response.bodySize / 1024).toFixed(1)} KB</span>
+        {entry.environmentName && (
+          <span className="text-[10px] bg-surface-800 text-surface-400 px-1.5 py-0.5 rounded shrink-0">{entry.environmentName}</span>
+        )}
+        <span className="text-[11px] text-surface-500 ml-auto shrink-0">
+          {new Date(entry.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+        </span>
+        <button onClick={onLoad} title="Load this response into the viewer" className="text-[10px] text-blue-400 hover:text-blue-300 shrink-0">load</button>
+      </div>
+      {open && (
+        <div className="px-4 pb-3 pt-1 flex flex-col gap-3 bg-surface-950/40">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[10px] uppercase tracking-wider text-surface-500 font-semibold">Request</span>
+            <p className="font-mono text-[10px] text-surface-300 break-all">{entry.request.method} {entry.resolvedUrl}</p>
+            <KVBlock label="Headers" rows={entry.request.headers.filter(h => h.enabled && h.key).map(h => [h.key, h.value])} />
+            {reqBody && (
+              <pre className="text-[10px] font-mono text-surface-300 bg-surface-900 border border-surface-800 rounded px-2 py-1.5 overflow-x-auto whitespace-pre-wrap break-words max-h-40 overflow-y-auto">{reqBody}</pre>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[10px] uppercase tracking-wider text-surface-500 font-semibold">Response</span>
+            <p className="font-mono text-[10px]"><span className={getStatusColor(entry.response.status)}>{entry.response.status} {entry.response.statusText}</span></p>
+            <KVBlock label="Headers" rows={Object.entries(entry.response.headers)} />
+            {entry.response.body && (
+              <pre className="text-[10px] font-mono text-surface-300 bg-surface-900 border border-surface-800 rounded px-2 py-1.5 overflow-x-auto whitespace-pre-wrap break-words max-h-56 overflow-y-auto">{entry.response.body}</pre>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 type RespTab = 'body' | 'headers' | 'tests' | 'console' | 'request' | 'history' | 'http'
 
@@ -59,7 +142,7 @@ export function ResponseViewer() {
         headers: response.headers,
         body: response.body,
         bodySize: response.bodySize,
-      })
+      }, { checkXml: xmlWellFormed })
     : [];
   const httpErrors = httpFindings.filter(x => x.severity === 'error').length;
 
@@ -151,6 +234,12 @@ export function ResponseViewer() {
   const supportsTree = isJson || isXml;
   const displayBody = isJson ? prettyJson(response.body) : isXml ? prettyXml(response.body) : response.body;
 
+  // Body parse error (for a red ! on the Body tab, regardless of tree/raw view).
+  const bodyParseError = response.body.trim().length > 0 && (
+    (isJson && (() => { try { JSON.parse(response.body); return false; } catch { return true; } })()) ||
+    (isXml && contentType.includes('xml') && !xmlWellFormed(response.body))
+  );
+
   const passedCount = scriptResult?.testResults.filter(t => t.passed).length ?? 0;
   const totalCount = scriptResult?.testResults.length ?? 0;
   const consoleCount = scriptResult?.consoleOutput.length ?? 0;
@@ -158,7 +247,7 @@ export function ResponseViewer() {
 
   const tabList: { id: RespTab; label: string; badge?: number | string; error?: boolean }[] = [
     { id: 'request', label: 'Request' },
-    { id: 'body', label: 'Body' },
+    { id: 'body', label: 'Body', badge: bodyParseError ? '!' : undefined, error: bodyParseError },
     { id: 'headers', label: 'Headers' },
     { id: 'tests', label: 'Tests', badge: totalCount > 0 ? `${passedCount}/${totalCount}` : undefined },
     { id: 'console', label: 'Console', badge: hasScriptError ? '!' : consoleCount > 0 ? consoleCount : undefined, error: hasScriptError },
@@ -362,23 +451,11 @@ export function ResponseViewer() {
             ) : (
               <div className="flex flex-col">
                 {requestHistory.map(entry => (
-                  <button
+                  <HistoryTabRow
                     key={entry.id}
-                    onClick={() => { if (activeTabId) setTabResponse(activeTabId, entry.response, entry.scriptResult ?? null); }}
-                    className="flex items-center gap-3 px-4 py-2 border-b border-surface-800 hover:bg-surface-800/50 text-left transition-colors"
-                  >
-                    <span className={`text-xs font-bold font-mono shrink-0 w-8 ${getStatusColor(entry.response.status)}`}>
-                      {entry.response.status || 'ERR'}
-                    </span>
-                    <span className="text-xs text-surface-400 shrink-0">{entry.response.durationMs}ms</span>
-                    <span className="text-[11px] text-surface-500 shrink-0">{(entry.response.bodySize / 1024).toFixed(1)} KB</span>
-                    {entry.environmentName && (
-                      <span className="text-[10px] bg-surface-800 text-surface-400 px-1.5 py-0.5 rounded shrink-0">{entry.environmentName}</span>
-                    )}
-                    <span className="text-[11px] text-surface-500 ml-auto shrink-0">
-                      {new Date(entry.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    </span>
-                  </button>
+                    entry={entry}
+                    onLoad={() => { if (activeTabId) setTabResponse(activeTabId, entry.response, entry.scriptResult ?? null); }}
+                  />
                 ))}
               </div>
             )}
