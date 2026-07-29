@@ -43,14 +43,16 @@ export function useWorkspaceLoader() {
       useStore.getState().setHistory([]);
     }
 
-    for (const colPath of ws.collections) {
+    // Guard against a malformed manifest (e.g. a collection opened as a
+    // workspace): these are arrays on a real Workspace, absent on a Collection.
+    for (const colPath of ws.collections ?? []) {
       try {
         const col: Collection = await electron.loadCollection(colPath);
         loadCollection(colPath, col);
       } catch { /* ignore missing files */ }
     }
 
-    for (const envPath of ws.environments) {
+    for (const envPath of ws.environments ?? []) {
       try {
         const env = await electron.loadEnvironment(envPath);
         loadEnvironment(envPath, env);
@@ -88,7 +90,7 @@ export function useWorkspaceLoader() {
       for (const { relPath, snapshot } of snapshots) loadContractSnapshot(relPath, snapshot);
     } catch { /* no workspace dir yet, or no contracts */ }
 
-    if (ws.collections.length > 0) {
+    if ((ws.collections ?? []).length > 0) {
       try {
         const firstCol: Collection = await electron.loadCollection(ws.collections[0]);
         setActiveCollection(firstCol.id);

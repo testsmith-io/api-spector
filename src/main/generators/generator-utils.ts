@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import type { ApiRequest, AuthConfig, Collection, Environment, Folder, KeyValuePair } from '../../shared/types';
+import { authIsConfigured } from '../../shared/request-collection';
 
 // ─── Shared helpers for the code generators ──────────────────────────────────
 //
@@ -90,7 +91,7 @@ export function resolveEffectiveAuth(
   req: ApiRequest,
   inherited: { auth: AuthConfig | null },
 ): AuthConfig {
-  return req.auth.type !== 'none' ? req.auth : (inherited.auth ?? req.auth);
+  return authIsConfigured(req.auth) ? req.auth : (inherited.auth ?? req.auth);
 }
 
 /** Inherited (collection/folder) headers first, then the request's own — enabled + non-empty only. */

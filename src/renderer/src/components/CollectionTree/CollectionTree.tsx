@@ -582,6 +582,7 @@ function FolderContents ( {
             folderId={folder.id}
             reqIndex={reqIndex}
             name={req.name}
+            url={req.url}
             method={req.method}
             protocol={req.protocol}
             authType={req.auth.type}

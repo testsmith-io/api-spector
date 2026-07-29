@@ -6,6 +6,7 @@ import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
 import { readFile, writeFile, mkdir, readdir, unlink } from 'fs/promises';
 import { join, dirname, resolve, basename } from 'path';
+import { randomUUID } from 'crypto';
 import type { Collection, Environment, Workspace } from '../../shared/types';
 import { loadGlobals, getGlobals, setGlobals, persistGlobals } from '../globals-store';
 
@@ -228,12 +229,29 @@ export function registerFileHandlers(ipc: IpcMain): void {
     });
     if (result.canceled || !result.filePaths[0]) return null;
     const wsPath = result.filePaths[0];
+    const raw = await readFile(wsPath, 'utf8');
+    const parsed = JSON.parse(raw) as unknown;
+
+    // A collection saved with a .spector extension is not a workspace. Offer to
+    // wrap it in one rather than failing to open.
+    if (looksLikeCollection(parsed)) {
+      const { response } = await dialog.showMessageBox({
+        type: 'question',
+        buttons: ['Create Workspace', 'Cancel'],
+        defaultId: 0,
+        cancelId: 1,
+        message: 'This is a collection, not a workspace.',
+        detail: `API Spector opens workspaces, which contain collections.\n\nCreate a workspace in this folder and add "${basename(wsPath)}" to it? The collection is moved into a collections/ folder and this file becomes the workspace.`,
+      });
+      if (response !== 0) return null;
+      return wrapCollectionAsWorkspace(wsPath, parsed as Collection);
+    }
+
     workspaceDir = dirname(wsPath);
     workspaceFile = wsPath;
     await loadGlobals(workspaceDir);
     await saveLastWorkspacePath(wsPath);
-    const raw = await readFile(wsPath, 'utf8');
-    return { workspace: JSON.parse(raw) as Workspace, workspacePath: wsPath };
+    return { workspace: parsed as Workspace, workspacePath: wsPath };
   });
 
   handleIpc(ipc, IPC.file.newWorkspace, async () => {
@@ -467,4 +485,44 @@ async function tryOpenWorkspaceInDir(dir: string): Promise<{ workspace: Workspac
 
 export function getWorkspaceDir(): string | null {
   return workspaceDir;
+}
+
+/** A `.spector` file whose JSON is a Collection, not a Workspace manifest
+ *  (has rootFolder/requests but no `collections` list). Happens when a
+ *  collection is saved or shared with the workspace extension. */
+function looksLikeCollection(obj: unknown): boolean {
+  if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Record<string, unknown>;
+  return !Array.isArray(o['collections']) && (!!o['rootFolder'] || !!o['requests']);
+}
+
+/** Turn a collection file into a proper workspace: write the collection under
+ *  collections/, then replace the picked file with a workspace manifest that
+ *  references it. The collection content is preserved, just relocated. */
+async function wrapCollectionAsWorkspace(
+  collFilePath: string,
+  collection: Collection,
+): Promise<{ workspace: Workspace; workspacePath: string }> {
+  const dir = dirname(collFilePath);
+  const base = basename(collFilePath).replace(/\.(spector|json)$/i, '');
+  const safe = base.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'collection';
+  const collRel = `collections/${safe}.json`;
+
+  if (!collection.id) collection.id = randomUUID();
+  await mkdir(join(dir, 'collections'), { recursive: true });
+  await atomicWrite(join(dir, collRel), JSON.stringify(collection, null, 2));
+
+  const ws: Workspace = { version: '1.0', collections: [collRel], environments: [], activeEnvironmentId: null };
+  await ensureGitignore(dir);
+  await ensureVscodeFileAssociation(dir);
+  await ensureReadme(dir, basename(collFilePath));
+  // Replace the picked collection file with the manifest (content is safe in
+  // collections/ already). The file the user opened becomes the workspace.
+  await atomicWrite(collFilePath, JSON.stringify(ws, null, 2));
+
+  workspaceDir = dir;
+  workspaceFile = collFilePath;
+  await loadGlobals(dir);
+  await saveLastWorkspacePath(collFilePath);
+  return { workspace: ws, workspacePath: collFilePath };
 }

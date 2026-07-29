@@ -10,6 +10,16 @@ import { InlineEdit } from '../common/InlineEdit';
 import { type MenuItem, DotsBtn } from '../common/ContextMenu';
 import { PencilIcon, CopyIcon, TagIcon, SyncIcon, TrashIcon } from '../common/icons';
 
+/** The path portion of a request URL, for showing under the name in the tree.
+ *  Strips a leading {{baseUrl}} token and the scheme+host so an imported
+ *  request reads as "/pets/{id}" rather than its vendor description. */
+function requestPath(url: string): string {
+  const trimmed = url.trim()
+    .replace(/^\{\{[^}]+\}\}/, '')     // leading {{baseUrl}} variable
+    .replace(/^https?:\/\/[^/]+/i, ''); // scheme + host
+  return trimmed || url.trim();
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const HOOK_LABELS: Record<NonNullable<ApiRequest['hookType']>, string> = {
@@ -43,6 +53,7 @@ export interface RequestRowProps {
   folderId: string
   reqIndex: number
   name: string
+  url: string
   method: string
   protocol?: ApiRequest['protocol']
   authType: string
@@ -62,7 +73,7 @@ export interface RequestRowProps {
 }
 
 export function RequestRow({
-  reqId, collectionId, folderId, reqIndex, name, method, protocol, authType, hookType, disabled, tags, isActive, indent, autoRename = false,
+  reqId, collectionId, folderId, reqIndex, name, url, method, protocol, authType, hookType, disabled, tags, isActive, indent, autoRename = false,
   onSelect, onRename, onDelete, onDuplicate, onUpdateTags, onSetHookType, onToggleDisabled,
 }: RequestRowProps) {
   const [renaming, setRenaming] = useState(autoRename);
@@ -157,6 +168,12 @@ export function RequestRow({
               )}
             </div>
           )}
+          {(() => {
+            const path = requestPath(url);
+            return path && path !== name ? (
+              <span className="block text-[10px] text-surface-500 font-mono truncate leading-tight" title={url}>{path}</span>
+            ) : null;
+          })()}
           {(tags.length > 0 || addingTag) && (
             <TagChips
               tags={tags}

@@ -6,7 +6,7 @@ import { useStore } from '../../store';
 import type { RunRequestResult, RunSummary, RunnerItem } from '../../../../shared/types';
 import { findFolder } from '../../store';
 import { buildJsonReport, buildJUnitReport, buildHtmlReport } from '../../../../shared/report';
-import { collectAllTags, buildRunPlan, resolveInheritedAuthAndHeaders } from '../../../../shared/request-collection';
+import { collectAllTags, buildRunPlan, resolveInheritedAuthAndHeaders, authIsConfigured } from '../../../../shared/request-collection';
 import { buildCliArgs, generateGitHub, generateAzure, generateGitLab } from '../../../../shared/ci-generators';
 import { getMethodColor } from '../../../../shared/colors';
 import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
@@ -145,7 +145,7 @@ export function RunnerModal() {
       items = items.map(item => {
         const inherited = resolveInheritedAuthAndHeaders(item.request.id, col);
         const req = JSON.parse(JSON.stringify(item.request));
-        if (req.auth?.type === 'none' && inherited.auth && inherited.auth.type !== 'none') {
+        if (!authIsConfigured(req.auth) && inherited.auth && inherited.auth.type !== 'none') {
           req.auth = inherited.auth;
         }
         const inheritedHeaders = inherited.headers.filter(h => h.enabled && h.key);

@@ -39,7 +39,7 @@ import {
   maskPii,
 } from '../main/request-exec';
 import { buildJsonReport, buildJUnitReport, buildHtmlReport } from '../shared/report';
-import { buildRunPlan, resolveInheritedAuthAndHeaders } from '../shared/request-collection';
+import { buildRunPlan, resolveInheritedAuthAndHeaders, authIsConfigured } from '../shared/request-collection';
 import { selectEnvironment } from '../shared/environments';
 import {
   C, color, parseArgs,
@@ -220,7 +220,7 @@ async function main() {
     for (const item of items) {
       const req = item.request;
       const inherited = resolveInheritedAuthAndHeaders(req.id, col);
-      if (req.auth.type === 'none' && inherited.auth && inherited.auth.type !== 'none') {
+      if (!authIsConfigured(req.auth) && inherited.auth && inherited.auth.type !== 'none') {
         req.auth = inherited.auth;
       }
       const inheritedHeaders = inherited.headers.filter(h => h.enabled && h.key);

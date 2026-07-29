@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../../store';
 import type { ApiRequest, HttpMethod, KeyValuePair, RunRequestResult } from '../../../../shared/types';
-import { getHooksForRequest } from '../../../../shared/request-collection';
+import { getHooksForRequest, authIsConfigured } from '../../../../shared/request-collection';
 import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
 import { ParamsTab } from './ParamsTab';
 import { VarInput } from '../common/VarInput';
@@ -118,10 +118,12 @@ export function RequestBuilder({ request }: Props) {
       };
       let liveGlobals = { ...globals };
 
-      // Merge folder/collection-level auth and headers for the main request
+      // Merge folder/collection-level auth and headers for the main request.
+      // The request's own auth wins only when it actually carries a credential;
+      // an empty stub (e.g. from OpenAPI import) falls back to inherited auth.
       const inherited = useStore.getState().getInheritedAuthAndHeaders(request.id);
       const mergedAuth: typeof request.auth =
-        request.auth.type !== 'none' ? request.auth : (inherited.auth ?? request.auth);
+        authIsConfigured(request.auth) ? request.auth : (inherited.auth ?? request.auth);
       const mergedHeaders: KeyValuePair[] = [
         ...inherited.headers.filter(h => h.enabled),
         ...request.headers,
