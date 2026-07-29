@@ -291,6 +291,27 @@ export function getHooksForRequest(
  * This is the shared/main-process equivalent of the renderer's
  * `getInheritedAuthAndHeaders` store action.
  */
+/**
+ * Whether an auth config carries a usable credential. A request whose own auth
+ * is `none`, or a credential type left blank (e.g. the empty bearer stub that
+ * OpenAPI import stamps on every request from the spec's security scheme), does
+ * NOT override folder/collection auth: it should inherit instead. This is the
+ * decision point for "does the request's own auth win over the inherited one?".
+ */
+export function authIsConfigured(auth?: AuthConfig): boolean {
+  if (!auth || auth.type === 'none') return false;
+  const set = (s?: string): boolean => !!(s && s.trim());
+  switch (auth.type) {
+    case 'bearer': return set(auth.token) || set(auth.tokenSecretRef);
+    case 'basic':
+    case 'digest': return set(auth.username) || set(auth.password) || set(auth.passwordSecretRef);
+    case 'ntlm':   return set(auth.username) || set(auth.password) || set(auth.passwordSecretRef);
+    case 'apikey': return set(auth.apiKeyValue) || set(auth.apiKeySecretRef);
+    case 'oauth2': return set(auth.oauth2TokenUrl) || set(auth.oauth2ClientId) || set(auth.oauth2CachedToken);
+    default:       return true;
+  }
+}
+
 export function resolveInheritedAuthAndHeaders(
   requestId: string,
   collection: Collection,

@@ -28,6 +28,7 @@ const OPTIONS: ImportOption[] = [
   { id: 'insomnia', label: 'Insomnia', description: 'Export v4 JSON' },
   { id: 'bruno',    label: 'Bruno',    description: 'bruno.json collection file' },
   { id: 'http',     label: 'HTTP file', description: '.http / .rest (REST Client)' },
+  { id: 'spector',  label: 'API Spector', description: 'An existing .spector / .json collection' },
 ];
 
 // ── Helpers to walk a parsed collection ─────────────────────────────────────
@@ -121,6 +122,7 @@ export function ImportModal({ onImport, onClose }: Props) {
       if (opt.id === 'insomnia') col = await electron.importInsomnia();
       if (opt.id === 'bruno')    col = await electron.importBruno();
       if (opt.id === 'http')     col = await electron.importHttpFile();
+      if (opt.id === 'spector')  col = await electron.importSpectorCollection();
       if (!col) { setLoading(false); return; }
       if (opt.id === 'openapi') {
         enterPreview(col);

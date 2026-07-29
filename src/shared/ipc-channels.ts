@@ -76,6 +76,7 @@ export const IPC = {
     insomnia:          'import:insomnia',
     bruno:             'import:bruno',
     http:              'import:http',
+    spector:           'import:spector',
     openapiSchemas:    'import:openapi-schemas',
     openapiSchemasUrl: 'import:openapi-schemas-url',
   },

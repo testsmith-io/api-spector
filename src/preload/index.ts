@@ -112,6 +112,8 @@ const api = {
     ipcRenderer.invoke(IPC.import.bruno),
   importHttpFile: (): Promise<Collection | null> =>
     ipcRenderer.invoke(IPC.import.http),
+  importSpectorCollection: (): Promise<Collection | null> =>
+    ipcRenderer.invoke(IPC.import.spector),
   /** Extract response-body schemas from an OpenAPI spec file (no full import). */
   extractOpenApiSchemas: (): Promise<{ method: string; pathTemplate: string; pathRewritten: string; schema: string; operationId?: string; summary?: string }[] | null> =>
     ipcRenderer.invoke(IPC.import.openapiSchemas),
