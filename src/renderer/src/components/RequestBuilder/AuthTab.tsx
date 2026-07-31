@@ -175,7 +175,7 @@ export function AuthTab({ request, onChange }: { request: ApiRequest; onChange: 
                   className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
                 />
                 <button
-                  onClick={() => saveSecret(auth.oauth2ClientSecretRef ?? 'OAUTH2_CLIENT_SECRET')}
+                  onClick={() => { const ref = auth.oauth2ClientSecretRef ?? 'OAUTH2_CLIENT_SECRET'; setAuth({ oauth2ClientSecretRef: ref }); void saveSecret(ref); }}
                   className="px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded transition-colors"
                 >
                   {saved ? '✓' : 'Save'}
