@@ -68,6 +68,33 @@ To create a secret:
 
 The stored file contains only: `secretEncrypted`, `secretSalt`, `secretIv`, and a short `secretHash` (first 8 hex chars of SHA-256 of the value, for display only, not reversible).
 
+## Auth credentials and the OS keychain
+
+This is a separate mechanism from environment secrets above. It applies to auth on a request, folder, or collection (Bearer token, Basic password, API key, and so on), where a credential can be held in two ways:
+
+- **In the request** (default): type the token or password directly in the auth field. It supports `{{variables}}` and is saved with the collection file. Use a `{{variable}}` that points at a secret environment variable if you do not want the raw value on disk.
+- **In the OS keychain** (optional): expand "Store in OS keychain instead", paste the value, give it a key name (for example `API_TOKEN`), and click **Save**. The value is encrypted by the operating system and stored outside the collection.
+
+The keychain uses Electron's `safeStorage`, backed by the native credential system on each platform:
+
+| OS | Backing |
+|---|---|
+| macOS | Keychain |
+| Windows | DPAPI (tied to the Windows user account) |
+| Linux | libsecret (GNOME Keyring / KWallet), with a basic fallback |
+
+Notes:
+
+- It works on Windows.
+- The encrypted blob lives in `secrets.json` in the app's user-data folder, not in your workspace. It is never committed to git and does not travel between machines, so re-enter the value on a new machine. It is per-machine and per-OS-user.
+- The values are not readable back in the UI (a password field only ever shows dots). If you need to see or share a credential, use a `{{variable}}`, whose value is visible in the environment editor.
+- The CLI cannot read the keychain (it is not an Electron process). For `api-spector run` and CI, set an environment variable whose name matches the keychain key: the CLI resolves the reference from `process.env` of the same name. For example, a Bearer token stored under key `API_TOKEN` is read from the `API_TOKEN` environment variable when running headless.
+
+When to use which:
+
+- **Type it in the field** for quick local work, or use a `{{variable}}` for values you keep in an environment.
+- **OS keychain** for a static, long-lived token you want encrypted at rest on this one machine.
+
 ## Using variables in requests
 
 Use double-brace syntax anywhere: URL, headers, body, query params, script values.
