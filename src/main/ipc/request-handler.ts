@@ -101,6 +101,25 @@ function formatRequestError(
     lines.push(`[request:send] cause=${causeMessage}${causeCode ? ` (code=${causeCode})` : ''}`);
   }
 
+  // TLS certificate rejections are the most common opaque "fetch failed" cause,
+  // especially behind an intercepting proxy that presents a self-signed cert.
+  // Point the user at the toggle that fixes it (it covers the proxy leg too).
+  const certCodes = new Set([
+    'SELF_SIGNED_CERT_IN_CHAIN',
+    'DEPTH_ZERO_SELF_SIGNED_CERT',
+    'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+    'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+    'CERT_HAS_EXPIRED',
+    'ERR_TLS_CERT_ALTNAME_INVALID',
+  ]);
+  if (certCodes.has(code ?? '') || certCodes.has(causeCode ?? '')) {
+    lines.push(
+      '[request:send] hint=A self-signed or untrusted TLS certificate was rejected. ' +
+      'Uncheck "Reject unauthorized / self-signed certificates" in Collection or Workspace settings, ' +
+      'which also relaxes verification for the proxy connection, or add the CA certificate under TLS settings.',
+    );
+  }
+
   if (stack) {
     const preview = stack.split('\n').slice(0, 6).join('\n');
     lines.push('[request:send] stack:');

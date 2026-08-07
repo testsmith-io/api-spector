@@ -105,6 +105,9 @@ export interface CollectionsSliceActions {
 
   // Inherited auth/headers selector
   getInheritedAuthAndHeaders: (requestId: string) => { auth: AuthConfig | null; headers: KeyValuePair[] }
+  /** Merge the folder-chain variables for a request (root → immediate folder,
+   *  inner folders override). Excludes collection/environment/local scopes. */
+  getInheritedVariables: (requestId: string) => Record<string, string>
 
   // Collection dataset
   updateCollectionDataSet: (id: string, ds: DataSet) => void
@@ -524,5 +527,17 @@ export const createCollectionsSlice: StateCreator<
       if (folder.headers?.length) inheritedHeaders = [...inheritedHeaders, ...folder.headers];
     }
     return { auth: inheritedAuth, headers: inheritedHeaders };
+  },
+
+  getInheritedVariables: (requestId) => {
+    const state = get();
+    const colEntry = Object.values(state.collections).find(c => c.data.requests[requestId]);
+    if (!colEntry) return {};
+    const merged: Record<string, string> = {};
+    // Root → immediate folder; each inner folder overrides the outer ones.
+    for (const folder of findFolderPath(colEntry.data.rootFolder, requestId)) {
+      if (folder.variables) Object.assign(merged, folder.variables);
+    }
+    return merged;
   },
 });

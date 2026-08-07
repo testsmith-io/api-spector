@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../../store';
 import type { ApiRequest, HttpMethod, KeyValuePair, RunRequestResult } from '../../../../shared/types';
 import { getHooksForRequest, authIsConfigured } from '../../../../shared/request-collection';
@@ -79,6 +79,7 @@ export function RequestBuilder({ request }: Props) {
 
   const [editingName, setEditingName] = useState(false);
   const [showFuzz, setShowFuzz] = useState(false);
+  const [customVerb, setCustomVerb] = useState(false);
   const [runHooks, setRunHooks] = useState(() => localStorage.getItem('runHooks') !== 'false');
 
   function toggleRunHooks() {
@@ -92,6 +93,19 @@ export function RequestBuilder({ request }: Props) {
   function update(patch: Partial<ApiRequest>) {
     updateRequest(request.id, patch);
   }
+
+  // Replay support: history rows (and anywhere else) call requestSend() to
+  // bump this counter; when it changes we fire the same send pipeline as the
+  // Send button. The ref skips the initial mount so we never auto-send.
+  const sendSignal = useStore(s => s.sendSignal);
+  const lastSendSignal = useRef(sendSignal);
+  useEffect(() => {
+    if (sendSignal !== lastSendSignal.current) {
+      lastSendSignal.current = sendSignal;
+      void sendRequest();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sendSignal]);
 
   async function sendRequest() {
     if (!activeTabId) return;
@@ -114,6 +128,8 @@ export function RequestBuilder({ request }: Props) {
 
       let collectionVars: Record<string, string> = {
         ...(activeCollectionId ? (collections[activeCollectionId]?.data.collectionVariables ?? {}) : {}),
+        // Folder-chain variables sit above collection vars and below session/local.
+        ...useStore.getState().getInheritedVariables(request.id),
         ...sessionVars,
       };
       let liveGlobals = { ...globals };
@@ -341,17 +357,35 @@ export function RequestBuilder({ request }: Props) {
 
         {/* Method selector — only meaningful for HTTP. SOAP is always POST,
             shown as a static badge so the user sees what's on the wire. */}
-        {!isWs && !isSoap && (
-          <select
+        {!isWs && !isSoap && (customVerb ? (
+          <input
+            autoFocus
             value={request.method}
-            onChange={e => update({ method: e.target.value as HttpMethod })}
-            className={`bg-surface-800 border border-surface-700 rounded px-2 py-1.5 text-xs font-bold focus:outline-none focus:border-blue-500 ${METHOD_COLORS[request.method]}`}
+            onChange={e => update({ method: e.target.value.toUpperCase() })}
+            onBlur={() => setCustomVerb(false)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); setCustomVerb(false); } }}
+            placeholder="VERB"
+            title="Type any HTTP method"
+            className="w-24 bg-surface-800 border border-blue-500 rounded px-2 py-1.5 text-xs font-bold uppercase focus:outline-none text-fuchsia-400 placeholder-surface-600"
+          />
+        ) : (
+          <select
+            value={METHODS.includes(request.method) ? request.method : '__current__'}
+            onChange={e => {
+              if (e.target.value === '__custom__') setCustomVerb(true);
+              else if (e.target.value !== '__current__') update({ method: e.target.value as HttpMethod });
+            }}
+            className={`bg-surface-800 border border-surface-700 rounded px-2 py-1.5 text-xs font-bold focus:outline-none focus:border-blue-500 ${METHOD_COLORS[request.method] ?? 'text-fuchsia-400'}`}
           >
             {METHODS.map(m => (
               <option key={m} value={m} className="text-white">{m}</option>
             ))}
+            {!METHODS.includes(request.method) && (
+              <option value="__current__" className="text-white">{request.method}</option>
+            )}
+            <option value="__custom__" className="text-white">Custom…</option>
           </select>
-        )}
+        ))}
         {isSoap && (
           <span
             className="bg-surface-900 border border-surface-700 rounded px-2 py-1.5 text-xs font-bold text-amber-400 select-none"

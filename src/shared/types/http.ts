@@ -5,7 +5,14 @@
 
 // QUERY (RFC 10008): safe + idempotent like GET, but carries the query in a
 // request body — the body and its Content-Type are mandatory per the RFC.
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'QUERY'
+// The `(string & {})` arm keeps editor autocomplete for the well-known verbs
+// while still allowing any custom method (e.g. PURGE, LINK, a WebDAV verb).
+export type HttpMethod =
+  | 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'QUERY'
+  | (string & {})
+
+/** The well-known verbs, for menus and iteration. */
+export const KNOWN_HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'QUERY'] as const;
 
 export interface KeyValuePair {
   key: string

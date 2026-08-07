@@ -8,7 +8,7 @@ import { KVTable } from '../RequestBuilder/KVTable';
 import { Modal } from '../common/Modal';
 import { AuthEditor, type AuthEditorPatch } from '../common/AuthEditor';
 
-type ModalTab = 'auth' | 'headers'
+type ModalTab = 'auth' | 'headers' | 'variables'
 
 interface Props {
   collectionId: string
@@ -22,13 +22,19 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
   const [activeTab, setActiveTab] = useState<ModalTab>('auth');
   const [auth, setAuth]           = useState<AuthConfig>(folder.auth ?? { type: 'none' });
   const [headers, setHeaders]     = useState<KeyValuePair[]>(folder.headers ?? []);
+  const [varRows, setVarRows]     = useState<KeyValuePair[]>(
+    Object.entries(folder.variables ?? {}).map(([key, value]) => ({ key, value, enabled: true })),
+  );
 
   function patchAuth(patch: AuthEditorPatch) {
     setAuth(prev => ({ ...prev, ...patch } as AuthConfig));
   }
 
   function save() {
-    updateFolder(collectionId, folder.id, { auth, headers });
+    const variables = Object.fromEntries(
+      varRows.filter(r => r.key.trim()).map(r => [r.key.trim(), r.value]),
+    );
+    updateFolder(collectionId, folder.id, { auth, headers, variables });
     onClose();
   }
 
@@ -42,14 +48,14 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-surface-800 shrink-0">
           <div>
             <h2 className="text-sm font-semibold">Folder settings</h2>
-            <p className="text-[10px] text-surface-600 mt-0.5">{folder.name} - auth and headers inherited by all requests in this folder</p>
+            <p className="text-[10px] text-surface-600 mt-0.5">{folder.name} - auth, headers and variables inherited by all requests in this folder</p>
           </div>
           <button onClick={onClose} className="text-surface-400 hover:text-white text-lg leading-none">×</button>
         </div>
 
         {/* Tabs */}
         <div className="flex border-b border-surface-800 px-4 shrink-0">
-          {(['auth', 'headers'] as ModalTab[]).map(t => (
+          {(['auth', 'headers', 'variables'] as ModalTab[]).map(t => (
             <button
               key={t}
               onClick={() => setActiveTab(t)}
@@ -85,6 +91,19 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
               valuePlaceholder="value"
               headerMode
             />
+          )}
+          {activeTab === 'variables' && (
+            <div className="flex flex-col gap-2">
+              <p className="text-[10px] text-surface-600">
+                Variables scoped to this folder. They override collection variables and are overridden by an inner folder, the active environment, and script-set values. Reference them anywhere with {'{{name}}'}.
+              </p>
+              <KVTable
+                rows={varRows}
+                onChange={setVarRows}
+                keyPlaceholder="VARIABLE_NAME"
+                valuePlaceholder="value"
+              />
+            </div>
           )}
         </div>
 

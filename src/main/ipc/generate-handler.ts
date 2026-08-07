@@ -15,6 +15,7 @@ import { generateSupertestJs }    from '../generators/supertest-js';
 import { generateRestAssured }    from '../generators/rest-assured';
 import { generateKarate }         from '../generators/karate';
 import { generateHttpFile }       from '../generators/http-file';
+import { generateCurl }           from '../generators/curl';
 import type { GenerateOptions, GeneratedFile } from '../../shared/types';
 
 export function registerGenerateHandlers(ipc: IpcMain): void {
@@ -29,6 +30,7 @@ export function registerGenerateHandlers(ipc: IpcMain): void {
       case 'rest_assured':    return generateRestAssured(collection, environment);
       case 'karate':          return generateKarate(collection, environment);
       case 'http_file':       return generateHttpFile(collection, environment);
+      case 'curl':            return generateCurl(collection, environment);
       default:                throw new Error(`Unknown target: ${target}`);
     }
   });

@@ -18,7 +18,9 @@ export const IPC = {
   // ─── Workspace / File ──────────────────────────────────────────────────────
   file: {
     openWorkspace:       'file:openWorkspace',
+    openWorkspacePath:   'file:openWorkspacePath',
     getLastWorkspace:    'file:getLastWorkspace',
+    getRecentWorkspaces: 'file:getRecentWorkspaces',
     saveWorkspace:       'file:saveWorkspace',
     newWorkspace:        'file:newWorkspace',
     closeWorkspace:      'file:closeWorkspace',
@@ -186,5 +188,10 @@ export const IPC = {
   // ─── Shell ─────────────────────────────────────────────────────────────────
   shell: {
     openExternal: 'shell:openExternal',
+  },
+
+  // ─── App ───────────────────────────────────────────────────────────────────
+  app: {
+    checkUpdate: 'app:checkUpdate',
   },
 } as const;

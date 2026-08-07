@@ -54,6 +54,9 @@ export interface Folder {
   tags?: string[]
   auth?: AuthConfig
   headers?: KeyValuePair[]
+  /** Variables scoped to this folder. Override collection variables and are
+   *  overridden by an inner folder, the environment, and local (script) vars. */
+  variables?: Record<string, string>
 }
 
 export interface TlsSettings {

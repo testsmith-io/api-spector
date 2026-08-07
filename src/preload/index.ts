@@ -44,6 +44,10 @@ const api = {
     ipcRenderer.invoke(IPC.file.openWorkspace),
   getLastWorkspace: (): Promise<{ workspace: Workspace; workspacePath: string } | null> =>
     ipcRenderer.invoke(IPC.file.getLastWorkspace),
+  getRecentWorkspaces: (): Promise<{ path: string; name: string; lastOpened: number }[]> =>
+    ipcRenderer.invoke(IPC.file.getRecentWorkspaces),
+  openWorkspacePath: (path: string): Promise<{ workspace: Workspace; workspacePath: string } | null> =>
+    ipcRenderer.invoke(IPC.file.openWorkspacePath, path),
   saveWorkspace: (ws: Workspace): Promise<void> =>
     ipcRenderer.invoke(IPC.file.saveWorkspace, ws),
   newWorkspace: (): Promise<{ workspace: Workspace; workspacePath: string } | null> =>
@@ -343,6 +347,8 @@ const api = {
 
   // ─── Shell ────────────────────────────────────────────────────────────────
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke(IPC.shell.openExternal, url),
+  checkForUpdate: (): Promise<{ current: string; latest: string; updateAvailable: boolean; command: string } | null> =>
+    ipcRenderer.invoke(IPC.app.checkUpdate),
 
   // ─── Zoom ─────────────────────────────────────────────────────────────────
   setZoomFactor: (factor: number): void => webFrame.setZoomFactor(factor),
