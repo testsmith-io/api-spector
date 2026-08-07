@@ -2,9 +2,18 @@
 
 Run a whole collection (or a folder) once per row of a data table. Each row supplies a set of variables, so the same requests execute repeatedly with different inputs: three login payloads, ten product IDs, a spreadsheet of test cases.
 
+## Where to define a dataset
+
+A dataset can live on a **collection** or on a **folder**:
+
+- **Collection**: right-click the collection (or click its name) and open the **Data** tab. Running the collection iterates over these rows.
+- **Folder**: open the folder's settings and use its **Data** tab. Running that folder iterates over the folder's rows. A folder's own dataset takes priority over the collection's for a folder run; a folder with no dataset falls back to the collection's.
+
+The editor is identical in both places.
+
 ## The data table
 
-Open a collection in the main panel and select the **Data** tab.
+Select the **Data** tab (on a collection or a folder).
 
 - **Columns** are variable names. Add a column for each variable you want to vary (for example `username`, `password`, `expectedStatus`).
 - **Rows** are iterations. Each row holds one value per column.
@@ -49,6 +58,6 @@ sp.test('status matches row', () => {
 
 ## Notes
 
-- The dataset lives on the collection, so it is saved with the workspace and travels with it in Git.
+- The dataset lives on the collection or folder, so it is saved with the workspace and travels with it in Git.
 - Data-driven expansion happens in the desktop runner. The `api-spector run` CLI executes the requests as defined; drive CLI iterations from your pipeline instead (for example a matrix build), or run the dataset from the app.
 - Leave a cell empty to send an empty value for that variable in that iteration.

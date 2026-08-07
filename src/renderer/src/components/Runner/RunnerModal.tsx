@@ -91,7 +91,10 @@ export function RunnerModal() {
     ? (findFolder(colEntry.data.rootFolder, folderId)?.name ?? 'Folder')
     : null;
 
-  const dataSet = colEntry?.data.dataSet ?? { columns: [], rows: [] };
+  // When running a folder, its own dataset wins; otherwise use the collection's.
+  const dataSet =
+    ((folderId && colEntry ? findFolder(colEntry.data.rootFolder, folderId)?.dataSet : null)
+      ?? colEntry?.data.dataSet) ?? { columns: [], rows: [] };
   const iterCount = dataSet.rows.length;
 
   const availableTags = collectionId ? allTagsIn(collectionId, folderId) : [];
@@ -117,7 +120,9 @@ export function RunnerModal() {
   // ── Run ───────────────────────────────────────────────────────────────────
 
   const run = useCallback(async () => {
-    const ds = colEntry?.data.dataSet ?? { columns: [], rows: [] };
+    const ds =
+      ((folderId && colEntry ? findFolder(colEntry.data.rootFolder, folderId)?.dataSet : null)
+        ?? colEntry?.data.dataSet) ?? { columns: [], rows: [] };
     const baseItems = collectionId ? collectRequests(collectionId, folderId, filterTags) : [];
     if (baseItems.length === 0) return;
 

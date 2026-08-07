@@ -95,6 +95,7 @@ export function CollectionTree () {
   const tabs = useStore( s => s.tabs );
   const openInTab = useStore( s => s.openInTab );
   const setActiveCollection = useStore( s => s.setActiveCollection );
+  const setCollectionPanelOpen = useStore( s => s.setCollectionPanelOpen );
 
   // Derive the active request id from the active tab
   const activeRequestId = tabs.find( t => t.id === activeTabId )?.requestId ?? null;
@@ -158,7 +159,7 @@ export function CollectionTree () {
               isActive={col.id === activeCollectionId}
               activeRequestId={activeRequestId}
               existingCollectionNames={colList.map( c => c.data.name )}
-              onSelectCollection={() => setActiveCollection( col.id )}
+              onSelectCollection={() => { setActiveCollection( col.id ); setCollectionPanelOpen( true ); }}
               onSelectRequest={( reqId ) => openInTab( reqId, col.id )}
               newRequestId={newRequestId}
               onAddRequest={folderId => setNewRequestId( addRequest( col.id, folderId ) )}

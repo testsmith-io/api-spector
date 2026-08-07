@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: MIT
 
 import React, { useState } from 'react';
-import type { Folder, AuthConfig, KeyValuePair } from '../../../../shared/types';
+import type { Folder, AuthConfig, KeyValuePair, DataSet } from '../../../../shared/types';
 import { useStore } from '../../store';
 import { KVTable } from '../RequestBuilder/KVTable';
 import { Modal } from '../common/Modal';
 import { AuthEditor, type AuthEditorPatch } from '../common/AuthEditor';
+import { DataSetEditor } from '../common/DataSetEditor';
 
-type ModalTab = 'auth' | 'headers' | 'variables'
+type ModalTab = 'auth' | 'headers' | 'variables' | 'data'
 
 interface Props {
   collectionId: string
@@ -25,6 +26,7 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
   const [varRows, setVarRows]     = useState<KeyValuePair[]>(
     Object.entries(folder.variables ?? {}).map(([key, value]) => ({ key, value, enabled: true })),
   );
+  const [dataSet, setDataSet]     = useState<DataSet>(folder.dataSet ?? { columns: [], rows: [] });
 
   function patchAuth(patch: AuthEditorPatch) {
     setAuth(prev => ({ ...prev, ...patch } as AuthConfig));
@@ -34,7 +36,9 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
     const variables = Object.fromEntries(
       varRows.filter(r => r.key.trim()).map(r => [r.key.trim(), r.value]),
     );
-    updateFolder(collectionId, folder.id, { auth, headers, variables });
+    const cleanData: DataSet | undefined =
+      dataSet.columns.length > 0 ? dataSet : undefined;
+    updateFolder(collectionId, folder.id, { auth, headers, variables, dataSet: cleanData });
     onClose();
   }
 
@@ -55,7 +59,7 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
 
         {/* Tabs */}
         <div className="flex border-b border-surface-800 px-4 shrink-0">
-          {(['auth', 'headers', 'variables'] as ModalTab[]).map(t => (
+          {(['auth', 'headers', 'variables', 'data'] as ModalTab[]).map(t => (
             <button
               key={t}
               onClick={() => setActiveTab(t)}
@@ -104,6 +108,9 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
                 valuePlaceholder="value"
               />
             </div>
+          )}
+          {activeTab === 'data' && (
+            <DataSetEditor ds={dataSet} onChange={setDataSet} exportName={folder.name} scopeLabel="folder" />
           )}
         </div>
 

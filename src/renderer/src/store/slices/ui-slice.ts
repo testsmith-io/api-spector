@@ -35,6 +35,11 @@ export interface UiSliceState {
    *  irrelevant snippet palette still taking up half the editor width. */
   quickInsertsOpen: boolean
 
+  /** When true, the main pane shows the collection/folder data panel even if a
+   *  request tab is open. Cleared as soon as a request tab is (re)activated, so
+   *  it behaves like "bring the collection to front" rather than a mode. */
+  collectionPanelOpen: boolean
+
   /** Monotonic counter bumped by requestSend(). The active RequestBuilder
    *  watches it and fires its normal send pipeline when it changes, so history
    *  rows (and anything else) can replay the current request without
@@ -54,6 +59,8 @@ export interface UiSliceActions {
   setQuickInsertsOpen: (open: boolean) => void
   /** Ask the active request builder to (re)send the current request. */
   requestSend: () => void
+  /** Show or hide the collection/folder data panel over an open request. */
+  setCollectionPanelOpen: (open: boolean) => void
 }
 
 export type UiSlice = UiSliceState & UiSliceActions
@@ -74,6 +81,7 @@ export const createUiSlice: StateCreator<
   activeGitDiff: null,
   quickInsertsOpen: true,
   sendSignal: 0,
+  collectionPanelOpen: false,
 
   setShowGeneratorPanel: v => set(s => { s.showGeneratorPanel = v; }),
 
@@ -121,4 +129,6 @@ export const createUiSlice: StateCreator<
   setQuickInsertsOpen: (open) => set(s => { s.quickInsertsOpen = open; }),
 
   requestSend: () => set(s => { s.sendSignal += 1; }),
+
+  setCollectionPanelOpen: (open) => set(s => { s.collectionPanelOpen = open; }),
 });

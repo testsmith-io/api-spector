@@ -192,6 +192,7 @@ export default function App () {
   const [tabContextMenu, setTabContextMenu] = useState<{ x: number; y: number; tabId: string } | null>( null );
   const showGeneratorPanel = useStore( s => s.showGeneratorPanel );
   const sidebarTab = useStore( s => s.sidebarTab );
+  const collectionPanelOpen = useStore( s => s.collectionPanelOpen );
   const setSidebarTab = useStore( s => s.setSidebarTab );
   const historyCount = useStore( s => s.history.length );
   const addCollection = useStore( s => s.addCollection );
@@ -569,6 +570,10 @@ export default function App () {
             ) : sidebarTab === 'mocks' && activeMockId ? (
               <div className="flex-1 min-h-0">
                 <MockDetailPanel mockId={activeMockId} />
+              </div>
+            ) : collectionPanelOpen ? (
+              <div className="flex-1 min-h-0">
+                <CollectionPanel />
               </div>
             ) : activeRequest ? (
               <div className="flex-1 flex min-h-0">

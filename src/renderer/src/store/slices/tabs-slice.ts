@@ -110,6 +110,7 @@ export const createTabsSlice: StateCreator<
   activeCollectionId: null,
 
   openInTab: (requestId, collectionId) => set(s => {
+    s.collectionPanelOpen = false; // activating a request supersedes the data panel
     const existing = s.tabs.find(t => t.requestId === requestId);
     if (existing) {
       s.activeTabId = existing.id;
@@ -149,6 +150,7 @@ export const createTabsSlice: StateCreator<
 
   setActiveTabId: (id) => set(s => {
     s.activeTabId = id;
+    s.collectionPanelOpen = false; // clicking a request tab supersedes the data panel
     const tab = s.tabs.find(t => t.id === id);
     if (tab) s.activeCollectionId = tab.collectionId;
   }),
