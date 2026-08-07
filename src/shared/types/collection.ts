@@ -57,6 +57,10 @@ export interface Folder {
   /** Variables scoped to this folder. Override collection variables and are
    *  overridden by an inner folder, the environment, and local (script) vars. */
   variables?: Record<string, string>
+  /** Data-driven dataset for this folder: each row runs the folder once with
+   *  those variables injected. Used when running the folder; takes priority
+   *  over the collection dataset for folder runs. */
+  dataSet?: DataSet
 }
 
 export interface TlsSettings {

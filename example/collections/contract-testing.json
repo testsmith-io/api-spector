@@ -12,7 +12,15 @@
         "id": "folder-contracts",
         "name": "Toolshop contracts",
         "description": "",
-        "folders": [],
+        "folders": [
+          {
+            "id": "485ebe7b-db5c-4c58-9185-1a0a710c4552",
+            "name": "New Folder",
+            "description": "",
+            "folders": [],
+            "requestIds": []
+          }
+        ],
         "requestIds": [
           "list-brands",
           "71f8c426-7ed4-4988-8abd-d0a30a206c4b",
@@ -28,7 +36,7 @@
       "id": "list-brands",
       "name": "List brands",
       "method": "GET",
-      "url": "{{TOOLSHOP_URL}}/brands",
+      "url": "{{TOOLSHOP_URL}}/brandscc",
       "headers": [],
       "params": [],
       "auth": {
