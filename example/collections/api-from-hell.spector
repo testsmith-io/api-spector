@@ -1,0 +1,1676 @@
+{
+  "version": "1.0",
+  "id": "3dac237d-d361-4bed-bce2-7a48c7d1da1e",
+  "name": "API From Hell",
+  "description": "A deliberately awkward API for checking how REST clients display bad responses.",
+  "rootFolder": {
+    "id": "7c29c448-86e9-4939-bb58-f0ba3e92daff",
+    "name": "root",
+    "description": "",
+    "folders": [
+      {
+        "id": "6678a21f-1d73-40b8-9319-1300124c8758",
+        "name": "API From Hell",
+        "description": "",
+        "folders": [],
+        "requestIds": [
+          "53b48826-c17c-44ea-a89d-97074902de93",
+          "e2068a07-4de5-4fa1-8160-5a112438ae67",
+          "961844bc-5613-4113-86f4-a47241a3bf56",
+          "e7504c5d-26d9-4d54-af0d-2271bba4cdad",
+          "02d5770f-b3e6-428e-b2f0-6afea80c996d",
+          "f2cde16e-da70-4229-9e7d-040e899ef052",
+          "63bb9373-3de3-4dce-8210-77d16a04ad09",
+          "50e93d97-3cbe-4891-b048-6436f6842a2a",
+          "6222a844-066a-4b5f-845c-82a21bb038f5",
+          "7c906d7f-a3a7-419c-9379-e927c1244bf2",
+          "9fa65289-585e-4c02-89d0-708631041f08",
+          "aa2609af-fd30-4eb1-9ed8-a6631844620b",
+          "407869ef-1982-4931-901b-234f12d0d35d",
+          "e11ffbea-8d19-45b7-8851-a08f9db84f6c",
+          "24a032ca-0f2b-4d98-985b-e24432ca1424",
+          "b4e2f063-006d-48d0-9e12-6aa0bb4139b0",
+          "ea9b7e2e-b49c-4dc6-888c-cd1b55c42a0b",
+          "df9b0ee7-eabb-4d94-aac9-a1c0e8c7af8f",
+          "d2131cae-42c3-4372-865f-3349a6425e93",
+          "1178f59c-3303-48f3-9ce5-a1aa41585efe",
+          "f0f8235e-f0fc-4ac5-b04c-a93f9b1a859f",
+          "16479809-398a-412d-ac82-c316d9cec7a0",
+          "27b2397e-f3ae-48fd-9c8f-cc541da36be8",
+          "c4ab998b-d909-4ef8-9043-199ecde73929",
+          "18eaacb4-1b2c-45a8-8b58-1b964ab8bd5d",
+          "e6539a07-41d9-4914-b63f-4487c0ea204e",
+          "cbaea6ec-72a7-490c-b12f-87ca2a01f8dc",
+          "e13ffe15-bb04-474f-b683-e1c42b0ffdac",
+          "7eb8f5b6-158f-44df-8323-0da87ebf472f",
+          "7f52793f-f50d-409d-b1f9-243d34c16065",
+          "aa4ae9ab-b034-4174-a5a6-f198c2e5bb26",
+          "69c40c2d-e531-40b4-8af1-5e333df772bb",
+          "9353b6d8-9c1a-4800-83a4-97f86cb21aec",
+          "5dd0979b-9d72-4c00-bb64-52ee79c686d4",
+          "81637a0c-ae37-4c98-9be2-d2c6bdc0849b",
+          "ba751d6d-0c49-42c3-9a31-e89aa1cf6056",
+          "abecafa2-378e-4984-98f3-ece1e164ebe1",
+          "693f75a4-c134-4678-99ef-3d25c1526ec5",
+          "f9dc148b-e522-4fdd-aa9d-ce12ad5be1cd",
+          "6f407f2c-475f-4876-8a41-6e6950c05149",
+          "9b638a0c-c314-45a1-87c5-2f3d816b1968",
+          "6264c524-359d-4ce9-a149-f34c80f9f204",
+          "76a734a5-3f34-4509-b3a6-e87b2d0000a2",
+          "f014565f-669e-4eb4-a273-49a20b949d69",
+          "2af59378-f9e7-453a-995d-223130af88af",
+          "6b15ba1f-6c94-463b-bbfe-8b74c7e3bb00",
+          "78da5901-0b32-48f4-a407-538eaa6677e9",
+          "fa5fb2c7-6bfd-4c8c-a63d-422f4a8b4cd2",
+          "6a3f42e1-c358-488f-ac81-6d21d0931a42",
+          "f2e4ed44-32e0-4c0d-a03d-b9a68f8f22f7",
+          "72b16910-e67a-493a-94c6-9f209b7f28ce",
+          "c25337c5-9c21-4740-a9b3-bbb1c3c21c2b",
+          "458fe0ad-aac7-43c4-a098-b14c3bd1b1de",
+          "18f70fdf-a8e0-485b-9f27-774f9a51a214",
+          "26abf027-c050-48f8-88fb-86b7bea13749",
+          "acb4aef3-1086-4da6-a0c9-9a9456fbe317",
+          "2401ada5-5b6a-4555-999c-4768039dc507",
+          "56bdb1b9-4dc9-42e5-ae90-7178fd57ac6c",
+          "a1d305ed-6787-434a-9dd5-6e2412d1a100",
+          "a5d37359-e639-4abf-8c84-edc8b38e2fb3",
+          "136c7d69-cd84-4ada-904d-598c928461fd",
+          "ddea4ab5-6d84-4425-93c1-4346147b3254",
+          "da00a9b9-7e1b-400c-a36b-fdfeeb03696a",
+          "227548ee-e651-44b9-b5a9-bb4f7575d2c7",
+          "fe539e72-a53a-4c80-8b7c-6434e68542ee",
+          "30c93f99-17e0-489a-ae18-1cadac84ea9c",
+          "83c88fc8-b910-4385-bd72-a5abc0c2a820",
+          "8abf12b5-fd24-495b-b7eb-c18e1bb52051",
+          "c889e4aa-cdc9-4bf7-b256-85495e96e230",
+          "45c71af2-5abd-4332-b59a-6737671b9443",
+          "2cd9e4d9-4d41-4248-b9d0-102349adf143",
+          "d7618e95-2f04-4f78-8960-68ed5af60ce5",
+          "c98051f8-4957-45af-9ea2-005ec62f6b69",
+          "8d8599c8-a94b-499a-b3ce-408f00aad868",
+          "530168d0-a138-4945-922f-1800fcaaf969",
+          "56944662-098b-4444-a026-32c0a56cfa8a",
+          "ff3d2a88-6f72-4bef-a6e4-d041e5f768af"
+        ]
+      }
+    ],
+    "requestIds": []
+  },
+  "requests": {
+    "53b48826-c17c-44ea-a89d-97074902de93": {
+      "id": "53b48826-c17c-44ea-a89d-97074902de93",
+      "name": "Status - Markdown Documentation",
+      "method": "GET",
+      "url": "{{baseUrl}}/status",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Markdown status text describing the intentionally awkward response set.\n\nWhat is wrong: This is a good response, but it is markdown rather than JSON or XML.\n\nWhat to check in your client: A REST client should show the response body as text/markdown and make the content type visible.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "e2068a07-4de5-4fa1-8160-5a112438ae67": {
+      "id": "e2068a07-4de5-4fa1-8160-5a112438ae67",
+      "name": "Version - Missing Content-Type Header",
+      "method": "GET",
+      "url": "{{baseUrl}}/version",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a small JSON-looking version payload.\n\nWhat is wrong: No content type header is explicitly set for the response.\n\nWhat to check in your client: A REST client should still show the raw body and make the missing or defaulted content type obvious.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "961844bc-5613-4113-86f4-a47241a3bf56": {
+      "id": "961844bc-5613-4113-86f4-a47241a3bf56",
+      "name": "Good JSON - Valid JSON And Content-Type",
+      "method": "GET",
+      "url": "{{baseUrl}}/good/json",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns valid JSON with a matching application/json content type.\n\nWhat is wrong: Nothing is wrong with this response. It is the control sample.\n\nWhat to check in your client: A REST client should format or inspect this as valid JSON.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "e7504c5d-26d9-4d54-af0d-2271bba4cdad": {
+      "id": "e7504c5d-26d9-4d54-af0d-2271bba4cdad",
+      "name": "Good XML - Valid XML And Content-Type",
+      "method": "GET",
+      "url": "{{baseUrl}}/good/xml",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns valid XML with a matching application/xml content type.\n\nWhat is wrong: Nothing is wrong with this response. It is the XML control sample.\n\nWhat to check in your client: A REST client should format or inspect this as valid XML.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "02d5770f-b3e6-428e-b2f0-6afea80c996d": {
+      "id": "02d5770f-b3e6-428e-b2f0-6afea80c996d",
+      "name": "Good Text - Plain Text And Content-Type",
+      "method": "GET",
+      "url": "{{baseUrl}}/good/text",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns plain text with a matching text/plain content type.\n\nWhat is wrong: Nothing is wrong with this response. It is the plain text control sample.\n\nWhat to check in your client: A REST client should show the response as readable text and make the content type visible.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "f2cde16e-da70-4229-9e7d-040e899ef052": {
+      "id": "f2cde16e-da70-4229-9e7d-040e899ef052",
+      "name": "Good HTML - Valid HTML And Content-Type",
+      "method": "GET",
+      "url": "{{baseUrl}}/good/html",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns simple HTML with a matching text/html content type.\n\nWhat is wrong: Nothing is wrong with this response. It is the HTML control sample.\n\nWhat to check in your client: A REST client should make it clear whether it is showing rendered HTML or raw HTML.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "63bb9373-3de3-4dce-8210-77d16a04ad09": {
+      "id": "63bb9373-3de3-4dce-8210-77d16a04ad09",
+      "name": "Good CSV - Valid CSV And Content-Type",
+      "method": "GET",
+      "url": "{{baseUrl}}/good/csv",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns small comma-separated data with a matching text/csv content type.\n\nWhat is wrong: Nothing is wrong with this response. It is the CSV control sample.\n\nWhat to check in your client: A REST client should show the raw CSV and, if supported, provide a readable table view.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "50e93d97-3cbe-4891-b048-6436f6842a2a": {
+      "id": "50e93d97-3cbe-4891-b048-6436f6842a2a",
+      "name": "Good YAML - Valid YAML And Content-Type",
+      "method": "GET",
+      "url": "{{baseUrl}}/good/yaml",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a small YAML document with a matching application/yaml content type.\n\nWhat is wrong: Nothing is wrong with this response. It is the YAML control sample.\n\nWhat to check in your client: A REST client should preserve indentation and make the YAML media type visible.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "6222a844-066a-4b5f-845c-82a21bb038f5": {
+      "id": "6222a844-066a-4b5f-845c-82a21bb038f5",
+      "name": "Good Form URL Encoded - Valid Form Body And Content-Type",
+      "method": "GET",
+      "url": "{{baseUrl}}/good/form-urlencoded",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns URL-encoded key/value data with a matching application/x-www-form-urlencoded content type.\n\nWhat is wrong: Nothing is wrong with this response. It is the form-urlencoded control sample.\n\nWhat to check in your client: A REST client should show the raw encoded body and ideally decode the key/value pairs clearly.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "7c906d7f-a3a7-419c-9379-e927c1244bf2": {
+      "id": "7c906d7f-a3a7-419c-9379-e927c1244bf2",
+      "name": "Good Octet Stream - Binary-Looking Body And Content-Type",
+      "method": "GET",
+      "url": "{{baseUrl}}/good/octet-stream",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a small binary-looking payload with an application/octet-stream content type.\n\nWhat is wrong: Nothing is wrong with this response. It is the octet-stream control sample.\n\nWhat to check in your client: A REST client should make it clear whether it is showing bytes, text, or offering a download.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "9fa65289-585e-4c02-89d0-708631041f08": {
+      "id": "9fa65289-585e-4c02-89d0-708631041f08",
+      "name": "Missing Content-Type - JSON Body",
+      "method": "GET",
+      "url": "{{baseUrl}}/missing-content-type/json",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a JSON body without declaring a Content-Type header.\n\nWhat is wrong: The body looks like JSON but the server does not declare application/json.\n\nWhat to check in your client: A REST client should show that the content type is missing and avoid hiding how it inferred the format.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "aa2609af-fd30-4eb1-9ed8-a6631844620b": {
+      "id": "aa2609af-fd30-4eb1-9ed8-a6631844620b",
+      "name": "Missing Content-Type - XML Body",
+      "method": "GET",
+      "url": "{{baseUrl}}/missing-content-type/xml",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns an XML body without declaring a Content-Type header.\n\nWhat is wrong: The body looks like XML but the server does not declare application/xml.\n\nWhat to check in your client: A REST client should show that the content type is missing and avoid hiding how it inferred the format.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "407869ef-1982-4931-901b-234f12d0d35d": {
+      "id": "407869ef-1982-4931-901b-234f12d0d35d",
+      "name": "Missing Content-Type - HTML Body",
+      "method": "GET",
+      "url": "{{baseUrl}}/missing-content-type/html",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns an HTML body without declaring a Content-Type header.\n\nWhat is wrong: The body looks like HTML but the server does not declare text/html.\n\nWhat to check in your client: A REST client should show that the content type is missing and make rendered-vs-raw behavior obvious.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "e11ffbea-8d19-45b7-8851-a08f9db84f6c": {
+      "id": "e11ffbea-8d19-45b7-8851-a08f9db84f6c",
+      "name": "Malformed JSON - Missing Collection Terminator",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/json",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a JSON array that starts correctly but never closes the collection.\n\nWhat is wrong: The body is malformed JSON even though the status is 200 and content type says application/json.\n\nWhat to check in your client: A REST client should show a parse/formatting failure and still make the raw body available.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "24a032ca-0f2b-4d98-985b-e24432ca1424": {
+      "id": "24a032ca-0f2b-4d98-985b-e24432ca1424",
+      "name": "Malformed JSON - Trailing Comma In Array",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/json/trailing-comma-array",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a JSON array with a trailing comma before the closing bracket.\n\nWhat is wrong: JSON does not allow a trailing comma after the final array item.\n\nWhat to check in your client: A REST client should show that JSON parsing failed and still make the raw body available.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "b4e2f063-006d-48d0-9e12-6aa0bb4139b0": {
+      "id": "b4e2f063-006d-48d0-9e12-6aa0bb4139b0",
+      "name": "Malformed JSON - Trailing Comma In Object",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/json/trailing-comma-object",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a JSON object with a trailing comma before the closing brace.\n\nWhat is wrong: JSON does not allow a trailing comma after the final object property.\n\nWhat to check in your client: A REST client should flag the parse failure near the end of the object.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "ea9b7e2e-b49c-4dc6-888c-cd1b55c42a0b": {
+      "id": "ea9b7e2e-b49c-4dc6-888c-cd1b55c42a0b",
+      "name": "Malformed JSON - Unquoted Object Key",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/json/unquoted-key",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns an object where the property name is not wrapped in double quotes.\n\nWhat is wrong: JSON object keys must be double-quoted strings.\n\nWhat to check in your client: A REST client should not treat JavaScript object literal syntax as valid JSON.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "df9b0ee7-eabb-4d94-aac9-a1c0e8c7af8f": {
+      "id": "df9b0ee7-eabb-4d94-aac9-a1c0e8c7af8f",
+      "name": "Malformed JSON - Single Quoted String",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/json/single-quoted-string",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns JSON-looking data using single quotes for strings.\n\nWhat is wrong: JSON strings must use double quotes, not single quotes.\n\nWhat to check in your client: A REST client should distinguish JSON from JavaScript-like object notation.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "d2131cae-42c3-4372-865f-3349a6425e93": {
+      "id": "d2131cae-42c3-4372-865f-3349a6425e93",
+      "name": "Malformed JSON - Bad Escape Sequence",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/json/bad-escape",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a string with an unsupported escape sequence.\n\nWhat is wrong: JSON allows only specific escape sequences; \\q is not valid.\n\nWhat to check in your client: A REST client should show where the bad escape sequence breaks parsing.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "1178f59c-3303-48f3-9ce5-a1aa41585efe": {
+      "id": "1178f59c-3303-48f3-9ce5-a1aa41585efe",
+      "name": "Malformed JSON - Truncated String",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/json/truncated-string",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns an object with a string value that never closes.\n\nWhat is wrong: The response ends before the string terminator is present.\n\nWhat to check in your client: A REST client should make it clear that the body was incomplete or truncated.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "f0f8235e-f0fc-4ac5-b04c-a93f9b1a859f": {
+      "id": "f0f8235e-f0fc-4ac5-b04c-a93f9b1a859f",
+      "name": "Malformed JSON - Extra Data After Document",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/json/extra-data-after-document",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns one complete JSON object followed by another value.\n\nWhat is wrong: A JSON response body should contain one complete JSON document, not extra data after it.\n\nWhat to check in your client: A REST client should show that the first object parsed but unexpected data follows.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "16479809-398a-412d-ac82-c316d9cec7a0": {
+      "id": "16479809-398a-412d-ac82-c316d9cec7a0",
+      "name": "Malformed JSON - Missing Colon",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/json/missing-colon",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns an object property without the colon between key and value.\n\nWhat is wrong: JSON object members require a colon between the name and value.\n\nWhat to check in your client: A REST client should identify the structural syntax error.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "27b2397e-f3ae-48fd-9c8f-cc541da36be8": {
+      "id": "27b2397e-f3ae-48fd-9c8f-cc541da36be8",
+      "name": "Malformed JSON - Leading Zero Number",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/json/leading-zero-number",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a numeric value with a leading zero.\n\nWhat is wrong: JSON numbers cannot use leading zeroes like 01.\n\nWhat to check in your client: A REST client should reject the number rather than silently accepting non-standard JSON.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "c4ab998b-d909-4ef8-9043-199ecde73929": {
+      "id": "c4ab998b-d909-4ef8-9043-199ecde73929",
+      "name": "Malformed JSON - NaN Value",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/json/nan-value",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns NaN as a value in a JSON-looking object.\n\nWhat is wrong: NaN is not a valid JSON number or literal.\n\nWhat to check in your client: A REST client should not silently accept JavaScript-only numeric values as JSON.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "18eaacb4-1b2c-45a8-8b58-1b964ab8bd5d": {
+      "id": "18eaacb4-1b2c-45a8-8b58-1b964ab8bd5d",
+      "name": "Malformed JSON - Unclosed Object",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/json/unclosed-object",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns an object that never closes with a final brace.\n\nWhat is wrong: The JSON object starts correctly but the closing brace is missing.\n\nWhat to check in your client: A REST client should report the incomplete object and preserve the raw response.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "e6539a07-41d9-4914-b63f-4487c0ea204e": {
+      "id": "e6539a07-41d9-4914-b63f-4487c0ea204e",
+      "name": "Malformed JSON - Raw Control Character",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/json/control-character",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a string containing a raw control character.\n\nWhat is wrong: JSON strings cannot contain unescaped control characters.\n\nWhat to check in your client: A REST client should show that the body is not valid JSON and still allow raw inspection.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "cbaea6ec-72a7-490c-b12f-87ca2a01f8dc": {
+      "id": "cbaea6ec-72a7-490c-b12f-87ca2a01f8dc",
+      "name": "Problematic JSON - Duplicate Keys",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/json/duplicate-keys",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns valid JSON syntax with the same object key repeated.\n\nWhat is wrong: Duplicate object keys are ambiguous because parsers disagree on whether the first or last value wins.\n\nWhat to check in your client: A REST client should make duplicate keys visible or warn that values may be overwritten.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "e13ffe15-bb04-474f-b683-e1c42b0ffdac": {
+      "id": "e13ffe15-bb04-474f-b683-e1c42b0ffdac",
+      "name": "Problematic JSON - Large Integer",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/json/large-integer",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns an integer larger than JavaScript can safely represent exactly.\n\nWhat is wrong: Large JSON numbers can lose precision in clients that store all numbers as floating point values.\n\nWhat to check in your client: A REST client should display the exact raw value and avoid silently rounding it.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "7eb8f5b6-158f-44df-8323-0da87ebf472f": {
+      "id": "7eb8f5b6-158f-44df-8323-0da87ebf472f",
+      "name": "Problematic JSON - High Precision Decimal",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/json/high-precision-decimal",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a decimal value with more precision than many clients preserve.\n\nWhat is wrong: Some parsers or viewers round high precision decimal values when rendering or generating code.\n\nWhat to check in your client: A REST client should make the raw numeric text available so precision loss can be spotted.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "7f52793f-f50d-409d-b1f9-243d34c16065": {
+      "id": "7f52793f-f50d-409d-b1f9-243d34c16065",
+      "name": "Problematic JSON - Exponent Number",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/json/exponent-number",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns JSON numbers using exponent notation.\n\nWhat is wrong: Exponent notation is valid JSON, but some clients display, sort, or generate examples awkwardly.\n\nWhat to check in your client: A REST client should show both the raw exponent form and any interpreted value clearly.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "aa4ae9ab-b034-4174-a5a6-f198c2e5bb26": {
+      "id": "aa4ae9ab-b034-4174-a5a6-f198c2e5bb26",
+      "name": "Problematic JSON - Null Vs Missing Field",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/json/null-vs-missing",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns one item with a null field and another item where the same field is missing.\n\nWhat is wrong: Null and missing fields are semantically different but many clients and generated models blur them.\n\nWhat to check in your client: A REST client should make it easy to see that one value is explicit null and another is absent.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "69c40c2d-e531-40b4-8af1-5e333df772bb": {
+      "id": "69c40c2d-e531-40b4-8af1-5e333df772bb",
+      "name": "Problematic JSON - Escaped Unicode",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/json/escaped-unicode",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns escaped Unicode including a zero-width space and a visually similar character.\n\nWhat is wrong: Escaped Unicode can make values look normal while containing hidden or confusable characters.\n\nWhat to check in your client: A REST client should let users inspect raw escapes as well as rendered text.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "9353b6d8-9c1a-4800-83a4-97f86cb21aec": {
+      "id": "9353b6d8-9c1a-4800-83a4-97f86cb21aec",
+      "name": "Problematic JSON - Empty Object",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/json/empty-object",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns an empty JSON object where useful data would usually be expected.\n\nWhat is wrong: An empty object is valid JSON, but it may violate the semantic contract a client expects.\n\nWhat to check in your client: A REST client should make it clear that the response is valid but contains no fields.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "5dd0979b-9d72-4c00-bb64-52ee79c686d4": {
+      "id": "5dd0979b-9d72-4c00-bb64-52ee79c686d4",
+      "name": "Problematic JSON - Top-Level String",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/json/top-level-string",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a top-level JSON string instead of an object or array.\n\nWhat is wrong: Top-level strings are valid JSON but many clients and schemas assume an object or array.\n\nWhat to check in your client: A REST client should show that the complete JSON document is a scalar string.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "81637a0c-ae37-4c98-9be2-d2c6bdc0849b": {
+      "id": "81637a0c-ae37-4c98-9be2-d2c6bdc0849b",
+      "name": "Problematic JSON - Top-Level Number",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/json/top-level-number",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a top-level JSON number instead of an object or array.\n\nWhat is wrong: Top-level numbers are valid JSON but can surprise clients that expect structured data.\n\nWhat to check in your client: A REST client should show that the entire response body is one scalar number.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "ba751d6d-0c49-42c3-9a31-e89aa1cf6056": {
+      "id": "ba751d6d-0c49-42c3-9a31-e89aa1cf6056",
+      "name": "Problematic JSON - Top-Level Boolean",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/json/top-level-boolean",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a top-level JSON boolean.\n\nWhat is wrong: Top-level booleans are valid JSON but can expose assumptions in viewers and generated clients.\n\nWhat to check in your client: A REST client should display the boolean as the whole document, not as missing body content.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "abecafa2-378e-4984-98f3-ece1e164ebe1": {
+      "id": "abecafa2-378e-4984-98f3-ece1e164ebe1",
+      "name": "Problematic JSON - Top-Level Null",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/json/top-level-null",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a top-level JSON null value.\n\nWhat is wrong: Top-level null is valid JSON but can be confused with an empty response or missing data.\n\nWhat to check in your client: A REST client should distinguish the literal null body from no body.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "693f75a4-c134-4678-99ef-3d25c1526ec5": {
+      "id": "693f75a4-c134-4678-99ef-3d25c1526ec5",
+      "name": "Problematic JSON - Empty Body With JSON Content-Type",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/json/empty-body",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns application/json with an empty response body.\n\nWhat is wrong: An empty body is not a valid JSON document, even when the content type says JSON.\n\nWhat to check in your client: A REST client should show the empty body and not pretend it parsed a JSON value.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "f9dc148b-e522-4fdd-aa9d-ce12ad5be1cd": {
+      "id": "f9dc148b-e522-4fdd-aa9d-ce12ad5be1cd",
+      "name": "Problematic JSON - UTF-8 BOM Prefix",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/json/bom-prefix",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a JSON object prefixed with a UTF-8 byte order mark.\n\nWhat is wrong: Some JSON parsers tolerate a BOM and others reject or expose it as an unexpected character.\n\nWhat to check in your client: A REST client should preserve enough raw detail to diagnose the prefix if parsing fails.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "6f407f2c-475f-4876-8a41-6e6950c05149": {
+      "id": "6f407f2c-475f-4876-8a41-6e6950c05149",
+      "name": "Problematic JSON - NDJSON Stream",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/json/ndjson",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns newline-delimited JSON objects rather than a single JSON document.\n\nWhat is wrong: NDJSON is useful as a stream format, but it is not one JSON document and needs different handling.\n\nWhat to check in your client: A REST client should show this as line-delimited data rather than trying to parse it as one object.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "9b638a0c-c314-45a1-87c5-2f3d816b1968": {
+      "id": "9b638a0c-c314-45a1-87c5-2f3d816b1968",
+      "name": "Malformed XML - Missing Root Terminator",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/xml",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns XML that starts correctly but does not close the document.\n\nWhat is wrong: The body is malformed XML even though the status is 200 and content type says application/xml.\n\nWhat to check in your client: A REST client should show a parse/formatting failure and still make the raw body available.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "6264c524-359d-4ce9-a149-f34c80f9f204": {
+      "id": "6264c524-359d-4ce9-a149-f34c80f9f204",
+      "name": "Malformed XML - Mismatched Tag",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/xml/mismatched-tag",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns XML where a child element closes with the wrong tag name.\n\nWhat is wrong: The item element opens as item but closes as thing.\n\nWhat to check in your client: A REST client should show the mismatched closing tag error and raw XML.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "76a734a5-3f34-4509-b3a6-e87b2d0000a2": {
+      "id": "76a734a5-3f34-4509-b3a6-e87b2d0000a2",
+      "name": "Malformed XML - Unescaped Ampersand",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/xml/unescaped-ampersand",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns XML containing an ampersand that is not escaped as an entity.\n\nWhat is wrong: Ampersands in text content must be escaped as &amp; unless they start a valid entity.\n\nWhat to check in your client: A REST client should show the entity parsing error and raw response text.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "f014565f-669e-4eb4-a273-49a20b949d69": {
+      "id": "f014565f-669e-4eb4-a273-49a20b949d69",
+      "name": "Malformed XML - Duplicate Attribute",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/xml/duplicate-attribute",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns XML with the same attribute declared twice on one element.\n\nWhat is wrong: An XML element cannot have two attributes with the same name.\n\nWhat to check in your client: A REST client should show the duplicate attribute parse error.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "2af59378-f9e7-453a-995d-223130af88af": {
+      "id": "2af59378-f9e7-453a-995d-223130af88af",
+      "name": "Malformed XML - Undefined Entity",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/xml/undefined-entity",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns XML that references an entity which has not been declared.\n\nWhat is wrong: The &unknown; entity is not predefined or declared in the document.\n\nWhat to check in your client: A REST client should expose the undefined entity error.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "6b15ba1f-6c94-463b-bbfe-8b74c7e3bb00": {
+      "id": "6b15ba1f-6c94-463b-bbfe-8b74c7e3bb00",
+      "name": "Malformed XML - Multiple Root Elements",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/xml/multiple-root-elements",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns two top-level elements in one XML document.\n\nWhat is wrong: A well-formed XML document must have exactly one root element.\n\nWhat to check in your client: A REST client should show that content appears after the first complete root.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "78da5901-0b32-48f4-a407-538eaa6677e9": {
+      "id": "78da5901-0b32-48f4-a407-538eaa6677e9",
+      "name": "Malformed XML - Missing Attribute Quote",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/xml/missing-attribute-quote",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns XML where an attribute value is not quoted.\n\nWhat is wrong: XML attribute values must be wrapped in quotes.\n\nWhat to check in your client: A REST client should identify the attribute syntax error.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "fa5fb2c7-6bfd-4c8c-a63d-422f4a8b4cd2": {
+      "id": "fa5fb2c7-6bfd-4c8c-a63d-422f4a8b4cd2",
+      "name": "Malformed XML - Unclosed CDATA",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/xml/unclosed-cdata",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns XML with a CDATA section that never terminates.\n\nWhat is wrong: CDATA sections must close with ]]>. This response never closes the section.\n\nWhat to check in your client: A REST client should report the unterminated CDATA section.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "6a3f42e1-c358-488f-ac81-6d21d0931a42": {
+      "id": "6a3f42e1-c358-488f-ac81-6d21d0931a42",
+      "name": "Malformed XML - Invalid Character",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/xml/invalid-character",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns XML containing a character that is not allowed in XML 1.0 content.\n\nWhat is wrong: The body includes a raw control character inside the text node.\n\nWhat to check in your client: A REST client should show the invalid character problem without losing the raw response.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "f2e4ed44-32e0-4c0d-a03d-b9a68f8f22f7": {
+      "id": "f2e4ed44-32e0-4c0d-a03d-b9a68f8f22f7",
+      "name": "Malformed XML - Truncated Document",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/xml/truncated-document",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns XML that starts a nested element but ends before closing it.\n\nWhat is wrong: The document is incomplete and ends before the open elements are closed.\n\nWhat to check in your client: A REST client should report the unexpected end of document.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "72b16910-e67a-493a-94c6-9f209b7f28ce": {
+      "id": "72b16910-e67a-493a-94c6-9f209b7f28ce",
+      "name": "Malformed XML - Bad Processing Instruction",
+      "method": "GET",
+      "url": "{{baseUrl}}/malformed/xml/bad-processing-instruction",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns XML with a processing instruction that never closes.\n\nWhat is wrong: Processing instructions must close with ?> before normal element markup continues.\n\nWhat to check in your client: A REST client should show the processing instruction syntax error.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "c25337c5-9c21-4740-a9b3-bbb1c3c21c2b": {
+      "id": "c25337c5-9c21-4740-a9b3-bbb1c3c21c2b",
+      "name": "Problematic XML - Attributes Vs Elements",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/xml/attributes-vs-elements",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns the same kind of data in both attributes and child elements.\n\nWhat is wrong: Clients often flatten XML into maps and may hide whether a value came from an attribute or an element.\n\nWhat to check in your client: A REST client should make attributes and elements visibly distinct and avoid silently merging conflicting values.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "458fe0ad-aac7-43c4-a098-b14c3bd1b1de": {
+      "id": "458fe0ad-aac7-43c4-a098-b14c3bd1b1de",
+      "name": "Problematic XML - Empty Vs Missing Vs Nil",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/xml/empty-vs-missing-vs-nil",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns empty, missing, and explicitly nil values in one document.\n\nWhat is wrong: Empty elements, absent elements, and xsi:nil values are different states but clients may render them identically.\n\nWhat to check in your client: A REST client should help users distinguish empty, missing, and nil values.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "18f70fdf-a8e0-485b-9f27-774f9a51a214": {
+      "id": "18f70fdf-a8e0-485b-9f27-774f9a51a214",
+      "name": "Problematic XML - Whitespace Significant Text",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/xml/whitespace-text",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns XML text values with leading, trailing, and multiline whitespace.\n\nWhat is wrong: Pretty printers and object mappers can trim or normalize whitespace that is part of the value.\n\nWhat to check in your client: A REST client should let users inspect the raw text and spot whitespace-preservation issues.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "26abf027-c050-48f8-88fb-86b7bea13749": {
+      "id": "26abf027-c050-48f8-88fb-86b7bea13749",
+      "name": "Problematic XML - CDATA Content",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/xml/cdata-content",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns XML with JSON-looking and HTML-looking text inside CDATA.\n\nWhat is wrong: Clients may hide CDATA boundaries or try to interpret embedded markup as real XML.\n\nWhat to check in your client: A REST client should preserve CDATA content as text and make the raw body available.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "acb4aef3-1086-4da6-a0c9-9a9456fbe317": {
+      "id": "acb4aef3-1086-4da6-a0c9-9a9456fbe317",
+      "name": "Problematic XML - Mixed Content",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/xml/mixed-content",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns text and child elements mixed inside the same element.\n\nWhat is wrong: Mixed content is valid XML but awkward for clients that convert XML to simple JSON-like objects.\n\nWhat to check in your client: A REST client should show text nodes and child elements without dropping their order.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "2401ada5-5b6a-4555-999c-4768039dc507": {
+      "id": "2401ada5-5b6a-4555-999c-4768039dc507",
+      "name": "Problematic XML - Processing Instruction",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/xml/processing-instruction",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a valid processing instruction before the document root.\n\nWhat is wrong: Processing instructions are valid XML but many viewers hide or ignore them.\n\nWhat to check in your client: A REST client should make processing instructions visible in raw or structured views.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "56bdb1b9-4dc9-42e5-ae90-7178fd57ac6c": {
+      "id": "56bdb1b9-4dc9-42e5-ae90-7178fd57ac6c",
+      "name": "Problematic XML - Comments",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/xml/comments",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns XML containing comments between normal elements.\n\nWhat is wrong: Comments may be hidden by formatters or stripped by object conversion.\n\nWhat to check in your client: A REST client should preserve enough raw detail to show whether comments were present.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "a1d305ed-6787-434a-9dd5-6e2412d1a100": {
+      "id": "a1d305ed-6787-434a-9dd5-6e2412d1a100",
+      "name": "Problematic XML - Encoding Declaration Mismatch",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/xml/encoding-mismatch",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns XML where the HTTP charset and XML declaration disagree.\n\nWhat is wrong: The response header says UTF-8 but the XML declaration says ISO-8859-1.\n\nWhat to check in your client: A REST client should expose both the HTTP charset and XML declaration so encoding assumptions are visible.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "a5d37359-e639-4abf-8c84-edc8b38e2fb3": {
+      "id": "a5d37359-e639-4abf-8c84-edc8b38e2fb3",
+      "name": "Problematic XML - DOCTYPE And DTD",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/xml/doctype-dtd",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns XML with a safe inline DTD declaration.\n\nWhat is wrong: DOCTYPE and DTD declarations are valid XML but clients may block, ignore, or hide them for security reasons.\n\nWhat to check in your client: A REST client should show that the document includes a DTD without attempting unsafe external resolution.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "136c7d69-cd84-4ada-904d-598c928461fd": {
+      "id": "136c7d69-cd84-4ada-904d-598c928461fd",
+      "name": "Problematic XML - Empty Body With XML Content-Type",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/xml/empty-body",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns application/xml with an empty response body.\n\nWhat is wrong: An empty body is not an XML document, even when the content type says XML.\n\nWhat to check in your client: A REST client should show the empty body and not pretend it parsed XML.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "ddea4ab5-6d84-4425-93c1-4346147b3254": {
+      "id": "ddea4ab5-6d84-4425-93c1-4346147b3254",
+      "name": "Problematic XML - UTF-8 BOM Prefix",
+      "method": "GET",
+      "url": "{{baseUrl}}/problematic/xml/bom-prefix",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns XML prefixed with a UTF-8 byte order mark.\n\nWhat is wrong: Some clients hide the BOM while others expose it as a leading character or parsing issue.\n\nWhat to check in your client: A REST client should preserve enough raw detail to diagnose the prefix if parsing behaves unexpectedly.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "da00a9b9-7e1b-400c-a36b-fdfeeb03696a": {
+      "id": "da00a9b9-7e1b-400c-a36b-fdfeeb03696a",
+      "name": "Content-Type Mismatch - Header JSON Body XML",
+      "method": "GET",
+      "url": "{{baseUrl}}/mismatch/content-type/json-xml",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns XML while declaring application/json.\n\nWhat is wrong: The Content-Type header is application/json but the body is XML.\n\nWhat to check in your client: A REST client should make the mismatch visible and allow you to inspect the raw response.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "227548ee-e651-44b9-b5a9-bb4f7575d2c7": {
+      "id": "227548ee-e651-44b9-b5a9-bb4f7575d2c7",
+      "name": "Content-Type Mismatch - Header XML Body JSON",
+      "method": "GET",
+      "url": "{{baseUrl}}/mismatch/content-type/xml-json",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns JSON while declaring application/xml.\n\nWhat is wrong: The Content-Type header is application/xml but the body is JSON.\n\nWhat to check in your client: A REST client should make the mismatch visible and allow you to inspect the raw response.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "fe539e72-a53a-4c80-8b7c-6434e68542ee": {
+      "id": "fe539e72-a53a-4c80-8b7c-6434e68542ee",
+      "name": "201 Missing Location Header",
+      "method": "POST",
+      "url": "{{baseUrl}}/status-code/201-no-location",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a created-looking JSON response.\n\nWhat is wrong: The status is 201 Created, but the response does not include a Location header for the created resource.\n\nWhat to check in your client: A REST client should make the missing Location header easy to spot.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "30c93f99-17e0-489a-ae18-1cadac84ea9c": {
+      "id": "30c93f99-17e0-489a-ae18-1cadac84ea9c",
+      "name": "301 Missing Location Header",
+      "method": "GET",
+      "url": "{{baseUrl}}/status-code/301-no-location",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a permanent redirect status.\n\nWhat is wrong: The status is 301 Moved Permanently, but there is no Location header to follow.\n\nWhat to check in your client: A REST client should show that the redirect target is missing.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "83c88fc8-b910-4385-bd72-a5abc0c2a820": {
+      "id": "83c88fc8-b910-4385-bd72-a5abc0c2a820",
+      "name": "302 Missing Location Header",
+      "method": "GET",
+      "url": "{{baseUrl}}/status-code/302-no-location",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a common temporary redirect status.\n\nWhat is wrong: The status is 302 Found, but there is no Location header to follow.\n\nWhat to check in your client: A REST client should show that the redirect target is missing.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "8abf12b5-fd24-495b-b7eb-c18e1bb52051": {
+      "id": "8abf12b5-fd24-495b-b7eb-c18e1bb52051",
+      "name": "307 Missing Location Header",
+      "method": "GET",
+      "url": "{{baseUrl}}/status-code/307-no-location",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a temporary redirect status that should preserve the original method.\n\nWhat is wrong: The status is 307 Temporary Redirect, but there is no Location header to follow.\n\nWhat to check in your client: A REST client should show that the redirect target is missing and not silently change method.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "c889e4aa-cdc9-4bf7-b256-85495e96e230": {
+      "id": "c889e4aa-cdc9-4bf7-b256-85495e96e230",
+      "name": "204 Body Present Despite No Content",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/status-code/204-with-body",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns 204 No Content while the catalog defines a JSON response body.\n\nWhat is wrong: The status says no content, but the endpoint attempts to send response content.\n\nWhat to check in your client: A REST client should make it clear whether the body is present, discarded, or hidden by the HTTP stack. Local .jar or Docker execution may expose the body, while production proxies or gateways may strip it, so use an HTTP proxy between the API and client to inspect the actual response.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "45c71af2-5abd-4332-b59a-6737671b9443": {
+      "id": "45c71af2-5abd-4332-b59a-6737671b9443",
+      "name": "205 Body Present Despite Reset Content",
+      "method": "POST",
+      "url": "{{baseUrl}}/status-code/205-with-body",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns 205 Reset Content while the catalog defines a JSON response body.\n\nWhat is wrong: The status tells the client to reset the document view and should not include a response body.\n\nWhat to check in your client: A REST client should make the body/status contradiction visible.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "2cd9e4d9-4d41-4248-b9d0-102349adf143": {
+      "id": "2cd9e4d9-4d41-4248-b9d0-102349adf143",
+      "name": "304 Body Present Despite Not Modified",
+      "method": "GET",
+      "url": "{{baseUrl}}/status-code/304-with-body",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns 304 Not Modified while the catalog defines a JSON response body.\n\nWhat is wrong: The status is a cache validation response and should not include a response body.\n\nWhat to check in your client: A REST client should make it clear whether the body is present, discarded, or hidden by cache/status handling.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "d7618e95-2f04-4f78-8960-68ed5af60ce5": {
+      "id": "d7618e95-2f04-4f78-8960-68ed5af60ce5",
+      "name": "206 Missing Content-Range Header",
+      "method": "GET",
+      "url": "{{baseUrl}}/status-code/206-no-content-range",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a partial-looking body.\n\nWhat is wrong: The status is 206 Partial Content, but the response does not include Content-Range.\n\nWhat to check in your client: A REST client should make the missing range metadata easy to spot.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "c98051f8-4957-45af-9ea2-005ec62f6b69": {
+      "id": "c98051f8-4957-45af-9ea2-005ec62f6b69",
+      "name": "401 Missing WWW-Authenticate Header",
+      "method": "GET",
+      "url": "{{baseUrl}}/status-code/401-no-www-authenticate",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns an authentication failure body.\n\nWhat is wrong: The status is 401 Unauthorized, but the response does not include WWW-Authenticate.\n\nWhat to check in your client: A REST client should show the missing authentication challenge header.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "8d8599c8-a94b-499a-b3ce-408f00aad868": {
+      "id": "8d8599c8-a94b-499a-b3ce-408f00aad868",
+      "name": "405 Missing Allow Header",
+      "method": "POST",
+      "url": "{{baseUrl}}/status-code/405-no-allow",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a method-not-allowed response body.\n\nWhat is wrong: The status is 405 Method Not Allowed, but the response does not include Allow.\n\nWhat to check in your client: A REST client should show the missing allowed-methods metadata.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "530168d0-a138-4945-922f-1800fcaaf969": {
+      "id": "530168d0-a138-4945-922f-1800fcaaf969",
+      "name": "416 Missing Content-Range Header",
+      "method": "GET",
+      "url": "{{baseUrl}}/status-code/416-no-content-range",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns an unsatisfied range response body.\n\nWhat is wrong: The status is 416 Range Not Satisfiable, but the response does not include Content-Range.\n\nWhat to check in your client: A REST client should show the missing range explanation.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    },
+    "56944662-098b-4444-a026-32c0a56cfa8a": {
+      "id": "56944662-098b-4444-a026-32c0a56cfa8a",
+      "name": "200 Error-Shaped Body",
+      "method": "GET",
+      "url": "{{baseUrl}}/status-code/200-error-body",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a normal success status.\n\nWhat is wrong: The status is 200 OK, but the body is shaped like an error response.\n\nWhat to check in your client: A REST client should make it easy to inspect both status and body without assuming the request succeeded.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      },
+      "schema": "{\n  \"type\": \"string\"\n}"
+    },
+    "ff3d2a88-6f72-4bef-a6e4-d041e5f768af": {
+      "id": "ff3d2a88-6f72-4bef-a6e4-d041e5f768af",
+      "name": "500 Success-Shaped Body",
+      "method": "GET",
+      "url": "{{baseUrl}}/status-code/500-success-body",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns a server error status.\n\nWhat is wrong: The status is 500 Internal Server Error, but the body claims success.\n\nWhat to check in your client: A REST client should make it easy to inspect both status and body without assuming the body is truthful.",
+      "meta": {
+        "tags": [
+          "API From Hell"
+        ]
+      }
+    }
+  },
+  "collectionVariables": {}
+}

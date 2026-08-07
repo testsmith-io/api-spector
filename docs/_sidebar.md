@@ -7,6 +7,7 @@
 - **GUI**
   - [Collections & Requests](gui/collections.md)
   - [Environments, Variables & Secrets](gui/environments.md)
+  - [Data-Driven Runs](gui/data-driven.md)
   - [Mock Servers](gui/mock-servers.md)
   - [Export to Code](gui/code-generation.md)
   - [TLS & Certificates](gui/tls-certificates.md)

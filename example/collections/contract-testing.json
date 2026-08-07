@@ -32,7 +32,9 @@
       "headers": [],
       "params": [],
       "auth": {
-        "type": "none"
+        "type": "basic",
+        "username": "test",
+        "password": "pass"
       },
       "body": {
         "mode": "none"

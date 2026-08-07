@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Collection, ApiRequest, Folder, Environment, EnvVariable } from '../../../../shared/types';
 import { useStore } from '../../store';
 import { envRelPath } from '../../../../shared/naming-utils';
+import { parseCurl } from '../../../../shared/curl-import';
 import { Modal } from './Modal';
 
 const { electron } = window;
@@ -29,6 +30,7 @@ const OPTIONS: ImportOption[] = [
   { id: 'bruno',    label: 'Bruno',    description: 'bruno.json collection file' },
   { id: 'http',     label: 'HTTP file', description: '.http / .rest (REST Client)' },
   { id: 'spector',  label: 'API Spector', description: 'An existing .spector / .json collection' },
+  { id: 'curl',     label: 'cURL',     description: 'Paste a curl command' },
 ];
 
 // ── Helpers to walk a parsed collection ─────────────────────────────────────
@@ -63,6 +65,7 @@ export function ImportModal({ onImport, onClose }: Props) {
 
   const [selected, setSelected]   = useState<string | null>(null);
   const [url, setUrl]             = useState('');
+  const [curlText, setCurlText]   = useState('');
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState<string | null>(null);
   const urlInputRef               = useRef<HTMLInputElement>(null);
@@ -149,6 +152,38 @@ export function ImportModal({ onImport, onClose }: Props) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
+    }
+  }
+
+  function importCurl() {
+    const text = curlText.trim();
+    if (!text) return;
+    setError(null);
+    try {
+      const parsed = parseCurl(text);
+      const reqId = uuidv4();
+      const col: Collection = {
+        version: '1.0',
+        id: uuidv4(),
+        name: parsed.name || 'Imported request',
+        description: '',
+        rootFolder: { id: uuidv4(), name: 'root', description: '', folders: [], requestIds: [reqId] },
+        requests: {
+          [reqId]: {
+            id: reqId,
+            name: parsed.name,
+            method: parsed.method,
+            url: parsed.url,
+            headers: parsed.headers,
+            params: parsed.params,
+            auth: parsed.auth,
+            body: parsed.body,
+          } as ApiRequest,
+        },
+      };
+      enterPreview(col);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -311,7 +346,7 @@ export function ImportModal({ onImport, onClose }: Props) {
       >
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-surface-100">
-              Import OpenAPI - {previewCol.name}
+              Import - {previewCol.name}
             </h2>
             <button
               onClick={onClose}
@@ -537,6 +572,20 @@ export function ImportModal({ onImport, onClose }: Props) {
           </div>
         )}
 
+        {/* cURL command input (shown only when cURL selected) */}
+        {selected === 'curl' && (
+          <div className="flex flex-col gap-2">
+            <p className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">Paste a curl command</p>
+            <textarea
+              value={curlText}
+              onChange={e => { setCurlText(e.target.value); setError(null); }}
+              placeholder={"curl -X POST https://api.example.com/users \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"name\":\"Ada\"}'"}
+              rows={6}
+              className="w-full text-xs bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 placeholder-surface-600 font-mono resize-y"
+            />
+          </div>
+        )}
+
         {/* Error */}
         {error && <p className="text-[11px] text-red-400">{error}</p>}
 
@@ -548,16 +597,26 @@ export function ImportModal({ onImport, onClose }: Props) {
           >
             Cancel
           </button>
-          <button
-            disabled={!selected || loading}
-            onClick={() => {
-              const opt = OPTIONS.find(o => o.id === selected);
-              if (opt) runFileImport(opt);
-            }}
-            className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors"
-          >
-            {loading ? 'Importing…' : 'Choose File'}
-          </button>
+          {selected === 'curl' ? (
+            <button
+              disabled={!curlText.trim() || loading}
+              onClick={importCurl}
+              className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors"
+            >
+              Parse
+            </button>
+          ) : (
+            <button
+              disabled={!selected || loading}
+              onClick={() => {
+                const opt = OPTIONS.find(o => o.id === selected);
+                if (opt) runFileImport(opt);
+              }}
+              className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors"
+            >
+              {loading ? 'Importing…' : 'Choose File'}
+            </button>
+          )}
         </div>
     </Modal>
   );

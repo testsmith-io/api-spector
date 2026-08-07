@@ -14,6 +14,7 @@ export type GenerateTarget =
   | 'rest_assured'
   | 'karate'
   | 'http_file'
+  | 'curl'
 
 export interface GenerateOptions {
   collection: Collection

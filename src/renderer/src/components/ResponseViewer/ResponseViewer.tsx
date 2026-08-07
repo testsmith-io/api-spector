@@ -64,7 +64,7 @@ function KVBlock({ label, rows }: { label: string; rows: [string, string][] }) {
 
 /** One history entry, expandable to show the full request and response.
  *  Loading brings the response back into the main viewer. */
-function HistoryTabRow({ entry, onLoad }: { entry: HistoryEntry; onLoad: () => void }) {
+function HistoryTabRow({ entry, onLoad, onResend }: { entry: HistoryEntry; onLoad: () => void; onResend?: () => void }) {
   const [open, setOpen] = useState(false);
   const reqBody = requestBodyText(entry.request.body);
   return (
@@ -82,6 +82,9 @@ function HistoryTabRow({ entry, onLoad }: { entry: HistoryEntry; onLoad: () => v
           {new Date(entry.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </span>
         <button onClick={onLoad} title="Load this response into the viewer" className="text-[10px] text-blue-400 hover:text-blue-300 shrink-0">load</button>
+        {onResend && (
+          <button onClick={onResend} title="Send this request again" className="text-[10px] text-emerald-400 hover:text-emerald-300 shrink-0">resend</button>
+        )}
       </div>
       {open && (
         <div className="px-4 pb-3 pt-1 flex flex-col gap-3 bg-surface-950/40">
@@ -107,7 +110,7 @@ function HistoryTabRow({ entry, onLoad }: { entry: HistoryEntry; onLoad: () => v
   );
 }
 
-type RespTab = 'body' | 'headers' | 'tests' | 'console' | 'request' | 'history' | 'http'
+type RespTab = 'body' | 'headers' | 'tests' | 'console' | 'request' | 'history' | 'http' | 'error'
 
 export function ResponseViewer() {
   const activeTab = useStore(s => s.tabs.find(t => t.id === s.activeTabId));
@@ -124,6 +127,7 @@ export function ResponseViewer() {
   const hookResults = activeTab?.lastHookResults ?? null;
   const requestId = activeTab?.requestId ?? null;
   const setTabResponse = useStore(s => s.setTabResponse);
+  const requestSend = useStore(s => s.requestSend);
   const history = useStore(s => s.history);
   const activeEnvironmentId = useStore(s => s.activeEnvironmentId);
   const environments = useStore(s => s.environments);
@@ -157,6 +161,19 @@ export function ResponseViewer() {
       setTab('console');
     }
   }, [scriptResult?.preScriptError, scriptResult?.postScriptError]);
+
+  // A transport-level failure (no HTTP response) lands on the Error tab, but
+  // Request and History stay reachable so you can still inspect what was sent
+  // or jump back to a past response. Leave the Error tab once a real response
+  // replaces the failure.
+  useEffect(() => {
+    if (response?.error) {
+      if (tab !== 'request' && tab !== 'history') setTab('error');
+    } else if (tab === 'error') {
+      setTab('body');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [response]);
 
   const [diffMode, setDiffMode] = useState(false);
   const [showMockModal, setShowMockModal] = useState(false);
@@ -219,15 +236,6 @@ export function ResponseViewer() {
     );
   }
 
-  if (response.error) {
-    return (
-      <div className="h-full flex flex-col p-4 gap-2">
-        <div className="text-red-400 text-sm font-medium">Request failed</div>
-        <pre className="text-xs text-red-300 whitespace-pre-wrap">{response.error}</pre>
-      </div>
-    );
-  }
-
   const contentType = response.headers['content-type'] ?? '';
   const isJson = contentType.includes('json');
   const isXml = !isJson && (contentType.includes('xml') || contentType.includes('html'));
@@ -245,15 +253,40 @@ export function ResponseViewer() {
   const consoleCount = scriptResult?.consoleOutput.length ?? 0;
   const hasScriptError = !!(scriptResult?.preScriptError || scriptResult?.postScriptError);
 
-  const tabList: { id: RespTab; label: string; badge?: number | string; error?: boolean }[] = [
-    { id: 'request', label: 'Request' },
-    { id: 'body', label: 'Body', badge: bodyParseError ? '!' : undefined, error: bodyParseError },
-    { id: 'headers', label: 'Headers' },
-    { id: 'tests', label: 'Tests', badge: totalCount > 0 ? `${passedCount}/${totalCount}` : undefined },
-    { id: 'console', label: 'Console', badge: hasScriptError ? '!' : consoleCount > 0 ? consoleCount : undefined, error: hasScriptError },
-    { id: 'history', label: 'History', badge: requestHistory.length > 0 ? requestHistory.length : undefined },
-    { id: 'http', label: 'HTTP', badge: httpFindings.length > 0 ? (httpErrors > 0 ? '!' : httpFindings.length) : undefined, error: httpErrors > 0 },
-  ];
+  const historyBadge = requestHistory.length > 0 ? requestHistory.length : undefined;
+  const tabList: { id: RespTab; label: string; badge?: number | string; error?: boolean }[] = response.error
+    ? [
+        { id: 'error', label: 'Error', error: true },
+        { id: 'request', label: 'Request' },
+        { id: 'history', label: 'History', badge: historyBadge },
+      ]
+    : [
+        { id: 'request', label: 'Request' },
+        { id: 'body', label: 'Body', badge: bodyParseError ? '!' : undefined, error: bodyParseError },
+        { id: 'headers', label: 'Headers' },
+        { id: 'tests', label: 'Tests', badge: totalCount > 0 ? `${passedCount}/${totalCount}` : undefined },
+        { id: 'console', label: 'Console', badge: hasScriptError ? '!' : consoleCount > 0 ? consoleCount : undefined, error: hasScriptError },
+        { id: 'history', label: 'History', badge: historyBadge },
+        { id: 'http', label: 'HTTP', badge: httpFindings.length > 0 ? (httpErrors > 0 ? '!' : httpFindings.length) : undefined, error: httpErrors > 0 },
+      ];
+
+  // Shared by the normal History tab and the error view's History tab.
+  const historyContent = requestHistory.length === 0 ? (
+    <p className="text-xs text-surface-500 text-center p-8">
+      No past responses for this request yet. Each send is recorded here.
+    </p>
+  ) : (
+    <div className="flex flex-col">
+      {requestHistory.map(entry => (
+        <HistoryTabRow
+          key={entry.id}
+          entry={entry}
+          onLoad={() => { if (activeTabId) setTabResponse(activeTabId, entry.response, entry.scriptResult ?? null); }}
+          onResend={requestSend}
+        />
+      ))}
+    </div>
+  );
 
   return (
     <div className="h-full flex flex-col">
@@ -293,7 +326,7 @@ export function ResponseViewer() {
         </div>
 
 
-        <div className="ml-auto flex items-center gap-1 shrink-0">
+        {!response.error && <div className="ml-auto flex items-center gap-1 shrink-0">
           {/* Toasts */}
           {assertToast.toast && (
             <span className="text-[10px] text-emerald-400 font-medium px-1">{assertToast.toast.msg}</span>
@@ -362,14 +395,25 @@ export function ResponseViewer() {
           >
             ↓ Mock
           </button>
-        </div>
+        </div>}
       </div>
 
       {showMockModal && <SaveAsMockModal onClose={() => setShowMockModal(false)} />}
 
       {/* Content — flex-col so each panel can fill remaining height cleanly */}
       <div className="flex-1 min-h-0 flex flex-col overflow-y-auto">
-        {diffMode && pinnedResponse ? (
+        {response.error ? (
+          tab === 'request' ? (
+            <RequestPanel sentRequest={sentRequest} />
+          ) : tab === 'history' ? (
+            <div className="flex-1 min-h-0 overflow-y-auto">{historyContent}</div>
+          ) : (
+            <div className="flex flex-col p-4 gap-2">
+              <div className="text-red-400 text-sm font-medium">Request failed</div>
+              <pre className="text-xs text-red-300 whitespace-pre-wrap">{response.error}</pre>
+            </div>
+          )
+        ) : diffMode && pinnedResponse ? (
           <DiffView pinned={pinnedResponse} current={response} />
         ) : tab === 'body' && supportsTree && bodyView === 'tree' ? (
           <InteractiveBody
@@ -443,23 +487,7 @@ export function ResponseViewer() {
             )}
           </div>
         ) : tab === 'history' ? (
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            {requestHistory.length === 0 ? (
-              <p className="text-xs text-surface-500 text-center p-8">
-                No past responses for this request yet. Each send is recorded here.
-              </p>
-            ) : (
-              <div className="flex flex-col">
-                {requestHistory.map(entry => (
-                  <HistoryTabRow
-                    key={entry.id}
-                    entry={entry}
-                    onLoad={() => { if (activeTabId) setTabResponse(activeTabId, entry.response, entry.scriptResult ?? null); }}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto">{historyContent}</div>
         ) : null}
       </div>
 

@@ -11,9 +11,35 @@ import type { Collection, Environment, Workspace } from '../../shared/types';
 import { loadGlobals, getGlobals, setGlobals, persistGlobals } from '../globals-store';
 
 const LAST_WS_FILE = join(app.getPath('userData'), 'last-workspace.json');
+const RECENTS_FILE = join(app.getPath('userData'), 'recent-workspaces.json');
+const MAX_RECENTS = 10;
+
+interface RecentWorkspace { path: string; name: string; lastOpened: number }
+
+async function readRecentWorkspaces(): Promise<RecentWorkspace[]> {
+  try {
+    const list = JSON.parse(await readFile(RECENTS_FILE, 'utf8')) as RecentWorkspace[];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Move `wsPath` to the front of the MRU list (dedup, capped). */
+async function pushRecentWorkspace(wsPath: string): Promise<void> {
+  const name = basename(wsPath).replace(/\.(spector|json)$/i, '');
+  const list = (await readRecentWorkspaces()).filter(r => r.path !== wsPath);
+  list.unshift({ path: wsPath, name, lastOpened: Date.now() });
+  try {
+    await writeFile(RECENTS_FILE, JSON.stringify(list.slice(0, MAX_RECENTS), null, 2), 'utf8');
+  } catch (err) {
+    console.warn('file-handler: could not update recent-workspaces', err);
+  }
+}
 
 async function saveLastWorkspacePath(wsPath: string): Promise<void> {
   await writeFile(LAST_WS_FILE, JSON.stringify({ path: wsPath }), 'utf8');
+  await pushRecentWorkspace(wsPath);
 }
 
 async function readLastWorkspacePath(): Promise<string | null> {
@@ -453,6 +479,33 @@ export function registerFileHandlers(ipc: IpcMain): void {
     } catch {
       return null;
     }
+  });
+
+  // Recent-workspaces list for the welcome screen. Prune entries whose file no
+  // longer exists so the list never offers a dead link.
+  handleIpc(ipc, IPC.file.getRecentWorkspaces, async () => {
+    const list = await readRecentWorkspaces();
+    const alive = await Promise.all(list.map(async r => {
+      try { await readFile(r.path, 'utf8'); return r; } catch { return null; }
+    }));
+    return alive.filter((r): r is RecentWorkspace => r !== null);
+  });
+
+  // Open a workspace by path (no dialog) — used by the recent-workspaces list.
+  handleIpc(ipc, IPC.file.openWorkspacePath, async (_e, wsPath: string) => {
+    let raw: string;
+    try {
+      raw = await readFile(wsPath, 'utf8');
+    } catch {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as unknown;
+    if (looksLikeCollection(parsed)) return null; // not a workspace
+    workspaceDir = dirname(wsPath);
+    workspaceFile = wsPath;
+    await loadGlobals(workspaceDir);
+    await saveLastWorkspacePath(wsPath);
+    return { workspace: parsed as Workspace, workspacePath: wsPath };
   });
 }
 

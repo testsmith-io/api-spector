@@ -40,6 +40,7 @@ export function HistoryPanel() {
   const activeTabId = useStore(s => s.activeTabId);
   const setTabResponse = useStore(s => s.setTabResponse);
   const setActiveRequest = useStore(s => s.setActiveRequest);
+  const requestSend = useStore(s => s.requestSend);
   const collections = useStore(s => s.collections);
   const [selected, setSelected] = useState<HistoryEntry | null>(null);
   const [search, setSearch] = useState('');
@@ -83,6 +84,17 @@ export function HistoryPanel() {
     } else if (activeTabId) {
       setTabResponse(activeTabId, entry.response, entry.scriptResult ?? null);
     }
+  }
+
+  /** Bring a still-existing request into the pane and fire it again. */
+  function replay(entry: HistoryEntry) {
+    setSelected(entry);
+    setActiveRequest(entry.request.id);
+    requestSend();
+  }
+
+  function stillExists(entry: HistoryEntry): boolean {
+    return Object.values(collections).some(c => entry.request.id in c.data.requests);
   }
 
   return (
@@ -135,6 +147,7 @@ export function HistoryPanel() {
                   entry={entry}
                   isSelected={selected?.id === entry.id}
                   onSelect={() => open(entry)}
+                  onResend={stillExists(entry) ? () => replay(entry) : undefined}
                 />
               ))}
             </div>
@@ -146,25 +159,38 @@ export function HistoryPanel() {
 }
 
 function HistoryRow({
-  entry, isSelected, onSelect,
+  entry, isSelected, onSelect, onResend,
 }: {
   entry: HistoryEntry
   isSelected: boolean
   onSelect: () => void
+  onResend?: () => void
 }) {
   const status = entry.response.status;
   const hasError = !!entry.response.error;
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
-      className={`w-full text-left px-3 py-2 border-b border-surface-800/50 transition-colors ${
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
+      className={`group w-full text-left px-3 py-2 border-b border-surface-800/50 transition-colors cursor-pointer ${
         isSelected ? 'bg-surface-800' : 'hover:bg-surface-800/50'
       }`}
     >
       <div className="flex items-center gap-2 min-w-0">
         <MethodBadge method={entry.request.method} size="xs" />
         <span className="flex-1 text-xs truncate text-white">{entry.request.name}</span>
+        {onResend && (
+          <button
+            onClick={e => { e.stopPropagation(); onResend(); }}
+            title="Send this request again"
+            className="text-[10px] text-emerald-400 hover:text-emerald-300 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            resend
+          </button>
+        )}
         {hasError ? (
           <span className="text-red-400 text-[10px] font-medium shrink-0">ERR</span>
         ) : (
@@ -181,6 +207,6 @@ function HistoryRow({
       {entry.environmentName && (
         <div className="text-[10px] text-surface-400 mt-0.5">env: {entry.environmentName}</div>
       )}
-    </button>
+    </div>
   );
 }

@@ -34,6 +34,12 @@ export interface UiSliceState {
    *  adding a snippet — otherwise the user lands on the script with the now-
    *  irrelevant snippet palette still taking up half the editor width. */
   quickInsertsOpen: boolean
+
+  /** Monotonic counter bumped by requestSend(). The active RequestBuilder
+   *  watches it and fires its normal send pipeline when it changes, so history
+   *  rows (and anything else) can replay the current request without
+   *  duplicating the scripts/hooks/interpolation logic. */
+  sendSignal: number
 }
 
 export interface UiSliceActions {
@@ -46,6 +52,8 @@ export interface UiSliceActions {
   setPinnedResponse: (r: ResponsePayload | null) => void
   setActiveGitDiff: (d: { path: string; staged: boolean } | null) => void
   setQuickInsertsOpen: (open: boolean) => void
+  /** Ask the active request builder to (re)send the current request. */
+  requestSend: () => void
 }
 
 export type UiSlice = UiSliceState & UiSliceActions
@@ -65,6 +73,7 @@ export const createUiSlice: StateCreator<
   pinnedResponse: null,
   activeGitDiff: null,
   quickInsertsOpen: true,
+  sendSignal: 0,
 
   setShowGeneratorPanel: v => set(s => { s.showGeneratorPanel = v; }),
 
@@ -110,4 +119,6 @@ export const createUiSlice: StateCreator<
   setActiveGitDiff: (d) => set(s => { s.activeGitDiff = d; }),
 
   setQuickInsertsOpen: (open) => set(s => { s.quickInsertsOpen = open; }),
+
+  requestSend: () => set(s => { s.sendSignal += 1; }),
 });

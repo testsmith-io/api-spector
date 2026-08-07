@@ -7,6 +7,7 @@ import { generatePlaywright } from '../main/generators/playwright';
 import { generateSupertestTs } from '../main/generators/supertest-ts';
 import { generateRestAssured } from '../main/generators/rest-assured';
 import { generateKarate } from '../main/generators/karate';
+import { generateCurl } from '../main/generators/curl';
 import { makeCollection, makeEnvironment } from './fixtures/collection';
 import type { Collection } from '../shared/types';
 
@@ -39,6 +40,35 @@ function fileByPath ( files: { path: string; content: string }[], pathFragment: 
 }
 
 // ─── Robot Framework ─────────────────────────────────────────────────────────
+
+describe( 'generateCurl', () => {
+  const [file] = generateCurl( collection, environment );
+
+  it( 'emits a single .sh script slugged from the collection name', () => {
+    expect( file.path ).toBe( 'user-api.sh' );
+    expect( file.content.startsWith( '#!/usr/bin/env bash' ) ).toBe( true );
+  } );
+
+  it( 'emits one curl command per request with method and url', () => {
+    expect( ( file.content.match( /curl -sS -X/g ) ?? [] ).length ).toBe( 3 );
+    expect( file.content ).toContain( 'curl -sS -X GET "${BASE_URL}/users?page=1"' );
+    expect( file.content ).toContain( 'curl -sS -X DELETE "${BASE_URL}/users/${USER_ID}"' );
+  } );
+
+  it( 'rewrites {{VAR}} tokens to shell ${VAR} and exports known variables', () => {
+    expect( file.content ).not.toContain( '{{' );
+    expect( file.content ).toContain( 'BASE_URL=' );
+  } );
+
+  it( 'folds bearer auth into an Authorization header', () => {
+    expect( file.content ).toContain( '-H "Authorization: Bearer ${AUTH_TOKEN}"' );
+  } );
+
+  it( 'sends a JSON body with --data and a Content-Type header', () => {
+    expect( file.content ).toContain( '--data "{\\"name\\":\\"${USERNAME}\\",\\"email\\":\\"${EMAIL}\\"}"' );
+    expect( file.content ).toContain( '-H "Content-Type: application/json"' );
+  } );
+} );
 
 describe( 'generateRobotFramework', () => {
   const files = generateRobotFramework( collection, environment );

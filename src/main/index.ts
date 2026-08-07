@@ -32,6 +32,7 @@ import { registerDocsHandlers }     from './ipc/docs-handler';
 import { registerContractHandlers } from './ipc/contract-handler';
 import { registerGitHandlers }    from './ipc/git-handler';
 import { registerRecordHandlers }  from './ipc/record-handler';
+import { checkForUpdate }          from './update-check';
 import { stopAll } from './mock-server';
 
 function createSplashWindow(): BrowserWindow {
@@ -156,6 +157,7 @@ app.whenReady().then(async () => {
   registerGitHandlers(ipcMain);
   registerRecordHandlers(ipcMain, () => BrowserWindow.getAllWindows()[0]?.webContents ?? null);
   handleIpc(ipcMain, IPC.shell.openExternal, (_e, url: string) => shell.openExternal(url));
+  handleIpc(ipcMain, IPC.app.checkUpdate, () => checkForUpdate());
 
   createWindow();
 

@@ -25,6 +25,7 @@ const TARGETS: TargetDef[] = [
   { id: 'rest_assured',    label: 'REST Assured',    description: 'Java + JUnit 5 + Maven pom.xml' },
   { id: 'karate',          label: 'Karate',          description: 'Karate feature files + JUnit 5 runner + Maven' },
   { id: 'http_file',       label: 'HTTP file',       description: '.http / .rest file (VSCode REST Client / IntelliJ)' },
+  { id: 'curl',            label: 'cURL',            description: 'Runnable shell script, one curl command per request' },
 ];
 
 export function GeneratorPanel() {
