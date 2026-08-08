@@ -66,7 +66,6 @@ export function trustSystemCertificateStore(options: {
     typeof tlsApi.getCACertificates !== 'function' ||
     typeof tlsApi.setDefaultCACertificates !== 'function'
   ) {
-    systemCertificateStoreApplied = true;
     return false;
   }
 
@@ -75,13 +74,15 @@ export function trustSystemCertificateStore(options: {
     const systemCerts = tlsApi.getCACertificates('system');
     const combinedCerts = Array.from(new Set([...defaultCerts, ...systemCerts]));
 
-    systemCertificateStoreApplied = true;
-    if (!systemCerts.length || combinedCerts.length === defaultCerts.length) return false;
+    if (!systemCerts.length || combinedCerts.length === defaultCerts.length) {
+      systemCertificateStoreApplied = true;
+      return false;
+    }
 
     tlsApi.setDefaultCACertificates(combinedCerts);
+    systemCertificateStoreApplied = true;
     return true;
   } catch {
-    systemCertificateStoreApplied = true;
     return false;
   }
 }

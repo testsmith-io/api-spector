@@ -52,4 +52,51 @@ describe('trustSystemCertificateStore', () => {
     expect(applied).toBe(false);
     expect(setDefaultCACertificates).not.toHaveBeenCalled();
   });
+
+  it('retries when TLS certificate-store APIs become available later', async () => {
+    vi.resetModules();
+    const { trustSystemCertificateStore: freshTrustSystemCertificateStore } = await import('../main/request-exec');
+
+    expect(freshTrustSystemCertificateStore({
+      platform: 'win32',
+      tlsApi: {},
+    })).toBe(false);
+
+    const setDefaultCACertificates = vi.fn();
+    const getCACertificates = vi.fn((type: 'default' | 'system') => {
+      if (type === 'default') return ['bundled-root'];
+      return ['bundled-root', 'local-proxy-root'];
+    });
+
+    expect(freshTrustSystemCertificateStore({
+      platform: 'win32',
+      tlsApi: { getCACertificates, setDefaultCACertificates },
+    })).toBe(true);
+    expect(setDefaultCACertificates).toHaveBeenCalledWith(['bundled-root', 'local-proxy-root']);
+  });
+
+  it('retries after a certificate-store read error', async () => {
+    vi.resetModules();
+    const { trustSystemCertificateStore: freshTrustSystemCertificateStore } = await import('../main/request-exec');
+
+    expect(freshTrustSystemCertificateStore({
+      platform: 'win32',
+      tlsApi: {
+        getCACertificates: vi.fn(() => { throw new Error('temporary store error'); }),
+        setDefaultCACertificates: vi.fn(),
+      },
+    })).toBe(false);
+
+    const setDefaultCACertificates = vi.fn();
+    const getCACertificates = vi.fn((type: 'default' | 'system') => {
+      if (type === 'default') return ['bundled-root'];
+      return ['bundled-root', 'local-proxy-root'];
+    });
+
+    expect(freshTrustSystemCertificateStore({
+      platform: 'win32',
+      tlsApi: { getCACertificates, setDefaultCACertificates },
+    })).toBe(true);
+    expect(setDefaultCACertificates).toHaveBeenCalledWith(['bundled-root', 'local-proxy-root']);
+  });
 });
