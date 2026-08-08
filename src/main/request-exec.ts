@@ -14,6 +14,7 @@
 
 import { fetch, Headers, ProxyAgent, Agent } from 'undici';
 import { readFile } from 'fs/promises';
+import * as nodeTls from 'tls';
 import type {
   ApiRequest,
   SendRequestPayload,
@@ -38,6 +39,52 @@ import Ajv from 'ajv';
 
 export type ProxyConfig = NonNullable<SendRequestPayload['proxy']>;
 export type TlsConfig = NonNullable<SendRequestPayload['tls']>;
+
+type SystemCertificateTlsApi = {
+  getCACertificates?: (type: 'default' | 'system') => string[]
+  setDefaultCACertificates?: (certs: string[]) => void
+}
+
+let systemCertificateStoreApplied = false;
+
+/**
+ * Node does not use the Windows root store by default. Local TLS-intercepting
+ * proxies usually install their CA there, so merge it into this process while
+ * keeping normal certificate verification enabled.
+ */
+export function trustSystemCertificateStore(options: {
+  platform?: NodeJS.Platform | string
+  tlsApi?: SystemCertificateTlsApi
+  force?: boolean
+} = {}): boolean {
+  const platform = options.platform ?? process.platform;
+  if (platform !== 'win32') return false;
+  if (systemCertificateStoreApplied && !options.force) return false;
+
+  const tlsApi = options.tlsApi ?? nodeTls;
+  if (
+    typeof tlsApi.getCACertificates !== 'function' ||
+    typeof tlsApi.setDefaultCACertificates !== 'function'
+  ) {
+    systemCertificateStoreApplied = true;
+    return false;
+  }
+
+  try {
+    const defaultCerts = tlsApi.getCACertificates('default');
+    const systemCerts = tlsApi.getCACertificates('system');
+    const combinedCerts = Array.from(new Set([...defaultCerts, ...systemCerts]));
+
+    systemCertificateStoreApplied = true;
+    if (!systemCerts.length || combinedCerts.length === defaultCerts.length) return false;
+
+    tlsApi.setDefaultCACertificates(combinedCerts);
+    return true;
+  } catch {
+    systemCertificateStoreApplied = true;
+    return false;
+  }
+}
 
 // ─── PII masking ──────────────────────────────────────────────────────────────
 
@@ -222,6 +269,8 @@ export async function buildDispatcher(
   proxy?: ProxyConfig,
   tls?: TlsConfig,
 ): Promise<ProxyAgent | Agent | undefined> {
+  if (proxy?.url?.trim()) trustSystemCertificateStore();
+
   const connectOpts: Record<string, unknown> = {};
   let hasTls = false;
 
