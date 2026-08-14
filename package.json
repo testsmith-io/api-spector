@@ -13,6 +13,11 @@
   "homepage": "https://github.com/testsmith-io/api-spector",
   "license": "MIT",
   "main": "out/main/index.js",
+  "exports": {
+    ".": "./out/main/index.js",
+    "./engine": "./out/main/lib.js",
+    "./package.json": "./package.json"
+  },
   "bin": {
     "api-spector": "bin/cli.js"
   },

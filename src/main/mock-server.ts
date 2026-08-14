@@ -47,7 +47,7 @@ function matchPath(pattern: string, urlPath: string): boolean {
   }
 }
 
-function findRoute(routes: MockRoute[], method: string, urlPath: string): MockRoute | null {
+export function findRoute(routes: MockRoute[], method: string, urlPath: string): MockRoute | null {
   const path = urlPath.split('?')[0];
   return (
     routes.find(r => r.method === method && matchPath(r.path, path)) ??
@@ -210,7 +210,7 @@ interface ResponseDraft {
 
 // ─── Per-request handler ──────────────────────────────────────────────────────
 
-async function handleRequest(
+export async function handleRequest(
   serverId: string,
   req:      IncomingMessage,
   res:      ServerResponse,
