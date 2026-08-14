@@ -22,6 +22,8 @@ export default defineConfig( {
           agents:   resolve( __dirname, 'src/cli/agents.ts' ),
           contract: resolve( __dirname, 'src/cli/contract.ts' ),
           wsdl:     resolve( __dirname, 'src/cli/wsdl.ts' ),
+          // Node-only engine library, importable as '@testsmith/api-spector/engine'.
+          lib:      resolve( __dirname, 'src/lib/index.ts' ),
         }
       }
     }

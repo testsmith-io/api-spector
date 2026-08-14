@@ -1,7 +1,7 @@
 {
   "name": "@testsmith/api-spector",
   "productName": "API Spector",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "description": "Local-first API testing tool to inspect, test and mock APIs",
   "repository": {
     "type": "git",
@@ -13,6 +13,11 @@
   "homepage": "https://github.com/testsmith-io/api-spector",
   "license": "MIT",
   "main": "out/main/index.js",
+  "exports": {
+    ".": "./out/main/index.js",
+    "./engine": "./out/main/lib.js",
+    "./package.json": "./package.json"
+  },
   "bin": {
     "api-spector": "bin/cli.js"
   },
