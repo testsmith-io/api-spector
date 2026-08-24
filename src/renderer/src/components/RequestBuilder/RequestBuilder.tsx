@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../../store';
 import type { ApiRequest, HttpMethod, KeyValuePair, RunRequestResult } from '../../../../shared/types';
 import { getHooksForRequest, authIsConfigured } from '../../../../shared/request-collection';
+import { extractQueryParams } from '../../../../shared/url-params';
 import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
 import { ParamsTab } from './ParamsTab';
 import { VarInput } from '../common/VarInput';
@@ -14,6 +15,7 @@ import { AuthTab } from './AuthTab';
 import { ScriptsTab } from './ScriptsTab';
 import { SchemaTab } from './SchemaTab';
 import { ContractTab } from './ContractTab';
+import { StreamTab } from './StreamTab';
 import { WebSocketPanel } from '../WebSocket/WebSocketPanel';
 import { FuzzModal } from './FuzzModal';
 
@@ -51,8 +53,17 @@ function deriveHookStatus(r: {
   return tests.every(t => t.passed) ? 'passed' : 'failed';
 }
 
+// Tab tooltips. Schema vs Contract is the easily-confused pair: one is a local
+// throwaway check, the other is the published contract-testing expectation.
+const TAB_HINTS: Record<string, string> = {
+  schema: 'Schema — a local, throwaway JSON-Schema check of the last response. Not saved to the contract, not published.',
+  contract: 'Contract — the published expectation (status, body shape, headers) that drives contract testing: consumer pact, bi-directional verify, can-i-deploy.',
+  stream: 'Stream — idle and total timeouts for streamed responses (SSE / NDJSON / chunked).',
+};
+
 export function RequestBuilder({ request }: Props) {
   const updateRequest       = useStore(s => s.updateRequest);
+  const updateExampleRequest  = useStore(s => s.updateExampleRequest);
   const activeEnvironmentId = useStore(s => s.activeEnvironmentId);
   const activeCollectionId  = useStore(s => s.activeCollectionId);
   const environments        = useStore(s => s.environments);
@@ -65,6 +76,8 @@ export function RequestBuilder({ request }: Props) {
   const setTabRequestTab    = useStore(s => s.setTabRequestTab);
   const addHistoryEntry     = useStore(s => s.addHistoryEntry);
   const applyScriptUpdates  = useStore(s => s.applyScriptUpdates);
+  const startLiveStream     = useStore(s => s.startLiveStream);
+  const finishLiveStream    = useStore(s => s.finishLiveStream);
   const workspaceSettings   = useStore(s => s.workspace?.settings);
   const collectionTls       = useStore(s => activeCollectionId ? s.collections[activeCollectionId]?.data.tls : undefined);
 
@@ -90,8 +103,28 @@ export function RequestBuilder({ request }: Props) {
     });
   }
 
+  // When the tab is on an example, edits update the example's overrides rather
+  // than the base request (the example "overrides the request").
   function update(patch: Partial<ApiRequest>) {
-    updateRequest(request.id, patch);
+    if (activeAppTab?.exampleId) updateExampleRequest(request.id, activeAppTab.exampleId, patch);
+    else updateRequest(request.id, patch);
+  }
+
+  // Pasting a URL with a query string moves those params into the Params tab
+  // instead of leaving them in the address bar (the send path re-appends them,
+  // so the request on the wire is unchanged). Typing a URL is left untouched.
+  function handleUrlPaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    const pasted = e.clipboardData.getData('text');
+    if (!pasted.includes('?')) return;
+    const input = e.currentTarget;
+    const start = input.selectionStart ?? request.url.length;
+    const end   = input.selectionEnd ?? request.url.length;
+    const resulting = request.url.slice(0, start) + pasted + request.url.slice(end);
+    const split = extractQueryParams(resulting, request.params ?? []);
+    if (split.changed) {
+      e.preventDefault();
+      update({ url: split.url, params: split.params });
+    }
   }
 
   // Replay support: history rows (and anywhere else) call requestSend() to
@@ -204,13 +237,23 @@ export function RequestBuilder({ request }: Props) {
         useStore.getState().environments, activeEnvironmentId,
       );
       const freshSessionVars = useStore.getState().sessionVars;
-      const result = await electron.sendRequest({
-        ...basePayload,
-        environment: freshEnv,
-        request: mergedRequest,
-        collectionVars: { ...collectionVars, ...freshSessionVars },
-        globals: liveGlobals,
-      });
+      // A streamId lets the main process push live frames back for this send;
+      // the viewer renders them as they arrive. Only the main request streams.
+      const streamId = crypto.randomUUID();
+      startLiveStream(activeTabId, streamId);
+      let result;
+      try {
+        result = await electron.sendRequest({
+          ...basePayload,
+          environment: freshEnv,
+          request: mergedRequest,
+          collectionVars: { ...collectionVars, ...freshSessionVars },
+          globals: liveGlobals,
+          streamId,
+        });
+      } finally {
+        finishLiveStream(streamId);
+      }
 
       setTabResponse(activeTabId, result.response, result.scriptResult, result.sentRequest);
       applyScriptUpdates(result.scriptResult);
@@ -282,6 +325,9 @@ export function RequestBuilder({ request }: Props) {
   const isWs   = request.protocol === 'websocket';
   const isSoap = request.protocol === 'soap';
 
+  // An example is a request specimen (a saved payload), not a test — so it has
+  // no Scripts / Schema / Contract, only what it sends.
+  const isExample = !!activeAppTab?.exampleId;
   const tabs = [
     // SOAP collapses Params + Body into a single "SOAP" tab — the WSDL drives both.
     ...(!isSoap ? [{ id: 'params', label: 'Params', count: request.params.filter(p => p.enabled && p.key).length }] : []),
@@ -289,33 +335,43 @@ export function RequestBuilder({ request }: Props) {
     ...(!isWs ? [
       { id: 'body',    label: isSoap ? 'SOAP' : 'Body', count: request.body.mode !== 'none' ? 1 : 0 },
       { id: 'auth',    label: 'Auth',    count: request.auth.type !== 'none' ? 1 : 0 },
-      { id: 'scripts', label: 'Scripts', count: (hasPreScript ? 1 : 0) + (hasPostScript ? 1 : 0) },
-      { id: 'schema',   label: 'Schema',   count: request.schema?.trim() ? 1 : 0 },
-      { id: 'contract', label: 'Contract', count: (request.contract?.statusCode !== undefined || request.contract?.bodySchema?.trim() || request.contract?.headers?.some(h => h.key)) ? 1 : 0 },
+      ...(!isExample ? [
+        { id: 'scripts', label: 'Scripts', count: (hasPreScript ? 1 : 0) + (hasPostScript ? 1 : 0) },
+        { id: 'schema',   label: 'Schema',   count: request.schema?.trim() ? 1 : 0 },
+        { id: 'contract', label: 'Contract', count: (request.contract?.statusCode !== undefined || request.contract?.bodySchema?.trim() || request.contract?.headers?.some(h => h.key)) ? 1 : 0 },
+        { id: 'stream',   label: 'Stream',   count: (request.stream?.idleMs !== undefined || request.stream?.maxMs !== undefined) ? 1 : 0 },
+      ] : []),
     ] : []),
   ] as const;
 
   return (
     <div className="flex flex-col h-full">
-      {/* Request name */}
-      <div className="px-4 pt-3 pb-1 flex-shrink-0">
-        {editingName ? (
-          <input
-            autoFocus
-            value={request.name}
-            onChange={e => update({ name: e.target.value })}
-            onBlur={() => setEditingName(false)}
-            onKeyDown={e => e.key === 'Enter' && setEditingName(false)}
-            className="text-sm font-medium bg-transparent border-b border-blue-500 focus:outline-none w-full"
-          />
-        ) : (
-          <button
-            onClick={() => setEditingName(true)}
-            className="text-sm font-medium text-white hover:text-blue-400 transition-colors text-left"
-          >
-            {request.name}
-          </button>
-        )}
+      {/* Request name + example controls */}
+      <div className="px-4 pt-3 pb-1 flex-shrink-0 flex items-center justify-between gap-2">
+        <div className="min-w-0 flex items-center gap-2">
+          {editingName ? (
+            <input
+              autoFocus
+              value={request.name}
+              onChange={e => update({ name: e.target.value })}
+              onBlur={() => setEditingName(false)}
+              onKeyDown={e => e.key === 'Enter' && setEditingName(false)}
+              className="text-sm font-medium bg-transparent border-b border-blue-500 focus:outline-none w-full"
+            />
+          ) : (
+            <button
+              onClick={() => setEditingName(true)}
+              className="text-sm font-medium text-white hover:text-blue-400 transition-colors text-left truncate"
+            >
+              {request.name}
+            </button>
+          )}
+          {activeAppTab?.exampleId && (
+            <span className="shrink-0 text-[10px] uppercase tracking-wider text-amber-400 border border-amber-500/30 rounded px-1.5 py-0.5">
+              Example: {request.examples?.find(e => e.id === activeAppTab.exampleId)?.name ?? ''}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* URL bar */}
@@ -398,6 +454,7 @@ export function RequestBuilder({ request }: Props) {
         <VarInput
           value={request.url}
           onChange={url => update({ url })}
+          onPaste={handleUrlPaste}
           placeholder={
             isWs   ? 'ws://example.com/socket'
             : isSoap ? 'Endpoint (auto-filled from WSDL <soap:address>)'
@@ -451,6 +508,7 @@ export function RequestBuilder({ request }: Props) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                title={TAB_HINTS[tab.id]}
                 className={`px-3 py-1.5 text-xs transition-colors border-b-2 -mb-px ${
                   activeTab === tab.id
                     ? 'border-blue-500 text-white'
@@ -475,13 +533,22 @@ export function RequestBuilder({ request }: Props) {
 
           {/* Tab content */}
           <div className="px-4 py-3 flex-1 overflow-y-auto min-h-0">
-            {activeTab === 'params'  && <ParamsTab  request={request} onChange={update} />}
-            {activeTab === 'headers' && <HeadersTab request={request} onChange={update} />}
-            {activeTab === 'body'    && <BodyTab    request={request} onChange={update} />}
-            {activeTab === 'auth'    && <AuthTab    request={request} onChange={update} />}
-            {activeTab === 'scripts' && <ScriptsTab request={request} onChange={update} />}
-            {activeTab === 'schema'   && <SchemaTab   request={request} onChange={update} />}
-            {activeTab === 'contract' && <ContractTab request={request} onChange={update} />}
+            {(() => {
+              // On an example, Scripts/Schema/Contract are hidden; if the stored
+              // tab was one of them, fall back to Body so nothing renders blank.
+              const shown = isExample && (activeTab === 'scripts' || activeTab === 'schema' || activeTab === 'contract' || activeTab === 'stream')
+                ? 'body' : activeTab;
+              return <>
+                {shown === 'params'  && <ParamsTab  request={request} onChange={update} />}
+                {shown === 'headers' && <HeadersTab request={request} onChange={update} />}
+                {shown === 'body'    && <BodyTab    request={request} onChange={update} />}
+                {shown === 'auth'    && <AuthTab    request={request} onChange={update} />}
+                {!isExample && shown === 'scripts' && <ScriptsTab request={request} onChange={update} />}
+                {!isExample && shown === 'schema'   && <SchemaTab   request={request} onChange={update} />}
+                {!isExample && shown === 'contract' && <ContractTab request={request} onChange={update} />}
+                {!isExample && shown === 'stream'   && <StreamTab   request={request} onChange={update} />}
+              </>;
+            })()}
           </div>
         </>
       )}

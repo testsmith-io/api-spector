@@ -65,6 +65,40 @@ describe('importOpenApi', () => {
     expect(createPet?.body.mode).toBe('json');
   });
 
+  it('imports request-body examples as example payloads', async () => {
+    const col = await importOpenApi(join(FIXTURES, 'openapi.json'));
+    const createPet = Object.values(col.requests).find(r => r.name === 'Create pet');
+    const names = createPet?.examples?.map(e => e.name).sort();
+    expect(names).toEqual(['Fido', 'Rex']);
+
+    const rex = createPet!.examples!.find(e => e.name === 'Rex')!;
+    expect(rex.source).toBe('imported');
+    expect(rex.request?.body?.mode).toBe('json');
+    expect(rex.request?.body?.json).toContain('"age": 7');
+    // Full snapshot: the example also captures params/headers, so it fully
+    // defines what it sends (an example replaces the request when run).
+    expect(rex.request?.params).toBeDefined();
+    expect(rex.request?.headers).toBeDefined();
+  });
+
+  it('imports parameter examples as example payloads', async () => {
+    const col = await importOpenApi(join(FIXTURES, 'openapi.json'));
+    const listPets = Object.values(col.requests).find(r => r.name === 'List pets');
+    const large = listPets?.examples?.find(e => e.name === 'Large page');
+    expect(large).toBeDefined();
+    expect(large!.request?.params?.find(p => p.key === 'limit')?.value).toBe('100');
+    // Full snapshot: a param example still carries a (base) body + headers.
+    expect(large!.request?.body).toBeDefined();
+    expect(large!.request?.headers).toBeDefined();
+  });
+
+  it('leaves examples undefined when the spec has no named examples', async () => {
+    const col = await importOpenApi(join(FIXTURES, 'openapi.json'));
+    const getPet = Object.values(col.requests).find(r => r.name === 'Get pet');
+    expect(getPet).toBeDefined();
+    expect(getPet?.examples).toBeUndefined();
+  });
+
   it('throws on a non-existent file', async () => {
     await expect(importOpenApi('/nonexistent/file.json')).rejects.toThrow();
   });
@@ -295,6 +329,30 @@ describe('importPostman', () => {
     const col = await importPostman(join(FIXTURES, 'postman-collection.json'));
     const listPets = Object.values(col.requests).find(r => r.name === 'List pets');
     expect(listPets?.headers.some(h => h.key === 'Accept')).toBe(true);
+  });
+
+  it('imports saved examples (item.response[]) as request examples', async () => {
+    const col = await importPostman(join(FIXTURES, 'postman-collection.json'));
+    const listPets = Object.values(col.requests).find(r => r.name === 'List pets');
+    expect(listPets?.examples).toHaveLength(1);
+
+    const ex = listPets!.examples![0];
+    expect(ex.name).toBe('Two pets');
+    expect(ex.source).toBe('imported');
+    // The captured response.
+    expect(ex.response?.status).toBe(200);
+    expect(ex.response?.statusText).toBe('OK');
+    expect(ex.response?.headers['Content-Type']).toBe('application/json');
+    expect(ex.response?.body).toContain('Rex');
+    // The originating request variation (overrides the parent).
+    expect(ex.request?.method).toBe('GET');
+    expect(ex.request?.params.some(p => p.key === 'limit' && p.value === '2')).toBe(true);
+  });
+
+  it('leaves examples undefined for requests without saved responses', async () => {
+    const col = await importPostman(join(FIXTURES, 'postman-collection.json'));
+    const createPet = Object.values(col.requests).find(r => r.name === 'Create pet');
+    expect(createPet?.examples).toBeUndefined();
   });
 
   it('imports JSON body for POST', async () => {

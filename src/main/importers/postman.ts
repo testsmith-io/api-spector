@@ -3,7 +3,7 @@
 
 import { readFile } from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
-import type { Collection, ApiRequest, AuthConfig, RequestBody, KeyValuePair, Folder } from '../../shared/types';
+import type { Collection, ApiRequest, AuthConfig, RequestBody, KeyValuePair, Folder, RequestExample } from '../../shared/types';
 import { translateScript } from './script-translator';
 
 // ─── Postman v2.1 importer ────────────────────────────────────────────────────
@@ -87,20 +87,87 @@ function parseRequest(item: any, collectionAuth: any): ApiRequest {
     ? { url: item.request, method: 'GET' }
     : (item.request ?? {});
 
+  const method  = (req.method ?? 'GET').toUpperCase();
+  const url     = parseUrl(req.url);
+  const headers = parseHeaders(req.header);
+  const params  = parseParams(req.url);
+  const body    = parseBody(req.body);
+  const examples = parseExamples(item, { method, url, headers, params, body });
+
   return {
     id: uuidv4(),
     name: item.name ?? 'Request',
-    method: (req.method ?? 'GET').toUpperCase() as any,
-    url: parseUrl(req.url),
-    headers: parseHeaders(req.header),
-    params: parseParams(req.url),
+    method: method as any,
+    url,
+    headers,
+    params,
     auth: parseAuth(req.auth ?? collectionAuth),
-    body: parseBody(req.body),
+    body,
     description:       req.description ?? '',
     preRequestScript:  translateMaybe(parseScript(item.event, 'prerequest'), 'postman'),
     postRequestScript: translateMaybe(parseScript(item.event, 'test'), 'postman'),
     meta: {},
+    ...(examples ? { examples } : {}),
   };
+}
+
+/** Postman saved examples: item.response[] carries the originating request
+ *  variation (originalRequest) plus the captured response. Maps each to a
+ *  RequestExample. Defensive: skips malformed entries, returns undefined when
+ *  there are none, so requests without examples import exactly as before. */
+function parseExamples(
+  item: any,
+  parent: { method: string; url: string; headers: KeyValuePair[]; params: KeyValuePair[]; body: RequestBody },
+): RequestExample[] | undefined {
+  const responses = item?.response;
+  if (!Array.isArray(responses) || responses.length === 0) return undefined;
+
+  const examples: RequestExample[] = [];
+  for (const r of responses) {
+    if (!r || typeof r !== 'object') continue;
+
+    // A full snapshot of the request this example sends: the originating request
+    // variation if present, else the parent request. Examples fully define what
+    // they send, so every field is captured.
+    const orig = r.originalRequest;
+    const request = orig ? {
+      method: (orig.method ?? parent.method).toUpperCase() as ApiRequest['method'],
+      url:     parseUrl(orig.url),
+      headers: parseHeaders(orig.header),
+      params:  parseParams(orig.url),
+      body:    parseBody(orig.body),
+    } : {
+      method:  parent.method as ApiRequest['method'],
+      url:     parent.url,
+      headers: parent.headers,
+      params:  parent.params,
+      body:    parent.body,
+    };
+
+    const headers: Record<string, string> = {};
+    for (const h of (Array.isArray(r.header) ? r.header : [])) {
+      if (h && typeof h === 'object' && h.key) headers[h.key] = h.value ?? '';
+    }
+    const body = typeof r.body === 'string' ? r.body : '';
+    const code = typeof r.code === 'number' ? r.code : 0;
+
+    examples.push({
+      id: uuidv4(),
+      name: (typeof r.name === 'string' && r.name.trim()) ? r.name : 'Example',
+      request,
+      response: {
+        status:     code,
+        statusText: typeof r.status === 'string' ? r.status : '',
+        headers,
+        body,
+        bodySize:   body.length,
+        durationMs: typeof r.responseTime === 'number' ? r.responseTime : 0,
+      },
+      source: 'imported',
+    });
+  }
+
+  return examples.length ? examples : undefined;
 }
 
 function parseScript(events: any[] | undefined, listen: string): string | undefined {

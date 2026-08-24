@@ -10,6 +10,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { getStatusColor, getMethodColor } from '../../../../shared/colors';
 import type { HistoryEntry } from '../../../../shared/types';
 import { InteractiveBody } from './InteractiveBody';
+import { StreamView } from './StreamView';
 import { HookResultsPanel } from './HookResultsPanel';
 import { SaveAsMockModal } from './SaveAsMockModal';
 import { DiffView } from './DiffView';
@@ -121,6 +122,8 @@ export function ResponseViewer() {
   const setTabRequestTab = useStore(s => s.setTabRequestTab);
   const setTabScriptTab = useStore(s => s.setTabScriptTab);
   const isSending = activeTab?.isSending ?? false;
+  const liveStream = useStore(s => s.liveStream);
+  const streamForTab = liveStream && liveStream.tabId === activeTabId ? liveStream : null;
   const response = activeTab?.lastResponse ?? null;
   const scriptResult = activeTab?.lastScriptResult ?? null;
   const sentRequest = activeTab?.lastSentRequest ?? null;
@@ -221,6 +224,17 @@ export function ResponseViewer() {
   }
 
   if (isSending) {
+    // A streaming response renders live while the request is still open; a plain
+    // request just shows the spinner until it resolves.
+    if (streamForTab && (streamForTab.streaming || streamForTab.events.length > 0)) {
+      return (
+        <StreamView
+          events={streamForTab.events}
+          streaming={streamForTab.streaming}
+          streamId={streamForTab.streamId}
+        />
+      );
+    }
     return (
       <div className="h-full flex items-center justify-center text-surface-400 text-sm">
         Sending...
@@ -335,8 +349,8 @@ export function ResponseViewer() {
             <span className="text-[10px] text-blue-400 font-medium px-1">{contractToast.toast.msg}</span>
           )}
 
-          {/* Tree / Raw toggle — only for body tab with JSON or XML */}
-          {tab === 'body' && supportsTree && (
+          {/* Tree / Raw toggle — only for body tab with JSON or XML (not streams) */}
+          {tab === 'body' && supportsTree && !response.streamed && (
             <div className="flex rounded overflow-hidden border border-surface-800 mr-1">
               <button
                 onClick={() => setBodyView('tree')}
@@ -415,6 +429,13 @@ export function ResponseViewer() {
           )
         ) : diffMode && pinnedResponse ? (
           <DiffView pinned={pinnedResponse} current={response} />
+        ) : tab === 'body' && response.streamed ? (
+          <StreamView
+            events={response.events ?? []}
+            streaming={false}
+            streamClose={response.streamClose}
+            firstEventMs={response.firstEventMs}
+          />
         ) : tab === 'body' && supportsTree && bodyView === 'tree' ? (
           <InteractiveBody
             body={response.body}

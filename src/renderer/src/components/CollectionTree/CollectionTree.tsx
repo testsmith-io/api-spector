@@ -7,7 +7,10 @@ import type { Folder, Collection, ApiRequest } from '../../../../shared/types';
 import { FolderSettingsModal } from './FolderSettingsModal';
 import { CollectionSettingsModal } from './CollectionSettingsModal';
 import { SchemaSyncModal } from './SchemaSyncModal';
+import { PushContractModal } from './PushContractModal';
 import { RequestRow } from './RequestRow';
+import { cloudEnabled } from '../../lib/cloud-push';
+import { collectTagged } from '../../../../shared/request-collection';
 import { InlineEdit } from '../common/InlineEdit';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { DotsBtn } from '../common/ContextMenu';
@@ -28,6 +31,18 @@ export const DragCtx = createContext<{
   onDropRequest: ( destCollectionId: string, destFolderId: string, destIndex?: number ) => void
   onDropFolder: ( destCollectionId: string, destParentFolderId: string, destIndex?: number ) => void
 }>( { dragging: null, setDragging: () => { }, onDropRequest: () => { }, onDropFolder: () => { } } );
+
+// ─── Multi-select context ─────────────────────────────────────────────────────
+// Selection lives at the tree root and is read by RequestRow through context so
+// it doesn't have to be threaded through every folder level. Keys pair the
+// collection id with the request id (NUL-separated so ids can't collide).
+
+export const SelectionCtx = createContext<{
+  active: boolean
+  isSelected: ( collectionId: string, requestId: string ) => boolean
+  toggle: ( collectionId: string, requestId: string ) => void
+  clear: () => void
+}>( { active: false, isSelected: () => false, toggle: () => { }, clear: () => { } } );
 
 // ─── Tag chips ────────────────────────────────────────────────────────────────
 
@@ -88,6 +103,39 @@ export function TagChips ( {
 
 // ─── Root tree ────────────────────────────────────────────────────────────────
 
+// ─── Search ──────────────────────────────────────────────────────────────────
+
+function methodColor ( method: string ): string {
+  switch ( method ) {
+    case 'GET':    return 'text-emerald-400';
+    case 'POST':   return 'text-amber-400';
+    case 'PUT':    return 'text-sky-400';
+    case 'PATCH':  return 'text-violet-400';
+    case 'DELETE': return 'text-red-400';
+    default:       return 'text-surface-300';
+  }
+}
+
+type SearchMatch = { collectionId: string; collectionName: string; req: ApiRequest; path: string[] };
+
+/** Walk a collection's folder tree and collect every request whose name, URL,
+ *  method, or tags contain the (already lower-cased) query, remembering the
+ *  folder path so the flat result can show where each request lives. */
+function collectMatches ( col: Collection, q: string ): SearchMatch[] {
+  const out: SearchMatch[] = [];
+  const walk = ( folder: Folder, path: string[] ) => {
+    for ( const reqId of folder.requestIds ) {
+      const req = col.requests[reqId];
+      if ( !req ) continue;
+      const hay = [req.name, req.url, req.method, ...( req.meta?.tags ?? [] )].join( ' ' ).toLowerCase();
+      if ( hay.includes( q ) ) out.push( { collectionId: col.id, collectionName: col.name, req, path } );
+    }
+    for ( const sub of folder.folders ) walk( sub, [...path, sub.name] );
+  };
+  walk( col.rootFolder, [] );
+  return out;
+}
+
 export function CollectionTree () {
   const collections = useStore( s => s.collections );
   const activeCollectionId = useStore( s => s.activeCollectionId );
@@ -120,7 +168,28 @@ export function CollectionTree () {
   const moveFolder = useStore( s => s.moveFolder );
 
   const colList = Object.values( collections );
+  const [query, setQuery] = useState( '' );
+  const q = query.trim().toLowerCase();
+  const matches = q ? colList.flatMap( ( { data } ) => collectMatches( data, q ) ) : [];
   const [pendingConfirm, setPendingConfirm] = useState<{ message: string; onConfirm: () => void } | null>( null );
+
+  // ── Multi-select ──────────────────────────────────────────────────────────
+  const [selected, setSelected] = useState<Set<string>>( () => new Set() );
+  const selKey = ( c: string, r: string ) => `${c} ${r}`;
+  const selectionCtx = {
+    active:     selected.size > 0,
+    isSelected: ( c: string, r: string ) => selected.has( selKey( c, r ) ),
+    toggle:     ( c: string, r: string ) => setSelected( prev => {
+      const next = new Set( prev );
+      const k = selKey( c, r );
+      if ( next.has( k ) ) next.delete( k ); else next.add( k );
+      return next;
+    } ),
+    clear:      () => setSelected( new Set() ),
+  };
+  function forEachSelected ( fn: ( collectionId: string, requestId: string ) => void ) {
+    selected.forEach( k => { const i = k.indexOf( ' ' ); fn( k.slice( 0, i ), k.slice( i + 1 ) ); } );
+  }
   const [newRequestId, setNewRequestId] = useState<string | null>( null );
   const [dragging, setDragging] = useState<DragState | null>( null );
 
@@ -143,6 +212,7 @@ export function CollectionTree () {
 
   return (
     <DragCtx.Provider value={{ dragging, setDragging, onDropRequest, onDropFolder }}>
+     <SelectionCtx.Provider value={selectionCtx}>
       <div className="flex flex-col flex-1 min-h-0 select-none">
         {pendingConfirm && (
           <ConfirmDialog
@@ -151,7 +221,56 @@ export function CollectionTree () {
             onCancel={() => setPendingConfirm( null )}
           />
         )}
+        {colList.length > 0 && (
+          <div className="px-2 py-1.5 border-b border-surface-800 shrink-0">
+            <div className="relative">
+              <input
+                value={query}
+                onChange={e => setQuery( e.target.value )}
+                onKeyDown={e => { if ( e.key === 'Escape' ) setQuery( '' ); }}
+                placeholder="Search requests…"
+                className="w-full text-xs bg-surface-800 border border-surface-700 rounded pl-2 pr-6 py-1 focus:outline-none focus:border-blue-500 placeholder-surface-500"
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery( '' )}
+                  title="Clear (Esc)"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center text-surface-500 hover:text-surface-200 leading-none"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto">
+          {q ? (
+            matches.length === 0 ? (
+              <p className="px-3 py-3 text-xs text-surface-500">
+                No requests match &ldquo;{query.trim()}&rdquo;.
+              </p>
+            ) : (
+              <div className="py-1">
+                <p className="px-3 pb-1 text-[10px] uppercase tracking-wider text-surface-500">
+                  {matches.length} {matches.length === 1 ? 'match' : 'matches'}
+                </p>
+                {matches.map( ( { collectionId, collectionName, req, path } ) => (
+                  <button
+                    key={`${collectionId}:${req.id}`}
+                    onClick={() => openInTab( req.id, collectionId )}
+                    className={`w-full text-left flex items-baseline gap-2 px-3 py-1 hover:bg-surface-800 transition-colors ${req.id === activeRequestId ? 'bg-surface-800' : ''}`}
+                  >
+                    <span className={`text-[9px] font-mono font-bold w-10 shrink-0 ${methodColor( req.method )}`}>{req.method}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="text-xs text-surface-200 truncate block">{req.name}</span>
+                      <span className="text-[10px] text-surface-500 truncate block">{[collectionName, ...path].join( ' › ' )}</span>
+                    </span>
+                  </button>
+                ) )}
+              </div>
+            )
+          ) : (
+          <>
           {colList.map( ( { data: col } ) => (
             <CollectionNode
               key={col.id}
@@ -194,8 +313,43 @@ export function CollectionTree () {
               <p className="pt-1">or import from Postman / OpenAPI above.</p>
             </div>
           )}
+          </>
+          )}
         </div>
+
+        {selected.size > 0 && (
+          <div className="shrink-0 border-t border-surface-700 bg-surface-900 px-2 py-1.5 flex items-center gap-1 text-xs">
+            <span className="text-surface-300 mr-auto">{selected.size} selected</span>
+            <button
+              onClick={() => forEachSelected( ( _c, r ) => updateRequest( r, { disabled: false } ) )}
+              className="px-2 py-0.5 rounded hover:bg-surface-800 text-surface-300 transition-colors"
+              title="Enable selected requests"
+            >Enable</button>
+            <button
+              onClick={() => forEachSelected( ( _c, r ) => updateRequest( r, { disabled: true } ) )}
+              className="px-2 py-0.5 rounded hover:bg-surface-800 text-surface-300 transition-colors"
+              title="Disable selected requests"
+            >Disable</button>
+            <button
+              onClick={() => { forEachSelected( ( c, r ) => duplicateRequest( c, r ) ); selectionCtx.clear(); }}
+              className="px-2 py-0.5 rounded hover:bg-surface-800 text-surface-300 transition-colors"
+            >Duplicate</button>
+            <button
+              onClick={() => confirmThen(
+                `Delete ${selected.size} request${selected.size === 1 ? '' : 's'}?`,
+                () => { forEachSelected( ( c, r ) => deleteRequest( c, r ) ); selectionCtx.clear(); },
+              )}
+              className="px-2 py-0.5 rounded hover:bg-red-900/40 text-red-400 transition-colors"
+            >Delete</button>
+            <button
+              onClick={selectionCtx.clear}
+              className="px-1.5 py-0.5 rounded hover:bg-surface-800 text-surface-500 transition-colors"
+              title="Clear selection"
+            >×</button>
+          </div>
+        )}
       </div>
+     </SelectionCtx.Provider>
     </DragCtx.Provider>
   );
 }
@@ -245,6 +399,7 @@ function CollectionNode ( {
   const [renaming, setRenaming] = useState( false );
   const [showSettings, setShowSettings] = useState( false );
   const [showSchemaSync, setShowSchemaSync] = useState( false );
+  const [showPushContract, setShowPushContract] = useState( false );
   const [expandCtrl, setExpandCtrl] = useState<ExpandCtrl>( { value: true, seq: 0 } );
   const [dropOver, setDropOver] = useState( false );
   const dragCtx = useContext( DragCtx );
@@ -296,6 +451,7 @@ function CollectionNode ( {
             { type: 'item', label: 'Collection data', icon: <TableIcon />, onClick: onSelectCollection },
             { type: 'item', label: 'Settings', icon: <GearIcon />, onClick: () => setShowSettings( true ) },
             { type: 'item', label: 'Sync schemas', icon: <SyncIcon />, onClick: () => setShowSchemaSync( true ) },
+            ...( cloudEnabled() ? [{ type: 'item' as const, label: 'Push contract to cloud', icon: <SyncIcon />, onClick: () => setShowPushContract( true ) }] : [] ),
             { type: 'item', label: 'Rename', icon: <PencilIcon />, onClick: () => setRenaming( true ) },
             { type: 'item', label: 'Duplicate', icon: <CopyIcon />, onClick: onDuplicateCollection },
             { type: 'separator' },
@@ -327,6 +483,13 @@ function CollectionNode ( {
           onSetRequestHookType={onSetRequestHookType}
           onToggleRequestDisabled={onToggleRequestDisabled}
           onRunFolder={onRunFolder}
+        />
+      )}
+      {showPushContract && (
+        <PushContractModal
+          requests={collectTagged( col.rootFolder, col.requests, col.collectionVariables ?? {}, [] ).map( c => c.request )}
+          defaultConsumer={col.name}
+          onClose={() => setShowPushContract( false )}
         />
       )}
       {showSettings && (
@@ -374,7 +537,9 @@ function FolderRow ( {
   const [renaming, setRenaming] = useState( false );
   const [showSettings, setShowSettings] = useState( false );
   const [showSchemaSync, setShowSchemaSync] = useState( false );
+  const [showPushContract, setShowPushContract] = useState( false );
   const [addingTag, setAddingTag] = useState( false );
+  const folderCollection = useStore( s => s.collections[collectionId]?.data );
   const [dropPos, setDropPos] = useState<'before' | 'inside' | 'after' | null>( null );
   const dragCtx = useContext( DragCtx );
   const tags = folder.tags ?? [];
@@ -466,6 +631,7 @@ function FolderRow ( {
             { type: 'separator' },
             { type: 'item', label: 'Settings', icon: <KeyIcon />, onClick: () => setShowSettings( true ) },
             { type: 'item', label: 'Sync schemas', icon: <SyncIcon />, onClick: () => setShowSchemaSync( true ) },
+            ...( cloudEnabled() ? [{ type: 'item' as const, label: 'Push contract to cloud', icon: <SyncIcon />, onClick: () => setShowPushContract( true ) }] : [] ),
             { type: 'item', label: 'Add tag', icon: <TagIcon />, onClick: () => setAddingTag( true ) },
             { type: 'item', label: 'Rename', icon: <PencilIcon />, onClick: () => setRenaming( true ) },
             { type: 'item', label: 'Duplicate', icon: <CopyIcon />, onClick: onDuplicate },
@@ -477,6 +643,13 @@ function FolderRow ( {
 
       {expanded && children}
 
+      {showPushContract && folderCollection && (
+        <PushContractModal
+          requests={collectTagged( folder, folderCollection.requests, {}, [] ).map( c => c.request )}
+          defaultConsumer={folder.name}
+          onClose={() => setShowPushContract( false )}
+        />
+      )}
       {showSettings && (
         <FolderSettingsModal
           collectionId={collectionId}
@@ -527,6 +700,15 @@ function FolderContents ( {
   onToggleRequestDisabled: ( requestId: string ) => void
   onRunFolder: ( folderId: string ) => void
 } ) {
+  // Example actions + the currently-open example are read here so they don't
+  // have to be threaded through the whole folder prop chain.
+  const activeExampleId  = useStore( s => { const t = s.tabs.find( x => x.id === s.activeTabId ); return t?.exampleId ?? null; } );
+  const addExampleFromRequest = useStore( s => s.addExampleFromRequest );
+  const openExample      = useStore( s => s.openExample );
+  const renameExample    = useStore( s => s.renameExample );
+  const deleteExample    = useStore( s => s.deleteExample );
+  const duplicateExample = useStore( s => s.duplicateExample );
+
   return (
     <>
       {folder.folders.map( ( sub, subIndex ) => (
@@ -593,6 +775,8 @@ function FolderContents ( {
             isActive={req.id === activeRequestId}
             autoRename={req.id === newRequestId}
             indent={( depth + 1 ) * 12 + 8}
+            examples={req.examples?.map( e => ( { id: e.id, name: e.name } ) )}
+            activeExampleId={req.id === activeRequestId ? activeExampleId : null}
             onSelect={() => onSelectRequest( req.id )}
             onRename={name => onRenameRequest( req.id, name )}
             onDelete={() => onDeleteRequest( req.id )}
@@ -600,6 +784,11 @@ function FolderContents ( {
             onUpdateTags={tags => onUpdateRequestTags( req.id, tags )}
             onSetHookType={ht => onSetRequestHookType( req.id, ht )}
             onToggleDisabled={() => onToggleRequestDisabled( req.id )}
+            onAddExample={() => { const exId = addExampleFromRequest( req.id ); if ( exId ) openExample( req.id, collectionId, exId ); }}
+            onOpenExample={exId => openExample( req.id, collectionId, exId )}
+            onRenameExample={( exId, name ) => renameExample( req.id, exId, name )}
+            onDeleteExample={exId => deleteExample( req.id, exId )}
+            onDuplicateExample={exId => duplicateExample( req.id, exId )}
           />
         );
       } )}

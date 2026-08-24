@@ -18,6 +18,9 @@ import type { FullState } from '../index';
 export interface AppTab {
   id: string
   requestId: string | null
+  /** When set, this tab is editing an EXAMPLE of `requestId` (its overrides +
+   *  saved response), not the base request. Null/undefined = the base request. */
+  exampleId?: string | null
   scriptTab: 'pre' | 'post'
   collectionId: string | null
   lastResponse: ResponsePayload | null
@@ -25,13 +28,14 @@ export interface AppTab {
   lastSentRequest: SentRequest | null
   lastHookResults: RunRequestResult[] | null
   isSending: boolean
-  requestTab: 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'schema' | 'contract'
+  requestTab: 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'schema' | 'contract' | 'stream'
 }
 
-export function makeTab(requestId: string, collectionId: string, opts: { protocol?: ApiRequest['protocol'] } = {}): AppTab {
+export function makeTab(requestId: string, collectionId: string, opts: { protocol?: ApiRequest['protocol']; exampleId?: string | null } = {}): AppTab {
   return {
     id: uuidv4(),
     requestId,
+    exampleId: opts.exampleId ?? null,
     collectionId,
     lastResponse: null,
     lastScriptResult: null,
@@ -111,7 +115,7 @@ export const createTabsSlice: StateCreator<
 
   openInTab: (requestId, collectionId) => set(s => {
     s.collectionPanelOpen = false; // activating a request supersedes the data panel
-    const existing = s.tabs.find(t => t.requestId === requestId);
+    const existing = s.tabs.find(t => t.requestId === requestId && !t.exampleId);
     if (existing) {
       s.activeTabId = existing.id;
       s.activeCollectionId = collectionId;

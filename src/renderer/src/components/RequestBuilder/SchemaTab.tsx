@@ -86,6 +86,12 @@ export function SchemaTab({ request, onChange }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
+      {/* What this tab is — and how it differs from Contract. */}
+      <div className="rounded-lg border border-amber-700/40 bg-amber-950/20 px-3 py-2 text-[11px] leading-relaxed text-amber-200/90">
+        <span className="font-semibold text-amber-300">Schema — a local scratch check.</span>{' '}
+        Validate this request&apos;s last response against a JSON Schema, right here. It is <strong>not saved to the contract and not published</strong> — a dev-time sanity check only. To define what the provider <em>must</em> return (which drives contract testing), use the <strong>Contract</strong> tab.
+      </div>
+
       <div className="flex items-center justify-between">
         <span className="text-[10px] text-surface-600 uppercase tracking-wider font-medium">
           JSON Schema (draft-07+)
@@ -110,7 +116,7 @@ export function SchemaTab({ request, onChange }: Props) {
         </div>
       </div>
       <p className="text-[10px] text-surface-600">
-        Standalone schema for ad-hoc validation. Independent of the contract - edits here don&apos;t affect it.
+        Standalone &mdash; edits here don&apos;t touch the contract. Use &ldquo;Derive from contract&rdquo; to start from it.
       </p>
 
       {/* Schema editor */}

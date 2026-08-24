@@ -3,10 +3,14 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../../store';
+import { cloudEnabled } from '../../lib/cloud-push';
+import { PushToCloudModal } from './PushToCloudModal';
+import type { MockServer } from '../../../../shared/types';
 
 const { electron } = window;
 
 export function MockPanel() {
+  const [pushTarget, setPushTarget] = useState<MockServer | null>(null);
   const mocks         = useStore(s => s.mocks);
   const activeMockId  = useStore(s => s.activeMockId);
   const setActiveMock = useStore(s => s.setActiveMockId);
@@ -112,6 +116,7 @@ export function MockPanel() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
+      {pushTarget && <PushToCloudModal mock={pushTarget} onClose={() => setPushTarget(null)} />}
 
       {/* ── Recorder section ── */}
       <div className="border-b border-surface-800 flex-shrink-0">
@@ -222,6 +227,7 @@ export function MockPanel() {
         </div>
       )}
 
+
       <div className="flex-1 overflow-y-auto">
         {mockList.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
@@ -269,6 +275,15 @@ export function MockPanel() {
                   >
                     {entry.running ? '■' : '▶'}
                   </button>
+                  {cloudEnabled() && (
+                    <button
+                      onClick={e => { e.stopPropagation(); setPushTarget(mock); }}
+                      className="text-[10px] px-1 py-0.5 rounded text-surface-500 hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-colors"
+                      title="Push to cloud (choose routes)"
+                    >
+                      ☁
+                    </button>
+                  )}
                   <button
                     onClick={e => handleDelete(e, mock.id)}
                     className="text-[10px] px-1 py-0.5 rounded text-surface-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-colors"

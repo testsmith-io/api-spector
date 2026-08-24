@@ -4,11 +4,12 @@
 import { type IpcMain, dialog } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
-import { writeFile } from 'fs/promises';
+import { writeFile, mkdir } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
-import type { ContractRunPayload, ContractReport, ContractSnapshot } from '../../shared/types';
+import type { ContractRunPayload, ContractReport, ContractSnapshot, ApiRequest } from '../../shared/types';
+import { loadDesignContractRequests } from '../contract/design-contracts';
 import { runConsumerContracts }   from '../contract/consumer-verifier';
 import { runProviderVerification } from '../contract/provider-verifier';
 import { runLiveProviderVerification } from '../contract/provider-live-verifier';
@@ -17,6 +18,8 @@ import { recordResult }           from '../contract/results-store';
 import { runFuzz, type FuzzOptions, type FuzzRunResult } from '../contract/fuzz';
 import { inferSchemaFromJson }    from '../contract/schema-inferrer';
 import { reportToHtml, type ReportMeta } from '../contract/html-report';
+import { designContractToPact } from '../contract/design-pact';
+import type { ConsumerContract } from '../../shared/types';
 import {
   captureSnapshot, listSnapshots, loadSnapshot, deleteSnapshot, relPathOf,
 } from '../contract/snapshots';
@@ -38,8 +41,30 @@ async function resolveSnapshotSpec(relPath: string): Promise<{ specPath: string 
 export function registerContractHandlers(ipc: IpcMain): void {
   handleIpc(ipc, IPC.contract.run, async (_e, payload: ContractRunPayload): Promise<ContractReport> => {
     validateContractRunPayload(payload);
-    const { mode, requests, envVars, collectionVars = {}, requestBaseUrl, providerBaseUrl, stateHandlerUrl } = payload;
+    const { mode, envVars, collectionVars = {}, requestBaseUrl, providerBaseUrl, stateHandlerUrl } = payload;
+    let requests: ApiRequest[] = payload.requests;
     let { specUrl, specPath } = payload;
+
+    // Design-first contracts (Contract Designer + pacts/) run directly in the
+    // contract-bearing modes — no pact-import — exactly like the CLI. Provider
+    // mode validates all requests against a spec, so it is left untouched.
+    if (mode !== 'provider') {
+      const designReqs = await loadDesignContractRequests(
+        { designContracts: payload.designContracts },
+        getWorkspaceDir() ?? undefined,
+      );
+      const keyOf = (r: ApiRequest): string => `${r.method} ${r.url} ${r.name}`;
+      const seen = new Set(requests.map(keyOf));
+      const fresh = designReqs.filter(r => !seen.has(keyOf(r)));
+      if (fresh.length) {
+        requests = [...requests, ...fresh];
+        // Imported pacts use {{baseUrl}}; default it to empty so the path resolves
+        // and provider-live / bidirectional rebase onto the real provider.
+        if (envVars['baseUrl'] === undefined && collectionVars['baseUrl'] === undefined) {
+          collectionVars['baseUrl'] = '';
+        }
+      }
+    }
 
     if (payload.specSnapshotRelPath) {
       const resolved = await resolveSnapshotSpec(payload.specSnapshotRelPath);
@@ -78,6 +103,22 @@ export function registerContractHandlers(ipc: IpcMain): void {
     if (canceled || !filePath) return false;
     await writeFile(filePath, reportToHtml(report, { generatedAt: new Date().toISOString(), ...meta }), 'utf8');
     return true;
+  });
+
+  // Compile a design-first consumer contract to a Pact v3 file inside the
+  // workspace (pacts/<consumer>-<provider>.pact.json), so it travels with the
+  // project and commits to git. Local-first, no cloud needed: this pact can be
+  // imported or verified locally with `contract run`. Returns the path written,
+  // relative to the workspace dir.
+  handleIpc(ipc, IPC.contract.exportDesignPact, async (_e, contract: ConsumerContract): Promise<string> => {
+    const dir = getWorkspaceDir();
+    if (!dir) throw new Error('No workspace open — open or save a workspace first.');
+    const safe = (s: string) => (s || 'unnamed').replace(/[^a-zA-Z0-9._-]+/g, '-');
+    const relPath = join('pacts', `${safe(contract.consumer)}-${safe(contract.provider)}.pact.json`);
+    const fullPath = join(dir, relPath);
+    await mkdir(join(dir, 'pacts'), { recursive: true });
+    await writeFile(fullPath, JSON.stringify(designContractToPact(contract), null, 2), 'utf8');
+    return relPath;
   });
 
   // ── Snapshots (pinned spec versions) ───────────────────────────────────────

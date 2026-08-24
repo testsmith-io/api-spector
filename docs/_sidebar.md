@@ -26,6 +26,8 @@
 
 - **Reference**
   - [Contract Testing Types](reference/contract-testing-types.md)
+  - [Contract Testing Workflows](reference/contract-testing-workflows.md)
+  - [Contract Testing: Toolshop Example](reference/contract-testing-toolshop.md)
   - [Variables & Scopes](reference/variables.md)
   - [Faker: Dynamic Test Data](reference/faker.md)
   - [Scripting API](reference/scripting.md)

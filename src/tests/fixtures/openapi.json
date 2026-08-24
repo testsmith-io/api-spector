@@ -1,22 +1,52 @@
 {
   "openapi": "3.0.0",
-  "info": { "title": "Pet Store", "version": "1.0.0", "description": "A sample API" },
-  "servers": [{ "url": "https://api.petstore.com/v1" }],
+  "info": {
+    "title": "Pet Store",
+    "version": "1.0.0",
+    "description": "A sample API"
+  },
+  "servers": [
+    {
+      "url": "https://api.petstore.com/v1"
+    }
+  ],
   "paths": {
     "/pets": {
       "get": {
         "summary": "List pets",
         "operationId": "listPets",
-        "tags": ["pets"],
-        "parameters": [
-          { "name": "limit", "in": "query", "schema": { "type": "integer" } }
+        "tags": [
+          "pets"
         ],
-        "responses": { "200": { "description": "ok" } }
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "examples": {
+              "Small page": {
+                "value": 5
+              },
+              "Large page": {
+                "value": 100
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
       },
       "post": {
         "summary": "Create pet",
         "operationId": "createPet",
-        "tags": ["pets"],
+        "tags": [
+          "pets"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -24,40 +54,93 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "name": { "type": "string" },
-                  "age":  { "type": "integer" }
+                  "name": {
+                    "type": "string"
+                  },
+                  "age": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "examples": {
+                "Fido": {
+                  "summary": "A dog",
+                  "value": {
+                    "name": "Fido",
+                    "age": 3
+                  }
+                },
+                "Rex": {
+                  "summary": "Older dog",
+                  "value": {
+                    "name": "Rex",
+                    "age": 7
+                  }
                 }
               }
             }
           }
         },
-        "responses": { "201": { "description": "created" } }
+        "responses": {
+          "201": {
+            "description": "created"
+          }
+        }
       }
     },
     "/pets/{id}": {
       "get": {
         "summary": "Get pet",
         "operationId": "getPet",
-        "tags": ["pets"],
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        "tags": [
+          "pets"
         ],
-        "responses": { "200": { "description": "ok" } }
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
       },
       "delete": {
         "summary": "Delete pet",
         "operationId": "deletePet",
-        "tags": ["pets"],
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        "tags": [
+          "pets"
         ],
-        "responses": { "204": { "description": "deleted" } }
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "deleted"
+          }
+        }
       }
     }
   },
   "components": {
     "securitySchemes": {
-      "bearerAuth": { "type": "http", "scheme": "bearer" }
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
     }
   }
 }

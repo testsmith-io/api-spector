@@ -1,7 +1,7 @@
 {
   "name": "@testsmith/api-spector",
   "productName": "API Spector",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "Local-first API testing tool to inspect, test and mock APIs",
   "repository": {
     "type": "git",
@@ -43,6 +43,7 @@
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "build:icons": "node scripts/build-icons.mjs",
+    "build:agent": "node scripts/build-agent.mjs",
     "prepare": "npm run build:icons && node scripts/patch-electron-name.mjs",
     "prepublishOnly": "npm run build && npm run build:icons"
   },
@@ -50,6 +51,8 @@
     "@codemirror/lang-javascript": "^6.2.5",
     "@eslint/js": "^9.39.4",
     "@tailwindcss/postcss": "^4.2.2",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
     "@types/js-yaml": "^4.0.9",
     "@types/jszip": "^3.4.1",
     "@types/node": "^25.5.0",
@@ -58,17 +61,16 @@
     "@types/tv4": "^1.2.33",
     "@types/uuid": "^9.0.0",
     "@types/ws": "^8.18.1",
-    "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.1.0",
     "@vitejs/plugin-react": "^4.3.1",
     "@vitest/coverage-v8": "^3.2.4",
-    "jsdom": "^25.0.1",
     "autoprefixer": "^10.4.27",
     "electron-builder": "^26.8.1",
     "electron-vite": "^5.0.0",
+    "esbuild": "0.21.5",
     "eslint": "^9.39.4",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
+    "jsdom": "^25.0.1",
     "postcss": "^8.5.8",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",
@@ -77,6 +79,7 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
+    "@codemirror/commands": "^6.10.3",
     "@codemirror/lang-json": "^6.0.2",
     "@codemirror/lang-xml": "^6.1.0",
     "@codemirror/theme-one-dark": "^6.1.3",

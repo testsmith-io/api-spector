@@ -18,7 +18,22 @@
               "raw": "https://api.petstore.com/v1/pets?limit=10",
               "query": [{ "key": "limit", "value": "10" }]
             }
-          }
+          },
+          "response": [
+            {
+              "name": "Two pets",
+              "originalRequest": {
+                "method": "GET",
+                "header": [{ "key": "Accept", "value": "application/json" }],
+                "url": { "raw": "https://api.petstore.com/v1/pets?limit=2", "query": [{ "key": "limit", "value": "2" }] }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[{\"id\":1,\"name\":\"Fido\"},{\"id\":2,\"name\":\"Rex\"}]",
+              "responseTime": 42
+            }
+          ]
         },
         {
           "name": "Create pet",

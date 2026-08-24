@@ -21,7 +21,8 @@
           "req-apikey-query",
           "req-digest",
           "req-ntlm",
-          "req-oauth2"
+          "req-oauth2",
+          "pre-request"
         ]
       }
     ],
@@ -175,6 +176,30 @@
         "mode": "none"
       },
       "postRequestScript": "sp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });\nsp.test('server reports authenticated', function () { sp.expect(sp.response.json().authenticated).to.equal(true); });",
+      "protocol": "http"
+    },
+    "pre-request": {
+      "id": "pre-request",
+      "name": "Pre-request script sets a value",
+      "method": "GET",
+      "url": "{{BASE_URL}}/headers",
+      "headers": [
+        {
+          "key": "X-Trace",
+          "value": "{{traceId}}",
+          "enabled": true
+        }
+      ],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "preRequestScript": "sp.collectionVariables.set('traceId', 'trace-' + Date.now());",
+      "postRequestScript": "sp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });\nsp.test('trace header was sent', function () { sp.expect(sp.response.json()).to.have.property('x-trace'); });",
+      "description": "A pre-request script computes a value that the request then sends as a header.",
       "protocol": "http"
     }
   },

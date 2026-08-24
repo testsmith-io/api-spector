@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { useStore } from '../../store';
 import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
+import { ContractDesignerModal } from './ContractDesignerModal';
 import type { ContractMode, FuzzReport } from '../../../../shared/types';
 
 const { electron } = window;
@@ -34,6 +35,28 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
   const workspace = useStore(s => s.workspace);
 
   const [mode, setMode]               = useState<PanelMode>('consumer');
+  const [showDesigner, setShowDesigner] = useState(false);
+  const cloudConnected = useStore(s => Boolean(s.workspace?.settings?.cloud?.enabled));
+  const [providerName, setProviderName] = useState('');
+  const [specVersion, setSpecVersion]   = useState('');
+  const [publishingSpec, setPublishingSpec] = useState(false);
+  const [publishNote, setPublishNote]   = useState<string | null>(null);
+
+  async function publishSpecToCloud() {
+    setError(null); setPublishNote(null); setPublishingSpec(true);
+    try {
+      const res = await electron.cloudPushSpec({
+        pacticipant: providerName.trim(),
+        version: specVersion.trim(),
+        specUrl: specUrl.trim(),
+      });
+      setPublishNote(`Published ${providerName.trim()}@${specVersion.trim()} — ${res.verified_contracts} contract(s) re-verified`);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setPublishingSpec(false);
+    }
+  }
   const [specUrl, setSpecUrl]         = useState('');
   const [requestBaseUrl, setRequestBaseUrl] = useState('');
   const [providerBaseUrl, setProviderBaseUrl] = useState('');
@@ -59,6 +82,10 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
   const contractRequests = allRequests.filter(r =>
     r.contract && (r.contract.statusCode !== undefined || r.contract.bodySchema || r.contract.bodyMatcher || r.contract.headers?.length),
   );
+  // Design-first contracts (authored in the Designer) run too, without a manual
+  // pact-import; count their interactions so the panel reflects what will run.
+  const designInteractionCount = (workspace?.designContracts ?? [])
+    .reduce((n, cc) => n + cc.interactions.length, 0);
   const isFuzz = mode === 'fuzz';
   const needsSpec = mode === 'provider' || mode === 'bidirectional';
   // Fuzz can use a spec (mutating spec-derived inputs) but also works without one.
@@ -97,6 +124,9 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
       const result = await electron.runContracts({
         mode,
         requests,
+        // Let the main process add design-first contracts (Designer + pacts/) for
+        // the contract-bearing modes, so they run without a manual pact-import.
+        designContracts: workspace?.designContracts,
         envVars,
         collectionVars,
         specUrl:             specUrl.trim() || undefined,
@@ -193,6 +223,14 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Config area */}
       <div className="flex flex-col gap-3 px-3 py-3 border-b border-surface-800 flex-shrink-0">
+        {/* Design-first entry: author a consumer contract before any endpoint exists */}
+        <button
+          onClick={() => setShowDesigner(true)}
+          className="flex items-center justify-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-dashed border-surface-600 text-surface-300 hover:border-blue-500 hover:text-white transition-colors"
+          title="Design a consumer-driven contract up front, with no endpoints, then publish it to the cloud"
+        >
+          ✎ Design a contract (no endpoint needed)
+        </button>
         {/* Mode tabs */}
         <div className="flex gap-1 bg-surface-800 rounded-lg p-0.5">
           {([
@@ -330,6 +368,38 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
                 <p className="text-[10px] text-surface-600 mt-1 leading-relaxed">
                   Pin a snapshot to run against a specific spec version later, even after the provider ships an update.
                 </p>
+
+                {/* Provider side of bi-directional: publish the spec to the cloud broker. */}
+                {cloudConnected && (
+                  <div className="mt-2 pt-2 border-t border-surface-800 flex flex-col gap-1.5">
+                    <label className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">
+                      Publish spec to cloud <span className="text-surface-600 normal-case tracking-normal">(provider side of bi-directional)</span>
+                    </label>
+                    <div className="flex gap-1">
+                      <input
+                        value={providerName}
+                        onChange={e => setProviderName(e.target.value)}
+                        placeholder="provider name"
+                        className="flex-1 text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500 placeholder-surface-600"
+                      />
+                      <input
+                        value={specVersion}
+                        onChange={e => setSpecVersion(e.target.value)}
+                        placeholder="version (git SHA)"
+                        className="w-32 text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
+                      />
+                      <button
+                        onClick={publishSpecToCloud}
+                        disabled={publishingSpec || !specUrl.trim() || !providerName.trim() || !specVersion.trim()}
+                        title="Publish this OpenAPI spec to the broker; consumers' pacts are re-verified against it"
+                        className="px-2.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors"
+                      >
+                        {publishingSpec ? '…' : 'Publish'}
+                      </button>
+                    </div>
+                    {publishNote && <p className="text-[10px] text-emerald-400 leading-relaxed">{publishNote}</p>}
+                  </div>
+                )}
               </div>
             )}
 
@@ -431,7 +501,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
           <span className="text-[10px] text-surface-500">
             {mode === 'provider' || isFuzz
               ? `${allRequests.length} request${allRequests.length !== 1 ? 's' : ''}`
-              : `${contractRequests.length} contract${contractRequests.length !== 1 ? 's' : ''} defined`}
+              : `${contractRequests.length + designInteractionCount} contract${(contractRequests.length + designInteractionCount) !== 1 ? 's' : ''} defined`}
           </span>
           <button
             onClick={isFuzz ? runFuzz : runContracts}
@@ -500,6 +570,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
           </div>
         )}
       </div>
+      {showDesigner && <ContractDesignerModal onClose={() => setShowDesigner(false)} />}
     </div>
   );
 }

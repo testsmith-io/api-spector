@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 300" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#616b7a"/></marker>
+    <marker id="ac" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b45611"/></marker>
+    <marker id="ap" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6a3ff2"/></marker>
+    <marker id="ab" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f62ff"/></marker>
+  </defs>
+  <style>
+    .t{font-size:13px;font-weight:600;fill:#171b22}.s{font-size:11px;fill:#616b7a}
+    .h{font-size:11px;font-weight:700;letter-spacing:.04em}
+    .cons{fill:#fbf0e6;stroke:#b45611}.prov{fill:#efeafe;stroke:#6a3ff2}.acc{fill:#e7eeff;stroke:#2f62ff}
+    .art{fill:#ffffff;stroke:#d5dae2}.pass{fill:#e4f4ec;stroke:#0f8a56}
+    rect{stroke-width:1.5}
+  </style>
+
+  <!-- LANE 1: consumer-driven -->
+  <text x="16" y="24" class="h" fill="#b45611">CONSUMER-DRIVEN · needs an SDK to record + replay</text>
+  <rect x="16" y="34" width="180" height="46" rx="9" class="cons"/>
+  <text x="106" y="55" text-anchor="middle" class="t" fill="#b45611">Consumer + SDK</text>
+  <text x="106" y="72" text-anchor="middle" class="s">records a pact</text>
+  <rect x="252" y="42" width="92" height="30" rx="7" class="art"/><text x="298" y="61" text-anchor="middle" class="t">pact.json</text>
+  <rect x="400" y="34" width="200" height="46" rx="9" class="prov"/>
+  <text x="500" y="55" text-anchor="middle" class="t" fill="#6a3ff2">Provider replays</text>
+  <text x="500" y="72" text-anchor="middle" class="s">vs a RUNNING provider</text>
+  <rect x="656" y="42" width="168" height="30" rx="7" class="pass"/><text x="740" y="61" text-anchor="middle" class="t" fill="#0f8a56">pass / fail</text>
+  <path d="M196,57 L250,57" stroke="#b45611" stroke-width="1.6" fill="none" marker-end="url(#ac)"/>
+  <path d="M344,57 L398,57" stroke="#6a3ff2" stroke-width="1.6" fill="none" marker-end="url(#ap)"/>
+  <path d="M600,57 L654,57" stroke="#616b7a" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+
+  <line x1="16" y1="108" x2="824" y2="108" stroke="#e3e7ee"/>
+
+  <!-- LANE 2: provider-driven -->
+  <text x="16" y="132" class="h" fill="#6a3ff2">PROVIDER-DRIVEN · no Pact SDK</text>
+  <rect x="16" y="142" width="180" height="46" rx="9" class="prov"/>
+  <text x="106" y="163" text-anchor="middle" class="t" fill="#6a3ff2">Provider OpenAPI</text>
+  <text x="106" y="180" text-anchor="middle" class="s">= the contract</text>
+  <rect x="252" y="150" width="92" height="30" rx="7" class="art"/><text x="298" y="169" text-anchor="middle" class="t">spec</text>
+  <rect x="400" y="142" width="200" height="46" rx="9" class="cons"/>
+  <text x="500" y="163" text-anchor="middle" class="t" fill="#b45611">Consumer conforms</text>
+  <text x="500" y="180" text-anchor="middle" class="s">schema check · spec-mock</text>
+  <rect x="656" y="150" width="168" height="30" rx="7" class="pass"/><text x="740" y="169" text-anchor="middle" class="t" fill="#0f8a56">pass / fail</text>
+  <path d="M196,165 L250,165" stroke="#6a3ff2" stroke-width="1.6" fill="none" marker-end="url(#ap)"/>
+  <path d="M344,165 L398,165" stroke="#616b7a" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+  <path d="M600,165 L654,165" stroke="#616b7a" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+
+  <line x1="16" y1="216" x2="824" y2="216" stroke="#e3e7ee"/>
+
+  <!-- LANE 3: bi-directional -->
+  <text x="16" y="240" class="h" fill="#2f62ff">BI-DIRECTIONAL · no SDK · API Spector native</text>
+  <rect x="16" y="250" width="150" height="20" rx="6" class="cons"/><text x="91" y="264" text-anchor="middle" class="s" fill="#b45611">consumer pact</text>
+  <rect x="16" y="274" width="150" height="20" rx="6" class="prov"/><text x="91" y="288" text-anchor="middle" class="s" fill="#6a3ff2">provider spec</text>
+  <rect x="300" y="252" width="210" height="40" rx="9" class="acc"/>
+  <text x="405" y="270" text-anchor="middle" class="t" fill="#2f62ff">Broker compares</text>
+  <text x="405" y="285" text-anchor="middle" class="s">pact ↔ spec · static</text>
+  <rect x="606" y="257" width="168" height="30" rx="7" class="pass"/><text x="690" y="276" text-anchor="middle" class="t" fill="#0f8a56">pass / fail</text>
+  <path d="M166,262 C230,262 240,270 298,271" stroke="#b45611" stroke-width="1.6" fill="none" marker-end="url(#ac)"/>
+  <path d="M166,284 C230,284 240,275 298,274" stroke="#6a3ff2" stroke-width="1.6" fill="none" marker-end="url(#ap)"/>
+  <path d="M510,272 L604,272" stroke="#2f62ff" stroke-width="1.6" fill="none" marker-end="url(#ab)"/>
+</svg>

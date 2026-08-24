@@ -1,0 +1,30 @@
+{
+  "version": "1.0",
+  "id": "c97ac0e2-a4fe-446a-ac4d-eb99d3a33cac",
+  "name": "my-consumer → my-provider (contract mock)",
+  "port": 4100,
+  "routes": [
+    {
+      "id": "94e18ddd-1605-4b61-9342-0d796e693ddc",
+      "method": "GET",
+      "path": "/resource/:id",
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": "{\n  \"id\": 1\n}",
+      "description": "get a resource"
+    },
+    {
+      "id": "26fe6f72-3992-4b66-aad3-3d542e74c163",
+      "method": "GET",
+      "path": "/resources/:id",
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": "{\n  \"id\": 1\n}",
+      "description": "get a resource"
+    }
+  ]
+}

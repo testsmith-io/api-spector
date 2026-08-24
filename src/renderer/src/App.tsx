@@ -208,6 +208,7 @@ export default function App () {
   const setCommandPaletteOpen = useStore( s => s.setCommandPaletteOpen );
   const setWsStatus = useStore( s => s.setWsStatus );
   const addWsMessage = useStore( s => s.addWsMessage );
+  const pushLiveStreamEvents = useStore( s => s.pushLiveStreamEvents );
 
   // Fuzz report is lifted here (not in the contract store) so the parent can pick
   // which results panel to render for the contracts sidebar tab.
@@ -268,6 +269,13 @@ export default function App () {
   }, [addWsMessage, setWsStatus] );
 
   useEffect( () => {
+    electron.onRequestStreamEvent( ( { streamId, events } ) => {
+      pushLiveStreamEvents( streamId, events );
+    } );
+    return () => electron.offRequestStreamEvent();
+  }, [pushLiveStreamEvents] );
+
+  useEffect( () => {
     function handleKeyDown ( e: KeyboardEvent ) {
       if ( e.key === 'k' && ( e.metaKey || e.ctrlKey ) ) {
         e.preventDefault();
@@ -302,7 +310,26 @@ export default function App () {
   }, [collections] );
 
   const activeTab = useMemo( () => tabs.find( t => t.id === activeTabId ) ?? null, [tabs, activeTabId] );
-  const activeRequest = activeTab?.requestId ? requestsById.get( activeTab.requestId ) ?? null : null;
+  const activeBaseRequest = activeTab?.requestId ? requestsById.get( activeTab.requestId ) ?? null : null;
+  // When the tab is on an example, the example REPLACES the request when run:
+  // its params, headers and body are sent verbatim. A field the example does
+  // not list is sent empty (NOT inherited from the base request) — so an example
+  // with no body sends no body even if the base request has one. Method/URL/auth
+  // fall back to the base so the request is still runnable.
+  const activeRequest = useMemo( () => {
+    if ( !activeBaseRequest ) return null;
+    if ( !activeTab?.exampleId ) return activeBaseRequest;
+    const ex = activeBaseRequest.examples?.find( e => e.id === activeTab.exampleId );
+    if ( !ex ) return activeBaseRequest;
+    const o = ex.request ?? {};
+    return {
+      ...activeBaseRequest,
+      ...o,
+      params:  o.params  ?? [],
+      headers: o.headers ?? [],
+      body:    o.body    ?? { mode: 'none' },
+    };
+  }, [activeBaseRequest, activeTab?.exampleId] );
 
   // Stable callback so <TabRow> memoization holds — a fresh inline arrow
   // per render would invalidate every row's shallow-equal check.
@@ -459,12 +486,13 @@ export default function App () {
                 <div className="flex items-center overflow-x-auto flex-1 min-w-0">
                   {tabs.map( tab => {
                     const req = tab.requestId ? requestsById.get( tab.requestId ) ?? null : null;
+                    const exampleName = tab.exampleId ? req?.examples?.find( e => e.id === tab.exampleId )?.name : null;
                     return (
                       <TabRow
                         key={tab.id}
                         tabId={tab.id}
                         method={req?.method}
-                        name={req?.name ?? 'Untitled'}
+                        name={exampleName ? `${req?.name ?? 'Untitled'} · ${exampleName}` : ( req?.name ?? 'Untitled' )}
                         isActive={tab.id === activeTabId}
                         onActivate={setActiveTabId}
                         onClose={closeTab}

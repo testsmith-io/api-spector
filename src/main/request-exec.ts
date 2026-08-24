@@ -22,7 +22,10 @@ import type {
   RunStatus,
   RunnerItem,
   RunRequestResult,
+  StreamEvent,
+  StreamClose,
 } from '../shared/types';
+import { detectStreamKind, readStream } from './stream/parse';
 import { interpolate, buildUrl, mergeVars, buildDynamicVars } from './interpolation';
 import { runScript } from './script-runner';
 import { patchGlobals, persistGlobals } from './globals-store';
@@ -218,6 +221,18 @@ export function applyRequestDefaults(req: ApiRequest): void {
 
 // ─── Build undici dispatcher (proxy + TLS) ────────────────────────────────────
 
+// A shared HTTP/2-capable dispatcher for plain requests, so we don't build an
+// Agent per send. `allowH2` negotiates h2 via ALPN and transparently falls back
+// to HTTP/1.1 for servers that don't offer it — matching what a browser does.
+// This matters for streaming: some servers (and CDNs) only flush a response
+// body incrementally over HTTP/2; over HTTP/1.1 Node's TLS stack coalesces the
+// frames and an SSE/NDJSON stream arrives all at once at the end.
+let _defaultAgent: Agent | undefined;
+function defaultAgent(): Agent {
+  if (!_defaultAgent) _defaultAgent = new Agent({ allowH2: true } as ConstructorParameters<typeof Agent>[0]);
+  return _defaultAgent;
+}
+
 export async function buildDispatcher(
   proxy?: ProxyConfig,
   tls?: TlsConfig,
@@ -246,14 +261,15 @@ export async function buildDispatcher(
       uri: buildProxyUri({ url: proxy.url, auth: proxy.auth }),
       requestTls: hasTls ? connectOpts : undefined,
       proxyTls: hasTls ? connectOpts : undefined,
+      allowH2: true,
     } as ConstructorParameters<typeof ProxyAgent>[0]);
   }
 
   if (hasTls) {
-    return new Agent({ connect: connectOpts } as ConstructorParameters<typeof Agent>[0]);
+    return new Agent({ connect: connectOpts, allowH2: true } as ConstructorParameters<typeof Agent>[0]);
   }
 
-  return undefined;
+  return defaultAgent();
 }
 
 // ─── Body serialization ───────────────────────────────────────────────────────
@@ -314,6 +330,12 @@ export interface ExchangeOptions {
   /** Called with the outgoing request snapshot just before dispatch, so the
    *  caller still has it when the fetch itself throws. */
   onSent?: (sent: SentRequest) => void
+  /** Called for each frame of a streamed response, as it arrives. */
+  onStreamEvent?: (ev: StreamEvent) => void
+  /** Aborts an in-flight streamed read (the Stop button). */
+  signal?: AbortSignal
+  /** Force the streamed read path regardless of Content-Type. */
+  forceStream?: boolean
 }
 
 export interface ExchangeResult {
@@ -321,13 +343,18 @@ export interface ExchangeResult {
   statusText: string
   /** Response headers, unmasked. */
   rawHeaders: Record<string, string>
-  /** Response body, unmasked. */
+  /** Response body, unmasked. For a stream this is the full concatenation. */
   responseBody: string
   durationMs: number
   sentHeaders: Record<string, string>
   sentBody?: string
   /** resolvedUrl plus any apikey query param. */
   finalUrl: string
+  /** Set when the body was consumed as a stream. */
+  streamed?: boolean
+  events?: StreamEvent[]
+  streamClose?: StreamClose
+  firstEventMs?: number
 }
 
 /**
@@ -419,9 +446,31 @@ export async function performHttpExchange(opts: ExchangeOptions): Promise<Exchan
     fetchResp = await doFetch(headers);
   }
 
-  const responseBody = await fetchResp.text();
   const rawHeaders: Record<string, string> = {};
   fetchResp.headers.forEach((value, key) => { rawHeaders[key] = value; });
+
+  // Stream the body when the Content-Type is an event/line format (or the
+  // request forced it) AND the transport gave us a real ReadableStream. The
+  // NTLM path returns a non-standard response, so it falls back to buffering.
+  const kind = detectStreamKind(rawHeaders['content-type'], opts.forceStream);
+  const bodyStream = fetchResp.body as ReadableStream<Uint8Array> | null;
+  const canStream = kind !== null && bodyStream !== null && typeof bodyStream.getReader === 'function';
+
+  let responseBody: string;
+  let streamFields: Pick<ExchangeResult, 'streamed' | 'events' | 'streamClose' | 'firstEventMs'> = {};
+
+  if (canStream) {
+    const r = await readStream(bodyStream, kind, start, {
+      signal: opts.signal,
+      onEvent: opts.onStreamEvent,
+      idleMs: req.stream?.idleMs,
+      maxMs:  req.stream?.maxMs,
+    });
+    responseBody = r.text;
+    streamFields = { streamed: true, events: r.events, streamClose: r.close, firstEventMs: r.firstEventMs };
+  } else {
+    responseBody = await fetchResp.text();
+  }
 
   return {
     status: fetchResp.status,
@@ -432,6 +481,7 @@ export async function performHttpExchange(opts: ExchangeOptions): Promise<Exchan
     sentHeaders,
     sentBody: effectiveBody,
     finalUrl,
+    ...streamFields,
   };
 }
 

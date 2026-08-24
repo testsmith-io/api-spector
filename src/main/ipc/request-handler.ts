@@ -11,6 +11,7 @@ import type {
   ScriptExecutionMeta,
   SentRequest,
   TestResult,
+  StreamEvent,
 } from '../../shared/types';
 import { interpolate, buildUrl, buildEnvVars, mergeVars, buildDynamicVars } from '../interpolation';
 import { runScript } from '../script-runner';
@@ -129,9 +130,19 @@ function formatRequestError(
   return lines.join('\n');
 }
 
+// ─── Streaming ────────────────────────────────────────────────────────────────
+// Live-abort handles for in-flight streamed reads, keyed by the streamId the
+// renderer minted. The Stop button aborts through this map.
+const streamControllers = new Map<string, AbortController>();
+
 // ─── IPC handler ─────────────────────────────────────────────────────────────
 
 export function registerRequestHandler(ipc: IpcMain): void {
+  // Stop an in-flight streamed read (the response viewer's Stop button).
+  handleIpc(ipc, IPC.request.stopStream, async (_e, streamId: string) => {
+    streamControllers.get(streamId)?.abort();
+  });
+
   handleIpc(ipc, IPC.request.send, async (
     _e,
     payload: SendRequestPayload,
@@ -148,8 +159,28 @@ export function registerRequestHandler(ipc: IpcMain): void {
       proxy,
       tls,
       piiMaskPatterns = [],
+      streamId,
+      forceStream,
     } = payload;
     applyRequestDefaults(req);
+
+    // ── Streaming plumbing ─────────────────────────────────────────────────────
+    // Frames are coalesced and flushed on a short timer so a fast token stream
+    // can't flood IPC or thrash React. Masking is applied here too, so live and
+    // final frames are redacted identically to the buffered body.
+    const maskEvent = (ev: StreamEvent): StreamEvent =>
+      piiMaskPatterns.length ? { ...ev, data: maskPii(ev.data, piiMaskPatterns), json: undefined } : ev;
+    let abortController: AbortController | undefined;
+    let flushTimer: ReturnType<typeof setInterval> | undefined;
+    const pending: StreamEvent[] = [];
+    const flushStream = () => {
+      if (pending.length) _e.sender.send(IPC.request.streamEvent, { streamId, events: pending.splice(0) });
+    };
+    if (streamId) {
+      abortController = new AbortController();
+      streamControllers.set(streamId, abortController);
+      flushTimer = setInterval(flushStream, 40);
+    }
 
     const start = Date.now();
 
@@ -262,12 +293,22 @@ export function registerRequestHandler(ipc: IpcMain): void {
         proxy,
         tls,
         onSent: sent => { sentRequest = sent; },
+        forceStream,
+        signal: abortController?.signal,
+        onStreamEvent: streamId
+          ? ev => { pending.push(maskEvent(ev)); if (pending.length >= 50) flushStream(); }
+          : undefined,
       });
 
       // ── PII masking ────────────────────────────────────────────────────────
       const maskedBody    = maskPii(exchange.responseBody, piiMaskPatterns);
       const maskedHeaders = maskHeaders(exchange.rawHeaders, piiMaskPatterns);
       const bodySize      = Buffer.byteLength(exchange.responseBody, 'utf8');
+      const maskedEvents  = exchange.events?.map(maskEvent);
+      // Stream frames displayed in the viewer (masked, like the body).
+      const streamFields = exchange.streamed
+        ? { streamed: true as const, events: maskedEvents, streamClose: exchange.streamClose, firstEventMs: exchange.firstEventMs }
+        : {};
 
       response = {
         status:     exchange.status,
@@ -276,10 +317,11 @@ export function registerRequestHandler(ipc: IpcMain): void {
         body:       maskedBody,
         bodySize,
         durationMs: exchange.durationMs,
+        ...streamFields,
       };
       // Same shape but with the unmasked bytes — used only for feeding the
       // post-request script so `sp.response.json().access_token` returns the
-      // real value, not "[REDACTED]".
+      // real value, not "[REDACTED]". Unmasked events back the future sp.stream.
       scriptResponse = {
         status:     exchange.status,
         statusText: exchange.statusText,
@@ -287,6 +329,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
         body:       exchange.responseBody,
         bodySize,
         durationMs: exchange.durationMs,
+        ...(exchange.streamed ? { streamed: true as const, events: exchange.events } : {}),
       };
     } catch (err) {
       const diagnostic = formatRequestError(err, {
@@ -308,6 +351,13 @@ export function registerRequestHandler(ipc: IpcMain): void {
       };
       // Mirror for the script — same empty payload either way.
       scriptResponse = response;
+    } finally {
+      // Flush any buffered frames and release the abort handle.
+      if (streamId) {
+        if (flushTimer) clearInterval(flushTimer);
+        flushStream();
+        streamControllers.delete(streamId);
+      }
     }
 
     // ── Schema validation ─────────────────────────────────────────────────────

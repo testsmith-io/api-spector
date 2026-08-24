@@ -5,20 +5,73 @@
     "collections/data-extraction.json",
     "collections/auth-mechanisms.json",
     "collections/contract-testing.json",
-    "collections/api-from-hell.spector"
+    "collections/api-from-hell.spector",
+    "collections/new-collection.spector"
   ],
   "environments": [
     "environments/api-from-hell-env.env.json"
   ],
   "activeEnvironmentId": null,
   "mocks": [
-    "mocks/example-mock.mock.json"
+    "mocks/example-mock.mock.json",
+    "mocks/c97ac0e2-a4fe-446a-ac4d-eb99d3a33cac.mock.json"
   ],
   "contracts": [
     "contracts/toolshop-api-5-0-0-18efc664.contract.json",
     "contracts/toolshop-api-v4-4-0-0-2ba215dd.contract.json"
   ],
   "settings": {
-    "theme": "light"
-  }
+    "theme": "dark",
+    "tls": {
+      "rejectUnauthorized": true
+    },
+    "piiMaskPatterns": [
+      "authorization",
+      "password",
+      "token",
+      "secret",
+      "api-key",
+      "x-api-key"
+    ],
+    "cloud": {
+      "enabled": true,
+      "tokenSet": true
+    }
+  },
+  "designContracts": [
+    {
+      "id": "425493e5-9281-4976-a14c-dd3d91ef3c1d",
+      "consumer": "my-consumer",
+      "provider": "my-provider",
+      "interactions": [
+        {
+          "id": "94e18ddd-1605-4b61-9342-0d796e693ddc",
+          "description": "get a resource",
+          "request": {
+            "method": "GET",
+            "path": "/resource/{id}",
+            "headers": []
+          },
+          "response": {
+            "status": 200,
+            "body": "{\n  \"id\": 1\n}"
+          }
+        },
+        {
+          "id": "26fe6f72-3992-4b66-aad3-3d542e74c163",
+          "description": "get a resource",
+          "request": {
+            "method": "GET",
+            "path": "/resources/{id}",
+            "headers": []
+          },
+          "response": {
+            "status": 200,
+            "body": "{\n  \"id\": 1\n}"
+          }
+        }
+      ],
+      "updatedAt": "2026-08-22T20:02:31.822Z"
+    }
+  ]
 }

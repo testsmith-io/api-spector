@@ -5,6 +5,27 @@
 
 import type { AuthConfig, HttpMethod, KeyValuePair, RequestBody } from './http';
 import type { ContractExpectation } from './contract';
+import type { ResponsePayload } from './execution';
+import type { ConsumerContract } from './consumer-contract';
+
+/**
+ * A saved request/response snapshot attached to a request (like Postman/Bruno
+ * "examples"). The `request` is a partial OVERRIDE of the parent request — only
+ * the fields that differ are stored; everything else inherits from the parent.
+ * `response` is the response captured when the example was saved. Both optional
+ * and additive, so older `.spector` files (no `examples`) load unchanged.
+ */
+export interface RequestExample {
+  id: string
+  name: string
+  /** Overrides merged over the parent request when this example is opened/sent. */
+  request?: Partial<ApiRequest>
+  /** The response captured for this example. */
+  response?: ResponsePayload | null
+  createdAt?: string
+  /** Where the example came from, for import round-tripping. */
+  source?: 'saved' | 'imported'
+}
 
 export interface DataSet {
   /** Column headers = variable names injected per iteration. */
@@ -30,6 +51,10 @@ export interface ApiRequest {
   /** Standalone JSON Schema for ad-hoc body validation. Independent of `contract`. */
   schema?: string
   contract?: ContractExpectation
+  /** Streaming-response limits (SSE / NDJSON / chunked). Milliseconds; when a
+   *  field is unset the reader default applies (60s idle, 300s total). A value
+   *  of 0 disables that cap. */
+  stream?: { idleMs?: number; maxMs?: number }
   meta?: { tags?: string[]; createdAt?: string;[key: string]: unknown }
   /** Transport / wire protocol. Drives which UI shell is rendered:
    *  - 'http' (default) → method picker, URL bar, body modes
@@ -43,6 +68,9 @@ export interface ApiRequest {
   /** Cached GraphQL introspection result (raw JSON). Persisted so the schema
    *  explorer and query autocomplete survive tab switches and app restarts. */
   graphqlIntrospectionCache?: string
+  /** Saved request/response snapshots (Postman/Bruno-style examples). Each
+   *  overrides the parent request; shown nested under it in the tree. */
+  examples?: RequestExample[]
 }
 
 export interface Folder {
@@ -143,6 +171,8 @@ export interface Workspace {
   mocks?: string[]
   /** Paths (relative to the workspace dir) of pinned contract snapshots. */
   contracts?: string[]
+  /** Design-first consumer contracts authored in-app, stored inline. */
+  designContracts?: ConsumerContract[]
   settings?: {
     proxy?: {
       url: string
@@ -164,5 +194,14 @@ export interface Workspace {
     /** UI appearance — previously in localStorage, now travels with the workspace */
     theme?: 'dark' | 'light' | 'system'
     zoom?: number
+    /** API Spector Cloud integration. Push mocks and monitors to the hosted
+     *  service. The endpoint is not user-configurable (fixed to production; the
+     *  developer overrides it with API_SPECTOR_CLOUD_ENDPOINT). The token is NOT
+     *  stored here — it lives in the OS keychain under `cloud:token`; `tokenSet`
+     *  only records that one exists. */
+    cloud?: {
+      enabled: boolean
+      tokenSet?: boolean
+    }
   }
 }

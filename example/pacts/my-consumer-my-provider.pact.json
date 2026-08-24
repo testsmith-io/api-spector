@@ -1,0 +1,67 @@
+{
+  "consumer": {
+    "name": "my-consumer"
+  },
+  "provider": {
+    "name": "my-provider"
+  },
+  "interactions": [
+    {
+      "description": "get a resource",
+      "request": {
+        "method": "GET",
+        "path": "/resource/{id}"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": 1
+        },
+        "matchingRules": {
+          "body": {
+            "$.id": {
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "get a resource",
+      "request": {
+        "method": "GET",
+        "path": "/resources/{id}"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": 1
+        },
+        "matchingRules": {
+          "body": {
+            "$.id": {
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    },
+    "client": {
+      "name": "api-spector",
+      "designFirst": true
+    }
+  }
+}

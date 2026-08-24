@@ -18,11 +18,16 @@
             "name": "New Folder",
             "description": "",
             "folders": [],
-            "requestIds": []
+            "requestIds": [
+              "0c9a31e3-11ed-47c8-afb9-be2e8687454a",
+              "a9101a7b-ac17-45a7-82ab-30408da4d826",
+              "4cf3646e-66b9-4628-a1c0-aad0cd293966"
+            ]
           }
         ],
         "requestIds": [
           "list-brands",
+          "1a7dfd21-971d-4362-87dc-64aa2e60fdea",
           "71f8c426-7ed4-4988-8abd-d0a30a206c4b",
           "list-products",
           "category-tree"
@@ -36,7 +41,7 @@
       "id": "list-brands",
       "name": "List brands",
       "method": "GET",
-      "url": "{{TOOLSHOP_URL}}/brandscc",
+      "url": "{{TOOLSHOP_URL}}/brands",
       "headers": [],
       "params": [],
       "auth": {
@@ -103,7 +108,7 @@
     },
     "71f8c426-7ed4-4988-8abd-d0a30a206c4b": {
       "id": "71f8c426-7ed4-4988-8abd-d0a30a206c4b",
-      "name": "List brands (copy)",
+      "name": "Create a new brand",
       "method": "POST",
       "url": "{{TOOLSHOP_URL}}/brands",
       "headers": [],
@@ -113,7 +118,7 @@
       },
       "body": {
         "mode": "json",
-        "json": "{\n  \"name\": \"some name\",\n  \"slug\": \"xyz\"\n}"
+        "json": "{\n  \"name\": \"some name\",\n  \"slug\": \"{{faker.lorem.slug()}}\"\n}"
       },
       "description": "Pact-style body matcher: every brand must have string id/name and a slug matching ^[a-z0-9-]+$.",
       "protocol": "http",
@@ -127,6 +132,172 @@
           }
         ],
         "bodyMatcher": "{\"__match\": \"eachLike\", \"value\": {\"id\": {\"__match\": \"string\", \"value\": \"01KXB6M4EBFAZ6A52GYP7GNF7E\"}, \"name\": {\"__match\": \"string\", \"value\": \"ForgeFlex Tools\"}, \"slug\": {\"__match\": \"regex\", \"regex\": \"^[a-z0-9-]+$\", \"value\": \"forgeflex-tools\"}}, \"min\": 1}"
+      },
+      "postRequestScript": "sp.test(\"Status is 201\", function() {\n  sp.expect(sp.response.code).to.equal(201);\n});",
+      "examples": [
+        {
+          "id": "fd32cb89-9bf2-4bbb-b344-a41151c02fcd",
+          "name": "Example",
+          "request": {
+            "method": "POST",
+            "url": "{{TOOLSHOP_URL}}/brands",
+            "headers": [],
+            "params": [],
+            "auth": {
+              "type": "none"
+            },
+            "body": {
+              "mode": "json",
+              "json": "{\n  \"name\": \"some name\",\n  \"slug\": \"{{faker.lorem.slug()}}\"\n}"
+            }
+          },
+          "response": null,
+          "createdAt": "2026-08-19T14:45:44.754Z",
+          "source": "saved"
+        },
+        {
+          "id": "a0ac2a82-830d-4b2b-82bb-31b30fcf8fa7",
+          "name": "eded",
+          "request": {
+            "method": "POST",
+            "url": "{{TOOLSHOP_URL}}/brands",
+            "headers": [],
+            "params": [],
+            "auth": {
+              "type": "none"
+            },
+            "body": {
+              "mode": "json",
+              "json": "{\n  \"name\": \"some ndee\",\n  \"slug\": \"{{faker.lorem.slug()}}\"\n}"
+            },
+            "name": "Create a new branded"
+          },
+          "response": null,
+          "createdAt": "2026-08-19T14:51:43.004Z",
+          "source": "saved"
+        },
+        {
+          "id": "e2a97818-50e8-42bb-ae73-489057ece21e",
+          "name": "Example (2)",
+          "request": {
+            "method": "POST",
+            "url": "{{TOOLSHOP_URL}}/brands",
+            "headers": [],
+            "params": [],
+            "auth": {
+              "type": "none"
+            },
+            "body": {
+              "mode": "json",
+              "json": "{\n  \"name\": \"some name\",\n  \"slug\": \"{{faker.lorem.slug()}}\"\n}"
+            }
+          },
+          "response": null,
+          "createdAt": "2026-08-19T15:02:40.159Z",
+          "source": "saved"
+        },
+        {
+          "id": "283e455c-3b44-4655-b6ed-d31dd9b34dcd",
+          "name": "Example (3)",
+          "request": {
+            "method": "POST",
+            "url": "{{TOOLSHOP_URL}}/brands",
+            "headers": [],
+            "params": [],
+            "auth": {
+              "type": "none"
+            },
+            "body": {
+              "mode": "json",
+              "json": "{\n  \"name\": \"some name\",\n  \"slug\": \"{{faker.lorem.slug()}}\"\n}"
+            }
+          },
+          "response": null,
+          "createdAt": "2026-08-19T15:42:31.746Z",
+          "source": "saved"
+        }
+      ]
+    },
+    "1a7dfd21-971d-4362-87dc-64aa2e60fdea": {
+      "id": "1a7dfd21-971d-4362-87dc-64aa2e60fdea",
+      "name": "Status",
+      "method": "GET",
+      "url": "{{TOOLSHOP_URL}}/status",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "basic",
+        "username": "test",
+        "password": "pass"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Pact-style body matcher: every brand must have string id/name and a slug matching ^[a-z0-9-]+$.",
+      "protocol": "http",
+      "contract": {
+        "statusCode": 200,
+        "headers": [
+          {
+            "key": "content-type",
+            "value": "application/json;charset=UTF-8",
+            "required": false
+          }
+        ],
+        "bodySchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"version\": {\n      \"type\": \"string\"\n    },\n    \"environment\": {\n      \"type\": \"string\"\n    },\n    \"app_name\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\n    \"version\",\n    \"environment\",\n    \"app_name\"\n  ]\n}"
+      }
+    },
+    "0c9a31e3-11ed-47c8-afb9-be2e8687454a": {
+      "id": "0c9a31e3-11ed-47c8-afb9-be2e8687454a",
+      "name": "New Request",
+      "method": "POST",
+      "url": "",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "json",
+        "soap": {
+          "wsdlUrl": "",
+          "envelope": ""
+        }
+      },
+      "protocol": "http"
+    },
+    "a9101a7b-ac17-45a7-82ab-30408da4d826": {
+      "id": "a9101a7b-ac17-45a7-82ab-30408da4d826",
+      "name": "New Request",
+      "method": "GET",
+      "url": "https://api.practicesoftwaretesting.com/sales-stream?limit=5&interval=500&seed=42",
+      "headers": [],
+      "params": [
+        {
+          "key": "",
+          "value": "",
+          "enabled": false
+        }
+      ],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      }
+    },
+    "4cf3646e-66b9-4628-a1c0-aad0cd293966": {
+      "id": "4cf3646e-66b9-4628-a1c0-aad0cd293966",
+      "name": "New Request",
+      "method": "GET",
+      "url": "",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
       }
     }
   },

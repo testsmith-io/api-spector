@@ -10,7 +10,7 @@ const { electron } = window;
 const DEFAULT_PII_PATTERNS = ['authorization', 'password', 'token', 'secret', 'api-key', 'x-api-key'];
 const ZOOM_STEPS = [0.75, 0.90, 1.0, 1.10, 1.25, 1.50];
 
-type SettingsTab = 'general' | 'appearance' | 'proxy' | 'tls' | 'privacy' | 'contracts'
+type SettingsTab = 'general' | 'appearance' | 'proxy' | 'tls' | 'privacy' | 'contracts' | 'cloud'
 
 export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
   const workspace = useStore(s => s.workspace);
@@ -46,6 +46,24 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
 
   // Contracts state
   const [dashboardUrl, setDashboardUrl] = useState(existing.dashboardUrl ?? '');
+
+  // Cloud state (token lives in the OS keychain, never in the workspace file;
+  // the endpoint is fixed for end users, so it is not shown here)
+  const [cloudEnabled, setCloudEnabled] = useState(existing.cloud?.enabled ?? false);
+  const [cloudToken,   setCloudToken]   = useState('');
+  const cloudTokenSet = existing.cloud?.tokenSet ?? false;
+  const [cloudTest, setCloudTest] = useState<{ status: 'idle' | 'testing' | 'ok' | 'err'; msg?: string }>({ status: 'idle' });
+
+  async function testCloud() {
+    setCloudTest({ status: 'testing' });
+    try {
+      if (cloudToken.trim()) await electron.setSecret('cloud:token', cloudToken.trim());
+      const me = await electron.cloudTest();
+      setCloudTest({ status: 'ok', msg: `Connected as ${me.email} · ${me.organization} (${me.plan})` });
+    } catch (e) {
+      setCloudTest({ status: 'err', msg: (e as Error).message });
+    }
+  }
 
   // Privacy state
   const [patterns, setPatterns] = useState<string[]>(
@@ -91,6 +109,16 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
     if (dashboardUrl.trim()) settings.dashboardUrl = dashboardUrl.trim();
     else delete settings.dashboardUrl;
 
+    if (cloudEnabled || cloudTokenSet || cloudToken.trim()) {
+      settings.cloud = {
+        enabled: cloudEnabled,
+        tokenSet: cloudTokenSet || Boolean(cloudToken.trim()),
+      };
+    } else {
+      delete settings.cloud;
+    }
+    if (cloudToken.trim()) await electron.setSecret('cloud:token', cloudToken.trim());
+
     if (defaultEnvironment) settings.defaultEnvironment = defaultEnvironment;
     else delete settings.defaultEnvironment;
 
@@ -125,6 +153,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
     { id: 'tls',        label: 'TLS / Certificates' },
     { id: 'privacy',    label: 'Privacy' },
     { id: 'contracts',  label: 'Contracts' },
+    { id: 'cloud',      label: 'Cloud' },
   ];
 
   return (
@@ -314,6 +343,54 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
                 results panel. The link is view-only: recorded results reach the dashboard through
                 the workspace files, not through this URL.
               </p>
+            </>
+          )}
+
+          {activeTab === 'cloud' && (
+            <>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={cloudEnabled}
+                  onChange={e => setCloudEnabled(e.target.checked)}
+                  className="mt-0.5 accent-blue-500"
+                />
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-surface-200">Enable API Spector Cloud</span>
+                  <span className="text-surface-600 text-[11px]">
+                    Push mocks and monitors to a hosted instance. When on, "Push to cloud" actions
+                    appear on mocks and requests.
+                  </span>
+                </span>
+              </label>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">
+                  API token
+                </label>
+                <input
+                  type="password"
+                  value={cloudToken}
+                  onChange={e => setCloudToken(e.target.value)}
+                  placeholder={cloudTokenSet ? '•••••••• (saved — type to replace)' : 'Paste a token from the cloud dashboard'}
+                  className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
+                />
+                <span className="text-surface-600 text-[11px]">
+                  Stored in your OS keychain, never in the workspace file. Create one under Tokens in the cloud dashboard.
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={testCloud}
+                  disabled={cloudTest.status === 'testing'}
+                  className="px-3 py-1.5 bg-surface-700 hover:bg-surface-600 disabled:opacity-40 rounded transition-colors"
+                >
+                  {cloudTest.status === 'testing' ? 'Testing…' : 'Test connection'}
+                </button>
+                {cloudTest.status === 'ok'  && <span className="text-green-400 text-[11px]">✓ {cloudTest.msg}</span>}
+                {cloudTest.status === 'err' && <span className="text-red-400 text-[11px]">✗ {cloudTest.msg}</span>}
+              </div>
             </>
           )}
 

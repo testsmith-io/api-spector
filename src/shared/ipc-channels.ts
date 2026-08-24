@@ -43,6 +43,10 @@ export const IPC = {
   // ─── HTTP execution ────────────────────────────────────────────────────────
   request: {
     send: 'request:send',
+    /** Event (main→renderer): a batch of streamed response frames. */
+    streamEvent: 'request:stream-event',
+    /** Renderer→main: abort an in-flight streamed read by streamId. */
+    stopStream: 'request:stop-stream',
   },
 
   // ─── Secrets ───────────────────────────────────────────────────────────────
@@ -134,6 +138,8 @@ export const IPC = {
     run:              'contract:run',
     inferSchema:      'contract:inferSchema',
     exportReportHtml: 'contract:exportReportHtml',
+    /** Compile a design-first contract to a Pact file on disk (save dialog). */
+    exportDesignPact: 'contract:exportDesignPact',
     captureSnapshot:  'contract:captureSnapshot',
     listSnapshots:    'contract:listSnapshots',
     loadSnapshot:     'contract:loadSnapshot',
@@ -193,5 +199,25 @@ export const IPC = {
   // ─── App ───────────────────────────────────────────────────────────────────
   app: {
     checkUpdate: 'app:checkUpdate',
+  },
+
+  // ─── Cloud (API Spector Cloud integration) ──────────────────────────────────
+  cloud: {
+    /** Verify the endpoint + token (GET /api/me). */
+    test:        'cloud:test',
+    /** Push a mock server definition (POST /api/mocks). */
+    pushMock:    'cloud:pushMock',
+    /** Look up an existing cloud mock's routes (GET /api/mocks/{slug}). */
+    getMock:     'cloud:getMock',
+    /** Push a request as a monitor, URL resolved (POST /api/monitors). */
+    pushMonitor: 'cloud:pushMonitor',
+    /** Publish a consumer pact built from requests (PUT /api/contracts). */
+    pushPact:    'cloud:pushPact',
+    /** Publish a design-first consumer contract as a pact (PUT /api/contracts). */
+    pushDesignContract: 'cloud:pushDesignContract',
+    /** Publish a provider OpenAPI spec (PUT /api/provider-contracts). */
+    pushSpec:    'cloud:pushSpec',
+    /** Open the cloud deployment matrix in the browser. */
+    openMatrix:  'cloud:openMatrix',
   },
 } as const;

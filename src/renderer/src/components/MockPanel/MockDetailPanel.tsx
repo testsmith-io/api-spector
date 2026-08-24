@@ -10,6 +10,8 @@ import { useStore } from '../../store';
 import type { MockRoute, MockServer, MockHit } from '../../../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
 import { getMethodColor } from '../../../../shared/colors';
+import { cloudEnabled } from '../../lib/cloud-push';
+import { PushToCloudModal } from './PushToCloudModal';
 import {
   mockBodyCompletionExtension,
   mockScriptCompletionExtension,
@@ -419,6 +421,7 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
   const [error,      setError]      = useState<string | null>(null);
   const [newRouteId, setNewRouteId] = useState<string | null>(null);
   const [activeTab,  setActiveTab]  = useState<'routes' | 'requests'>('routes');
+  const [showPush,   setShowPush]   = useState(false);
 
   if (!entry) return null;
   const { data: mock, running } = entry;
@@ -516,8 +519,18 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
         )}
 
         <div className="ml-auto flex items-center gap-2">
+          {showPush && <PushToCloudModal mock={mock} onClose={() => setShowPush(false)} />}
           {error && (
             <span className="text-xs text-red-400 max-w-xs truncate" title={error}>⚠ {error}</span>
+          )}
+          {cloudEnabled() && (
+            <button
+              onClick={() => setShowPush(true)}
+              className="px-3 py-1.5 rounded text-sm font-medium bg-surface-800 hover:bg-surface-700 text-surface-300 border border-surface-700"
+              title="Push this mock to API Spector Cloud (choose routes)"
+            >
+              ☁ Push to cloud
+            </button>
           )}
           <div className="relative group/cli flex items-center">
             <button
