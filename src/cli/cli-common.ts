@@ -17,6 +17,10 @@ import { readFile, stat, readdir } from 'fs/promises';
 import { join, dirname, resolve } from 'path';
 import type { Workspace, Collection, Environment, MockServer } from '../shared/types';
 
+// Design-first contract loading lives in main/contract so the app's IPC can share
+// it; re-exported here so the CLI's existing import site keeps working.
+export { loadDesignContractRequests } from '../main/contract/design-contracts';
+
 // ─── ANSI colour helpers ──────────────────────────────────────────────────────
 
 export const C = {

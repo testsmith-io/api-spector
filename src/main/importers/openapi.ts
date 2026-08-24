@@ -5,7 +5,7 @@ import { readFile } from 'fs/promises';
 import { load as yamlLoad } from 'js-yaml';
 import { fetch } from 'undici';
 import { v4 as uuidv4 } from 'uuid';
-import type { Collection, ApiRequest, AuthConfig, RequestBody, KeyValuePair, Folder } from '../../shared/types';
+import type { Collection, ApiRequest, AuthConfig, RequestBody, KeyValuePair, Folder, RequestExample } from '../../shared/types';
 
 // ─── OpenAPI 3.x importer ─────────────────────────────────────────────────────
 
@@ -142,6 +142,71 @@ function buildBody(operation: any, spec: any): RequestBody {
   return { mode: 'none' };
 }
 
+/**
+ * Named example request payloads. OpenAPI attaches `examples` (a name→example
+ * map) to the request body and to individual parameters; by convention the same
+ * example NAME across body + params describes one scenario. We build a
+ * RequestExample per scenario name, overriding the body and/or params it names.
+ * Returns undefined when the spec carries no named examples (so nothing changes
+ * for specs that only have schemas / single examples baked into the request).
+ */
+function buildExamples(operation: any, spec: any, baseParams: KeyValuePair[], baseHeaders: KeyValuePair[], baseBody: RequestBody): RequestExample[] | undefined {
+  const json = resolve(spec, operation.requestBody?.content ?? {})['application/json'];
+
+  // Body examples: name → value.
+  const bodyExamples: Record<string, unknown> = {};
+  if (json?.examples && typeof json.examples === 'object') {
+    for (const [name, ex] of Object.entries<any>(json.examples)) {
+      bodyExamples[name] = resolve(spec, ex)?.value;
+    }
+  }
+
+  // Parameter examples: paramName → (name → value).
+  const paramExamples: Record<string, Record<string, unknown>> = {};
+  for (const p of (operation.parameters ?? [])) {
+    if (!p?.name || (p.in !== 'query' && p.in !== 'path')) continue;
+    if (p.examples && typeof p.examples === 'object') {
+      paramExamples[p.name] = {};
+      for (const [name, ex] of Object.entries<any>(p.examples)) {
+        paramExamples[p.name][name] = resolve(spec, ex)?.value;
+      }
+    }
+  }
+
+  const names = new Set<string>([
+    ...Object.keys(bodyExamples),
+    ...Object.values(paramExamples).flatMap(m => Object.keys(m)),
+  ]);
+  if (names.size === 0) return undefined;
+
+  const examples: RequestExample[] = [];
+  for (const name of names) {
+    // A full snapshot: the example fully defines what it sends. Fields this
+    // scenario names are overridden; the rest are captured from the base request
+    // (headers, and body/params when the scenario doesn't specify them) so the
+    // example is a complete, runnable request on its own.
+    const body: RequestBody = (name in bodyExamples && bodyExamples[name] !== undefined)
+      ? { mode: 'json', json: typeof bodyExamples[name] === 'string' ? String(bodyExamples[name]) : JSON.stringify(bodyExamples[name], null, 2) }
+      : baseBody;
+
+    const params = baseParams.some(pr => paramExamples[pr.key]?.[name] !== undefined)
+      ? baseParams.map(pr => {
+          const v = paramExamples[pr.key]?.[name];
+          return v !== undefined ? { ...pr, value: v === null ? '' : String(v) } : pr;
+        })
+      : baseParams;
+
+    examples.push({
+      id: uuidv4(),
+      name,
+      request: { headers: baseHeaders, params, body },
+      source: 'imported',
+    });
+  }
+
+  return examples.length ? examples : undefined;
+}
+
 function buildParams(operation: any): KeyValuePair[] {
   return (operation.parameters ?? [])
     .filter((p: any) => p.in === 'query')
@@ -273,18 +338,22 @@ function buildCollection(spec: any): Collection {
       // seen set per pathItem, which collapses repeat $refs to {}).
       const rawOperation = pathItem[method];
       const responseSchema = buildResponseSchema(rawOperation, spec);
+      const headers = buildHeaders(opWithParams);
+      const body = buildBody(opWithParams, spec);
+      const examples = buildExamples(opWithParams, spec, params, headers, body);
       const req: ApiRequest = {
         id: uuidv4(),
         name: operation.summary ?? operation.operationId ?? `${method.toUpperCase()} ${pathStr}`,
         method: method.toUpperCase() as any,
         url: rewritePathTemplate(`${baseUrl}${pathStr}`),
-        headers: buildHeaders(opWithParams),
+        headers,
         params,
         auth: buildAuth(security, securitySchemes),
-        body: buildBody(opWithParams, spec),
+        body,
         description: operation.description ?? '',
         meta: { tags },
         ...(responseSchema ? { schema: responseSchema } : {}),
+        ...(examples ? { examples } : {}),
       };
       requests[req.id] = req;
 

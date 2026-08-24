@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 270" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#616b7a"/></marker>
+    <marker id="ap" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6a3ff2"/></marker>
+  </defs>
+  <style>
+    .t{font-size:12.5px;font-weight:600;fill:#171b22}.s{font-size:10.5px;fill:#616b7a}
+    .h{font-size:11px;font-weight:700;letter-spacing:.04em;fill:#616b7a}
+    .box{fill:#ffffff;stroke:#d5dae2;stroke-width:1.5}.acc{fill:#e7eeff;stroke:#2f62ff;stroke-width:1.5}
+    .cons{fill:#fbf0e6;stroke:#b45611;stroke-width:1.5}.prov{fill:#efeafe;stroke:#6a3ff2;stroke-width:1.5}
+    .pass{fill:#e4f4ec;stroke:#0f8a56;stroke-width:1.3}
+  </style>
+
+  <text x="14" y="18" class="h" fill="#2f62ff">CLOUD BROKER</text>
+  <text x="470" y="18" class="h" fill="#6a3ff2">YOUR NETWORK · private runner</text>
+  <line x1="452" y1="28" x2="452" y2="244" stroke="#e3e7ee" stroke-dasharray="3 5"/>
+
+  <rect x="14" y="60" width="170" height="46" rx="9" class="cons"/><text x="99" y="81" text-anchor="middle" class="t" fill="#b45611">Consumer pact</text><text x="99" y="98" text-anchor="middle" class="s">GET /brands/{id} → 200</text>
+  <rect x="14" y="128" width="170" height="46" rx="9" class="box"/><text x="99" y="149" text-anchor="middle" class="t">Provider states</text><text x="99" y="166" text-anchor="middle" class="s">"brand 1 exists" → setup</text>
+  <rect x="250" y="94" width="150" height="46" rx="9" class="acc"/><text x="325" y="115" text-anchor="middle" class="t" fill="#2f62ff">verify-runtime</text><text x="325" y="132" text-anchor="middle" class="s">/due feed</text>
+
+  <path d="M184,83 C214,83 220,110 248,112" stroke="#b45611" stroke-width="1.5" fill="none" marker-end="url(#a)"/>
+  <path d="M184,151 C214,151 220,124 248,122" stroke="#616b7a" stroke-width="1.5" fill="none" marker-end="url(#a)"/>
+
+  <!-- runner -->
+  <rect x="490" y="94" width="150" height="46" rx="9" class="prov"/><text x="565" y="115" text-anchor="middle" class="t" fill="#6a3ff2">Verify runner</text><text x="565" y="132" text-anchor="middle" class="s">agent · outbound only</text>
+  <rect x="700" y="60" width="146" height="46" rx="9" class="box"/><text x="773" y="81" text-anchor="middle" class="t">Setup request</text><text x="773" y="98" text-anchor="middle" class="s">seed the state</text>
+  <rect x="700" y="128" width="146" height="46" rx="9" class="box"/><text x="773" y="149" text-anchor="middle" class="t">Running provider</text><text x="773" y="166" text-anchor="middle" class="s">real response</text>
+
+  <path d="M400,117 L488,117" stroke="#2f62ff" stroke-width="1.5" fill="none" marker-end="url(#a)"/><text x="444" y="110" text-anchor="middle" class="s">poll</text>
+  <path d="M640,105 C670,105 674,85 698,83" stroke="#6a3ff2" stroke-width="1.5" fill="none" marker-end="url(#ap)"/><text x="672" y="76" class="s">1. setup</text>
+  <path d="M640,128 C670,128 674,148 698,151" stroke="#6a3ff2" stroke-width="1.5" fill="none" marker-end="url(#ap)"/><text x="672" y="146" class="s">2. replay</text>
+
+  <!-- results back -->
+  <rect x="250" y="204" width="150" height="40" rx="9" class="pass"/><text x="325" y="222" text-anchor="middle" class="t" fill="#0f8a56">pass / fail</text><text x="325" y="237" text-anchor="middle" class="s">→ Matrix + gate</text>
+  <path d="M490,150 C420,190 400,200 402,222" stroke="#0f8a56" stroke-width="1.5" fill="none" marker-end="url(#a)"/><text x="470" y="205" class="s">post results</text>
+</svg>

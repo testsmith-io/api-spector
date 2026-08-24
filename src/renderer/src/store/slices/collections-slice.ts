@@ -10,6 +10,8 @@ import type {
   DataSet,
   Folder,
   KeyValuePair,
+  RequestExample,
+  ResponsePayload,
   TlsSettings,
 } from '../../../../shared/types';
 import { uniqueName, colRelPath } from '../../../../shared/naming-utils';
@@ -24,7 +26,7 @@ import {
   removeFolderById,
   removeFromFolder,
 } from '../../../../shared/folder-tree';
-import { makeTab } from './tabs-slice';
+import { makeTab, protocolFor } from './tabs-slice';
 import type { FullState } from '../index';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -95,6 +97,17 @@ export interface CollectionsSliceActions {
   duplicateRequest: (collectionId: string, id: string) => void
   moveRequest: (srcCollectionId: string, requestId: string, destCollectionId: string, destFolderId: string, destIndex?: number) => void
   moveFolder: (collectionId: string, folderId: string, destParentFolderId: string, destIndex?: number) => void
+
+  // Request examples (Postman/Bruno-style saved request/response snapshots)
+  addExample: (requestId: string, snapshot: { name?: string; request?: Partial<ApiRequest>; response?: ResponsePayload | null }) => string | null
+  /** Add an example seeded from the request's current payload (no response). */
+  addExampleFromRequest: (requestId: string) => string | null
+  updateExampleRequest: (requestId: string, exampleId: string, patch: Partial<ApiRequest>) => void
+  updateExampleResponse: (requestId: string, exampleId: string, response: ResponsePayload | null) => void
+  renameExample: (requestId: string, exampleId: string, name: string) => void
+  deleteExample: (requestId: string, exampleId: string) => void
+  duplicateExample: (requestId: string, exampleId: string) => void
+  openExample: (requestId: string, collectionId: string, exampleId: string) => void
 
   // Tags
   updateFolderTags: (collectionId: string, folderId: string, tags: string[]) => void
@@ -364,6 +377,122 @@ export const createCollectionsSlice: StateCreator<
     if (!entry) return;
     Object.assign(entry.data.requests[id], patch);
     entry.dirty = true;
+  }),
+
+  // ── Request examples ────────────────────────────────────────────────────────
+  addExample: (requestId, snapshot) => {
+    const id = uuidv4();
+    set(s => {
+      const entry = Object.values(s.collections).find(c => c.data.requests[requestId]);
+      if (!entry) return;
+      const req = entry.data.requests[requestId];
+      const list = req.examples ?? (req.examples = []);
+      const example: RequestExample = {
+        id,
+        name: snapshot.name || uniqueName('Example', list.map(e => e.name)),
+        request: snapshot.request,
+        response: snapshot.response ?? null,
+        createdAt: new Date().toISOString(),
+        source: 'saved',
+      };
+      list.push(example);
+      entry.dirty = true;
+    });
+    return id;
+  },
+
+  addExampleFromRequest: (requestId) => {
+    // Snapshot from committed (non-draft) state so structuredClone can't hit an
+    // Immer proxy; the example's payload starts as a copy of the request.
+    const entry = Object.values(get().collections).find(c => c.data.requests[requestId]);
+    if (!entry) return null;
+    const req = entry.data.requests[requestId];
+    const id = uuidv4();
+    const example: RequestExample = {
+      id,
+      name: uniqueName('Example', (req.examples ?? []).map(e => e.name)),
+      request: {
+        method: req.method, url: req.url,
+        headers: structuredClone(req.headers), params: structuredClone(req.params),
+        auth: structuredClone(req.auth), body: structuredClone(req.body),
+      },
+      response: null,
+      createdAt: new Date().toISOString(),
+      source: 'saved',
+    };
+    set(s => {
+      const e = Object.values(s.collections).find(c => c.data.requests[requestId]);
+      if (!e) return;
+      const r = e.data.requests[requestId];
+      (r.examples ?? (r.examples = [])).push(example);
+      e.dirty = true;
+    });
+    return id;
+  },
+
+  updateExampleRequest: (requestId, exampleId, patch) => set(s => {
+    const entry = Object.values(s.collections).find(c => c.data.requests[requestId]);
+    const ex = entry?.data.requests[requestId].examples?.find(e => e.id === exampleId);
+    if (!entry || !ex) return;
+    ex.request = { ...(ex.request ?? {}), ...patch };
+    entry.dirty = true;
+  }),
+
+  updateExampleResponse: (requestId, exampleId, response) => set(s => {
+    const entry = Object.values(s.collections).find(c => c.data.requests[requestId]);
+    const ex = entry?.data.requests[requestId].examples?.find(e => e.id === exampleId);
+    if (!entry || !ex) return;
+    ex.response = response;
+    entry.dirty = true;
+  }),
+
+  renameExample: (requestId, exampleId, name) => set(s => {
+    const entry = Object.values(s.collections).find(c => c.data.requests[requestId]);
+    const ex = entry?.data.requests[requestId].examples?.find(e => e.id === exampleId);
+    if (!entry || !ex) return;
+    ex.name = name;
+    entry.dirty = true;
+  }),
+
+  deleteExample: (requestId, exampleId) => set(s => {
+    const entry = Object.values(s.collections).find(c => c.data.requests[requestId]);
+    const req = entry?.data.requests[requestId];
+    if (!entry || !req?.examples) return;
+    req.examples = req.examples.filter(e => e.id !== exampleId);
+    entry.dirty = true;
+    // Close any tab open on this example.
+    const idx = s.tabs.findIndex(t => t.requestId === requestId && t.exampleId === exampleId);
+    if (idx !== -1) {
+      const wasActive = s.tabs[idx].id === s.activeTabId;
+      s.tabs.splice(idx, 1);
+      if (wasActive) s.activeTabId = (s.tabs[idx] ?? s.tabs[idx - 1] ?? null)?.id ?? null;
+    }
+  }),
+
+  duplicateExample: (requestId, exampleId) => set(s => {
+    const entry = Object.values(s.collections).find(c => c.data.requests[requestId]);
+    const list = entry?.data.requests[requestId].examples;
+    const ex = list?.find(e => e.id === exampleId);
+    if (!entry || !list || !ex) return;
+    list.push({
+      ...structuredClone(ex),
+      id: uuidv4(),
+      name: uniqueName(ex.name, list.map(e => e.name)),
+      createdAt: new Date().toISOString(),
+    });
+    entry.dirty = true;
+  }),
+
+  openExample: (requestId, collectionId, exampleId) => set(s => {
+    const existing = s.tabs.find(t => t.requestId === requestId && t.exampleId === exampleId);
+    if (existing) { s.activeTabId = existing.id; s.activeCollectionId = collectionId; return; }
+    const ex = Object.values(s.collections).find(c => c.data.requests[requestId])
+      ?.data.requests[requestId].examples?.find(e => e.id === exampleId);
+    const tab = makeTab(requestId, collectionId, { protocol: protocolFor(s, requestId), exampleId });
+    tab.lastResponse = ex?.response ?? null;
+    s.tabs.push(tab);
+    s.activeTabId = tab.id;
+    s.activeCollectionId = collectionId;
   }),
 
   renameRequest: (id, name) => set(s => {

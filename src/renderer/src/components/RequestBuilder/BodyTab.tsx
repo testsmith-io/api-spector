@@ -3,11 +3,11 @@
 
 import React, { useMemo } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
-import { json } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
 import type { ApiRequest, RequestBody } from '../../../../shared/types';
 import { KVTable } from './KVTable';
 import { varCompletionExtension, varHoverTooltipExtension } from './atCompletions';
+import { jsonWithComments, xmlWithComments, commentKeymap } from './commentKeymap';
 import { useVarNames } from '../../hooks/useVarNames';
 import { useVarValues } from '../../hooks/useVarValues';
 import { GraphQLEditor } from './GraphQLEditor';
@@ -83,7 +83,7 @@ export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: 
             height="300px"
             maxHeight="50vh"
             theme={oneDark}
-            extensions={[json(), varExt]}
+            extensions={[jsonWithComments(), varExt]}
             onChange={val => onChange({ body: { ...body, json: val } })}
             basicSetup={{ lineNumbers: true, foldGutter: false, autocompletion: false }}
           />
@@ -113,7 +113,10 @@ export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: 
               height="300px"
               maxHeight="50vh"
               theme={oneDark}
-              extensions={[varExt]}
+              // XML payloads (application/xml, text/xml, image/svg+xml, ...) get the
+              // XML language so Cmd/Ctrl+/ toggles <!-- --> comments; anything else
+              // stays plain text with the same keymap (a no-op without comment tokens).
+              extensions={/xml/i.test(body.rawContentType ?? '') ? [xmlWithComments(), varExt] : [commentKeymap, varExt]}
               onChange={val => onChange({ body: { ...body, raw: val } })}
               basicSetup={{ lineNumbers: true, foldGutter: false, autocompletion: false }}
             />

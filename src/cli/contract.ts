@@ -30,7 +30,7 @@
 
 import { readFile, writeFile } from 'fs/promises';
 import { join, resolve as resolvePath } from 'path';
-import type { Workspace, ApiRequest, ContractSnapshot, ContractMode, ContractReport } from '../shared/types';
+import type { Workspace, ApiRequest, ContractSnapshot, ContractMode, ContractReport, ContractExpectation } from '../shared/types';
 import { runConsumerContracts, hasContract } from '../main/contract/consumer-verifier';
 import { runProviderVerification } from '../main/contract/provider-verifier';
 import { runLiveProviderVerification } from '../main/contract/provider-live-verifier';
@@ -46,7 +46,12 @@ import { loadWebhookConfig, watchContractEvents, fireWebhooks } from '../main/co
 import { writeFile as fsWriteFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { randomUUID } from 'crypto';
-import { parseArgs, loadWorkspace, loadCollections, loadEnvironments } from './cli-common';
+import { parseArgs, loadWorkspace, loadCollections, loadEnvironments, loadDesignContractRequests } from './cli-common';
+import { brokerConfigFromEnv, publishPact as brokerPublishPact, publishSpec as brokerPublishSpec, canIDeploy as brokerCanIDeploy, recordDeployment as brokerRecordDeployment, deployPreview as brokerDeployPreview } from '../main/cloud/broker-client';
+import { resolveVersion } from '../main/cloud/git';
+import { parseSelfVerification } from '../main/cloud/self-verification';
+import { fetch as undiciFetch } from 'undici';
+import { load as loadYamlSpec } from 'js-yaml';
 import { selectEnvironment, resolveEnvironmentChain } from '../shared/environments';
 
 // ─── Commands ────────────────────────────────────────────────────────────────
@@ -165,7 +170,24 @@ async function cmdRun ( args: Record<string, string | boolean> ): Promise<void> 
   for ( const c of collections ) Object.assign( collectionVars, c.collectionVariables ?? {} );
 
   const allRequests: ApiRequest[] = collections.flatMap( c => Object.values( c.requests ) );
-  const contractRequests = allRequests.filter( r => hasContract( r.contract ) );
+  const collectionContracts = allRequests.filter( r => hasContract( r.contract ) );
+
+  // Design-first contracts (Contract Designer + pacts/*.json) run directly, with
+  // no manual pact-import. A collection request wins over a duplicate design one.
+  const keyOf = ( r: ApiRequest ): string => `${r.method} ${r.url} ${r.name}`;
+  const collectionKeys = new Set( collectionContracts.map( keyOf ) );
+  const designContracts = ( await loadDesignContractRequests( workspace, dir ) )
+    .filter( r => !collectionKeys.has( keyOf( r ) ) );
+  const contractRequests = [ ...collectionContracts, ...designContracts ];
+  if ( designContracts.length ) {
+    console.log( `  + ${designContracts.length} design-first interaction(s) from the Contract Designer / pacts/` );
+    // Imported pacts use {{baseUrl}} (see pactToCollection). Run directly - without
+    // a collection to define it - by defaulting baseUrl to empty, so the path
+    // resolves and provider-live / bidirectional rebase onto the real provider.
+    if ( envVars['baseUrl'] === undefined && collectionVars['baseUrl'] === undefined ) {
+      collectionVars['baseUrl'] = '';
+    }
+  }
 
   // Resolve spec source: --snapshot takes priority over --spec-url / --spec-path.
   let specUrl = typeof args['spec-url'] === 'string' ? args['spec-url'] : undefined;
@@ -649,6 +671,158 @@ async function cmdPactExport ( args: Record<string, string | boolean> ): Promise
   console.log( `  Exported ${requests.length} interaction(s) to ${out} (${consumer} → ${provider})` );
 }
 
+// ─── Cloud broker commands (git-native, CI-native) ──────────────────────────
+//
+// These target the API Spector Cloud broker (auth: API_SPECTOR_TOKEN), keyed to
+// the git SHA automatically. The existing can-i-deploy / record-deployment
+// commands stay local (--workspace); the broker path is taken with --broker or
+// when API_SPECTOR_TOKEN is set and no --workspace is given.
+
+const str = ( v: string | boolean | undefined ): string | undefined => typeof v === 'string' ? v : undefined;
+const die = ( msg: string ): never => { console.error( `  [error] ${msg}` ); process.exit( 2 ); };
+
+/** True when a command should hit the cloud broker rather than the local store. */
+function wantsCloud ( args: Record<string, string | boolean> ): boolean {
+  return !!args['broker'] || ( !!process.env['API_SPECTOR_TOKEN'] && !args['workspace'] );
+}
+
+/** Derive a contract expectation from a request's saved example response — the
+ *  "pact from traffic you already ran" path, no Contract tab needed. Status +
+ *  a type-based body schema (integer/string/… per top-level field). */
+function deriveContract ( req: ApiRequest ): ContractExpectation | undefined {
+  const ex = ( req.examples ?? [] ).find( e => e.response && typeof e.response.status === 'number' );
+  if ( !ex?.response ) return undefined;
+
+  const c: ContractExpectation = { statusCode: ex.response.status };
+  try {
+    const body = JSON.parse( ex.response.body || 'null' );
+    if ( body && typeof body === 'object' && !Array.isArray( body ) ) {
+      const jsType = ( v: unknown ): string =>
+        Array.isArray( v ) ? 'array' : v === null ? 'null'
+          : typeof v === 'number' ? ( Number.isInteger( v ) ? 'integer' : 'number' )
+          : typeof v === 'boolean' ? 'boolean' : typeof v === 'object' ? 'object' : 'string';
+      c.bodySchema = JSON.stringify( {
+        type: 'object',
+        required: Object.keys( body ),
+        properties: Object.fromEntries( Object.entries( body ).map( ( [k, v] ) => [k, { type: jsType( v ) }] ) ),
+      } );
+    }
+  } catch { /* non-JSON body → status-only contract */ }
+  return c;
+}
+
+async function cmdPublish ( args: Record<string, string | boolean> ): Promise<void> {
+  const wsArg = str( args['workspace'] ) ?? die( '--workspace <path> is required' );
+  const consumer = str( args['consumer'] ) ?? die( '--consumer <name> is required' );
+  const provider = str( args['provider'] ) ?? die( '--provider <name> is required' );
+  const version = resolveVersion( str( args['version'] ) );
+
+  const { workspace, dir } = await loadWorkspace( wsArg );
+  const collections = await loadCollections( workspace, dir, { filterName: str( args['collection'] ) } );
+  let all = collections.flatMap( c => Object.values( c.requests ) );
+
+  const tag = str( args['tag'] );
+  if ( tag ) all = all.filter( r => ( r.meta?.tags ?? [] ).includes( tag ) );
+
+  let requests = all.filter( r => hasContract( r.contract ) );
+
+  // --derive: for requests without an explicit contract, synthesise one from a
+  // saved example response (pact from traffic).
+  if ( args['derive'] ) {
+    const derived = all
+      .filter( r => !hasContract( r.contract ) )
+      .map( r => ( { ...r, contract: deriveContract( r ) } ) )
+      .filter( r => hasContract( r.contract ) );
+    requests = [...requests, ...derived];
+  }
+
+  if ( requests.length === 0 ) die( 'No requests with contract expectations found to publish (set them on the Contract tab, or pass --derive to use saved example responses).' );
+
+  const pact = exportPact( consumer, provider, requests );
+  await brokerPublishPact( brokerConfigFromEnv(), { consumer, provider, consumerVersion: version, pact } );
+  console.log( `  Published ${requests.length} interaction(s): ${consumer}@${version.slice( 0, 7 )} → ${provider}` );
+}
+
+// Local provider-spec publish = pin the spec into the workspace (git). `--spec`
+// is accepted as an alias for `--spec-path`, and `--provider` names the snapshot,
+// so the same flags work whether you target the broker or the workspace.
+async function cmdPublishSpecLocal ( args: Record<string, string | boolean> ): Promise<void> {
+  const norm = { ...args };
+  if ( typeof norm['spec'] === 'string' && typeof norm['spec-path'] !== 'string' ) norm['spec-path'] = norm['spec'];
+  if ( typeof norm['provider'] === 'string' && typeof norm['name'] !== 'string' ) norm['name'] = norm['provider'];
+  return cmdPin( norm );
+}
+
+async function cmdPublishSpec ( args: Record<string, string | boolean> ): Promise<void> {
+  const pacticipant = str( args['provider'] ) ?? str( args['pacticipant'] ) ?? die( '--provider <name> is required' );
+  const version = resolveVersion( str( args['version'] ) );
+
+  let specText: string;
+  const specUrl = str( args['spec-url'] );
+  const specPath = str( args['spec'] ) ?? str( args['spec-path'] );
+  if ( specUrl ) {
+    const res = await undiciFetch( specUrl );
+    if ( !res.ok ) die( `Could not fetch spec from ${specUrl} (HTTP ${res.status})` );
+    specText = await res.text();
+  } else if ( specPath ) {
+    specText = await readFile( specPath, 'utf8' );
+  } else {
+    return die( '--spec <path> or --spec-url <url> is required' );
+  }
+
+  let spec: unknown;
+  try { spec = JSON.parse( specText ); } catch { spec = loadYamlSpec( specText ); }
+  if ( !spec || typeof spec !== 'object' ) die( 'Could not parse the OpenAPI spec (expected JSON or YAML).' );
+
+  // Optional provider self-verification: the outcome of running the provider's own
+  // tests (JUnit/Postman/Schemathesis) against this spec, published as evidence.
+  let results: Record<string, unknown> | undefined;
+  const resultsPath = str( args['results'] );
+  if ( resultsPath ) results = parseSelfVerification( await readFile( resultsPath, 'utf8' ), resultsPath );
+
+  await brokerPublishSpec( brokerConfigFromEnv(), { pacticipant, version, spec: spec as object, results } );
+  const selfNote = results ? ` (self-verification: ${results.success ? 'passed' : 'FAILED'})` : '';
+  console.log( `  Published spec: ${pacticipant}@${version.slice( 0, 7 )}${selfNote}` );
+}
+
+async function cmdCloudCanIDeploy ( args: Record<string, string | boolean> ): Promise<void> {
+  const pacticipant = str( args['pacticipant'] ) ?? die( '--pacticipant <name> is required' );
+  const version = resolveVersion( str( args['version'] ) );
+  const environment = str( args['environment'] ) ?? str( args['to'] ) ?? die( '--environment <name> is required' );
+
+  const { deployable, reason } = await brokerCanIDeploy( brokerConfigFromEnv(), { pacticipant, version, environment } );
+  if ( deployable ) {
+    console.log( `  ✓ ${pacticipant}@${version.slice( 0, 7 )} can deploy to ${environment}` );
+  } else {
+    console.error( `  ✗ ${pacticipant}@${version.slice( 0, 7 )} cannot deploy to ${environment}` );
+    if ( reason ) console.error( `    ${reason}` );
+    process.exit( 1 ); // fail the pipeline
+  }
+}
+
+async function cmdPreview ( args: Record<string, string | boolean> ): Promise<void> {
+  const pacticipant = str( args['pacticipant'] ) ?? die( '--pacticipant <name> is required' );
+  const version = resolveVersion( str( args['version'] ) );
+  const environment = str( args['environment'] ) ?? str( args['to'] ) ?? die( '--environment <name> is required' );
+
+  const preview = await brokerDeployPreview( brokerConfigFromEnv(), { pacticipant, version, environment } );
+
+  // Markdown for a PR check / comment. The workflow posts this via the Checks API.
+  console.log( `### ${preview.check.title}\n\n${preview.check.summary}` );
+
+  // Non-gating by default; opt into failing the step with --fail-on-break.
+  if ( !preview.deployable && args['fail-on-break'] ) process.exit( 1 );
+}
+
+async function cmdCloudRecordDeployment ( args: Record<string, string | boolean> ): Promise<void> {
+  const pacticipant = str( args['pacticipant'] ) ?? die( '--pacticipant <name> is required' );
+  const version = resolveVersion( str( args['version'] ) );
+  const environment = str( args['environment'] ) ?? str( args['env'] ) ?? die( '--environment <name> is required' );
+
+  await brokerRecordDeployment( brokerConfigFromEnv(), { pacticipant, version, environment } );
+  console.log( `  Recorded ${pacticipant}@${version.slice( 0, 7 )} deployed to ${environment}` );
+}
+
 // ─── Entry ───────────────────────────────────────────────────────────────────
 
 async function main (): Promise<void> {
@@ -658,8 +832,15 @@ async function main (): Promise<void> {
   if ( sub === 'list' ) return cmdList( args );
   if ( sub === 'pin' ) return cmdPin( args );
   if ( sub === 'run' ) return cmdRun( args );
-  if ( sub === 'can-i-deploy' ) return cmdCanIDeploy( args );
-  if ( sub === 'record-deployment' ) return cmdRecordDeployment( args );
+  if ( sub === 'publish' ) return cmdPublish( args );
+  // `publish-spec` mirrors deploy-check: --broker publishes to the cloud broker,
+  // otherwise it pins the spec into the workspace (local / git) — the provider
+  // side of bi-directional testing, with or without the cloud.
+  if ( sub === 'publish-spec' ) return wantsCloud( args ) ? cmdPublishSpec( args ) : cmdPublishSpecLocal( args );
+  if ( sub === 'preview' ) return cmdPreview( args );
+  // `deploy-check` is the primary name; `can-i-deploy` is a Pact-compatible alias.
+  if ( sub === 'deploy-check' || sub === 'can-i-deploy' ) return wantsCloud( args ) ? cmdCloudCanIDeploy( args ) : cmdCanIDeploy( args );
+  if ( sub === 'record-deployment' ) return wantsCloud( args ) ? cmdCloudRecordDeployment( args ) : cmdRecordDeployment( args );
   if ( sub === 'environments' ) return cmdEnvironments( args );
   if ( sub === 'webhooks' ) return cmdWebhooks( args );
   if ( sub === 'fuzz' ) return cmdFuzz( args );
@@ -673,13 +854,20 @@ async function main (): Promise<void> {
   api-spector contract pin           --workspace <path> --spec-url <url> | --spec-path <file> [--name <label>]
   api-spector contract run           --workspace <path> --mode <consumer|provider|provider-live|bidirectional> [options]
   api-spector contract report        --workspace <path> [--html <path>] [--serve [--port <n>]]
-  api-spector contract can-i-deploy  --workspace <path> --pacticipant <name> --app-version <ver> [--to <env>]
+  api-spector contract deploy-check  --workspace <path> --pacticipant <name> --app-version <ver> [--to <env>]
   api-spector contract record-deployment --workspace <path> --pacticipant <name> --app-version <ver> --env <name>
   api-spector contract environments  --workspace <path>
   api-spector contract webhooks      --workspace <path> [--test]
   api-spector contract fuzz          --workspace <path> --provider-base-url <url> [--snapshot <id> | --spec-url <url>] [--cases <n>] [--seed <n>] [--include-writes] [--trace] [--html <path>]
   api-spector contract pact-import   --file <pact.json> [--out <collection.json>]
   api-spector contract pact-export   --workspace <path> --out <pact.json> [--consumer <name> --provider <name> --collection <name>]
+
+  Cloud broker (git-native; auth via API_SPECTOR_TOKEN, version = git SHA):
+  api-spector contract publish       --workspace <path> --consumer <name> --provider <name> [--tag <folder>] [--version <sha>]
+  api-spector contract publish-spec  --provider <name> --spec <file> | --spec-url <url> [--broker] [--version <sha>]
+                                     # --broker → cloud; otherwise pins into --workspace (local / git)
+  api-spector contract deploy-check  --broker --pacticipant <name> --environment <env> [--version <sha>]   # exit 1 = blocked (alias: can-i-deploy)
+  api-spector contract record-deployment --broker --pacticipant <name> --environment <env> [--version <sha>]
 
   Modes:
     consumer       Send requests to the real provider, assert each response (live).

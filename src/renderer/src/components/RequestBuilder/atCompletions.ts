@@ -83,6 +83,99 @@ const HEADERS_METHODS: Completion[] = [
   { label: 'toObject', type: 'function', detail: '()',     info: 'Return all headers as a plain object' },
 ];
 
+// ─── chai assertion chain (sp.expect(...).to.be.equal(...)) ───────────────────
+//
+// The assertion returned by sp.expect() is a chai `expect`. Language chains
+// (to/be/have/not/deep/…) read naturally and mostly pass through; the leaf
+// methods/getters do the checking. We offer context-aware members after each
+// link in the chain so `sp.expect(x).` keeps completing.
+
+const CHAI_METHODS: Completion[] = [
+  { label: 'equal',    type: 'function', detail: '(value)',       info: 'Strict (===) equality' },
+  { label: 'eql',      type: 'function', detail: '(value)',       info: 'Deep equality' },
+  { label: 'include',  type: 'function', detail: '(value)',       info: 'Target includes value (string / array / object)' },
+  { label: 'contain',  type: 'function', detail: '(value)',       info: 'Alias of include' },
+  { label: 'match',    type: 'function', detail: '(regexp)',      info: 'String matches a regular expression' },
+  { label: 'above',    type: 'function', detail: '(n)',           info: 'Greater than n' },
+  { label: 'below',    type: 'function', detail: '(n)',           info: 'Less than n' },
+  { label: 'least',    type: 'function', detail: '(n)',           info: 'Greater than or equal to n' },
+  { label: 'most',     type: 'function', detail: '(n)',           info: 'Less than or equal to n' },
+  { label: 'within',   type: 'function', detail: '(min, max)',    info: 'Number within an inclusive range' },
+  { label: 'closeTo',  type: 'function', detail: '(expected, delta)', info: 'Number close to expected within delta' },
+  { label: 'a',        type: 'function', detail: "(type)",        info: "Type check, e.g. .to.be.a('string')" },
+  { label: 'an',       type: 'function', detail: "(type)",        info: "Type check, e.g. .to.be.an('array')" },
+  { label: 'property', type: 'function', detail: '(name, [value])', info: 'Object has a property (optionally equal to value)' },
+  { label: 'lengthOf', type: 'function', detail: '(n)',           info: 'Array / string length equals n' },
+  { label: 'keys',     type: 'function', detail: '(...keys)',     info: 'Object has the given keys' },
+  { label: 'members',  type: 'function', detail: '(array)',       info: 'Array has the given members' },
+  { label: 'oneOf',    type: 'function', detail: '(array)',       info: 'Value is one of the array' },
+  { label: 'throw',    type: 'function', detail: '([error])',     info: 'Function throws' },
+  { label: 'satisfy',  type: 'function', detail: '(fn)',          info: 'Value satisfies a predicate' },
+];
+
+const CHAI_GETTERS: Completion[] = [
+  { label: 'true',      type: 'property', info: 'Value is true' },
+  { label: 'false',     type: 'property', info: 'Value is false' },
+  { label: 'null',      type: 'property', info: 'Value is null' },
+  { label: 'undefined', type: 'property', info: 'Value is undefined' },
+  { label: 'NaN',       type: 'property', info: 'Value is NaN' },
+  { label: 'ok',        type: 'property', info: 'Value is truthy' },
+  { label: 'empty',     type: 'property', info: 'Array / string / object is empty' },
+  { label: 'exist',     type: 'property', info: 'Value is neither null nor undefined' },
+];
+
+/** Language-chain words offered as sub-property continuations. */
+const chaiWords = (words: string[]): Completion[] =>
+  words.map(w => ({ label: w, type: 'property', info: 'Chai chain' }));
+const chaiPick = (labels: string[]): Completion[] =>
+  CHAI_METHODS.filter(c => labels.includes(c.label));
+
+// What to offer based on the last word in the chain (before the partial being typed).
+const CHAI_AFTER: Record<string, Completion[]> = {
+  '':     [...chaiWords(['to', 'not']), ...chaiPick(['equal'])],           // right after expect(...)
+  to:     [...chaiWords(['be', 'have', 'include', 'deep', 'not', 'a', 'an']), ...CHAI_METHODS],
+  not:    [...chaiWords(['be', 'have', 'include', 'deep', 'a', 'an']), ...CHAI_METHODS],
+  be:     [...CHAI_GETTERS, ...chaiPick(['above', 'below', 'within', 'a', 'an', 'oneOf', 'closeTo', 'empty'])],
+  been:   [...CHAI_GETTERS, ...chaiPick(['above', 'below', 'within'])],
+  have:   chaiPick(['property', 'lengthOf', 'keys', 'members']),
+  has:    chaiPick(['property', 'lengthOf', 'keys', 'members']),
+  deep:   chaiPick(['equal', 'include', 'members', 'property']),
+};
+const CHAI_DEFAULT: Completion[] = [
+  ...chaiWords(['to', 'be', 'have', 'include', 'not', 'deep']),
+  ...CHAI_METHODS,
+  ...CHAI_GETTERS,
+];
+
+/** Complete the chai chain after a balanced `sp.expect( … )`. Returns null when
+ *  the cursor is not on a `.member` right after a completed expect() call. */
+function chaiChainCompletion(textBefore: string, pos: number): CompletionResult | null {
+  const start = textBefore.lastIndexOf('sp.expect(');
+  if (start === -1) return null;
+
+  // Scan for the matching ')' of expect( so the argument can itself contain
+  // parens/dots (e.g. sp.expect(sp.response.code)).
+  let depth = 0, close = -1;
+  for (let i = start + 'sp.expect'.length; i < textBefore.length; i++) {
+    const ch = textBefore[i];
+    if (ch === '(') depth++;
+    else if (ch === ')') { depth--; if (depth === 0) { close = i; break; } }
+  }
+  if (close === -1) return null; // still typing the expect() argument
+
+  const chain = textBefore.slice(close + 1); // e.g. ".to.be.bel"
+  const m = /^((?:\.\w+)*)\.(\w*)$/.exec(chain);
+  if (!m) return null; // not a plain .word chain (e.g. after a method call)
+
+  const priorWords = m[1] ? m[1].split('.').filter(Boolean) : [];
+  const lastWord   = priorWords.length ? priorWords[priorWords.length - 1] : '';
+  const partial    = m[2].toLowerCase();
+  const options    = (CHAI_AFTER[lastWord] ?? CHAI_DEFAULT)
+    .filter(o => o.label.toLowerCase().includes(partial));
+
+  return { from: pos - m[2].length, options, validFor: /^\w*$/ };
+}
+
 // ─── faker ───────────────────────────────────────────────────────────────────
 
 const FAKER_NAMESPACES: Completion[] = [
@@ -230,6 +323,10 @@ export function makeAtCompletionSource(varNames: string[]) {
         validFor: /^\w*$/,
       };
     }
+
+    // sp.expect(...).to.be.xxx — chai assertion chain
+    const chai = chaiChainCompletion(textBefore, context.pos);
+    if (chai) return chai;
 
     // at.response.headers.xxx
     const headersMatch = /\bsp\.response\.headers\.(\w*)$/.exec(textBefore);

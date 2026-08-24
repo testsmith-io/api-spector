@@ -4,6 +4,7 @@
 // ─── Contract testing ─────────────────────────────────────────────────────────
 
 import type { ApiRequest } from './collection';
+import type { ConsumerContract } from './consumer-contract';
 
 export interface ContractExpectation {
   statusCode?: number
@@ -154,6 +155,10 @@ export interface ContractRunPayload {
    *  interaction we POST `{ state, params, action: 'setup' }` here, mirroring
    *  Pact's "state change URL". */
   stateHandlerUrl?: string
+  /** Design-first contracts authored in the Contract Designer, run directly
+   *  (no pact-import) in the contract-bearing modes. The app passes these from
+   *  its in-memory workspace; the CLI reads them from the workspace file. */
+  designContracts?: ConsumerContract[]
 }
 
 // ─── Contract snapshots (pinned OpenAPI/spec versions) ───────────────────────

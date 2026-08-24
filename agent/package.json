@@ -1,0 +1,30 @@
+{
+  "name": "@testsmith/api-spector-agent",
+  "version": "0.4.6",
+  "description": "API Spector private runner: monitor internal/local APIs the cloud cannot reach, with no inbound connections.",
+  "license": "MIT",
+  "homepage": "https://api-spector.dev",
+  "type": "commonjs",
+  "bin": {
+    "api-spector-agent": "dist/index.cjs"
+  },
+  "main": "dist/index.cjs",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "api-spector",
+    "monitoring",
+    "uptime",
+    "private-runner",
+    "agent",
+    "contract-testing"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

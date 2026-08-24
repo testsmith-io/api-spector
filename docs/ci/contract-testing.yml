@@ -1,0 +1,102 @@
+# API Spector — git-native contract testing in CI
+#
+# Copy into .github/workflows/ in your consumer AND provider repos. It publishes
+# on every push (keyed to the commit SHA automatically), gates the deploy with
+# deploy-check, and records the deployment after a successful release.
+#
+# One secret is required: API_SPECTOR_TOKEN (create it in the cloud dashboard
+# under Tokens). For a self-hosted stack, also set the API_SPECTOR_CLOUD_ENDPOINT
+# env below.
+
+name: Contract testing
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  API_SPECTOR_TOKEN: ${{ secrets.API_SPECTOR_TOKEN }}
+  # API_SPECTOR_CLOUD_ENDPOINT: https://your-cloud-host   # only for a self-hosted broker
+
+jobs:
+  # ── CONSUMER repo: publish the pact, then check you can deploy ──────────────
+  consumer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22.x' }
+
+      # Publish the pact built from your workspace's requests + Contract-tab
+      # expectations. Version = ${{ github.sha }}, resolved automatically.
+      - name: Publish consumer pact
+        run: >
+          npx --yes @testsmith/api-spector contract publish
+          --workspace ./api-tests.spector
+          --consumer web --provider orders-api
+
+      # Gate: can web@<sha> go to production against what's live there?
+      # Exit 1 (pipeline fails) if a provider no longer offers what you need.
+      - name: deploy-check (production)
+        run: >
+          npx --yes @testsmith/api-spector contract deploy-check --broker
+          --pacticipant web --environment production
+
+      # After the real deploy step succeeds, record it so the next gate compares
+      # against reality. (Move this into your deploy job, post-release.)
+      - name: Record deployment
+        if: github.ref == 'refs/heads/main'
+        run: >
+          npx --yes @testsmith/api-spector contract record-deployment --broker
+          --pacticipant web --environment production
+
+  # ── PROVIDER repo: publish the spec on every merge ─────────────────────────
+  provider:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22.x' }
+
+      # Keep the spec fresh: publish it keyed to the commit, so the broker
+      # re-verifies every consumer pact against what you actually shipped.
+      - name: Publish provider spec
+        run: >
+          npx --yes @testsmith/api-spector contract publish-spec
+          --provider orders-api --spec ./openapi.json
+
+      # A provider change that would break a live consumer is blocked here.
+      - name: deploy-check (production)
+        run: >
+          npx --yes @testsmith/api-spector contract deploy-check --broker
+          --pacticipant orders-api --environment production
+
+  # ── PR-native feedback: post the who/what/why as a comment, not an opaque 409 ──
+  pr-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions: { pull-requests: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22.x' }
+
+      # `preview` prints a markdown summary naming what breaks and who it affects.
+      - name: Contract deploy preview
+        id: preview
+        run: |
+          echo 'body<<EOF' >> "$GITHUB_OUTPUT"
+          npx --yes @testsmith/api-spector contract preview \
+            --pacticipant orders-api --environment production >> "$GITHUB_OUTPUT"
+          echo 'EOF' >> "$GITHUB_OUTPUT"
+
+      - name: Comment on the PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `${{ steps.preview.outputs.body }}`,
+            })

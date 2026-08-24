@@ -15,8 +15,7 @@
         "folders": [],
         "requestIds": [
           "login",
-          "use-token",
-          "pre-request"
+          "use-token"
         ]
       }
     ],
@@ -27,7 +26,7 @@
       "id": "login",
       "name": "Login (extract token)",
       "method": "POST",
-      "url": "{{BASE_URL}}/login",
+      "url": "https://api.practicesoftwaretesting.com/users/login",
       "headers": [],
       "params": [],
       "auth": {
@@ -35,17 +34,18 @@
       },
       "body": {
         "mode": "json",
-        "json": "{\"username\":\"demo\",\"password\":\"secret\"}"
+        "json": "{\"email\":\"customer@practicesoftwaretesting.com\",\"password\":\"welcome01\"}"
       },
-      "postRequestScript": "var data = sp.response.json();\nsp.collectionVariables.set('authToken', data.token);\nsp.collectionVariables.set('userId', String(data.userId));\nsp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });\nsp.test('received a token', function () { sp.expect(data.token).to.be.a('string'); });",
+      "postRequestScript": "var data = sp.response.json();\nsp.collectionVariables.set('authToken', data.access_token);",
       "description": "Stores the returned token in a collection variable for the next request.",
-      "protocol": "http"
+      "protocol": "http",
+      "hookType": "before"
     },
     "use-token": {
       "id": "use-token",
       "name": "Use the extracted token",
       "method": "GET",
-      "url": "{{BASE_URL}}/me",
+      "url": "https://api.practicesoftwaretesting.com/users/me",
       "headers": [
         {
           "key": "Authorization",
@@ -62,34 +62,23 @@
       },
       "postRequestScript": "sp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });\nsp.test('profile is returned', function () { sp.expect(sp.response.json()).to.have.property('email'); });",
       "description": "Reuses {{authToken}} captured by the Login request.",
-      "protocol": "http"
-    },
-    "pre-request": {
-      "id": "pre-request",
-      "name": "Pre-request script sets a value",
-      "method": "GET",
-      "url": "{{BASE_URL}}/headers",
-      "headers": [
-        {
-          "key": "X-Trace",
-          "value": "{{traceId}}",
-          "enabled": true
-        }
-      ],
-      "params": [],
-      "auth": {
-        "type": "none"
-      },
-      "body": {
-        "mode": "none"
-      },
-      "preRequestScript": "sp.collectionVariables.set('traceId', 'trace-' + Date.now());",
-      "postRequestScript": "sp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });\nsp.test('trace header was sent', function () { sp.expect(sp.response.json()).to.have.property('x-trace'); });",
-      "description": "A pre-request script computes a value that the request then sends as a header.",
-      "protocol": "http"
+      "protocol": "http",
+      "contract": {
+        "statusCode": 200,
+        "headers": [
+          {
+            "key": "content-type",
+            "value": "application/json",
+            "required": true
+          }
+        ],
+        "bodySchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"id\": {\n      \"type\": \"string\"\n    },\n    \"provider\": {\n      \"type\": \"null\"\n    },\n    \"first_name\": {\n      \"type\": \"string\"\n    },\n    \"last_name\": {\n      \"type\": \"string\"\n    },\n    \"phone\": {\n      \"type\": \"null\"\n    },\n    \"dob\": {\n      \"type\": \"string\"\n    },\n    \"email\": {\n      \"type\": \"string\"\n    },\n    \"totp_enabled\": {\n      \"type\": \"boolean\"\n    },\n    \"created_at\": {\n      \"type\": \"string\"\n    },\n    \"address\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"street\": {\n          \"type\": \"string\"\n        },\n        \"house_number\": {\n          \"type\": \"null\"\n        },\n        \"city\": {\n          \"type\": \"string\"\n        },\n        \"state\": {\n          \"type\": \"null\"\n        },\n        \"country\": {\n          \"type\": \"string\"\n        },\n        \"postal_code\": {\n          \"type\": \"null\"\n        }\n      },\n      \"required\": [\n        \"street\",\n        \"city\",\n        \"country\"\n      ]\n    }\n  },\n  \"required\": [\n    \"id\",\n    \"first_name\",\n    \"last_name\",\n    \"dob\",\n    \"email\",\n    \"totp_enabled\",\n    \"created_at\",\n    \"address\"\n  ]\n}"
+      }
     }
   },
   "collectionVariables": {
-    "BASE_URL": "http://127.0.0.1:19200"
+    "BASE_URL": "http://127.0.0.1:19200",
+    "authToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2FwaS5wcmFjdGljZXNvZnR3YXJldGVzdGluZy5jb20vdXNlcnMvbG9naW4iLCJpYXQiOjE3ODY4MjIxMzIsImV4cCI6MTc4NjgyMjQzMiwibmJmIjoxNzg2ODIyMTMyLCJqdGkiOiJRdzAxVlFWQk1wY2J3Yll3Iiwic3ViIjoiMDFNMDNDUVBSQ0pYU0YyREtBNVRXQUtRVjQiLCJwcnYiOiIyM2JkNWM4OTQ5ZjYwMGFkYjM5ZTcwMWM0MDA4NzJkYjdhNTk3NmY3Iiwicm9sZSI6InVzZXIifQ.2mgLvMNGSNf_4FVDkmu52NX4YG9r9WAwyIrnYqGOwJY",
+    "userId": "undefined"
   }
 }

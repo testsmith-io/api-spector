@@ -30,7 +30,7 @@
       "statusCode": 200,
       "headers": {},
       "body": "",
-      "id": "bearer",
+      "id": "cdb9f874-2173-4d96-9dce-6d2087d1db7e",
       "path": "/bearer",
       "description": "Expects Authorization: Bearer mock-bearer-token-123",
       "script": "if(request.headers.authorization==='Bearer mock-bearer-token-123'){response.headers['Content-Type']='application/json';response.body=JSON.stringify({authenticated:true,scheme:'bearer'});}else{response.statusCode=401;response.headers['Content-Type']='application/json';response.body=JSON.stringify({authenticated:false,scheme:'bearer',error:'invalid or missing credentials',got:request.headers.authorization||null});}"

@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { xml } from '@codemirror/lang-xml';
 import { oneDark } from '@codemirror/theme-one-dark';
+import { commentKeymap } from './commentKeymap';
 import type { ApiRequest, SoapBody, WsdlParam, WsdlOperation, WsdlEndpoint } from '../../../../shared/types';
 import { contentTypeForSoap, withContentType } from '../../../../shared/soap';
 
@@ -265,7 +266,7 @@ export function SoapEditor({ request, onChange }: Props) {
                       value={soap.envelope ?? ''}
                       height="100%"
                       theme={oneDark}
-                      extensions={[xml()]}
+                      extensions={[xml(), commentKeymap]}
                       onChange={val => updateSoap({ envelope: val })}
                       basicSetup={{ lineNumbers: true, foldGutter: true }}
                     />
@@ -313,7 +314,7 @@ export function SoapEditor({ request, onChange }: Props) {
               value={soap.envelope ?? ''}
               height="100%"
               theme={oneDark}
-              extensions={[xml()]}
+              extensions={[xml(), commentKeymap]}
               onChange={val => updateSoap({ envelope: val })}
               basicSetup={{ lineNumbers: true, foldGutter: true }}
             />

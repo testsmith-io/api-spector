@@ -314,7 +314,20 @@ function kvToHeaders(kv: { key: string; value: string; enabled?: boolean }[] | u
   return Object.keys(out).length ? out : undefined;
 }
 
-/** Build a Pact v3 file from a set of requests carrying consumer contracts. */
+/** Pact v4 interaction discriminator for synchronous HTTP. */
+export const V4_SYNC_HTTP = 'Synchronous/HTTP';
+
+/** A stable short key for a Pact v4 interaction: FNV-1a over its identity. */
+export function interactionKey(identity: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < identity.length; i++) {
+    h ^= identity.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
+/** Build a Pact v4 file from a set of requests carrying consumer contracts. */
 export function exportPact(consumer: string, provider: string, requests: ApiRequest[]): object {
   const interactions = requests
     .filter(r => r.contract)
@@ -347,7 +360,13 @@ export function exportPact(consumer: string, provider: string, requests: ApiRequ
       if (r.body?.mode === 'json' && r.body.json) { try { request['body'] = JSON.parse(r.body.json); } catch { /* skip */ } }
       else if (r.body?.mode === 'raw' && r.body.raw) request['body'] = r.body.raw;
 
-      const interaction: Record<string, unknown> = { description: r.name, request, response };
+      const interaction: Record<string, unknown> = {
+        type: V4_SYNC_HTTP,
+        key: interactionKey(`${r.method}|${path}|${c.statusCode ?? ''}|${r.name}`),
+        description: r.name,
+        request,
+        response,
+      };
       if (c.providerStates?.length) interaction['providerStates'] = c.providerStates.map(name => ({ name }));
       return interaction;
     });
@@ -357,7 +376,7 @@ export function exportPact(consumer: string, provider: string, requests: ApiRequ
     provider: { name: provider },
     interactions,
     metadata: {
-      pactSpecification: { version: '3.0.0' },
+      pactSpecification: { version: '4.0' },
       client: { name: 'api-spector' },
     },
   };

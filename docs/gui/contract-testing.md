@@ -4,7 +4,7 @@ Contract testing verifies that a consumer (your API collection) and a provider (
 
 Think of it as **who owns the definition of "correct"**. For how these modes map to the industry terms (consumer-driven, provider-driven, and bi-directional contract testing) and how to choose between them, see **[Contract Testing Types](../reference/contract-testing-types.md)**.
 
-> **New in this release:** live provider verification with provider states, Pact-style flexible matchers, Pact file import/export, HTML reports, and a local `can-i-deploy` gate. The CLI side of all of this is covered in **[Contract Testing (CLI)](../cli/contract-testing.md)**.
+> **New in this release:** live provider verification with provider states, Pact-style flexible matchers, Pact file import/export, HTML reports, and a local `deploy-check` gate. The CLI side of all of this is covered in **[Contract Testing (CLI)](../cli/contract-testing.md)**.
 
 ---
 
@@ -202,7 +202,7 @@ Expanding a card shows each violation with its type, path, message, and expected
 **Record** in the results bar saves the run under `contracts/results/<pacticipant>/<version>.json` in the workspace, exactly like the CLI's `contract run --record`. Give it a pacticipant name (defaults to the active collection) and a version. Recorded runs power two things:
 
 - the [contract dashboard](../cli/contract-testing.md#serving-the-dashboard) (`contract report --serve`, also available as a [docker container](../cli/docker.md#the-contract-dashboard)) - refresh the page after recording and the new cell appears
-- the [`can-i-deploy` gate](../cli/contract-testing.md#can-i-deploy-the-deployment-gate)
+- the [`deploy-check` gate](../cli/contract-testing.md#deploy-check-the-deployment-gate)
 
 Commit the results folder to git to share them with the team.
 

@@ -20,6 +20,8 @@ import type {
   MockRoute,
   MockHit,
   WsMessage,
+  StreamEvent,
+  ConsumerContract,
   ApiRequest,
   ContractRunPayload,
   ContractReport,
@@ -149,6 +151,32 @@ const api = {
   ): Promise<{ accessToken: string; expiresAt: number; refreshToken?: string }> =>
     ipcRenderer.invoke(IPC.oauth2.refreshToken, auth, vars, refreshToken),
 
+  // ─── Cloud integration ────────────────────────────────────────────────────────
+  cloudTest: (): Promise<{ email: string; organization: string; plan: string }> =>
+    ipcRenderer.invoke(IPC.cloud.test),
+  cloudPushMock: (server: MockServer): Promise<{ id: number; url: string; routes: number }> =>
+    ipcRenderer.invoke(IPC.cloud.pushMock, server),
+  cloudGetMock: (name: string): Promise<{ exists: boolean; routes?: { method: string; path: string }[] }> =>
+    ipcRenderer.invoke(IPC.cloud.getMock, name),
+  cloudPushMonitor: (input: unknown): Promise<{ id: number }> =>
+    ipcRenderer.invoke(IPC.cloud.pushMonitor, input),
+  cloudPushPact: (input: { consumer: string; provider: string; consumerVersion: string; requests: unknown[] }): Promise<{
+    id: number; content_sha: string;
+    verification: { success: boolean; checks: { interaction: string; passed: boolean; error: string | null }[] } | null;
+  }> =>
+    ipcRenderer.invoke(IPC.cloud.pushPact, input),
+  cloudPushDesignContract: (input: { contract: ConsumerContract; consumerVersion: string }): Promise<{
+    id: number; content_sha: string;
+    verification: { success: boolean; checks: { interaction: string; passed: boolean; error: string | null }[] } | null;
+  }> =>
+    ipcRenderer.invoke(IPC.cloud.pushDesignContract, input),
+  cloudPushSpec: (input: { pacticipant: string; version: string; spec?: string; specUrl?: string }): Promise<{
+    verified_contracts: number;
+    results: { consumer: string; version: string; success: boolean }[];
+  }> =>
+    ipcRenderer.invoke(IPC.cloud.pushSpec, input),
+  cloudOpenMatrix: (): Promise<void> => ipcRenderer.invoke(IPC.cloud.openMatrix),
+
   // ─── Mock servers ─────────────────────────────────────────────────────────────
   mockStart:    (server: MockServer): Promise<void> =>
     ipcRenderer.invoke(IPC.mock.start, server),
@@ -194,6 +222,17 @@ const api = {
     ipcRenderer.removeAllListeners(IPC.ws.status);
   },
 
+  // ─── Streamed responses (SSE / NDJSON / chunked) ──────────────────────────
+  onRequestStreamEvent: (cb: (payload: { streamId: string; events: StreamEvent[] }) => void): void => {
+    ipcRenderer.on(IPC.request.streamEvent, (_e, payload) => cb(payload));
+  },
+  offRequestStreamEvent: (): void => {
+    ipcRenderer.removeAllListeners(IPC.request.streamEvent);
+  },
+  /** Abort an in-flight streamed read (the Stop button). */
+  stopStream: (streamId: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.request.stopStream, streamId),
+
   // ─── SOAP / WSDL ──────────────────────────────────────────────────────────
   wsdlFetch: (url: string, extraHeaders?: Record<string, string>): Promise<{
     operations: Array<{
@@ -238,6 +277,8 @@ const api = {
     meta?: { title?: string; provider?: string; consumer?: string; spec?: string },
   ): Promise<boolean> =>
     ipcRenderer.invoke(IPC.contract.exportReportHtml, report, meta),
+  exportDesignPact: (contract: ConsumerContract): Promise<string> =>
+    ipcRenderer.invoke(IPC.contract.exportDesignPact, contract),
   captureContractSnapshot: (opts: { specUrl?: string; specPath?: string; name?: string }) =>
     ipcRenderer.invoke(IPC.contract.captureSnapshot, opts) as Promise<{ relPath: string; snapshot: ContractSnapshot }>,
   listContractSnapshots: (registered: string[] = []) =>
