@@ -4,6 +4,11 @@
   "description": "API Spector private runner: monitor internal/local APIs the cloud cannot reach, with no inbound connections.",
   "license": "MIT",
   "homepage": "https://api-spector.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/testsmith-io/api-spector",
+    "directory": "agent"
+  },
   "type": "commonjs",
   "bin": {
     "api-spector-agent": "dist/index.cjs"
