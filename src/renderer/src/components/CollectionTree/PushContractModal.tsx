@@ -32,7 +32,7 @@ export function PushContractModal({ requests, defaultConsumer, onClose }: {
   const [status, setStatus] = useState<{ state: 'idle' | 'pushing' | 'ok' | 'warn' | 'err'; msg?: string; detail?: string[] }>({ state: 'idle' });
 
   function toggle(id: string) {
-    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setSelected(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   }
 
   const canPush = mode === 'consumer'

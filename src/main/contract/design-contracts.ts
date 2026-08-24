@@ -13,7 +13,7 @@ import { designContractToPact } from './design-pact';
  * and the app), with no manual `pact-import` into a collection.
  *
  * Two sources are merged and de-duplicated (the same interaction from both is
- * kept once): the workspace's inline `designContracts`, and any `pacts/​*.json`
+ * kept once): the workspace's inline `designContracts`, and any `pacts/*.json`
  * files in the workspace directory (read only when `dir` is given). Each is
  * normalized through the same Pact importer the CLI already uses, so the results
  * carry a `contract` and run in the consumer / provider-live / bidirectional
