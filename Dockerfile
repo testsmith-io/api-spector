@@ -1,10 +1,9 @@
-# API Spector CLI image: run tests, mock servers, and the contract dashboard
-# in CI or on a server, with no Node/Electron setup on the host.
+# API Spector CLI image: run tests and mock servers in CI or on a server, with
+# no Node/Electron setup on the host.
 #
 #   docker build -t api-spector .
 #   docker run --rm -v "$PWD:/workspace" api-spector run --workspace /workspace
-#   docker run --rm -p 8080:8080 -v "$PWD:/workspace" api-spector \
-#     contract report --workspace /workspace --serve --port 8080
+#   docker run --rm -p 3005:3005 -v "$PWD:/workspace" api-spector mock --workspace /workspace
 #
 # The UI is not included (Electron is skipped entirely); use the desktop app
 # for that. Every CLI subcommand works: run, mock, record, contract, wsdl, agents.
@@ -22,7 +21,7 @@ RUN npm run build
 # ── Runtime stage: production deps only, no Electron, no toolchain ───────────
 FROM node:22-alpine AS production
 LABEL org.opencontainers.image.title="API Spector CLI" \
-      org.opencontainers.image.description="Local-first API testing: CLI runner, mock servers, contract testing and dashboard" \
+      org.opencontainers.image.description="Local-first API testing: CLI runner, mock servers, contract testing" \
       org.opencontainers.image.source="https://github.com/testsmith-io/api-spector"
 WORKDIR /app
 ENV NODE_ENV=production
@@ -35,6 +34,7 @@ COPY bin ./bin
 
 # Convention: mount your workspace at /workspace and pass relative paths.
 WORKDIR /workspace
-EXPOSE 8080
+# Mock servers default to 3005; map the ports you need with `docker run -p`.
+EXPOSE 3005
 ENTRYPOINT ["node", "/app/bin/cli.js"]
 CMD ["--help"]

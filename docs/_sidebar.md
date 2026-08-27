@@ -29,6 +29,7 @@
   - [Contract Testing Workflows](reference/contract-testing-workflows.md)
   - [Contract Testing: Toolshop Example](reference/contract-testing-toolshop.md)
   - [Variables & Scopes](reference/variables.md)
+  - [Secret Managers (Vault, AWS, Azure, 1Password)](reference/secrets-vault.md)
   - [Faker: Dynamic Test Data](reference/faker.md)
   - [Scripting API](reference/scripting.md)
   - [Pact Compatibility & Matchers](reference/pact-compatibility.md)

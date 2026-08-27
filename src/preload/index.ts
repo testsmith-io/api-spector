@@ -137,6 +137,12 @@ const api = {
   saveGeneratedFilesAsZip: (files: GeneratedFile[], collectionName: string, target: GenerateTarget): Promise<boolean> =>
     ipcRenderer.invoke(IPC.generate.saveZip, files, collectionName, target),
 
+  // ─── HashiCorp Vault (interactive OIDC login) ─────────────────────────────
+  vaultOidcLogin: (
+    opts: { address: string; mount?: string; role?: string; namespace?: string; skipVerify?: boolean },
+  ): Promise<{ ok: true; expiresInSeconds: number; entityId?: string }> =>
+    ipcRenderer.invoke(IPC.vault.oidcLogin, opts),
+
   // ─── OAuth 2.0 ────────────────────────────────────────────────────────────
   oauth2StartFlow: (
     auth: AuthConfig,

@@ -74,7 +74,7 @@ export function registerContractHandlers(ipc: IpcMain): void {
 
     switch (mode) {
       case 'consumer':
-        return runConsumerContracts(requests, envVars, collectionVars);
+        return runConsumerContracts(requests, envVars, collectionVars, providerBaseUrl);
       case 'provider':
         return runProviderVerification(requests, envVars, collectionVars, specUrl, specPath, requestBaseUrl);
       case 'provider-live':
@@ -174,7 +174,7 @@ export function registerContractHandlers(ipc: IpcMain): void {
 
   // Persist a run for the dashboard / can-i-deploy gate — same results-store
   // the CLI's `contract run --record` writes to, so GUI-recorded runs show up
-  // in `contract report --serve` (and the docker dashboard) on refresh.
+  // in the exported dashboard (`contract report --html`) and can-i-deploy.
   handleIpc(ipc, IPC.contract.recordResult, async (
     _e,
     opts: { pacticipant: string; version: string; report: ContractReport },

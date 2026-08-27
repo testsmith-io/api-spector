@@ -4,21 +4,18 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { fetch } from 'undici';
-import { listResults, listEnvironments, type RecordedResult, type EnvironmentState } from './results-store';
+import type { RecordedResult, EnvironmentState } from './results-store';
 
-// ─── Outbound webhooks for the served dashboard ───────────────────────────────
+// ─── Outbound webhooks (Pact-Broker style "contract changed" notifications) ───
 //
-// The serve mode (`contract report --serve`) is the one always-on process in
-// the setup, so it is where notifications live. It polls the workspace's
-// contract data; when a new verification result or deployment appears (written
-// locally or arriving via `git pull`), it POSTs to the configured URLs. This
-// covers the Pact Broker's "contract changed, trigger provider CI" workflow.
+// Webhooks are OUTBOUND ONLY. Configuration lives in `contracts/webhooks.json`
+// (committed to git); `contract webhooks --test` sends a sample event to each
+// configured URL. Secrets do not belong in the file: `$NAME` tokens in URLs and
+// header values are replaced from the process environment at fire time.
 //
-// Direction matters: webhooks are OUTBOUND ONLY. The server still accepts no
-// writes; results reach it through the filesystem. Configuration lives in
-// `contracts/webhooks.json` (committed to git). Secrets do not belong in that
-// file: `$NAME` tokens in URLs and header values are replaced from the serving
-// process's environment at fire time.
+// snapshotState/diffState compute the events representing what changed between
+// two snapshots of the contract data (used to build payloads from recorded
+// results and deployments).
 
 const WEBHOOKS_FILE = 'contracts/webhooks.json';
 
@@ -145,38 +142,3 @@ export function diffState(
   return events;
 }
 
-/** Poll the workspace for new results/deployments and fire webhooks for the
- *  difference. Returns a stop function. The first scan only establishes the
- *  baseline; pre-existing data does not fire events. */
-export function watchContractEvents(
-  dir: string,
-  hooks: WebhookConfig[],
-  intervalMs = 10_000,
-  log: (msg: string) => void = console.log,
-): () => void {
-  let prev: ContractDataState | null = null;
-  let running = false;
-
-  const tick = async (): Promise<void> => {
-    if (running) return; // skip overlapping scans
-    running = true;
-    try {
-      const [results, envs] = await Promise.all([listResults(dir), listEnvironments(dir)]);
-      const next = snapshotState(results, envs);
-      if (prev !== null) {
-        for (const payload of diffState(prev, next, results)) {
-          await fireWebhooks(hooks, payload, process.env, log);
-        }
-      }
-      prev = next;
-    } catch (e) {
-      log(`  [webhook] scan failed: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      running = false;
-    }
-  };
-
-  void tick();
-  const timer = setInterval(() => { void tick(); }, intervalMs);
-  return () => clearInterval(timer);
-}

@@ -98,3 +98,37 @@ export async function recordDeployment(cfg: BrokerConfig, input: { pacticipant: 
   const r = await brokerFetch(cfg, path, 'POST', {});
   if (!r.ok) fail(r, 'record-deployment failed');
 }
+
+export interface CompatCheck { interaction: string; passed: boolean; error: string | null; mismatches?: Array<{ location: string; consumer: string; provider: string; reason: string }> }
+
+/** Compatibility check: can provider@version satisfy consumer@version? Read-only
+ *  (no verification recorded, no deployment considered). 200 = compatible,
+ *  409 = incompatible; both carry the per-interaction checks. */
+export async function checkCompatibility(cfg: BrokerConfig, input: { consumer: string; consumerVersion: string; provider: string; providerVersion: string }): Promise<{ compatible: boolean; checks: CompatCheck[] }> {
+  const q = new URLSearchParams({ consumer: input.consumer, consumerVersion: input.consumerVersion, provider: input.provider, providerVersion: input.providerVersion }).toString();
+  const r = await brokerFetch(cfg, '/api/compatibility?' + q, 'GET');
+  if (r.status !== 200 && r.status !== 409) fail(r, 'Compatibility check failed');
+  return { compatible: r.json?.compatible === true, checks: r.json?.checks ?? [] };
+}
+
+/** Fetch consumer contracts in the active project (optionally filtered). */
+export async function fetchContracts(cfg: BrokerConfig, input: { consumer?: string; provider?: string } = {}): Promise<Array<{ id: number; consumer: string; consumerVersion: string; provider: string; content: object }>> {
+  const q = new URLSearchParams();
+  if (input.consumer) q.set('consumer', input.consumer);
+  if (input.provider) q.set('provider', input.provider);
+  const suffix = q.toString() ? '?' + q.toString() : '';
+  const r = await brokerFetch(cfg, '/api/contracts' + suffix, 'GET');
+  if (!r.ok) fail(r, 'Fetch contracts failed');
+  return r.json?.contracts ?? [];
+}
+
+/** Publish a provider verification result for a contract. */
+export async function publishVerification(cfg: BrokerConfig, input: { contractId: number; providerVersion: string; success: boolean; buildUrl?: string }): Promise<void> {
+  const r = await brokerFetch(cfg, '/api/verifications', 'POST', {
+    contractId: input.contractId,
+    providerVersion: input.providerVersion,
+    success: input.success,
+    ...(input.buildUrl ? { buildUrl: input.buildUrl } : {}),
+  });
+  if (!r.ok) fail(r, 'Publish verification failed');
+}

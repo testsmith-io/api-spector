@@ -9,6 +9,7 @@ import { join, dirname, resolve, basename } from 'path';
 import { randomUUID } from 'crypto';
 import type { Collection, Environment, Workspace } from '../../shared/types';
 import { loadGlobals, getGlobals, setGlobals, persistGlobals } from '../globals-store';
+import { setSecretsConfig } from '../secrets';
 
 const LAST_WS_FILE = join(app.getPath('userData'), 'last-workspace.json');
 const RECENTS_FILE = join(app.getPath('userData'), 'recent-workspaces.json');
@@ -277,6 +278,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     workspaceFile = wsPath;
     await loadGlobals(workspaceDir);
     await saveLastWorkspacePath(wsPath);
+    setSecretsConfig((parsed as Workspace).settings?.secrets);
     return { workspace: parsed as Workspace, workspacePath: wsPath };
   });
 
@@ -329,6 +331,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
 
   handleIpc(ipc, IPC.file.saveWorkspace, async (_e, ws: Workspace) => {
     if (!workspaceFile) return;
+    setSecretsConfig(ws.settings?.secrets); // apply edited connection config at once
     await atomicWrite(workspaceFile, JSON.stringify(ws, null, 2));
     // Backfill the editor file-association for workspaces created before this
     // helper existed. Idempotent — no-op if the file already maps *.spector.
@@ -475,6 +478,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
       workspaceDir = dirname(wsPath);
       workspaceFile = wsPath;
       await loadGlobals(workspaceDir);
+      setSecretsConfig(workspace.settings?.secrets);
       return { workspace, workspacePath: wsPath };
     } catch {
       return null;
@@ -505,6 +509,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     workspaceFile = wsPath;
     await loadGlobals(workspaceDir);
     await saveLastWorkspacePath(wsPath);
+    setSecretsConfig((parsed as Workspace).settings?.secrets);
     return { workspace: parsed as Workspace, workspacePath: wsPath };
   });
 }
@@ -530,6 +535,7 @@ async function tryOpenWorkspaceInDir(dir: string): Promise<{ workspace: Workspac
     workspaceDir = dir;
     workspaceFile = wsPath;
     await loadGlobals(workspaceDir);
+    setSecretsConfig(workspace.settings?.secrets);
     return { workspace, workspacePath: wsPath };
   } catch {
     return null;

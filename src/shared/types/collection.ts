@@ -148,6 +148,12 @@ export interface EnvVariable {
    * at send-time — never stored on disk. Takes precedence over value/secret.
    */
   envRef?: string
+  /**
+   * External secret-manager reference, e.g. "vault:secret/data/app#token".
+   * Resolved at send-time by the matching provider (HashiCorp Vault, ...); only
+   * the reference is stored, never the value. Takes precedence over value/secret.
+   */
+  secretRef?: string
 }
 
 export interface Environment {
@@ -180,11 +186,6 @@ export interface Workspace {
     }
     tls?: TlsSettings
     piiMaskPatterns?: string[]
-    /** URL of a served contract dashboard (`contract report --serve`). Used
-     *  only for the "Open dashboard" link in the contract results panel —
-     *  the app never sends data to it; results travel via the workspace
-     *  files / git. */
-    dashboardUrl?: string
     /** Name of the environment CLI runs use when no --environment flag is
      *  given, and the app activates when no environment is selected yet. */
     defaultEnvironment?: string
@@ -203,5 +204,58 @@ export interface Workspace {
       enabled: boolean
       tokenSet?: boolean
     }
+    /** External secret-manager connection config. Non-secret only (addresses,
+     *  roles, mounts) — safe to commit. Tokens/secret-ids come from the
+     *  environment (see docs/secrets-vault.md), never from here. Environment
+     *  variables override these values. */
+    secrets?: SecretsSettings
   }
+}
+
+// ─── External secret managers ─────────────────────────────────────────────────
+
+export interface VaultSettings {
+  /** Vault base URL, e.g. https://vault.acme.internal:8200 (env: VAULT_ADDR). */
+  address?: string
+  /** Vault Enterprise namespace (env: VAULT_NAMESPACE). */
+  namespace?: string
+  /** How API Spector authenticates to Vault. Defaults are inferred from which
+   *  credentials are present (token → approle → jwt). */
+  authMethod?: 'token' | 'approle' | 'jwt'
+  /** AppRole role id (the secret id always comes from the environment). */
+  roleId?: string
+  /** Role name for JWT/OIDC (workload-identity) auth, e.g. in CI. */
+  jwtRole?: string
+  /** Auth mount path when it is not the method default (approle / jwt). */
+  loginMount?: string
+  /** KV secrets-engine version. `auto` detects v2 by the response shape. */
+  kvVersion?: 'auto' | '1' | '2'
+  /** Skip TLS verification (dev only; env: VAULT_SKIP_VERIFY). */
+  skipVerify?: boolean
+}
+
+export interface AwsSecretsSettings {
+  /** AWS region, e.g. eu-west-1 (env: AWS_REGION). */
+  region?: string
+}
+
+export interface AzureKeyVaultSettings {
+  /** Key Vault name or full base URL (https://NAME.vault.azure.net). */
+  vault?: string
+  /** Entra tenant id (env: AZURE_TENANT_ID). */
+  tenantId?: string
+  /** App registration client id (env: AZURE_CLIENT_ID). */
+  clientId?: string
+}
+
+export interface OnePasswordSettings {
+  /** 1Password Connect base URL (env: OP_CONNECT_HOST). */
+  connectHost?: string
+}
+
+export interface SecretsSettings {
+  vault?: VaultSettings
+  aws?: AwsSecretsSettings
+  azure?: AzureKeyVaultSettings
+  onePassword?: OnePasswordSettings
 }

@@ -58,6 +58,19 @@ export type {
   TlsConfig,
 } from '../main/request-exec';
 
+// ── External secret managers (HashiCorp Vault, ...) ──
+// The engine resolves `vault:...` (and any registered scheme) references inside
+// auth and environment variables automatically. Register additional backends
+// via registerSecretProvider; set connection config with setSecretsConfig.
+export {
+  registerSecretProvider,
+  registeredSchemes,
+  hasSecretScheme,
+  resolveExternalSecret,
+  setSecretsConfig,
+} from '../main/secrets';
+export type { SecretProvider, SecretResolveContext } from '../main/secrets';
+
 // ── Shared types ──
 export type {
   MockServer,

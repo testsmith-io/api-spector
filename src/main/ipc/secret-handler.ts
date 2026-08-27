@@ -4,6 +4,7 @@
 import { type IpcMain } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
+import { hasSecretScheme, resolveExternalSecret } from '../secrets';
 import type { safeStorage as SafeStorageType } from 'electron';
 import { pbkdf2Sync, createDecipheriv } from 'crypto';
 import { readFile, writeFile } from 'fs/promises';
@@ -119,6 +120,13 @@ export function decryptSecret(
  * The CLI only ever reaches the process.env fallback since the store is never initialised.
  */
 export async function getSecret(ref: string): Promise<string | null> {
+  // External secret managers (HashiCorp Vault, ...) via a registered scheme,
+  // e.g. `vault:secret/data/app#token`. Ordinary keychain / env refs have no
+  // registered scheme and fall through to the store + process.env below.
+  if (hasSecretScheme(ref)) {
+    return resolveExternalSecret(ref);
+  }
+
   const stored = secretStore[ref];
   if (stored) {
     const ss = getSafeStorage();
