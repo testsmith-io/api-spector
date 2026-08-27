@@ -10,7 +10,7 @@ const { electron } = window;
 const DEFAULT_PII_PATTERNS = ['authorization', 'password', 'token', 'secret', 'api-key', 'x-api-key'];
 const ZOOM_STEPS = [0.75, 0.90, 1.0, 1.10, 1.25, 1.50];
 
-type SettingsTab = 'general' | 'appearance' | 'proxy' | 'tls' | 'privacy' | 'contracts' | 'cloud'
+type SettingsTab = 'general' | 'appearance' | 'proxy' | 'tls' | 'privacy' | 'cloud' | 'secrets'
 
 export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
   const workspace = useStore(s => s.workspace);
@@ -44,9 +44,6 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
     existing.tls?.rejectUnauthorized !== false, // default true
   );
 
-  // Contracts state
-  const [dashboardUrl, setDashboardUrl] = useState(existing.dashboardUrl ?? '');
-
   // Cloud state (token lives in the OS keychain, never in the workspace file;
   // the endpoint is fixed for end users, so it is not shown here)
   const [cloudEnabled, setCloudEnabled] = useState(existing.cloud?.enabled ?? false);
@@ -62,6 +59,41 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
       setCloudTest({ status: 'ok', msg: `Connected as ${me.email} · ${me.organization} (${me.plan})` });
     } catch (e) {
       setCloudTest({ status: 'err', msg: (e as Error).message });
+    }
+  }
+
+  // Secrets state — external secret-manager connection config (non-secret only;
+  // tokens/secret-ids come from the environment or the OIDC login button).
+  const sec = existing.secrets ?? {};
+  const [vAddress,   setVAddress]   = useState(sec.vault?.address ?? '');
+  const [vNamespace, setVNamespace] = useState(sec.vault?.namespace ?? '');
+  const [vAuthMethod, setVAuthMethod] = useState<'token' | 'approle' | 'jwt'>(sec.vault?.authMethod ?? 'token');
+  const [vRoleId,    setVRoleId]    = useState(sec.vault?.roleId ?? '');
+  const [vJwtRole,   setVJwtRole]   = useState(sec.vault?.jwtRole ?? '');
+  const [vLoginMount, setVLoginMount] = useState(sec.vault?.loginMount ?? '');
+  const [vKvVersion, setVKvVersion] = useState<'auto' | '1' | '2'>(sec.vault?.kvVersion ?? 'auto');
+  const [vSkipVerify, setVSkipVerify] = useState(sec.vault?.skipVerify ?? false);
+  const [awsRegion,  setAwsRegion]  = useState(sec.aws?.region ?? '');
+  const [azVault,    setAzVault]    = useState(sec.azure?.vault ?? '');
+  const [azTenantId, setAzTenantId] = useState(sec.azure?.tenantId ?? '');
+  const [azClientId, setAzClientId] = useState(sec.azure?.clientId ?? '');
+  const [opConnectHost, setOpConnectHost] = useState(sec.onePassword?.connectHost ?? '');
+  const [oidc, setOidc] = useState<{ status: 'idle' | 'busy' | 'ok' | 'err'; msg?: string }>({ status: 'idle' });
+
+  async function vaultOidcLogin() {
+    setOidc({ status: 'busy', msg: 'Complete the sign-in in your browser…' });
+    try {
+      const r = await electron.vaultOidcLogin({
+        address: vAddress.trim(),
+        mount: vLoginMount.trim() || undefined,
+        role: vJwtRole.trim() || undefined,
+        namespace: vNamespace.trim() || undefined,
+        skipVerify: vSkipVerify,
+      });
+      const mins = Math.round((r.expiresInSeconds ?? 0) / 60);
+      setOidc({ status: 'ok', msg: `Signed in${mins ? ` · token expires in ~${mins} min` : ''}` });
+    } catch (e) {
+      setOidc({ status: 'err', msg: (e as Error).message });
     }
   }
 
@@ -106,9 +138,6 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
 
     settings.piiMaskPatterns = patterns;
 
-    if (dashboardUrl.trim()) settings.dashboardUrl = dashboardUrl.trim();
-    else delete settings.dashboardUrl;
-
     if (cloudEnabled || cloudTokenSet || cloudToken.trim()) {
       settings.cloud = {
         enabled: cloudEnabled,
@@ -124,6 +153,33 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
 
     if (persistHistory) settings.persistHistory = true;
     else delete settings.persistHistory;
+
+    // External secret managers — non-secret connection config only. Each block is
+    // omitted when empty; the whole `secrets` block is dropped when all are empty.
+    const secrets: NonNullable<typeof settings.secrets> = {};
+    const vault: NonNullable<typeof secrets.vault> = {};
+    if (vAddress.trim())    vault.address = vAddress.trim();
+    if (vNamespace.trim())  vault.namespace = vNamespace.trim();
+    if (vAuthMethod !== 'token') vault.authMethod = vAuthMethod;
+    if (vRoleId.trim())     vault.roleId = vRoleId.trim();
+    if (vJwtRole.trim())    vault.jwtRole = vJwtRole.trim();
+    if (vLoginMount.trim()) vault.loginMount = vLoginMount.trim();
+    if (vKvVersion !== 'auto') vault.kvVersion = vKvVersion;
+    if (vSkipVerify)        vault.skipVerify = true;
+    if (Object.keys(vault).length) secrets.vault = vault;
+
+    if (awsRegion.trim()) secrets.aws = { region: awsRegion.trim() };
+
+    const azure: NonNullable<typeof secrets.azure> = {};
+    if (azVault.trim())    azure.vault = azVault.trim();
+    if (azTenantId.trim()) azure.tenantId = azTenantId.trim();
+    if (azClientId.trim()) azure.clientId = azClientId.trim();
+    if (Object.keys(azure).length) secrets.azure = azure;
+
+    if (opConnectHost.trim()) secrets.onePassword = { connectHost: opConnectHost.trim() };
+
+    if (Object.keys(secrets).length) settings.secrets = secrets;
+    else delete settings.secrets;
 
     updateWorkspaceSettings(settings);
 
@@ -152,7 +208,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
     { id: 'proxy',      label: 'Proxy' },
     { id: 'tls',        label: 'TLS / Certificates' },
     { id: 'privacy',    label: 'Privacy' },
-    { id: 'contracts',  label: 'Contracts' },
+    { id: 'secrets',    label: 'Secrets' },
     { id: 'cloud',      label: 'Cloud' },
   ];
 
@@ -324,28 +380,6 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
             </>
           )}
 
-          {activeTab === 'contracts' && (
-            <>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">
-                  Dashboard URL (optional)
-                </label>
-                <input
-                  value={dashboardUrl}
-                  onChange={e => setDashboardUrl(e.target.value)}
-                  placeholder="http://localhost:8080"
-                  className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
-                />
-              </div>
-              <p className="text-surface-600 text-[11px]">
-                Where your contract dashboard is served (api-spector contract report --serve,
-                locally or as a docker container). Adds an "Open dashboard" link to the contract
-                results panel. The link is view-only: recorded results reach the dashboard through
-                the workspace files, not through this URL.
-              </p>
-            </>
-          )}
-
           {activeTab === 'cloud' && (
             <>
               <label className="flex items-start gap-2 cursor-pointer">
@@ -483,6 +517,116 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
                 >
                   Add
                 </button>
+              </div>
+            </>
+          )}
+          {activeTab === 'secrets' && (
+            <>
+              <p className="text-surface-600 text-[11px]">
+                Reference secrets from an external manager instead of storing them. Put a reference like{' '}
+                <span className="font-mono text-surface-400">vault:secret/data/app#token</span> in an environment
+                variable or an auth field; it is resolved at send-time and never written to the workspace. This
+                connection config is non-secret — tokens and secret-ids come from your environment (or the Vault
+                sign-in below).
+              </p>
+
+              {/* HashiCorp Vault */}
+              <div className="flex flex-col gap-2 border border-surface-800 rounded p-3">
+                <div className="text-[10px] uppercase tracking-wider text-surface-500 font-semibold">HashiCorp Vault</div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Address (VAULT_ADDR)</label>
+                  <input value={vAddress} onChange={e => setVAddress(e.target.value)} placeholder="https://vault.acme.internal:8200"
+                    className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Namespace</label>
+                    <input value={vNamespace} onChange={e => setVNamespace(e.target.value)} placeholder="(Enterprise)"
+                      className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Auth method</label>
+                    <select value={vAuthMethod} onChange={e => setVAuthMethod(e.target.value as 'token' | 'approle' | 'jwt')}
+                      className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500">
+                      <option value="token">Token / OIDC</option>
+                      <option value="approle">AppRole</option>
+                      <option value="jwt">JWT (CI)</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Role (AppRole/JWT/OIDC)</label>
+                    <input value={vJwtRole} onChange={e => setVJwtRole(e.target.value)} placeholder="apispector"
+                      className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Login mount</label>
+                    <input value={vLoginMount} onChange={e => setVLoginMount(e.target.value)} placeholder="oidc / approle / jwt"
+                      className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600" />
+                  </div>
+                </div>
+                {vAuthMethod === 'approle' && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Role ID <span className="text-surface-600 normal-case">(secret id via VAULT_SECRET_ID)</span></label>
+                    <input value={vRoleId} onChange={e => setVRoleId(e.target.value)}
+                      className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono" />
+                  </div>
+                )}
+                <div className="flex items-center gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">KV version</label>
+                    <select value={vKvVersion} onChange={e => setVKvVersion(e.target.value as 'auto' | '1' | '2')}
+                      className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500">
+                      <option value="auto">auto</option>
+                      <option value="2">v2</option>
+                      <option value="1">v1</option>
+                    </select>
+                  </div>
+                  <label className="flex items-center gap-2 mt-4 cursor-pointer">
+                    <input type="checkbox" checked={vSkipVerify} onChange={e => setVSkipVerify(e.target.checked)} />
+                    <span className="text-surface-300">Skip TLS verify (dev)</span>
+                  </label>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <button onClick={vaultOidcLogin} disabled={!vAddress.trim() || oidc.status === 'busy'}
+                    className="px-3 py-1.5 bg-surface-700 hover:bg-surface-600 disabled:opacity-40 rounded transition-colors">
+                    {oidc.status === 'busy' ? 'Waiting for browser…' : 'Sign in with OIDC'}
+                  </button>
+                  {oidc.msg && (
+                    <span className={`text-[11px] ${oidc.status === 'ok' ? 'text-green-400' : oidc.status === 'err' ? 'text-red-400' : 'text-surface-500'}`}>{oidc.msg}</span>
+                  )}
+                </div>
+                <p className="text-surface-600 text-[11px]">Opens your browser to sign in; the short-lived token is used for this session only.</p>
+              </div>
+
+              {/* AWS / Azure / 1Password */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">AWS region <span className="text-surface-600 normal-case">(credentials from AWS_* env)</span></label>
+                <input value={awsRegion} onChange={e => setAwsRegion(e.target.value)} placeholder="eu-west-1"
+                  className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600" />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Azure vault</label>
+                  <input value={azVault} onChange={e => setAzVault(e.target.value)} placeholder="acme-kv"
+                    className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Tenant id</label>
+                  <input value={azTenantId} onChange={e => setAzTenantId(e.target.value)}
+                    className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Client id</label>
+                  <input value={azClientId} onChange={e => setAzClientId(e.target.value)}
+                    className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono" />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">1Password Connect host <span className="text-surface-600 normal-case">(token from OP_CONNECT_TOKEN)</span></label>
+                <input value={opConnectHost} onChange={e => setOpConnectHost(e.target.value)} placeholder="https://op.acme.internal"
+                  className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600" />
               </div>
             </>
           )}

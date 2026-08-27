@@ -159,6 +159,7 @@ body {
 :root.light .text-red-300 { color: #b91c1c !important; }   /* red-700  */
 :root.light .text-red-400 { color: #dc2626 !important; }   /* red-600  */
 :root.light .text-red-500 { color: #991b1b !important; }   /* red-800  */
+:root.light .bg-red-800       { background-color: #fecaca !important; }  /* red-200 (fail badge) */
 :root.light .bg-red-900\/30 { background-color: #fee2e2 !important; }  /* red-100  */
 :root.light .bg-red-900\/20 { background-color: #fef2f2 !important; }  /* red-50   */
 :root.light .bg-red-900\/50 { background-color: #fee2e2 !important; }  /* red-100  */

@@ -134,7 +134,6 @@ export function ContractResultsPanel() {
   const clearReport = useStore(s => s.setLastContractReport);
   const activeCollId = useStore(s => s.activeCollectionId);
   const collections  = useStore(s => s.collections);
-  const dashboardUrl = useStore(s => s.workspace?.settings?.dashboardUrl);
 
   const [recordOpen, setRecordOpen]   = useState(false);
   const [pacticipant, setPacticipant] = useState('');
@@ -194,15 +193,6 @@ export function ContractResultsPanel() {
           {modeLabel}
         </span>
         <span className="text-xs text-surface-500 ml-auto">{report.durationMs}ms</span>
-        {dashboardUrl && (
-          <button
-            onClick={() => window.electron.openExternal(dashboardUrl)}
-            className="text-[11px] text-surface-500 hover:text-surface-200 transition-colors"
-            title={`Open the contract dashboard (${dashboardUrl})`}
-          >
-            Open dashboard
-          </button>
-        )}
         <button
           onClick={() => {
             if (!recordOpen && !pacticipant) {

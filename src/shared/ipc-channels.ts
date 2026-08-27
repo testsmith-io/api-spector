@@ -100,6 +100,11 @@ export const IPC = {
     refreshToken: 'oauth2:refreshToken',
   },
 
+  // ─── HashiCorp Vault (interactive OIDC login) ──────────────────────────────
+  vault: {
+    oidcLogin: 'vault:oidcLogin',
+  },
+
   // ─── Mock servers ──────────────────────────────────────────────────────────
   mock: {
     start:        'mock:start',

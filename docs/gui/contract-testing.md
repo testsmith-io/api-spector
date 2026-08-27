@@ -201,12 +201,10 @@ Expanding a card shows each violation with its type, path, message, and expected
 
 **Record** in the results bar saves the run under `contracts/results/<pacticipant>/<version>.json` in the workspace, exactly like the CLI's `contract run --record`. Give it a pacticipant name (defaults to the active collection) and a version. Recorded runs power two things:
 
-- the [contract dashboard](../cli/contract-testing.md#serving-the-dashboard) (`contract report --serve`, also available as a [docker container](../cli/docker.md#the-contract-dashboard)) - refresh the page after recording and the new cell appears
+- the [contract dashboard](../cli/contract-testing.md#html-dashboard) (`contract report --html`, a static file you can publish as a CI artifact) - the new cell appears the next time you export it
 - the [`deploy-check` gate](../cli/contract-testing.md#deploy-check-the-deployment-gate)
 
 Commit the results folder to git to share them with the team.
-
-If you set a **Dashboard URL** in Workspace Settings (Contracts tab), an **Open dashboard** button appears in the results bar linking straight to your served dashboard. The URL is view-only: recorded results reach the dashboard through the workspace files, never through that URL.
 
 ### Export an HTML report
 

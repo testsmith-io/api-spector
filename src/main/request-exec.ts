@@ -27,6 +27,7 @@ import type {
 } from '../shared/types';
 import { detectStreamKind, readStream } from './stream/parse';
 import { interpolate, buildUrl, mergeVars, buildDynamicVars } from './interpolation';
+import { hasSecretScheme, resolveExternalSecret } from './secrets';
 import { runScript } from './script-runner';
 import { patchGlobals, persistGlobals } from './globals-store';
 import {
@@ -363,7 +364,15 @@ export interface ExchangeResult {
  * Throws on transport failure — error shaping stays with the caller.
  */
 export async function performHttpExchange(opts: ExchangeOptions): Promise<ExchangeResult> {
-  const { req, vars, resolvedUrl, dispatcher, proxy, tls, onSent } = opts;
+  const { req, resolvedUrl, dispatcher, proxy, tls, onSent } = opts;
+
+  // Inline external-secret references in the send fields (body, headers, auth).
+  // For the runner path these are already in `vars`; resolving again here (cache
+  // hit) also covers the single-send path, which does not run executeRunnerRequest.
+  let vars = opts.vars;
+  const inlineSecrets = await resolveInlineSecrets(req);
+  if (Object.keys(inlineSecrets).length) vars = { ...vars, ...inlineSecrets };
+
   const start = Date.now();
 
   // OAuth2: ensure a fresh token before building headers
@@ -546,6 +555,39 @@ export interface RunnerExecResult {
  * protocol tests → post-script → status. Used verbatim by the GUI batch
  * runner and the CLI runner.
  */
+// Resolve inline external-secret references — {{vault:...}}, {{aws:...}},
+// {{azure:...}}, {{op://...}} — used anywhere in the request (URL, params,
+// headers, body, auth, scripts). interpolate() is synchronous, so these async
+// lookups run once up-front and the resolved values are added to the variable
+// scope keyed by their full reference (e.g. vars['vault:kv/data/app#k'] = 'v'),
+// so the normal {{...}} substitution then picks them up. Throws with a clear
+// message if a referenced secret cannot be resolved.
+export async function resolveInlineSecrets(req: ApiRequest): Promise<Record<string, string>> {
+  const haystack = [
+    req.url ?? '',
+    JSON.stringify(req.params ?? []),
+    JSON.stringify(req.headers ?? []),
+    JSON.stringify(req.body ?? {}),
+    JSON.stringify(req.auth ?? {}),
+    req.preRequestScript ?? '',
+    req.postRequestScript ?? '',
+  ].join('\n');
+
+  const refs = new Set<string>();
+  for (const m of haystack.matchAll(/\{\{\s*([^}]+?)\s*\}\}/g)) {
+    const inner = m[1].trim();
+    if (hasSecretScheme(inner)) refs.add(inner);
+  }
+  if (refs.size === 0) return {};
+
+  const out: Record<string, string> = {};
+  await Promise.all([...refs].map(async (ref) => {
+    const value = await resolveExternalSecret(ref);
+    if (value !== null) out[ref] = value;
+  }));
+  return out;
+}
+
 export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<RunnerExecResult> {
   const { req, collectionVars, envVars, globals, dispatcher, piiMaskPatterns, proxy, tls, onScriptOutput } = opts;
   let { localVars } = opts;
@@ -569,6 +611,25 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
   let updatedGlobals = { ...globals };
   let preScriptError: string | undefined;
 
+  // Inline external-secret references ({{vault:...}} etc.) anywhere in the
+  // request/scripts — resolved once (async) and merged into the scope so the
+  // synchronous interpolate() can substitute them.
+  let inlineSecrets: Record<string, string> = {};
+  try {
+    inlineSecrets = await resolveInlineSecrets(req);
+  } catch (err) {
+    return {
+      result: {
+        ...base,
+        status: 'error',
+        durationMs: 0,
+        error: err instanceof Error ? err.message : String(err),
+      },
+      updatedEnvVars, updatedCollectionVars, updatedGlobals, updatedLocalVars: localVars,
+    };
+  }
+  if (Object.keys(inlineSecrets).length) vars = { ...vars, ...inlineSecrets };
+
   // Pre-request script
   if (req.preRequestScript?.trim()) {
     const r = await runScript(interpolate(req.preRequestScript, vars), {
@@ -585,6 +646,7 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
     await persistGlobals();
     onScriptOutput?.('pre', r.consoleOutput, r.error);
     vars = mergeVars(updatedEnvVars, updatedCollectionVars, updatedGlobals, localVars, dynamicVars);
+    if (Object.keys(inlineSecrets).length) vars = { ...vars, ...inlineSecrets };
   }
 
   const resolvedUrl = buildUrl(req.url, req.params, vars);

@@ -6,8 +6,10 @@ Everything the [Contract Testing](../gui/contract-testing.md) panel does is avai
 api-spector contract list          --workspace <path>
 api-spector contract pin           --workspace <path> --spec-url <url> | --spec-path <file> [--name <label>]
 api-spector contract run           --workspace <path> --mode <mode> [options]
-api-spector contract report        --workspace <path> [--html <path>] [--serve [--port <n>]]
+api-spector contract report        --workspace <path> [--html <path>]
 api-spector contract deploy-check  --workspace <path> --pacticipant <name> --app-version <ver> [--to <env>]
+api-spector contract check         --consumer <name> --consumer-version <ver> --provider <name> --provider-version <ver>
+api-spector contract publish-verification --consumer <name> --provider <name> --provider-version <ver> --success <bool>
 api-spector contract record-deployment --workspace <path> --pacticipant <name> --app-version <ver> --env <name>
 api-spector contract environments  --workspace <path>
 api-spector contract webhooks      --workspace <path> [--test]
@@ -163,6 +165,35 @@ This is wire-compatible with Pact's state change URL, so an existing Pact provid
 
 ---
 
+## `check`: the compatibility check (vs `deploy-check`)
+
+Two *different* questions:
+
+- **`contract check`** — *pairwise* and **read-only**: is `consumer@version` compatible with `provider@version`? It compares the consumer's published pact against that exact provider spec version via the broker's compatibility engine, records nothing, and ignores what's deployed. Exit `0` = compatible, `1` = incompatible (with per-field reasons).
+- **`deploy-check`** — the *deployment* gate: is a version safe to ship to an environment given **everything currently deployed there** and its verification results (see below).
+
+```bash
+# Cloud (--broker / API_SPECTOR_TOKEN): compatibility of two specific versions
+api-spector contract check \
+  --consumer webshop-ui --consumer-version 2.4.0 \
+  --provider orders-api --provider-version 6.1.0
+# ✗ webshop-ui@2.4.0 is INCOMPATIBLE with orders-api@6.1.0
+#     get order
+#       response.body.status: consumer requires string, provider integer
+```
+
+Backed by `GET /api/compatibility?consumer&consumerVersion&provider&providerVersion` (200 compatible / 409 incompatible).
+
+**Publishing a provider verification result** — when the provider verifies a consumer's pact in its own CI, publish the verdict so the Matrix and `deploy-check` see it:
+
+```bash
+api-spector contract publish-verification \
+  --consumer webshop-ui --provider orders-api \
+  --provider-version "$(git rev-parse HEAD)" --success true [--build-url "$CI_URL"]
+```
+
+It resolves the contract via the broker and records the result against the provider version (`POST /api/verifications`).
+
 ## `deploy-check`: the deployment gate
 
 The deployment gate — **file-based locally, or against the shared cloud broker** with `--broker`. It answers one question: is a given version safe to ship, i.e. is every contract it shares with what's live still satisfied?
@@ -216,7 +247,7 @@ api-spector contract deploy-check --workspace ./ws \
 
 `record-deployment` never blocks: it documents a fact. If the recorded version has no passing verification it prints a warning, because that means the `deploy-check` gate was skipped. The intended pipeline order is: verify with `--record`, gate with `deploy-check`, deploy, then `record-deployment`.
 
-The dashboard (static export and `--serve`) renders an Environments table showing each deployment with a pass/fail badge linking to its verification run.
+The dashboard (static export via `--html`) renders an Environments table showing each deployment with a pass/fail badge linking to its verification run.
 
 ## Pending contracts
 
@@ -256,7 +287,7 @@ Safety: without `--include-writes`, write-method requests are skipped and the co
 
 ## Webhooks
 
-The served dashboard is the always-on process in the setup, so it also handles notifications. Configure outbound webhooks in `contracts/webhooks.json`:
+Configure outbound webhooks in `contracts/webhooks.json` to notify other systems (e.g. trigger a provider's CI) about recorded results and deployments:
 
 ```json
 {
@@ -271,9 +302,7 @@ The served dashboard is the always-on process in the setup, so it also handles n
 }
 ```
 
-While `contract report --serve` runs, it polls the workspace (default every 10 seconds, `--webhook-interval <seconds>` to change) and POSTs a JSON payload to each matching URL when a new verification result or deployment appears, whether written locally or arriving through `git pull`. `$NAME` tokens in URLs and header values are replaced from the serving process environment, so secrets stay out of the committed file.
-
-Webhooks are outbound only. The server still accepts no writes; data reaches it exclusively through the filesystem. Inspect the configuration with `contract webhooks --workspace <path>`, and send a test event with `--test`.
+Webhooks are outbound only. `$NAME` tokens in URLs and header values are replaced from the process environment, so secrets stay out of the committed file. Inspect the configuration with `contract webhooks --workspace <path>`, and send a test event to each configured URL with `--test`.
 
 ## Reports
 
@@ -286,10 +315,6 @@ Webhooks are outbound only. The server still accepts no writes; data reaches it 
 ### HTML run report
 
 `--html` writes a **single self-contained file** (inline CSS, no external assets): a pass/fail headline and ratio bar, run metadata, and one expandable card per interaction with full violation detail. It is the same report the GUI's **Export HTML** button produces.
-
-### Serving the dashboard
-
-`contract report --serve [--port <n>]` starts a read-only HTTP server rendering the dashboard live (results re-read on every request), with each matrix cell linking to the full run report. See [Docker](docker.md#the-contract-dashboard) for running it as a container.
 
 ### HTML dashboard
 

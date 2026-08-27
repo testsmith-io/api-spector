@@ -103,6 +103,26 @@ env:
 
 If the key is not set, encrypted secrets will not be resolved and a warning will appear in the console output.
 
+## External secret managers
+
+Instead of storing a secret, reference one in your secret manager and resolve it at run time — nothing is written to the workspace, results, or console. Put a reference in an environment variable (`secretRef`), an auth field, or inline as `{{vault:...}}` anywhere in a request (URL, header, body, or script). Built-in backends:
+
+| Provider | Reference |
+|---|---|
+| HashiCorp Vault | `vault:secret/data/app#api_key` |
+| AWS Secrets Manager | `aws:prod/db#password` |
+| Azure Key Vault | `azure:acme-kv/db-password` |
+| 1Password | `op://Prod/Database/password` |
+
+Credentials come from the environment (the same conventions each tool already uses), so the same workspace runs unchanged on a laptop and in CI:
+
+```bash
+vault login -method=oidc                 # or AWS/Azure/1Password env
+api-spector run --workspace ./ws.spector --env prod
+```
+
+The design is pluggable — more backends drop in as providers. See [Secret Managers](docs/reference/secrets-vault.md).
+
 ## Development
 
 ```bash

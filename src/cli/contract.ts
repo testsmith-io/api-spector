@@ -25,7 +25,7 @@
  *   --allow-pending           Never-verified failures report as pending.
  *
  * Also: pin, can-i-deploy [--to <env>], record-deployment, environments,
- * webhooks [--test], report [--serve], pact-import, pact-export.
+ * webhooks [--test], report [--html <path>], pact-import, pact-export.
  */
 
 import { readFile, writeFile } from 'fs/promises';
@@ -42,12 +42,12 @@ import { runFuzz } from '../main/contract/fuzz';
 import { recordResult, canIDeploy, listResults, recordDeployment, listEnvironments } from '../main/contract/results-store';
 import { importPact, pactToCollection, exportPact } from '../main/contract/pact-format';
 import { loadPendingStore, savePendingStore, applyPendingSemantics } from '../main/contract/pending';
-import { loadWebhookConfig, watchContractEvents, fireWebhooks } from '../main/contract/webhooks';
+import { loadWebhookConfig, fireWebhooks } from '../main/contract/webhooks';
 import { writeFile as fsWriteFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { randomUUID } from 'crypto';
 import { parseArgs, loadWorkspace, loadCollections, loadEnvironments, loadDesignContractRequests } from './cli-common';
-import { brokerConfigFromEnv, publishPact as brokerPublishPact, publishSpec as brokerPublishSpec, canIDeploy as brokerCanIDeploy, recordDeployment as brokerRecordDeployment, deployPreview as brokerDeployPreview } from '../main/cloud/broker-client';
+import { brokerConfigFromEnv, publishPact as brokerPublishPact, publishSpec as brokerPublishSpec, canIDeploy as brokerCanIDeploy, recordDeployment as brokerRecordDeployment, deployPreview as brokerDeployPreview, checkCompatibility as brokerCheckCompatibility, fetchContracts as brokerFetchContracts, publishVerification as brokerPublishVerification } from '../main/cloud/broker-client';
 import { resolveVersion } from '../main/cloud/git';
 import { parseSelfVerification } from '../main/cloud/self-verification';
 import { fetch as undiciFetch } from 'undici';
@@ -229,7 +229,7 @@ async function cmdRun ( args: Record<string, string | boolean> ): Promise<void> 
   const modeValue = mode as ContractMode;
   switch ( modeValue ) {
     case 'consumer':
-      report = await runConsumerContracts( contractRequests, envVars, collectionVars );
+      report = await runConsumerContracts( contractRequests, envVars, collectionVars, providerBaseUrl );
       break;
     case 'provider':
       report = await runProviderVerification( allRequests, envVars, collectionVars, specUrl, specPath, requestBaseUrl );
@@ -525,8 +525,8 @@ async function cmdWebhooks ( args: Record<string, string | boolean> ): Promise<v
     console.log( '      ]' );
     console.log( '    }' );
     console.log( '' );
-    console.log( '  $NAME tokens are replaced from the serving process environment.' );
-    console.log( '  The dashboard (`contract report --serve`) fires them when new results appear.' );
+    console.log( '  $NAME tokens are replaced from the process environment.' );
+    console.log( '  Run `contract webhooks --test` to send a sample event to each configured URL.' );
     return;
   }
 
@@ -557,71 +557,6 @@ async function cmdReport ( args: Record<string, string | boolean> ): Promise<voi
   if ( typeof wsArg !== 'string' ) { console.error( '  [error] --workspace <path> is required' ); process.exit( 2 ); }
 
   const { dir } = await loadWorkspace( wsArg );
-
-  // ── Serve mode: read-only dashboard over HTTP ──────────────────────────────
-  // Results are re-read from disk on every request, so recording a new run
-  // (or `git pull`ing one) shows up on refresh with no restart. The server
-  // never accepts writes: results only ever arrive via the filesystem/git.
-  if ( args['serve'] ) {
-    const port = typeof args['port'] === 'string' ? Number( args['port'] ) : 8080;
-    if ( !Number.isInteger( port ) || port < 1 || port > 65535 ) {
-      console.error( '  [error] --port must be a number between 1 and 65535' );
-      process.exit( 2 );
-    }
-    const { createServer } = await import( 'http' );
-    const server = createServer( async ( req, res ) => {
-      try {
-        const url = req.url ?? '/';
-        if ( url === '/healthz' ) {
-          res.writeHead( 200, { 'Content-Type': 'text/plain' } );
-          res.end( 'ok' );
-          return;
-        }
-        const records = await listResults( dir );
-        const runMatch = /^\/run\/([^/]+)\/([^/]+)$/.exec( url );
-        if ( runMatch ) {
-          const pacticipant = decodeURIComponent( runMatch[1] );
-          const version = decodeURIComponent( runMatch[2] );
-          const rec = records.find( r => r.pacticipant === pacticipant && r.version === version );
-          if ( !rec ) {
-            res.writeHead( 404, { 'Content-Type': 'text/plain' } );
-            res.end( 'No recorded result for that pacticipant/version' );
-            return;
-          }
-          res.writeHead( 200, { 'Content-Type': 'text/html; charset=utf-8' } );
-          res.end( reportToHtml( rec.report, {
-            title: `${pacticipant} @ ${version}`,
-            generatedAt: rec.recordedAt,
-          } ) );
-          return;
-        }
-        const environments = await listEnvironments( dir );
-        res.writeHead( 200, { 'Content-Type': 'text/html; charset=utf-8' } );
-        res.end( dashboardToHtml( records, new Date().toISOString(), { runLinkBase: '/run', environments } ) );
-      } catch ( e ) {
-        res.writeHead( 500, { 'Content-Type': 'text/plain' } );
-        res.end( e instanceof Error ? e.message : String( e ) );
-      }
-    } );
-    server.listen( port, () => {
-      console.log( `  Contract dashboard serving at http://localhost:${port}` );
-      console.log( `  Workspace: ${wsArg} (results re-read on every request)` );
-      console.log( '  Read-only: record new results via `contract run --record`, then refresh.' );
-    } );
-
-    // Outbound webhooks: when contracts/webhooks.json exists, poll for new
-    // results/deployments (written locally or arriving via git pull) and
-    // notify the configured URLs. Inbound stays closed.
-    const hooks = await loadWebhookConfig( dir );
-    if ( hooks.length > 0 ) {
-      const intervalMs = typeof args['webhook-interval'] === 'string'
-        ? Math.max( 2, Number( args['webhook-interval'] ) ) * 1000
-        : 10_000;
-      watchContractEvents( dir, hooks, intervalMs );
-      console.log( `  Webhooks: ${hooks.length} configured (polling every ${intervalMs / 1000}s)` );
-    }
-    return;
-  }
 
   const out = typeof args['html'] === 'string' ? args['html'] : 'contract-dashboard.html';
   const records = await listResults( dir );
@@ -825,6 +760,53 @@ async function cmdCloudRecordDeployment ( args: Record<string, string | boolean>
 
 // ─── Entry ───────────────────────────────────────────────────────────────────
 
+// The Compatibility Check: is consumer@version compatible with provider@version?
+// Read-only, pairwise, no deployment considered (that is deploy-check). Exit 1 on
+// incompatible, with per-field reasons — usable as a CI gate on its own.
+async function cmdCheck ( args: Record<string, string | boolean> ): Promise<void> {
+  const consumer = str( args['consumer'] ) ?? die( '--consumer <name> is required' );
+  const consumerVersion = str( args['consumer-version'] ) ?? die( '--consumer-version <ver> is required' );
+  const provider = str( args['provider'] ) ?? die( '--provider <name> is required' );
+  const providerVersion = str( args['provider-version'] ) ?? die( '--provider-version <ver> is required' );
+
+  const { compatible, checks } = await brokerCheckCompatibility( brokerConfigFromEnv(), { consumer, consumerVersion, provider, providerVersion } );
+  if ( compatible ) {
+    console.log( `  ✓ ${consumer}@${consumerVersion} is compatible with ${provider}@${providerVersion}` );
+    return;
+  }
+  console.error( `  ✗ ${consumer}@${consumerVersion} is INCOMPATIBLE with ${provider}@${providerVersion}` );
+  for ( const c of checks.filter( c => !c.passed ) ) {
+    console.error( `    ${c.interaction}` );
+    for ( const m of c.mismatches ?? [] ) console.error( `      ${m.location}: consumer requires ${m.consumer}, provider ${m.provider}` );
+    if ( ( !c.mismatches || !c.mismatches.length ) && c.error ) console.error( `      ${c.error}` );
+  }
+  process.exit( 1 );
+}
+
+// Publish a provider verification result to the broker (the outcome of verifying
+// the provider against a consumer's pact). Resolves the contract id via the
+// broker, then records the pass/fail against the provider version.
+async function cmdPublishVerification ( args: Record<string, string | boolean> ): Promise<void> {
+  const consumer = str( args['consumer'] ) ?? die( '--consumer <name> is required' );
+  const provider = str( args['provider'] ) ?? die( '--provider <name> is required' );
+  const providerVersion = resolveVersion( str( args['provider-version'] ) ?? str( args['version'] ) );
+  const successArg = str( args['success'] );
+  if ( successArg === undefined ) die( '--success <true|false> is required' );
+  const success = successArg === 'true' || successArg === '1';
+  const buildUrl = str( args['build-url'] );
+  const consumerVersion = str( args['consumer-version'] );
+
+  const cfg = brokerConfigFromEnv();
+  const contracts = await brokerFetchContracts( cfg, { consumer, provider } );
+  const match = consumerVersion
+    ? contracts.find( c => c.consumerVersion === consumerVersion )
+    : contracts[contracts.length - 1]; // latest published
+  if ( !match ) die( `No published contract for ${consumer} -> ${provider}${consumerVersion ? '@' + consumerVersion : ''}.` );
+
+  await brokerPublishVerification( cfg, { contractId: match.id, providerVersion, success, buildUrl } );
+  console.log( `  Published verification: ${provider}@${providerVersion.slice( 0, 7 )} -> ${consumer}@${match.consumerVersion} = ${success ? 'passed' : 'FAILED'}` );
+}
+
 async function main (): Promise<void> {
   const [, , sub, ...rest] = process.argv;
   const args = parseArgs( rest );
@@ -840,6 +822,8 @@ async function main (): Promise<void> {
   if ( sub === 'preview' ) return cmdPreview( args );
   // `deploy-check` is the primary name; `can-i-deploy` is a Pact-compatible alias.
   if ( sub === 'deploy-check' || sub === 'can-i-deploy' ) return wantsCloud( args ) ? cmdCloudCanIDeploy( args ) : cmdCanIDeploy( args );
+  if ( sub === 'check' ) return cmdCheck( args );
+  if ( sub === 'publish-verification' ) return cmdPublishVerification( args );
   if ( sub === 'record-deployment' ) return wantsCloud( args ) ? cmdCloudRecordDeployment( args ) : cmdRecordDeployment( args );
   if ( sub === 'environments' ) return cmdEnvironments( args );
   if ( sub === 'webhooks' ) return cmdWebhooks( args );
@@ -853,7 +837,7 @@ async function main (): Promise<void> {
   api-spector contract list          --workspace <path>
   api-spector contract pin           --workspace <path> --spec-url <url> | --spec-path <file> [--name <label>]
   api-spector contract run           --workspace <path> --mode <consumer|provider|provider-live|bidirectional> [options]
-  api-spector contract report        --workspace <path> [--html <path>] [--serve [--port <n>]]
+  api-spector contract report        --workspace <path> [--html <path>]
   api-spector contract deploy-check  --workspace <path> --pacticipant <name> --app-version <ver> [--to <env>]
   api-spector contract record-deployment --workspace <path> --pacticipant <name> --app-version <ver> --env <name>
   api-spector contract environments  --workspace <path>
@@ -883,7 +867,8 @@ async function main (): Promise<void> {
     --collection <name>       Filter to one collection
     --environment <name>      Environment for {{var}} resolution
     --request-base-url <url>  Strip this host before matching spec paths
-    --provider-base-url <url> (provider-live) rebase requests onto this origin
+    --provider-base-url <url> (provider-live, consumer) rebase requests onto
+                              this origin (lets host-less design contracts run)
     --states-url <url>        (provider-live) provider state handler endpoint
     --output <path>           Write ContractReport JSON here
     --junit <path>            Write JUnit XML here (for CI test reporters)

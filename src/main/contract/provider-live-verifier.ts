@@ -8,9 +8,13 @@ import type {
   ContractReport,
   ContractViolation,
 } from '../../shared/types';
-import { interpolate, buildUrl } from '../interpolation';
+import { interpolate, buildUrl, rebaseUrl } from '../interpolation';
 import { buildAuthHeaders } from '../auth-builder';
 import { validateConsumerResponse, hasContract } from './consumer-verifier';
+
+// rebaseUrl now lives in ../interpolation (shared with consumer-verifier and
+// fuzz). Re-exported here so existing importers keep working unchanged.
+export { rebaseUrl };
 
 // ─── Live provider verification ───────────────────────────────────────────────
 //
@@ -25,22 +29,6 @@ import { validateConsumerResponse, hasContract } from './consumer-verifier';
 //   2. Provider states (Pact `given(...)`) are seeded before each interaction by
 //      POSTing to a state-handler URL, so the provider can be put in a known
 //      state (e.g. "user 123 exists") before the request is sent.
-
-/** Swap the origin (and optional base path) of a request URL for the provider
- *  base URL, keeping the request's own path and query string. */
-export function rebaseUrl(fullUrl: string, providerBaseUrl?: string): string {
-  if (!providerBaseUrl) return fullUrl;
-  try {
-    const orig = new URL(fullUrl, 'http://placeholder.invalid');
-    const base = new URL(providerBaseUrl);
-    const basePath = base.pathname.replace(/\/$/, '');
-    base.pathname = (basePath + orig.pathname).replace(/\/{2,}/g, '/');
-    base.search = orig.search;
-    return base.toString();
-  } catch {
-    return fullUrl;
-  }
-}
 
 /** Seed a single provider state via the state-handler URL (Pact convention).
  *  Returns a violation if the handler is missing or responds non-2xx. */

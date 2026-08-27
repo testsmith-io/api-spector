@@ -255,7 +255,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
         {/* Mode description */}
         <p className="text-[10px] text-surface-500 leading-relaxed">
           {mode === 'consumer'
-            ? 'Sends requests to the real provider and validates each response against the contract defined in the Contract tab.'
+            ? 'Sends requests to the real provider and validates each response against the contract defined in the Contract tab. Set a base URL below to send host-less (design-first) contracts.'
             : mode === 'provider'
             ? 'Static analysis: validates that your requests conform to the provider\'s published OpenAPI spec (no HTTP calls).'
             : mode === 'provider-live'
@@ -265,12 +265,12 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
             : 'Checks static schema compatibility between consumer contracts and provider spec, then verifies live responses.'}
         </p>
 
-        {/* Provider base URL + state handler (provider-live / fuzz) */}
-        {(mode === 'provider-live' || isFuzz) && (
+        {/* Provider base URL + state handler (consumer / provider-live / fuzz) */}
+        {(mode === 'consumer' || mode === 'provider-live' || isFuzz) && (
           <div className="flex flex-col gap-2">
             <div>
               <label className="text-[10px] text-surface-500 uppercase tracking-wider font-medium block mb-1">
-                Provider base URL
+                Provider base URL {mode === 'consumer' && <span className="normal-case text-surface-600">(optional)</span>}
               </label>
               <input
                 value={providerBaseUrl}
@@ -281,6 +281,8 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
               <p className="text-[10px] text-surface-600 mt-1 leading-relaxed">
                 {isFuzz
                   ? 'Required. Each fuzzed request is rebased onto this origin before it is sent.'
+                  : mode === 'consumer'
+                  ? 'Optional. Rebase each request onto this origin before sending, so design-first contracts that carry only a path (e.g. /brands) can run. Requests with a full URL are sent as-is.'
                   : 'Each request is rebased onto this origin before being replayed against the live provider.'}
               </p>
             </div>

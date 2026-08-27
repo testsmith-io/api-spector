@@ -30,6 +30,7 @@ import type {
   RunRequestResult, RunSummary,
 } from '../shared/types';
 import { buildEnvVars } from '../main/interpolation';
+import { setSecretsConfig } from '../main/secrets';
 import { loadGlobals, getGlobals } from '../main/globals-store';
 import {
   buildDispatcher,
@@ -120,6 +121,11 @@ async function main() {
 
   await loadGlobals(wsDir);
 
+  // Apply external secret-manager connection config (Vault, ...) from the
+  // workspace. Environment variables override it, so the same workspace runs
+  // unchanged locally and in CI.
+  setSecretsConfig(workspace.settings?.secrets);
+
   const collections  = await loadCollections(workspace, wsDir, {
     onError: relPath => console.error(color(`  [warn] Could not load collection: ${relPath}`, C.yellow)),
   });
@@ -149,7 +155,7 @@ async function main() {
   // Collect resolved secret values so we can redact them from reports
   const envVarsSnapshot    = await buildEnvVars(env);
   const secretValuesToMask = (env?.variables ?? [])
-    .filter(v => v.secret && v.enabled)
+    .filter(v => (v.secret || v.secretRef) && v.enabled)
     .map(v => envVarsSnapshot[v.key])
     .filter((v): v is string => typeof v === 'string' && v.length > 0);
 

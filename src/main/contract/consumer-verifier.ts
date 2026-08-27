@@ -10,7 +10,7 @@ import type {
   ContractReport,
   ContractViolation,
 } from '../../shared/types';
-import { interpolate, buildUrl } from '../interpolation';
+import { interpolate, buildUrl, rebaseUrl } from '../interpolation';
 import { buildAuthHeaders } from '../auth-builder';
 import { compileMatcherExample } from './matchers';
 
@@ -152,9 +152,30 @@ function validateBody(schema: unknown, bodyText: string): ContractViolation[] {
 async function executeContract(
   req: ApiRequest,
   vars: Record<string, string>,
+  providerBaseUrl?: string,
 ): Promise<ContractResult> {
-  const url   = buildUrl(req.url, req.params, vars);
+  // Rebase onto the provider base URL when given, so host-less contracts (a
+  // design-first pact carries only a path, e.g. `/brands`) can be sent. Without
+  // a base, the request's own URL is used as-is.
+  const url   = rebaseUrl(buildUrl(req.url, req.params, vars), providerBaseUrl);
   const start = Date.now();
+
+  // A bare path with no base URL can't be fetched ("Failed to parse URL from
+  // /brands"). Fail with an actionable message instead of the raw parse error.
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) {
+    return {
+      requestId:   req.id,
+      requestName: req.name,
+      method:      req.method,
+      url,
+      passed:      false,
+      violations:  [{
+        type:    'status_mismatch',
+        message: `Request URL "${url}" has no host. Set a base URL to send it against, or set a {{baseUrl}} variable in the active environment.`,
+      }],
+      durationMs: Date.now() - start,
+    };
+  }
 
   try {
     const headers = new Headers();
@@ -216,6 +237,7 @@ export async function runConsumerContracts(
   requests: ApiRequest[],
   envVars: Record<string, string>,
   collectionVars: Record<string, string> = {},
+  providerBaseUrl?: string,
 ): Promise<ContractReport> {
   const vars = { ...envVars, ...collectionVars };
   // Only run requests that have a contract with at least one expectation
@@ -223,7 +245,7 @@ export async function runConsumerContracts(
   const contractRequests = requests.filter(r => !r.disabled && hasContract(r.contract));
 
   const start   = Date.now();
-  const results = await Promise.all(contractRequests.map(r => executeContract(r, vars)));
+  const results = await Promise.all(contractRequests.map(r => executeContract(r, vars, providerBaseUrl)));
   const passed  = results.filter(r => r.passed).length;
 
   return {

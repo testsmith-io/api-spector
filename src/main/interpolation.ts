@@ -3,6 +3,7 @@
 
 import type { Environment, KeyValuePair } from '../shared/types';
 import { decryptSecret } from './ipc/secret-handler';
+import { hasSecretScheme, resolveExternalSecret } from './secrets';
 import type { faker as FakerType } from '@faker-js/faker';
 import dayjs from 'dayjs';
 import * as vm from 'vm';
@@ -112,6 +113,25 @@ export function buildUrl(
   return url + sep + qs;
 }
 
+/** Swap the origin (and optional base path) of a request URL for `baseUrl`,
+ *  keeping the request's own path and query string. Used to rebase a contract's
+ *  path (which may be host-less, e.g. `/brands`) onto a provider you point at,
+ *  so the same contracts run against localhost, staging, or production without
+ *  editing every request. Returns the original URL when no base is given. */
+export function rebaseUrl(fullUrl: string, baseUrl?: string): string {
+  if (!baseUrl) return fullUrl;
+  try {
+    const orig = new URL(fullUrl, 'http://placeholder.invalid');
+    const base = new URL(baseUrl);
+    const basePath = base.pathname.replace(/\/$/, '');
+    base.pathname = (basePath + orig.pathname).replace(/\/{2,}/g, '/');
+    base.search = orig.search;
+    return base.toString();
+  } catch {
+    return fullUrl;
+  }
+}
+
 /** Resolve all environment variables, decrypting encrypted secrets when a master key is set. */
 export async function buildEnvVars(environment: Environment | null): Promise<Record<string, string>> {
   const vars: Record<string, string> = {};
@@ -119,7 +139,17 @@ export async function buildEnvVars(environment: Environment | null): Promise<Rec
   const masterKey = process.env['API_SPECTOR_MASTER_KEY'];
   for (const v of environment.variables) {
     if (!v.enabled) continue;
-    if (v.envRef) {
+    if (v.secretRef && hasSecretScheme(v.secretRef)) {
+      // External secret manager (HashiCorp Vault, ...) — resolved at send-time,
+      // never stored. A resolution failure leaves the var unset (so only the
+      // requests that use it fail) with a warning, rather than aborting the run.
+      try {
+        const resolved = await resolveExternalSecret(v.secretRef);
+        if (resolved !== null) vars[v.key] = resolved;
+      } catch (err) {
+        console.warn(`[secrets] could not resolve ${v.key} (${v.secretRef}): ${(err as Error).message}`);
+      }
+    } else if (v.envRef) {
       // OS environment variable — read from process.env at send-time
       const envValue = process.env[v.envRef];
       if (envValue !== undefined) vars[v.key] = envValue;
