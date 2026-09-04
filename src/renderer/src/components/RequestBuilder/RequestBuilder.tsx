@@ -17,6 +17,7 @@ import { SchemaTab } from './SchemaTab';
 import { ContractTab } from './ContractTab';
 import { StreamTab } from './StreamTab';
 import { WebSocketPanel } from '../WebSocket/WebSocketPanel';
+import { GrpcPanel } from '../Grpc/GrpcPanel';
 import { FuzzModal } from './FuzzModal';
 
 const { electron } = window;
@@ -324,6 +325,7 @@ export function RequestBuilder({ request }: Props) {
   const hasPostScript = Boolean(request.postRequestScript?.trim());
   const isWs   = request.protocol === 'websocket';
   const isSoap = request.protocol === 'soap';
+  const isGrpc = request.protocol === 'grpc';
 
   // An example is a request specimen (a saved payload), not a test — so it has
   // no Scripts / Schema / Contract, only what it sends.
@@ -380,7 +382,7 @@ export function RequestBuilder({ request }: Props) {
         <div className="flex bg-surface-800 border border-surface-700 rounded overflow-hidden text-xs font-bold flex-shrink-0">
           <button
             onClick={() => update({ protocol: 'http' })}
-            className={`px-2 py-1.5 transition-colors ${request.protocol !== 'websocket' && request.protocol !== 'soap' ? 'bg-blue-600 text-white' : 'text-surface-500 hover:text-white'}`}
+            className={`px-2 py-1.5 transition-colors ${!isWs && !isSoap && !isGrpc ? 'bg-blue-600 text-white' : 'text-surface-500 hover:text-white'}`}
             title="HTTP request"
           >
             HTTP
@@ -409,11 +411,21 @@ export function RequestBuilder({ request }: Props) {
           >
             SOAP
           </button>
+          <button
+            onClick={() => update({
+              protocol: 'grpc',
+              body: request.body.mode === 'grpc' ? request.body : { ...request.body, mode: 'grpc', grpc: request.body.grpc ?? { message: '{}', metadata: [], plaintext: false } },
+            })}
+            className={`px-2 py-1.5 transition-colors ${isGrpc ? 'bg-violet-700 text-violet-100' : 'text-surface-500 hover:text-white'}`}
+            title="gRPC - proto-defined services over HTTP/2"
+          >
+            gRPC
+          </button>
         </div>
 
         {/* Method selector — only meaningful for HTTP. SOAP is always POST,
             shown as a static badge so the user sees what's on the wire. */}
-        {!isWs && !isSoap && (customVerb ? (
+        {!isWs && !isSoap && !isGrpc && (customVerb ? (
           <input
             autoFocus
             value={request.method}
@@ -450,6 +462,14 @@ export function RequestBuilder({ request }: Props) {
             POST
           </span>
         )}
+        {isGrpc && (
+          <span
+            className="bg-surface-900 border border-surface-700 rounded px-2 py-1.5 text-xs font-bold text-violet-400 select-none"
+            title="gRPC target is host:port"
+          >
+            gRPC
+          </span>
+        )}
 
         <VarInput
           value={request.url}
@@ -458,6 +478,7 @@ export function RequestBuilder({ request }: Props) {
           placeholder={
             isWs   ? 'ws://example.com/socket'
             : isSoap ? 'Endpoint (auto-filled from WSDL <soap:address>)'
+            : isGrpc ? 'localhost:50051'
             : 'https://api.example.com/endpoint'
           }
           wrapperClassName="flex-1"
@@ -469,7 +490,7 @@ export function RequestBuilder({ request }: Props) {
         />
 
         {/* Hooks toggle + Send button (HTTP only) */}
-        {!isWs && (
+        {!isWs && !isGrpc && (
           <>
             <button
               onClick={toggleRunHooks}
@@ -495,10 +516,14 @@ export function RequestBuilder({ request }: Props) {
 
       {showFuzz && <FuzzModal request={request} onClose={() => setShowFuzz(false)} />}
 
-      {/* WS Panel (takes over the full remaining area) */}
+      {/* WS / gRPC panels take over the full remaining area */}
       {isWs ? (
         <div className="flex-1 min-h-0 overflow-hidden">
           <WebSocketPanel request={request} />
+        </div>
+      ) : isGrpc ? (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <GrpcPanel request={request} onChange={update} />
         </div>
       ) : (
         <>

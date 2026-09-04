@@ -28,6 +28,7 @@ import { registerMockHandlers } from './ipc/mock-handler';
 import { registerOAuth2Handlers } from './ipc/oauth2-handler';
 import { registerVaultHandlers } from './ipc/vault-handler';
 import { registerWsHandlers, closeAllWsConnections } from './ipc/ws-handler';
+import { registerGrpcHandlers, closeAllGrpcConnections } from './ipc/grpc-handler';
 import { registerSoapHandlers } from './ipc/soap-handler';
 import { registerDocsHandlers }     from './ipc/docs-handler';
 import { registerContractHandlers } from './ipc/contract-handler';
@@ -154,6 +155,7 @@ app.whenReady().then(async () => {
   registerOAuth2Handlers(ipcMain);
   registerVaultHandlers(ipcMain);
   registerWsHandlers(ipcMain);
+  registerGrpcHandlers(ipcMain);
   registerSoapHandlers(ipcMain);
   registerDocsHandlers(ipcMain);
   registerContractHandlers(ipcMain);
@@ -176,5 +178,6 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', async () => {
   closeAllWsConnections();
+  closeAllGrpcConnections();
   await stopAll();
 });

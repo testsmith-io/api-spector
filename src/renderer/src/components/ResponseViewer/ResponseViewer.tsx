@@ -43,6 +43,7 @@ function requestBodyText(body: HistoryEntry['request']['body']): string {
     case 'raw': return body.raw ?? '';
     case 'graphql': return body.graphql?.query ?? '';
     case 'soap': return body.soap?.envelope ?? '';
+    case 'grpc': return body.grpc?.message ?? '';
     case 'form': return (body.form ?? []).filter(p => p.enabled && p.key).map(p => `${p.key}=${p.value}`).join('\n');
     default: return '';
   }

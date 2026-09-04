@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../../store';
 import type { GitStatus, GitCommit, GitBranch, GitRemote, GitFile, CiPlatform } from '../../../../shared/types';
 import { Toast, useToast } from '../common/Toast';
-import { detectPlatform, generateCiContent, ciFilePath } from '../../lib/ci-templates';
+import { detectPlatform, generateCiContent, ciFilePath, secretManagerOf, requestSecretManagers, type SecretManagerKind } from '../../lib/ci-templates';
 
 const { electron } = window;
 
@@ -654,6 +654,7 @@ function BranchesTab({ onRefresh }: { onRefresh: () => void }) {
 function CiTab() {
   const environments = useStore(s => s.environments);
   const envList = Object.values(environments);
+  const collections = useStore(s => s.collections);
 
   const [remotes,      setRemotes]      = useState<GitRemote[]>([]);
   const [platform,     setPlatform]     = useState<CiPlatform>('unknown');
@@ -681,10 +682,23 @@ function CiTab() {
     const secretVars = env
       ? env.data.variables.filter(v => v.secret && v.enabled).map(v => v.key)
       : [];
+    // Detect which external secret managers this run references, so the pipeline
+    // can wire up their credentials (VAULT_ADDR + OIDC step, etc.). Two sources:
+    // env-var secretRefs, and inline {{vault:...}} used anywhere in a request
+    // (URL, headers, body, auth, pre/post scripts).
+    const envRefManagers = env
+      ? env.data.variables
+          .filter(v => v.enabled && v.secretRef)
+          .map(v => secretManagerOf(v.secretRef!))
+          .filter((k): k is SecretManagerKind => k !== null)
+      : [];
+    const inlineManagers = Object.values(collections).flatMap(c =>
+      Object.values(c.data.requests).flatMap(requestSecretManagers));
+    const secretManagers = [...new Set([...envRefManagers, ...inlineManagers])];
     const envName = env?.data.name ?? '';
-    setPreview(generateCiContent(platform, envName, tags, secretVars));
+    setPreview(generateCiContent(platform, envName, tags, secretVars, secretManagers));
     setWritten(false);
-  }, [platform, envId, tags, environments]);
+  }, [platform, envId, tags, environments, collections]);
 
   async function write() {
     try {

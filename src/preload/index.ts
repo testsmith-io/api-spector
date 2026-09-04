@@ -20,6 +20,8 @@ import type {
   MockRoute,
   MockHit,
   WsMessage,
+  GrpcMessage,
+  GrpcServiceInfo,
   StreamEvent,
   ConsumerContract,
   ApiRequest,
@@ -226,6 +228,32 @@ const api = {
   offWsEvents: (): void => {
     ipcRenderer.removeAllListeners(IPC.ws.message);
     ipcRenderer.removeAllListeners(IPC.ws.status);
+  },
+
+  // ─── gRPC ─────────────────────────────────────────────────────────────────
+  grpcLoadProto: (src: { protoSource?: string; protoPath?: string; importPaths?: string[] }): Promise<{ services: GrpcServiceInfo[] }> =>
+    ipcRenderer.invoke(IPC.grpc.loadProto, src),
+
+  grpcInvoke: (requestId: string, opts: {
+    target: string; serviceName: string; methodName: string; message: string
+    metadata?: Record<string, string>; plaintext?: boolean
+    protoSource?: string; protoPath?: string; importPaths?: string[]
+  }): Promise<void> => ipcRenderer.invoke(IPC.grpc.invoke, requestId, opts),
+
+  grpcCancel: (requestId: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.grpc.cancel, requestId),
+
+  onGrpcMessage: (cb: (event: { requestId: string; message: GrpcMessage }) => void): void => {
+    ipcRenderer.on(IPC.grpc.message, (_e, payload) => cb(payload));
+  },
+
+  onGrpcStatus: (cb: (event: { requestId: string; status: string; code?: number; codeName?: string; error?: string }) => void): void => {
+    ipcRenderer.on(IPC.grpc.status, (_e, payload) => cb(payload));
+  },
+
+  offGrpcEvents: (): void => {
+    ipcRenderer.removeAllListeners(IPC.grpc.message);
+    ipcRenderer.removeAllListeners(IPC.grpc.status);
   },
 
   // ─── Streamed responses (SSE / NDJSON / chunked) ──────────────────────────

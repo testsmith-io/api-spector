@@ -133,6 +133,20 @@ export const IPC = {
     import: 'wsdl:import',
   },
 
+  // ─── gRPC ──────────────────────────────────────────────────────────────────
+  grpc: {
+    /** Load a .proto (source or path) and enumerate its services/methods. */
+    loadProto: 'grpc:loadProto',
+    /** Invoke a method (unary or server-streaming). Streams back messages. */
+    invoke:    'grpc:invoke',
+    /** Cancel an in-flight call. */
+    cancel:    'grpc:cancel',
+    /** Event: a received message frame. */
+    message:   'grpc:message',
+    /** Event: call status change (running / completed / error, with code). */
+    status:    'grpc:status',
+  },
+
   // ─── Docs generation ───────────────────────────────────────────────────────
   docs: {
     generate: 'docs:generate',
