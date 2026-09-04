@@ -27,11 +27,6 @@ const PROVIDER_ENV: Record<SecretManagerKind, string[]> = {
   op:    ['OP_CONNECT_HOST', 'OP_CONNECT_TOKEN'],
 };
 
-const PROVIDER_LABEL: Record<SecretManagerKind, string> = {
-  vault: 'HashiCorp Vault', aws: 'AWS Secrets Manager',
-  azure: 'Azure Key Vault', op: '1Password',
-};
-
 // Map a secret-manager reference (from an env var's secretRef) to its provider.
 export function secretManagerOf(ref: string): SecretManagerKind | null {
   if (ref.startsWith('op://')) return 'op';
