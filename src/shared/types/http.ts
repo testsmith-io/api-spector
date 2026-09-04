@@ -83,17 +83,61 @@ export interface SoapBody {
   soapAction?: string
 }
 
+/** A gRPC call definition. The proto schema comes from pasted source or a file
+ *  path (server reflection is a follow-up); the call targets one service/method
+ *  and sends a single request message as JSON (client streaming is a follow-up). */
+export interface GrpcBody {
+  /** Pasted .proto source, or use protoPath. */
+  protoSource?: string
+  /** Path to a .proto file on disk. */
+  protoPath?: string
+  /** Extra import roots so a proto's `import` statements resolve. */
+  importPaths?: string[]
+  /** Fully-qualified service name, e.g. "helloworld.Greeter". */
+  serviceName?: string
+  /** Method name as declared in the proto, e.g. "SayHello". */
+  methodName?: string
+  /** Request message as a JSON string (kept as text for {{var}} interpolation). */
+  message: string
+  /** Per-call metadata (gRPC's equivalent of headers). */
+  metadata?: KeyValuePair[]
+  /** Connect without TLS (h2c). Default is TLS. */
+  plaintext?: boolean
+}
+
+/** One method discovered from a proto, with its streaming shape. */
+export interface GrpcMethodInfo {
+  name: string
+  requestStream: boolean
+  responseStream: boolean
+}
+
+/** One service discovered from a proto. */
+export interface GrpcServiceInfo {
+  name: string
+  methods: GrpcMethodInfo[]
+}
+
 export interface RequestBody {
-  mode: 'none' | 'json' | 'form' | 'raw' | 'graphql' | 'soap'
+  mode: 'none' | 'json' | 'form' | 'raw' | 'graphql' | 'soap' | 'grpc'
   json?: string
   form?: KeyValuePair[]
   raw?: string
   rawContentType?: string
   graphql?: GraphQLBody
   soap?: SoapBody
+  grpc?: GrpcBody
 }
 
 export interface WsMessage {
+  id: string
+  direction: 'sent' | 'received'
+  data: string
+  timestamp: number
+}
+
+/** A single frame in a gRPC call's log (a sent request or a received message). */
+export interface GrpcMessage {
   id: string
   direction: 'sent' | 'received'
   data: string

@@ -7,6 +7,7 @@ import type { Workspace, ScriptExecutionMeta } from '../../../shared/types';
 import { uniqueName, colRelPath } from '../../../shared/naming-utils';
 import { findFolder, findFolderPath } from '../../../shared/folder-tree';
 import { createWsSlice, type WsSlice } from './slices/ws-slice';
+import { createGrpcSlice, type GrpcSlice } from './slices/grpc-slice';
 import { createStreamSlice, type StreamSlice } from './slices/stream-slice';
 import { createHistorySlice, type HistorySlice } from './slices/history-slice';
 import { createRunnerSlice, type RunnerSlice } from './slices/runner-slice';
@@ -68,12 +69,13 @@ interface WorkspaceActions {
 export type FullState =
   WorkspaceState & WorkspaceActions &
   TabsSlice & CollectionsSlice & EnvironmentsSlice & MocksSlice & UiSlice &
-  WsSlice & StreamSlice & HistorySlice & RunnerSlice & RecorderSlice & ContractSlice
+  WsSlice & GrpcSlice & StreamSlice & HistorySlice & RunnerSlice & RecorderSlice & ContractSlice
 
 export const useStore: UseBoundStore<StoreApi<FullState>> = create<FullState>()(
   immer((set, get, api) => ({
     // ── Slice composition ─────────────────────────────────────────────────────
     ...createWsSlice(set, get, api),
+    ...createGrpcSlice(set, get, api),
     ...createStreamSlice(set, get, api),
     ...createHistorySlice(set, get, api),
     ...createRunnerSlice(set, get, api),

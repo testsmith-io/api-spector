@@ -60,7 +60,7 @@ export interface ApiRequest {
    *  - 'http' (default) → method picker, URL bar, body modes
    *  - 'websocket'      → ws:// URL, message panel
    *  - 'soap'           → WSDL-driven endpoint, single SOAP editor (POST + xml) */
-  protocol?: 'http' | 'websocket' | 'soap'  // default 'http'
+  protocol?: 'http' | 'websocket' | 'soap' | 'grpc'  // default 'http'
   /** When set, this request acts as a lifecycle hook within its folder/collection scope. */
   hookType?: 'beforeAll' | 'before' | 'after' | 'afterAll'
   /** When true, the request is excluded from collection/folder runs. */

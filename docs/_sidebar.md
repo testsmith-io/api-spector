@@ -14,6 +14,7 @@
   - [Import OpenAPI](gui/import-openapi.md)
   - [HTTP Files (.http / .rest)](gui/http-files.md)
   - [Contract Testing](gui/contract-testing.md)
+  - [gRPC](gui/grpc.md)
   - [Git Integration](gui/git.md)
 
 - **CLI**
@@ -34,3 +35,17 @@
   - [Scripting API](reference/scripting.md)
   - [Pact Compatibility & Matchers](reference/pact-compatibility.md)
   - [Building Desktop Apps](reference/building-desktop-apps.md)
+
+- **Compare**
+  - [Overview](compare/README.md)
+  - [vs Postman](compare/postman.md)
+  - [vs Insomnia](compare/insomnia.md)
+  - [vs Bruno](compare/bruno.md)
+  - [vs Yaak](compare/yaak.md)
+  - [vs Kreya](compare/kreya.md)
+  - [vs Milkman](compare/milkman.md)
+  - [vs SoapUI](compare/soapui.md)
+  - [vs ReadyAPI](compare/readyapi.md)
+  - [vs PactFlow](compare/pactflow.md)
+  - [vs Dredd](compare/dredd.md)
+  - [vs Microcks](compare/microcks.md)
