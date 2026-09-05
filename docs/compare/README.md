@@ -39,6 +39,14 @@ Where another tool is a better fit, these pages say so.
 - **Contract testing built in.** Design-first and Pact-compatible: consumer,
   provider, live provider verification with provider states, and bi-directional,
   with a `deploy-check` gate.
+- **OpenAPI test coverage.** See which operations of your spec are actually
+  tested, and gate CI on it (`api-spector coverage --fail-under 80`). Answers "is
+  my API tested according to its contract?" — not just "does this request work?"
+- **Test generation.** Generate happy-path, negative, and boundary tests from an
+  OpenAPI spec, or one-click fill the untested operations coverage found.
+- **API diff & impact analysis.** Flag breaking changes between two spec
+  versions, map them to the tests they affect, and gate deploys
+  (`api-spector compare --fail-on-breaking`).
 - **Git-native.** Collections are files you can diff and review in a pull request.
 - **Optional cloud.** [API Spector Cloud](https://api-spector.dev) adds hosted
   mocks, monitors, status pages, and a contract broker when you want them, never

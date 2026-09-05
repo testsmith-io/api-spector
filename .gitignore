@@ -31,4 +31,6 @@ npm-debug.log*
 
 # Claude
 .claude
-coverage
+
+# Test-coverage output (repo root only, so it doesn't match the Coverage/ UI folder)
+/coverage

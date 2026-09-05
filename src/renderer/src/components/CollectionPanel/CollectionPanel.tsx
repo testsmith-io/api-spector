@@ -13,6 +13,8 @@ export function CollectionPanel() {
   const collections               = useStore(s => s.collections);
   const updateCollectionDataSet   = useStore(s => s.updateCollectionDataSet);
   const openRunner                = useStore(s => s.openRunner);
+  const setCoverageOpen           = useStore(s => s.setCoverageOpen);
+  const setCompareOpen            = useStore(s => s.setCompareOpen);
 
   const [activeTab, setActiveTab] = useState<'data' | 'variables'>('data');
 
@@ -46,15 +48,31 @@ export function CollectionPanel() {
             {iterCount > 0 ? ` · ${iterCount} data row${iterCount !== 1 ? 's' : ''}` : ''}
           </p>
         </div>
-        <button
-          onClick={() => openRunner(activeCollectionId)}
-          className="px-3 py-1.5 text-xs bg-emerald-700 hover:bg-emerald-600 rounded font-medium transition-colors flex items-center gap-1.5"
-        >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"/>
-          </svg>
-          Run collection
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCoverageOpen(true)}
+            title="Measure how much of an OpenAPI spec this workspace tests"
+            className="px-3 py-1.5 text-xs border border-surface-700 text-surface-300 hover:text-white hover:border-surface-500 rounded font-medium transition-colors"
+          >
+            Coverage
+          </button>
+          <button
+            onClick={() => setCompareOpen(true)}
+            title="Diff two OpenAPI versions: breaking changes and which tests they affect"
+            className="px-3 py-1.5 text-xs border border-surface-700 text-surface-300 hover:text-white hover:border-surface-500 rounded font-medium transition-colors"
+          >
+            Compare
+          </button>
+          <button
+            onClick={() => openRunner(activeCollectionId)}
+            className="px-3 py-1.5 text-xs bg-emerald-700 hover:bg-emerald-600 rounded font-medium transition-colors flex items-center gap-1.5"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"/>
+            </svg>
+            Run collection
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}

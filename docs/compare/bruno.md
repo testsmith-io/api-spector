@@ -24,6 +24,7 @@ narrow: it is a very good request client.
 | Export to test code | Robot Framework, Playwright, Karate, REST Assured, supertest | Not a focus |
 | Mock servers | Yes (local and cloud) | No |
 | Contract testing | Built in, Pact-compatible | No |
+| OpenAPI test coverage | Yes, with a CI gate | No |
 | Protocols | HTTP/REST, GraphQL, WebSocket, SOAP, gRPC (unary + server streaming) | HTTP/REST, GraphQL, gRPC |
 | Scope | Client + mocks + contracts + code export | Focused request client |
 

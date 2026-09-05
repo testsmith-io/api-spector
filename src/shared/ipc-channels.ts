@@ -152,6 +152,12 @@ export const IPC = {
     generate: 'docs:generate',
   },
 
+  // ─── OpenAPI coverage ────────────────────────────────────────────────────────
+  coverage: {
+    /** Read + parse an OpenAPI spec (file path, URL, or raw text). */
+    loadSpec: 'coverage:loadSpec',
+  },
+
   // ─── Contract testing ──────────────────────────────────────────────────────
   contract: {
     run:              'contract:run',

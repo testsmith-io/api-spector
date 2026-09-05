@@ -301,6 +301,10 @@ const api = {
     examples?: Record<string, { sent?: unknown; response?: unknown }>
   }): Promise<string> => ipcRenderer.invoke(IPC.docs.generate, payload),
 
+  // ─── OpenAPI coverage ─────────────────────────────────────────────────────
+  coverageLoadSpec: (source: { path?: string; url?: string; text?: string }): Promise<unknown> =>
+    ipcRenderer.invoke(IPC.coverage.loadSpec, source),
+
   // ─── Contract testing ─────────────────────────────────────────────────────
   runContracts: (payload: ContractRunPayload): Promise<ContractReport> =>
     ipcRenderer.invoke(IPC.contract.run, payload),

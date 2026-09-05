@@ -39,6 +39,8 @@ export interface UiSliceState {
    *  request tab is open. Cleared as soon as a request tab is (re)activated, so
    *  it behaves like "bring the collection to front" rather than a mode. */
   collectionPanelOpen: boolean
+  coverageOpen: boolean
+  compareOpen: boolean
 
   /** Monotonic counter bumped by requestSend(). The active RequestBuilder
    *  watches it and fires its normal send pipeline when it changes, so history
@@ -61,6 +63,9 @@ export interface UiSliceActions {
   requestSend: () => void
   /** Show or hide the collection/folder data panel over an open request. */
   setCollectionPanelOpen: (open: boolean) => void
+  setCoverageOpen: (open: boolean) => void
+  setCoverageSpec: (spec: string) => void
+  setCompareOpen: (open: boolean) => void
 }
 
 export type UiSlice = UiSliceState & UiSliceActions
@@ -82,6 +87,8 @@ export const createUiSlice: StateCreator<
   quickInsertsOpen: true,
   sendSignal: 0,
   collectionPanelOpen: false,
+  coverageOpen: false,
+  compareOpen: false,
 
   setShowGeneratorPanel: v => set(s => { s.showGeneratorPanel = v; }),
 
@@ -131,4 +138,17 @@ export const createUiSlice: StateCreator<
   requestSend: () => set(s => { s.sendSignal += 1; }),
 
   setCollectionPanelOpen: (open) => set(s => { s.collectionPanelOpen = open; }),
+
+  setCoverageOpen: (open) => set(s => { s.coverageOpen = open; }),
+
+  setCompareOpen: (open) => set(s => { s.compareOpen = open; }),
+
+  // The OpenAPI spec used for coverage travels with the workspace (persisted on
+  // save), mirroring how theme/zoom are stored.
+  setCoverageSpec: (spec) => set(s => {
+    if (s.workspace) {
+      if (!s.workspace.settings) s.workspace.settings = {};
+      s.workspace.settings.coverageSpec = spec;
+    }
+  }),
 });

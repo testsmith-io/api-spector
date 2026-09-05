@@ -21,6 +21,9 @@ export default defineConfig( {
           record:   resolve( __dirname, 'src/cli/record.ts' ),
           agents:   resolve( __dirname, 'src/cli/agents.ts' ),
           contract: resolve( __dirname, 'src/cli/contract.ts' ),
+          coverage: resolve( __dirname, 'src/cli/coverage.ts' ),
+          'generate-tests': resolve( __dirname, 'src/cli/generate-tests.ts' ),
+          compare:  resolve( __dirname, 'src/cli/compare.ts' ),
           wsdl:     resolve( __dirname, 'src/cli/wsdl.ts' ),
           // Node-only engine library, importable as '@testsmith/api-spector/engine'.
           lib:      resolve( __dirname, 'src/lib/index.ts' ),

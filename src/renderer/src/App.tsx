@@ -14,6 +14,8 @@ import { HistoryPanel } from './components/History/HistoryPanel';
 import { WelcomeScreen } from './components/common/WelcomeScreen';
 import { Toolbar } from './components/common/Toolbar';
 import { RunnerModal } from './components/Runner/RunnerModal';
+import { CoverageModal } from './components/Coverage/CoverageModal';
+import { CompareModal } from './components/Compare/CompareModal';
 import { CollectionPanel } from './components/CollectionPanel/CollectionPanel';
 import { MockPanel } from './components/MockPanel/MockPanel';
 import { MockDetailPanel } from './components/MockPanel/MockDetailPanel';
@@ -357,6 +359,8 @@ export default function App () {
   return (
     <div className="flex flex-col h-screen bg-surface-950" style={{ color: 'var(--text-primary)' }}>
       <RunnerModal />
+      <CoverageModal />
+      <CompareModal />
       <CommandPalette />
       {docsModalOpen && <DocsGeneratorModal onClose={() => setDocsModalOpen( false )} />}
       {/* macOS drag region with centered title — hidden on Windows (native title bar used instead) */}
