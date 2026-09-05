@@ -21,11 +21,17 @@
   - [Run Tests](cli/run.md)
   - [Mock Servers](cli/mock.md)
   - [Contract Testing](cli/contract-testing.md)
+  - [Test Coverage](reference/coverage.md)
+  - [Test Generation](reference/test-generation.md)
+  - [API Diff & Impact](reference/api-diff.md)
   - [Pipeline Integration](cli/cicd.md)
   - [Docker](cli/docker.md)
   - [AI Agents](cli/agents.md)
 
 - **Reference**
+  - [OpenAPI Test Coverage](reference/coverage.md)
+  - [Test Generation](reference/test-generation.md)
+  - [API Diff & Impact Analysis](reference/api-diff.md)
   - [Contract Testing Types](reference/contract-testing-types.md)
   - [Contract Testing Workflows](reference/contract-testing-workflows.md)
   - [Contract Testing: Toolshop Example](reference/contract-testing-toolshop.md)

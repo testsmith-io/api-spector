@@ -68,6 +68,9 @@ export interface CollectionsSliceActions {
 
   // Collection CRUD
   addCollection: (name: string) => void
+  /** Insert a fully-built collection (e.g. generated tests) and register it in
+   *  the workspace so it persists. Returns the collection id. */
+  addCollectionObject: (data: Collection) => string
   renameCollection: (id: string, name: string) => void
   deleteCollection: (id: string) => void
 
@@ -177,6 +180,20 @@ export const createCollectionsSlice: StateCreator<
     s.activeCollectionId = col.id;
     if (s.workspace) s.workspace.collections.push(relPath);
   }),
+
+  addCollectionObject: (data) => {
+    let id = data.id;
+    set(s => {
+      const existingNames = Object.values(s.collections).map(c => c.data.name);
+      data.name = uniqueName(data.name, existingNames);
+      const relPath = colRelPath(data.name, data.id);
+      s.collections[data.id] = { relPath, data, dirty: true };
+      s.activeCollectionId = data.id;
+      if (s.workspace) s.workspace.collections.push(relPath);
+      id = data.id;
+    });
+    return id;
+  },
 
   renameCollection: (id, name) => set(s => {
     if (!s.collections[id]) return;

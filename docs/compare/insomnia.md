@@ -20,6 +20,7 @@ features, which prompted some users to look for offline-first alternatives.
 | Secrets | AES-256-GCM local + external managers | Environment variables, plugins |
 | Export to test code | Robot Framework, Playwright, Karate, REST Assured, supertest | Snippets; Inso CLI for its own runner |
 | Contract testing | Built in, Pact-compatible | Not built in |
+| OpenAPI test coverage | Yes, with a CI gate | No |
 | Mock servers | Local and cloud | Cloud mocks |
 | Protocols | HTTP/REST, GraphQL, WebSocket, SOAP, gRPC (unary + server streaming) | HTTP/REST, GraphQL, gRPC, WebSocket |
 | Storage | Files (Git-friendly) | Local DB, with cloud/Git sync options |

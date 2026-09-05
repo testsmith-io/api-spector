@@ -22,6 +22,9 @@ const COMMANDS = {
   record:   { entrypoint: 'record.js',  runner: 'node' },
   agents:   { entrypoint: 'agents.js',  runner: 'node' },
   contract: { entrypoint: 'contract.js',runner: 'node' },
+  coverage: { entrypoint: 'coverage.js',runner: 'node' },
+  'generate-tests': { entrypoint: 'generate-tests.js', runner: 'node' },
+  compare:  { entrypoint: 'compare.js', runner: 'node' },
   wsdl:     { entrypoint: 'wsdl.js',    runner: 'node' },
 }
 
@@ -35,6 +38,9 @@ function printHelp() {
   console.log('    api-spector mock     --workspace <path>   Start mock servers from CLI')
   console.log('    api-spector record   --upstream <url>     Record API traffic as mock stubs')
   console.log('    api-spector contract list|run             Manage & run pinned contract snapshots')
+  console.log('    api-spector coverage --spec <file>        Measure OpenAPI test coverage')
+  console.log('    api-spector generate-tests --spec <file>  Generate tests from an OpenAPI spec')
+  console.log('    api-spector compare <old> <new>           Diff specs; find breaking changes + impact')
   console.log('    api-spector wsdl     describe|import-*    Inspect a WSDL or import as collection/mock')
   console.log('')
   console.log('  Options:')

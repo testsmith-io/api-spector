@@ -209,6 +209,10 @@ export interface Workspace {
      *  environment (see docs/secrets-vault.md), never from here. Environment
      *  variables override these values. */
     secrets?: SecretsSettings
+    /** Path or URL of the OpenAPI spec this workspace is measured against for
+     *  test coverage. Lets `api-spector coverage` and the UI default without a
+     *  --spec flag each time. */
+    coverageSpec?: string
   }
 }
 

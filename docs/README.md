@@ -13,6 +13,9 @@
 - **Encrypted secrets:** AES-256-GCM encryption with a master password, never stored in plain text
 - **Mock servers:** define and run HTTP mock servers with per-route delay and status control
 - **Contract testing:** consumer, provider, live provider verification (with provider states), and bi-directional modes; Pact-style matchers, Pact file import/export, a local `deploy-check` gate, and HTML/JUnit reports
+- **OpenAPI test coverage:** measure which spec operations are actually tested, with a CI gate (`api-spector coverage --fail-under 80`)
+- **Test generation:** generate happy-path, negative, and boundary tests from an OpenAPI spec (`api-spector generate-tests`), or fill coverage gaps from the app
+- **API diff & impact analysis:** `api-spector compare old.yaml new.yaml` flags breaking changes, maps them to affected tests, and gives a deploy verdict (`--fail-on-breaking`)
 - **Code generation:** export collections as Robot Framework or Playwright test suites
 - **Variable interpolation:** `{{variable}}` syntax across URLs, headers, bodies, and scripts
 - **Scripting:** pre-request and post-response JavaScript with `pm`-compatible API

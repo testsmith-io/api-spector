@@ -31,6 +31,7 @@ import { registerWsHandlers, closeAllWsConnections } from './ipc/ws-handler';
 import { registerGrpcHandlers, closeAllGrpcConnections } from './ipc/grpc-handler';
 import { registerSoapHandlers } from './ipc/soap-handler';
 import { registerDocsHandlers }     from './ipc/docs-handler';
+import { registerCoverageHandlers } from './ipc/coverage-handler';
 import { registerContractHandlers } from './ipc/contract-handler';
 import { registerGitHandlers }    from './ipc/git-handler';
 import { registerRecordHandlers }  from './ipc/record-handler';
@@ -158,6 +159,7 @@ app.whenReady().then(async () => {
   registerGrpcHandlers(ipcMain);
   registerSoapHandlers(ipcMain);
   registerDocsHandlers(ipcMain);
+  registerCoverageHandlers(ipcMain);
   registerContractHandlers(ipcMain);
   registerGitHandlers(ipcMain);
   registerRecordHandlers(ipcMain, () => BrowserWindow.getAllWindows()[0]?.webContents ?? null);

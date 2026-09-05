@@ -24,6 +24,7 @@ tiers.
 | Secrets | AES-256-GCM local + Vault/AWS/Azure/1Password references | Vault/env; cloud-synced vault |
 | Export to test code | Robot Framework, Playwright, Karate, REST Assured, supertest | Snippets; runs in Postman's runner/Newman |
 | Contract testing | Built in, Pact-compatible | Via external tooling |
+| OpenAPI test coverage | Yes, with a CI gate | Partial (cloud platform inventory) |
 | Mock servers | Local and cloud | Cloud |
 | Collaboration | Git (files, pull requests) | Real-time cloud workspaces |
 | Protocols | HTTP/REST, GraphQL, WebSocket, SOAP, gRPC (unary + server streaming) | HTTP/REST, GraphQL, gRPC, WebSocket, SOAP |

@@ -1,6 +1,6 @@
 {
   "name": "@testsmith/api-spector-agent",
-  "version": "0.4.9",
+  "version": "0.5.0",
   "description": "API Spector private runner: monitor internal/local APIs the cloud cannot reach, with no inbound connections.",
   "license": "MIT",
   "homepage": "https://api-spector.dev",
