@@ -10,6 +10,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { getStatusColor, getMethodColor } from '../../../../shared/colors';
 import type { HistoryEntry } from '../../../../shared/types';
 import { InteractiveBody } from './InteractiveBody';
+import { ResponseTable, bodyHasArray } from './ResponseTable';
 import { StreamView } from './StreamView';
 import { HookResultsPanel } from './HookResultsPanel';
 import { SaveAsMockModal } from './SaveAsMockModal';
@@ -181,7 +182,7 @@ export function ResponseViewer() {
 
   const [diffMode, setDiffMode] = useState(false);
   const [showMockModal, setShowMockModal] = useState(false);
-  const [bodyView, setBodyView] = useState<'tree' | 'raw'>('raw');
+  const [bodyView, setBodyView] = useState<'tree' | 'raw' | 'table'>('raw');
   const assertToast = useToast(2500);
   const contractToast = useToast(2500);
 
@@ -256,6 +257,9 @@ export function ResponseViewer() {
   const isXml = !isJson && (contentType.includes('xml') || contentType.includes('html'));
   const supportsTree = isJson || isXml;
   const displayBody = isJson ? prettyJson(response.body) : isXml ? prettyXml(response.body) : response.body;
+  // Show the Table view only when the body actually has an array to tabulate.
+  // (A plain computation, not a hook: this sits after early returns above.)
+  const showTable = supportsTree && !response.streamed && bodyHasArray(response.body, contentType);
 
   // Body parse error (for a red ! on the Body tab, regardless of tree/raw view).
   const bodyParseError = response.body.trim().length > 0 && (
@@ -367,6 +371,15 @@ export function ResponseViewer() {
               >
                 Raw
               </button>
+              {showTable && (
+                <button
+                  onClick={() => setBodyView('table')}
+                  className={`px-2 py-0.5 text-[10px] transition-colors ${bodyView === 'table' ? 'bg-surface-700 text-white' : 'text-surface-600 hover:text-white'}`}
+                  title="Show an array in the response as a sortable table"
+                >
+                  Table
+                </button>
+              )}
             </div>
           )}
 
@@ -437,6 +450,8 @@ export function ResponseViewer() {
             streamClose={response.streamClose}
             firstEventMs={response.firstEventMs}
           />
+        ) : tab === 'body' && showTable && bodyView === 'table' ? (
+          <ResponseTable body={response.body} contentType={contentType} />
         ) : tab === 'body' && supportsTree && bodyView === 'tree' ? (
           <InteractiveBody
             body={response.body}
