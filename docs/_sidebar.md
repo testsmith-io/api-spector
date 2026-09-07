@@ -10,6 +10,7 @@
   - [Data-Driven Runs](gui/data-driven.md)
   - [Mock Servers](gui/mock-servers.md)
   - [Export to Code](gui/code-generation.md)
+  - [Table View for Arrays](gui/response-table.md)
   - [TLS & Certificates](gui/tls-certificates.md)
   - [Import OpenAPI](gui/import-openapi.md)
   - [HTTP Files (.http / .rest)](gui/http-files.md)
