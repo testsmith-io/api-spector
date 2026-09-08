@@ -21,7 +21,9 @@ tiers.
 | Runs fully offline | Yes | Limited; account and sync are central |
 | Account required | No | Effectively yes for most workflows |
 | Where data lives | Your machine (files) | Postman cloud by default |
-| Secrets | AES-256-GCM local + Vault/AWS/Azure/1Password references | Vault/env; cloud-synced vault |
+| Secret managers | Vault, AWS, Azure, 1Password (+ AES-256-GCM local) | Vault/env; cloud-synced vault |
+| GraphQL query builder | Yes, introspection-driven | Yes |
+| SOAP + WSDL loader | Yes, load a WSDL and generate the envelope | Manual, no WSDL import |
 | Export to test code | Robot Framework, Playwright, Karate, REST Assured, supertest | Snippets; runs in Postman's runner/Newman |
 | Contract testing | Built in, Pact-compatible | Via external tooling |
 | OpenAPI test coverage | Yes, with a CI gate | Partial (cloud platform inventory) |
@@ -31,6 +33,7 @@ tiers.
 
 ## Where API Spector fits
 
+- **Author faster.** An introspection-driven GraphQL query builder, a SOAP WSDL loader that fills in the envelope, and Vault / AWS / Azure / 1Password secret references, all built in - no plugins.
 - **Your data stays local.** No forced sign-in, no collections living in someone
   else's cloud. Good for regulated environments and anyone uneasy about API keys
   syncing off-machine.

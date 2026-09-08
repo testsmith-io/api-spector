@@ -56,10 +56,10 @@ export function ContractTab({ request, onChange }: Props) {
 
   return (
     <div className="flex flex-col gap-4 h-full min-h-0">
-      {/* What this tab is — and how it differs from Schema. */}
+      {/* What this tab is, and how it differs from Schema. */}
       <div className="rounded-lg border border-blue-700/50 bg-blue-950/30 px-3 py-2 text-[11px] leading-relaxed text-blue-200/90">
-        <span className="font-semibold text-blue-300">Contract — the published expectation.</span>{' '}
-        What this request <em>needs</em> from the provider: status, body shape, headers. It becomes the <strong>consumer pact</strong> used for contract testing (bi-directional verify &amp; <span className="font-mono">can-i-deploy</span>). For a throwaway local response check, use the <strong>Schema</strong> tab.
+        <span className="font-semibold text-blue-300">Contract.</span>{' '}
+        What this request <em>expects</em> from the provider: status, headers, and body shape (a JSON Schema). It is checked against the response in the <strong>Contract</strong> panel and is the consumer side of contract testing (consumer &amp; bi-directional verify), feeding the <span className="font-mono">deploy-check</span> gate. For a quick body check that runs on every send, use the <strong>Schema</strong> tab.
       </div>
 
       {/* Status indicator */}
