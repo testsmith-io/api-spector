@@ -86,7 +86,13 @@ function loadAppIcon(): Electron.NativeImage | undefined {
 }
 
 
+// Keep the splash on screen at least this long so it reads as intentional, but
+// never add a fixed delay on top of load time (it used to always wait 1.2s
+// AFTER the window finished loading).
+const MIN_SPLASH_MS = 350;
+
 function createWindow(): void {
+  const startedAt = Date.now();
   const splash = createSplashWindow();
   const appIcon = loadAppIcon();
 
@@ -119,11 +125,13 @@ function createWindow(): void {
   }
 
   win.webContents.once('did-finish-load', () => {
-    // Brief pause so the splash is visible even on fast machines
+    // Show as soon as the window is loaded; only hold back for whatever remains
+    // of the minimum splash time (0 once load already took that long).
+    const remaining = Math.max(0, MIN_SPLASH_MS - (Date.now() - startedAt));
     setTimeout(() => {
       splash.close();
       win.show();
-    }, 1200);
+    }, remaining);
   });
 
   // On Windows the native title bar is shown — include the version in the title

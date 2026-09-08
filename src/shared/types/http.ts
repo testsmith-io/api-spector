@@ -79,6 +79,11 @@ export interface SoapBody {
   serviceName?: string
   portName?: string
   operationName?: string
+  /** SOAP version + binding of the selected operation. A WSDL can expose the
+   *  same operation name in both a 1.1 and a 1.2 binding, so these disambiguate
+   *  which one is selected (operationName alone is not unique). */
+  soapVersion?: '1.1' | '1.2'
+  binding?: string
   envelope: string        // the XML envelope (hand-edited or template-generated)
   soapAction?: string
 }

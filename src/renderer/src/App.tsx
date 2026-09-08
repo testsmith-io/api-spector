@@ -208,6 +208,7 @@ export default function App () {
   const updateMock         = useStore( s => s.updateMock );
   const theme = useStore( s => s.theme );
   const setCommandPaletteOpen = useStore( s => s.setCommandPaletteOpen );
+  const requestSend = useStore( s => s.requestSend );
   const setWsStatus = useStore( s => s.setWsStatus );
   const addWsMessage = useStore( s => s.addWsMessage );
   const pushLiveStreamEvents = useStore( s => s.pushLiveStreamEvents );
@@ -283,10 +284,16 @@ export default function App () {
         e.preventDefault();
         setCommandPaletteOpen( true );
       }
+      // Cmd/Ctrl+Enter (re)sends the active request. The active RequestBuilder
+      // handles the actual send and ignores it for WebSocket/gRPC tabs.
+      if ( e.key === 'Enter' && ( e.metaKey || e.ctrlKey ) ) {
+        e.preventDefault();
+        requestSend();
+      }
     }
     window.addEventListener( 'keydown', handleKeyDown );
     return () => window.removeEventListener( 'keydown', handleKeyDown );
-  }, [setCommandPaletteOpen] );
+  }, [setCommandPaletteOpen, requestSend] );
 
   // Keep light class in sync when OS preference changes (system theme)
   useEffect( () => {

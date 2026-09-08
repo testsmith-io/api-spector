@@ -15,6 +15,9 @@ export interface GqlArg {
   name: string
   type: GqlTypeRef
   description?: string | null
+  /** The argument's default value as a GraphQL literal string, or null. A
+   *  non-null arg WITH a default is optional to provide (the default applies). */
+  defaultValue?: string | null
 }
 
 export interface GqlField {
@@ -65,6 +68,13 @@ export function isLeafKind(kind: string): boolean {
 
 export function isRequired(ref: GqlTypeRef | null): boolean {
   return !!ref && ref.kind === 'NON_NULL';
+}
+
+/** Whether an argument must actually be supplied: non-null type AND no default
+ *  value. `first: Int! = 10` is non-null but optional (the default applies), so
+ *  it is NOT required. */
+export function argRequired(arg: GqlArg): boolean {
+  return isRequired(arg.type) && arg.defaultValue == null;
 }
 
 /** Default literal value for an argument based on its type. Picks something
@@ -249,7 +259,7 @@ export const INTROSPECTION_QUERY = `query IntrospectionQuery {
         name description
         type { ${TYPE_REF} }
         args {
-          name description
+          name description defaultValue
           type { ${TYPE_REF} }
         }
       }

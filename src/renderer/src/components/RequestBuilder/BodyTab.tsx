@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import React, { useMemo } from 'react';
+import React, { useMemo, lazy, Suspense } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { oneDark } from '@codemirror/theme-one-dark';
 import type { ApiRequest, RequestBody } from '../../../../shared/types';
@@ -10,8 +10,12 @@ import { varCompletionExtension, varHoverTooltipExtension } from './atCompletion
 import { jsonWithComments, xmlWithComments, commentKeymap } from './commentKeymap';
 import { useVarNames } from '../../hooks/useVarNames';
 import { useVarValues } from '../../hooks/useVarValues';
-import { GraphQLEditor } from './GraphQLEditor';
-import { SoapEditor } from './SoapEditor';
+
+// GraphQL (graphql + cm6-graphql) and SOAP (WSDL/XML) editors are heavy and only
+// used for those body modes, so they load on demand to keep startup lean.
+const GraphQLEditor = lazy(() => import('./GraphQLEditor').then(m => ({ default: m.GraphQLEditor })));
+const SoapEditor = lazy(() => import('./SoapEditor').then(m => ({ default: m.SoapEditor })));
+const EditorFallback = <div className="p-4 text-xs text-surface-500">Loading editor…</div>;
 
 type BodyMode = RequestBody['mode']
 
@@ -36,7 +40,7 @@ export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: 
   if (isSoap) {
     return (
       <div className="flex flex-col h-full min-h-0">
-        <SoapEditor request={request} onChange={onChange} />
+        <Suspense fallback={EditorFallback}><SoapEditor request={request} onChange={onChange} /></Suspense>
       </div>
     );
   }
@@ -126,13 +130,13 @@ export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: 
 
       {mode === 'graphql' && (
         <div className="flex-1 min-h-0">
-          <GraphQLEditor request={request} onChange={onChange} />
+          <Suspense fallback={EditorFallback}><GraphQLEditor request={request} onChange={onChange} /></Suspense>
         </div>
       )}
 
       {mode === 'soap' && (
         <div className="flex-1 min-h-0">
-          <SoapEditor request={request} onChange={onChange} />
+          <Suspense fallback={EditorFallback}><SoapEditor request={request} onChange={onChange} /></Suspense>
         </div>
       )}
     </div>

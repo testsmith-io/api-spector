@@ -96,6 +96,8 @@ export function SoapEditor({ request, onChange }: Props) {
         soap: {
           ...soap,
           operationName: op.name,
+          soapVersion:   op.soapVersion,
+          binding:       op.binding,
           soapAction:    op.soapAction ?? '',
           envelope:      op.inputTemplate,
         },
@@ -126,7 +128,16 @@ export function SoapEditor({ request, onChange }: Props) {
     applyOperation(op);
   }
 
-  const selected = operations.find(o => o.name === soap.operationName) ?? operations[0];
+  // Match the stored operation exactly (name + version + binding when present),
+  // so same-named 1.1 / 1.2 operations don't collide. Fall back to name-only for
+  // requests saved before the version was recorded.
+  const selected =
+    operations.find(o =>
+      o.name === soap.operationName
+      && (soap.soapVersion === undefined || o.soapVersion === soap.soapVersion)
+      && (soap.binding === undefined || (o.binding ?? '') === (soap.binding ?? '')))
+    ?? operations.find(o => o.name === soap.operationName)
+    ?? operations[0];
   const primaryEndpoint = endpoints[0]?.address;
   const versions = Array.from(new Set(operations.map(o => o.soapVersion))).sort();
 
@@ -198,7 +209,7 @@ export function SoapEditor({ request, onChange }: Props) {
             </div>
             <div className="overflow-y-auto flex-1">
               {operations.map(op => {
-                const active = selected && op.name === selected.name && op.soapVersion === selected.soapVersion;
+                const active = selected && op.name === selected.name && op.soapVersion === selected.soapVersion && (op.binding ?? '') === (selected.binding ?? '');
                 return (
                   <button
                     key={`${op.binding ?? ''}:${op.name}:${op.soapVersion}`}
@@ -217,8 +228,8 @@ export function SoapEditor({ request, onChange }: Props) {
             </div>
           </div>
 
-          {/* Detail */}
-          <div className="flex-1 min-w-0 flex flex-col gap-2">
+          {/* Detail (scrolls independently of the operations list) */}
+          <div className="flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col gap-2 pr-1">
             {selected && (
               <>
                 {/* Operation header */}
@@ -261,7 +272,7 @@ export function SoapEditor({ request, onChange }: Props) {
                   </p>
                 )}
                 {showXml && (
-                  <div className="rounded overflow-hidden border border-surface-700 flex-1 min-h-0">
+                  <div className="rounded overflow-hidden border border-surface-700 h-72 shrink-0">
                     <CodeMirror
                       value={soap.envelope ?? ''}
                       height="100%"
