@@ -22,7 +22,7 @@ builds on it with a modern UI and more features.
 |---|---|---|
 | SOAP / WSDL | Yes (WSDL-driven editor) | Yes, a core strength |
 | REST / HTTP | Yes | Yes |
-| GraphQL / WebSocket | Yes | Limited |
+| GraphQL query builder | Yes, introspection-driven | Limited |
 | gRPC | Yes (unary + server streaming) | No |
 | Functional testing | Yes | Yes |
 | Load testing | No | Yes |
@@ -31,7 +31,7 @@ builds on it with a modern UI and more features.
 | Mock servers | Yes | Yes (SOAP/REST mocks) |
 | Export to test code | Robot Framework, Playwright, Karate, REST Assured, supertest | Groovy scripts |
 | Footprint / UI | Lightweight, modern | Heavier, Java desktop |
-| Secrets | AES-256-GCM local + external managers | Properties / project files |
+| Secret managers | Vault, AWS, Azure, 1Password (+ AES-256-GCM local) | Properties / project files |
 
 ## Where API Spector fits
 

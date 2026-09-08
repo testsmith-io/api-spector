@@ -33,6 +33,9 @@ Where another tool is a better fit, these pages say so.
   and test-code export, instead of stitching several tools together.
 - **Broad protocol coverage.** REST/HTTP, GraphQL, SOAP, WebSocket, and gRPC
   (unary and server streaming) in one client.
+- **Rich request authoring.** An introspection-driven GraphQL query builder, a
+  SOAP WSDL loader that generates the envelope for you, and secret-manager
+  integrations (Vault, AWS, Azure, 1Password) built in - not left to plugins.
 - **Export to real test code.** Robot Framework, Playwright, Karate, REST Assured,
   and supertest, so tests run in your existing stack, not locked in a proprietary
   runner.

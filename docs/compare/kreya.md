@@ -19,10 +19,10 @@ freemium model and appeals to teams whose APIs are largely gRPC.
 |---|---|---|
 | gRPC | Yes (unary + server streaming) | Yes, deeper (client/bidi streaming, reflection) |
 | HTTP/REST | Yes | Yes |
-| GraphQL | Yes | Limited |
-| SOAP / WebSocket | Yes | Partial |
+| GraphQL query builder | Yes, introspection-driven | Limited |
+| SOAP + WSDL loader | Yes, WSDL-driven | Partial |
 | Local-first / offline | Yes | Yes |
-| Secrets | AES-256-GCM local + external managers | Environment variables |
+| Secret managers | Vault, AWS, Azure, 1Password (+ AES-256-GCM local) | Environment variables |
 | Export to test code | Robot Framework, Playwright, Karate, REST Assured, supertest | Not a focus |
 | Mock servers | Yes | No |
 | Contract testing | Built in, Pact-compatible | No |

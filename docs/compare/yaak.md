@@ -18,7 +18,9 @@ is a sleek, focused client that has grown quickly.
 | Local-first / offline | Yes | Yes |
 | Account required | No | No |
 | Storage | Files (Git-friendly) | Local, with Git sync |
-| Secrets | AES-256-GCM local + Vault/AWS/Azure/1Password | Environment variables |
+| Secret managers | Vault, AWS, Azure, 1Password (+ AES-256-GCM local) | Environment variables |
+| GraphQL query builder | Yes, introspection-driven | Yes |
+| SOAP + WSDL loader | Yes, load a WSDL and generate the envelope | No |
 | Export to test code | Robot Framework, Playwright, Karate, REST Assured, supertest | Not a focus |
 | Mock servers | Yes (local and cloud) | No |
 | Contract testing | Built in, Pact-compatible | No |
@@ -27,6 +29,7 @@ is a sleek, focused client that has grown quickly.
 
 ## Where API Spector fits
 
+- **Author faster.** An introspection-driven GraphQL query builder, a SOAP WSDL loader that fills in the envelope, and Vault / AWS / Azure / 1Password secret references, all built in - no plugins.
 - **Beyond the request client.** If your work extends to mocking, contract
   testing, or generating runnable tests, API Spector includes those.
 - **Standard test output.** Export to Robot Framework, Playwright, Karate, REST

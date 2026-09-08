@@ -20,7 +20,9 @@ It is community-driven, and capabilities depend on which plugins you add.
 | Account required | No | No |
 | Storage | Files (Git-friendly) | Files (Git-friendly) |
 | Out-of-the-box features | Client, mocks, contracts, code export | Core client; rest via plugins |
-| Secrets | AES-256-GCM local + Vault/AWS/Azure/1Password | Plugin-dependent |
+| Secret managers | Vault, AWS, Azure, 1Password (+ AES-256-GCM local) | Plugin-dependent |
+| GraphQL query builder | Yes, introspection-driven | Plugin-dependent |
+| SOAP + WSDL loader | Yes, load a WSDL and generate the envelope | Plugin-dependent |
 | Export to test code | Robot Framework, Playwright, Karate, REST Assured, supertest | Plugin-dependent |
 | Mock servers | Yes | Plugin-dependent |
 | Contract testing | Built in, Pact-compatible | No |

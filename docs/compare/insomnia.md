@@ -17,7 +17,9 @@ features, which prompted some users to look for offline-first alternatives.
 |---|---|---|
 | Local-first / offline | Yes | Supported, but account and cloud are emphasised |
 | Account required | No | Prompted; some features gated |
-| Secrets | AES-256-GCM local + external managers | Environment variables, plugins |
+| Secret managers | Vault, AWS, Azure, 1Password (+ AES-256-GCM local) | Environment variables, plugins |
+| GraphQL query builder | Yes, introspection-driven | Yes |
+| SOAP + WSDL loader | Yes, load a WSDL and generate the envelope | No |
 | Export to test code | Robot Framework, Playwright, Karate, REST Assured, supertest | Snippets; Inso CLI for its own runner |
 | Contract testing | Built in, Pact-compatible | Not built in |
 | OpenAPI test coverage | Yes, with a CI gate | No |
@@ -27,6 +29,7 @@ features, which prompted some users to look for offline-first alternatives.
 
 ## Where API Spector fits
 
+- **Author faster.** An introspection-driven GraphQL query builder, a SOAP WSDL loader that fills in the envelope, and Vault / AWS / Azure / 1Password secret references, all built in - no plugins.
 - **No account, no nudging.** The app is fully usable offline with nothing to sign
   in to.
 - **From request to test code.** Export a collection to Robot Framework,

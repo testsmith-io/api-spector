@@ -26,10 +26,11 @@ teams and is licensed commercially.
 | Service virtualization | Mock servers | Yes (ServiceV) |
 | Contract testing | Built in, Pact-compatible | Not a focus |
 | SOAP / REST | Yes | Yes |
+| GraphQL query builder | Yes, introspection-driven | Limited |
 | gRPC | Yes (unary + server streaming) | No |
 | Export to test code | Robot Framework, Playwright, Karate, REST Assured, supertest | Its own runner + CI tooling |
 | Local-first / offline | Yes | Desktop; enterprise/cloud features |
-| Secrets | AES-256-GCM local + external managers | Project properties / vault |
+| Secret managers | Vault, AWS, Azure, 1Password (+ AES-256-GCM local) | Project properties / vault |
 
 ## Where API Spector fits
 

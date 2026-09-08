@@ -20,7 +20,9 @@ narrow: it is a very good request client.
 | Local-first / offline | Yes | Yes |
 | Account required | No | No |
 | Storage | Files (Git-friendly) | Files, `.bru` markup (Git-friendly) |
-| Secrets | AES-256-GCM local + Vault/AWS/Azure/1Password | Env files, `.env`, secret vars |
+| Secret managers | Vault, AWS, Azure, 1Password (+ AES-256-GCM local) | Env files, `.env`, secret vars |
+| GraphQL query builder | Yes, introspection-driven | Yes |
+| SOAP + WSDL loader | Yes, load a WSDL and generate the envelope | No |
 | Export to test code | Robot Framework, Playwright, Karate, REST Assured, supertest | Not a focus |
 | Mock servers | Yes (local and cloud) | No |
 | Contract testing | Built in, Pact-compatible | No |
@@ -32,6 +34,7 @@ narrow: it is a very good request client.
 
 Bruno and API Spector agree on the fundamentals, so the choice is about scope.
 
+- **Author faster.** An introspection-driven GraphQL query builder, a SOAP WSDL loader that fills in the envelope, and Vault / AWS / Azure / 1Password secret references, all built in - no plugins.
 - **More of the workflow in one place.** If you also need mock servers, contract
   testing, or to generate runnable tests, API Spector covers those without adding
   another tool.
