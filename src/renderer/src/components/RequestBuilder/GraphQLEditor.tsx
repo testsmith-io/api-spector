@@ -17,11 +17,17 @@ import {
   displayType,
   getBaseTypeName,
   getBaseKind,
-  buildSnippet,
-  insertSnippet,
+  argRequired,
   parseIntrospection,
   fetchSchemaFromUrl,
 } from '../../lib/graphql-introspection';
+import { insertField, validateQuery, type OperationType } from '../../lib/graphql-query-builder';
+
+type InsertHandler = (field: GqlField, path: string[], opType: OperationType, allFields?: boolean) => void;
+
+function opTypeForLabel(label: string): OperationType {
+  return label === 'Mutation' ? 'mutation' : label === 'Subscription' ? 'subscription' : 'query';
+}
 
 // ─── Schema explorer components ──────────────────────────────────────────────
 
@@ -29,12 +35,17 @@ function FieldNode({
   field,
   typeMap,
   depth,
+  path,
+  opType,
   onInsert,
 }: {
   field: GqlField
   typeMap: Map<string, GqlType>
   depth: number
-  onInsert: (snippet: string, parentField?: string) => void
+  /** Ancestor field names from the operation root to this field's parent. */
+  path: string[]
+  opType: OperationType
+  onInsert: InsertHandler
 }) {
   const [expanded, setExpanded] = useState(false);
   const baseTypeName = getBaseTypeName(field.type);
@@ -42,15 +53,6 @@ function FieldNode({
   const isObject     = baseKind === 'OBJECT' || baseKind === 'INTERFACE';
   const nestedType   = typeMap.get(baseTypeName);
   const hasChildren  = isObject && !!nestedType?.fields?.length;
-
-  // When a child field is clicked, pass it up with the parent context.
-  // If the child already carries a parentField (from a deeper nesting level),
-  // pass it through unchanged — the deeper child knows which block it needs.
-  // Only set this field's name as parentField if the child didn't provide one
-  // (i.e. the child is a direct leaf of this field).
-  const childInsert = useCallback((childSnippet: string, childParent?: string) => {
-    onInsert(childSnippet, childParent ?? field.name);
-  }, [field.name, onInsert]);
 
   return (
     <div>
@@ -72,19 +74,35 @@ function FieldNode({
 
         <span className="text-emerald-400 text-[11px] font-medium flex-1 truncate">{field.name}</span>
 
-        {field.args.length > 0 && (
-          <span className="text-surface-600 text-[10px] truncate max-w-[60px]" title={field.args.map(a => a.name).join(', ')}>
-            ({field.args.map(a => a.name).join(', ')})
-          </span>
-        )}
+        {field.args.length > 0 && (() => {
+          const hasRequired = field.args.some(argRequired);
+          // Required args get a trailing ! so it's clear the field needs input
+          // (e.g. brand(id!) vs brands()).
+          const label = field.args.map(a => a.name + (argRequired(a) ? "!" : "")).join(', ');
+          const full = field.args.map(a => `${a.name}: ${displayType(a.type)}`).join(', ');
+          return (
+            <span className={`text-[10px] truncate max-w-[70px] ${hasRequired ? 'text-amber-500/80' : 'text-surface-600'}`} title={full}>
+              ({label})
+            </span>
+          );
+        })()}
 
         <span className="text-blue-400/60 text-[10px] truncate max-w-[64px] ml-1">
           {displayType(field.type)}
         </span>
 
+        {hasChildren && (
+          <button
+            onClick={() => onInsert(field, path, opType, true)}
+            className="opacity-0 group-hover:opacity-100 text-[10px] text-surface-600 hover:text-blue-400 px-1 transition-opacity flex-shrink-0"
+            title="Insert with all of this type's fields"
+          >
+            all
+          </button>
+        )}
         <button
-          onClick={() => onInsert(buildSnippet(field, typeMap))}
-          className="opacity-0 group-hover:opacity-100 text-[10px] text-surface-600 hover:text-blue-400 px-1 transition-opacity ml-1 flex-shrink-0"
+          onClick={() => onInsert(field, path, opType)}
+          className="opacity-0 group-hover:opacity-100 text-[10px] text-surface-600 hover:text-blue-400 px-1 transition-opacity ml-0.5 flex-shrink-0"
           title="Insert into query"
         >
           +
@@ -92,7 +110,7 @@ function FieldNode({
       </div>
 
       {expanded && hasChildren && nestedType!.fields!.map(f => (
-        <FieldNode key={f.name} field={f} typeMap={typeMap} depth={depth + 1} onInsert={childInsert} />
+        <FieldNode key={f.name} field={f} typeMap={typeMap} depth={depth + 1} path={[...path, field.name]} opType={opType} onInsert={onInsert} />
       ))}
     </div>
   );
@@ -102,16 +120,22 @@ function RootTypeSection({
   label,
   typeName,
   typeMap,
+  listOnly,
   onInsert,
 }: {
   label: string
   typeName: string
   typeMap: Map<string, GqlType>
-  onInsert: (snippet: string, parentField?: string) => void
+  /** Hide root fields that require an argument (the by-id lookups), leaving the
+   *  list/collection fields. */
+  listOnly: boolean
+  onInsert: InsertHandler
 }) {
   const [expanded, setExpanded] = useState(true);
   const type = typeMap.get(typeName);
-  if (!type?.fields?.length) return null;
+  const opType = opTypeForLabel(label);
+  const fields = (type?.fields ?? []).filter(f => !listOnly || !f.args.some(argRequired));
+  if (!fields.length) return null;
 
   return (
     <div>
@@ -121,10 +145,10 @@ function RootTypeSection({
       >
         <span className="text-[9px]">{expanded ? '▾' : '▸'}</span>
         {label}
-        <span className="text-surface-400 normal-case tracking-normal font-normal ml-auto">{type.fields.length} fields</span>
+        <span className="text-surface-400 normal-case tracking-normal font-normal ml-auto">{fields.length} fields</span>
       </button>
-      {expanded && type.fields.map(f => (
-        <FieldNode key={f.name} field={f} typeMap={typeMap} depth={0} onInsert={onInsert} />
+      {expanded && fields.map(f => (
+        <FieldNode key={f.name} field={f} typeMap={typeMap} depth={0} path={[]} opType={opType} onInsert={onInsert} />
       ))}
     </div>
   );
@@ -135,13 +159,13 @@ function SchemaExplorer({
   onInsert,
 }: {
   schema: ParsedSchema
-  onInsert: (snippet: string, parentField?: string) => void
+  onInsert: InsertHandler
 }) {
   const [search, setSearch] = useState('');
+  const [listOnly, setListOnly] = useState(false);
 
   const filter = search.trim().toLowerCase();
-
-  function filteredInsert(snippet: string, parentField?: string) { onInsert(snippet, parentField); }
+  const passesListOnly = (f: GqlField) => !listOnly || !f.args.some(argRequired);
 
   // When searching, show a flat filtered list across all root type fields
   const rootTypeNames = [schema.queryType, schema.mutationType, schema.subscriptionType].filter(Boolean) as string[];
@@ -153,27 +177,31 @@ function SchemaExplorer({
       const label = typeName === schema.queryType ? 'Query'
         : typeName === schema.mutationType ? 'Mutation' : 'Subscription';
       for (const f of type?.fields ?? []) {
-        if (f.name.toLowerCase().includes(filter)) allFields.push({ rootLabel: label, field: f });
+        if (f.name.toLowerCase().includes(filter) && passesListOnly(f)) allFields.push({ rootLabel: label, field: f });
       }
     }
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-2 py-1.5 border-b border-surface-800 flex-shrink-0">
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="px-2 py-1.5 border-b border-surface-800 flex-shrink-0 flex flex-col gap-1">
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search fields…"
           className="w-full bg-surface-800 border border-surface-700 rounded px-2 py-0.5 text-[11px] focus:outline-none focus:border-blue-500 placeholder-surface-700"
         />
+        <label className="flex items-center gap-1 text-[10px] text-surface-500 cursor-pointer" title="Hide the by-id lookups (e.g. product(id!)); show list/collection fields">
+          <input type="checkbox" checked={listOnly} onChange={e => setListOnly(e.target.checked)} />
+          Hide fields that require arguments
+        </label>
       </div>
 
       <div className="flex-1 overflow-y-auto py-1">
         {filter ? (
           allFields.length > 0 ? allFields.map(({ rootLabel, field }) => (
             <div key={`${rootLabel}-${field.name}`}>
-              <FieldNode field={field} typeMap={schema.typeMap} depth={0} onInsert={filteredInsert} />
+              <FieldNode field={field} typeMap={schema.typeMap} depth={0} path={[]} opType={opTypeForLabel(rootLabel)} onInsert={onInsert} />
             </div>
           )) : (
             <p className="text-[11px] text-surface-400 px-3 py-4 text-center">No fields match "{search}"</p>
@@ -181,13 +209,13 @@ function SchemaExplorer({
         ) : (
           <>
             {schema.queryType && (
-              <RootTypeSection label="Query" typeName={schema.queryType} typeMap={schema.typeMap} onInsert={onInsert} />
+              <RootTypeSection label="Query" typeName={schema.queryType} typeMap={schema.typeMap} listOnly={listOnly} onInsert={onInsert} />
             )}
             {schema.mutationType && (
-              <RootTypeSection label="Mutation" typeName={schema.mutationType} typeMap={schema.typeMap} onInsert={onInsert} />
+              <RootTypeSection label="Mutation" typeName={schema.mutationType} typeMap={schema.typeMap} listOnly={listOnly} onInsert={onInsert} />
             )}
             {schema.subscriptionType && (
-              <RootTypeSection label="Subscription" typeName={schema.subscriptionType} typeMap={schema.typeMap} onInsert={onInsert} />
+              <RootTypeSection label="Subscription" typeName={schema.subscriptionType} typeMap={schema.typeMap} listOnly={listOnly} onInsert={onInsert} />
             )}
           </>
         )}
@@ -280,9 +308,20 @@ export function GraphQLEditor({ request, onChange }: Props) {
     onChange({ body: { ...request.body, graphql: { ...gql, ...patch } } });
   }
 
-  const handleInsert = useCallback((snippet: string, parentField?: string) => {
-    onChange({ body: { ...request.body, graphql: { ...gql, query: insertSnippet(gql.query, snippet, parentField) } } });
-  }, [gql, onChange, request.body]);
+  // Insert a field from the explorer by editing the query AST and printing it,
+  // so the result is always valid: the field lands in the right operation, its
+  // required args become typed variables (added to the signature + seeded into
+  // the variables JSON), and object/union fields get a valid selection set.
+  const handleInsert = useCallback<InsertHandler>((field, path, opType, allFields) => {
+    if (!schema) return;
+    const { query, variables } = insertField(gql.query, gql.variables, schema, opType, path, field, gql.operationName || undefined, { allFields });
+    onChange({ body: { ...request.body, graphql: { ...gql, query, variables } } });
+  }, [gql, onChange, request.body, schema]);
+
+  // Live validation against the schema, plus a used-but-unset variable check.
+  const problems = useMemo(() => validateQuery(gqlSchema, gql.query, gql.variables), [gqlSchema, gql.query, gql.variables]);
+  const errors = problems.filter(p => p.severity === 'error');
+  const warnings = problems.filter(p => p.severity === 'warning');
 
   async function loadSchema() {
     const url = request.url.trim();
@@ -373,7 +412,7 @@ export function GraphQLEditor({ request, onChange }: Props) {
       <div className="flex flex-1 min-h-0 gap-2">
         {/* Schema explorer */}
         {hasSchema && showExplorer && (
-          <div className="w-56 flex-shrink-0 border border-surface-700 rounded overflow-hidden flex flex-col">
+          <div className="w-56 flex-shrink-0 min-h-0 border border-surface-700 rounded overflow-hidden flex flex-col">
             <div className="px-2 py-1 border-b border-surface-800 flex-shrink-0">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-surface-600">Schema</span>
             </div>
@@ -384,8 +423,15 @@ export function GraphQLEditor({ request, onChange }: Props) {
         {/* Right: query + variables */}
         <div className="flex-1 flex flex-col min-h-0 gap-2">
           {/* Query editor */}
-          <div className="flex-1 min-h-0 rounded overflow-hidden border border-surface-700">
-            <div className="flex justify-end px-2 py-0.5 bg-surface-800/50 border-b border-surface-700">
+          <div className="flex-1 min-h-0 rounded overflow-hidden border border-surface-700 flex flex-col">
+            <div className="flex items-center justify-between px-2 py-0.5 bg-surface-800/50 border-b border-surface-700 shrink-0">
+              {!gql.query.trim() ? <span /> : errors.length ? (
+                <span className="text-[10px] text-red-400" title={errors.map(e => e.message).join('\n')}>✗ {errors.length} error{errors.length !== 1 ? 's' : ''}</span>
+              ) : warnings.length ? (
+                <span className="text-[10px] text-amber-400" title={warnings.map(w => w.message).join('\n')}>▲ {warnings.length} warning{warnings.length !== 1 ? 's' : ''}</span>
+              ) : (
+                <span className="text-[10px] text-emerald-400">✓ valid</span>
+              )}
               <button
                 onClick={() => {
                   try {
@@ -407,15 +453,17 @@ export function GraphQLEditor({ request, onChange }: Props) {
                 Format
               </button>
             </div>
-            <CodeMirror
-              value={gql.query}
-              height="100%"
-              theme={oneDark}
-              extensions={gqlExtension}
-              onChange={val => updateGql({ query: val })}
-              placeholder="query {\n  # your query here\n}"
-              basicSetup={{ lineNumbers: true, foldGutter: true, bracketMatching: true, autocompletion: !gqlSchema }}
-            />
+            <div className="flex-1 min-h-0">
+              <CodeMirror
+                value={gql.query}
+                height="100%"
+                theme={oneDark}
+                extensions={gqlExtension}
+                onChange={val => updateGql({ query: val })}
+                placeholder="query {\n  # your query here\n}"
+                basicSetup={{ lineNumbers: true, foldGutter: true, bracketMatching: true, autocompletion: !gqlSchema }}
+              />
+            </div>
           </div>
 
           {/* Variables section */}

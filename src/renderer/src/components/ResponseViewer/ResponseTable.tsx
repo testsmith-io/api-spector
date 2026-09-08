@@ -164,7 +164,7 @@ export function ResponseTable({ body, contentType }: Props) {
                 const row = rows[i];
                 return (
                   <tr key={i} className="hover:bg-surface-800/40">
-                    <td className="px-3 py-1 text-right text-surface-600 border-b border-surface-800/50">{i}</td>
+                    <td className="px-3 py-1 text-right text-surface-600 border-b border-surface-800/50">{i + 1}</td>
                     {isPrimitiveRows ? (
                       <td className={td}><Cell value={row} onDrill={() => drill(i, null, row)} /></td>
                     ) : (

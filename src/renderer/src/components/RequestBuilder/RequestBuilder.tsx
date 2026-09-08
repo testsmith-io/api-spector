@@ -136,7 +136,9 @@ export function RequestBuilder({ request }: Props) {
   useEffect(() => {
     if (sendSignal !== lastSendSignal.current) {
       lastSendSignal.current = sendSignal;
-      void sendRequest();
+      // WebSocket / gRPC drive their own panels; the HTTP send pipeline does not
+      // apply, so the Cmd/Ctrl+Enter shortcut is a no-op for them.
+      if (request.protocol !== 'websocket' && request.protocol !== 'grpc') void sendRequest();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sendSignal]);
@@ -506,6 +508,7 @@ export function RequestBuilder({ request }: Props) {
             <button
               onClick={sendRequest}
               disabled={isSending || !request.url}
+              title="Send (Cmd/Ctrl+Enter)"
               className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-surface-800 disabled:text-surface-400 rounded text-sm font-medium transition-colors min-w-[72px]"
             >
               {isSending ? '...' : 'Send'}
