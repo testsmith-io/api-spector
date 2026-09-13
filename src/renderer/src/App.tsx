@@ -256,6 +256,20 @@ export default function App () {
     } );
   }, [applyWorkspace] );
 
+  // "Open in API Spector" deep link (spector://open-from-git?url=…) from the web
+  // courses: run the same open-from-Git flow as the welcome-screen button.
+  useEffect( () => {
+    electron.onOpenFromGit( async ( repoUrl: string ) => {
+      try {
+        const result = await electron.openFromGit( repoUrl );
+        if ( result ) await applyWorkspace( result.workspace, result.workspacePath );
+      } catch ( err ) {
+        console.error( 'Open from Git (deep link) failed:', err );
+      }
+    } );
+    return () => electron.offOpenFromGit();
+  }, [applyWorkspace] );
+
   useEffect( () => {
     electron.onMockHit( addMockHit );
     return () => electron.offMockHit();

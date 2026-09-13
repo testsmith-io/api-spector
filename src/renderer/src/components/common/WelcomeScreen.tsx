@@ -13,6 +13,10 @@ export function WelcomeScreen() {
   const { applyWorkspace } = useWorkspaceLoader();
   const [recents, setRecents] = useState<Recent[]>([]);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [gitOpen, setGitOpen] = useState(false);
+  const [gitUrl, setGitUrl] = useState('');
+  const [gitBusy, setGitBusy] = useState(false);
+  const [gitError, setGitError] = useState<string | null>(null);
 
   useEffect(() => {
     electron.getRecentWorkspaces().then(setRecents).catch(() => setRecents([]));
@@ -30,6 +34,22 @@ export function WelcomeScreen() {
     const result = await electron.newWorkspace();
     if (!result) return;
     await applyWorkspace(result.workspace, result.workspacePath);
+  }
+
+  async function openFromGit() {
+    const url = gitUrl.trim();
+    if (!url || gitBusy) return;
+    setGitBusy(true);
+    setGitError(null);
+    try {
+      const result = await electron.openFromGit(url);
+      if (!result) return; // user cancelled the folder picker
+      await applyWorkspace(result.workspace, result.workspacePath);
+    } catch (err) {
+      setGitError(err instanceof Error ? err.message : 'Could not open the repository');
+    } finally {
+      setGitBusy(false);
+    }
   }
 
   async function openRecent(path: string) {
@@ -89,6 +109,35 @@ export function WelcomeScreen() {
         >
           New Workspace
         </button>
+        {gitOpen ? (
+          <div className="flex flex-col gap-2">
+            <input
+              type="text"
+              value={gitUrl}
+              onChange={e => setGitUrl(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') openFromGit(); }}
+              placeholder="https://github.com/owner/repo"
+              autoFocus
+              disabled={gitBusy}
+              className="px-3 py-2 bg-surface-900 border border-surface-700 rounded text-xs focus:outline-none focus:border-blue-600 disabled:opacity-60"
+            />
+            <button
+              onClick={openFromGit}
+              disabled={gitBusy || !gitUrl.trim()}
+              className="px-4 py-2 bg-surface-800 hover:bg-surface-700 rounded text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              {gitBusy ? 'Cloning…' : 'Clone & Open'}
+            </button>
+            {gitError && <p className="text-[11px] text-red-400 text-left px-1">{gitError}</p>}
+          </div>
+        ) : (
+          <button
+            onClick={() => setGitOpen(true)}
+            className="px-4 py-2 bg-surface-800 hover:bg-surface-700 rounded text-sm font-medium transition-colors"
+          >
+            Open from Git
+          </button>
+        )}
       </div>
 
       {recents.length > 0 && (

@@ -5,8 +5,9 @@ import { type IpcMain, dialog, app } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
 import { readFile, writeFile, mkdir, readdir, unlink } from 'fs/promises';
-import { join, dirname, resolve, basename } from 'path';
+import { join, dirname, resolve, basename, sep } from 'path';
 import { randomUUID } from 'crypto';
+import JSZip from 'jszip';
 import type { Collection, Environment, Workspace } from '../../shared/types';
 import { loadGlobals, getGlobals, setGlobals, persistGlobals } from '../globals-store';
 import { setSecretsConfig } from '../secrets';
@@ -512,6 +513,55 @@ export function registerFileHandlers(ipc: IpcMain): void {
     setSecretsConfig((parsed as Workspace).settings?.secrets);
     return { workspace: parsed as Workspace, workspacePath: wsPath };
   });
+
+  // Open a public Git repository directly: pick a destination folder, download
+  // the repo as a zip, extract it, and open the workspace it contains. No git
+  // binary and no auth — public repos only. Returns null if the user cancels
+  // the folder picker; throws (surfaced to the renderer) on any other failure.
+  handleIpc(ipc, IPC.file.openFromGit, async (_e, repoUrl: string) => {
+    const archiveUrl = await resolveArchiveUrl(repoUrl);
+    if (!archiveUrl) {
+      throw new Error('unsupported URL — use a public GitHub repo URL or a direct .zip link');
+    }
+
+    const pick = await dialog.showOpenDialog({
+      title: 'Choose a folder to clone the repository into',
+      properties: ['openDirectory', 'createDirectory'],
+      buttonLabel: 'Clone here',
+    });
+    if (pick.canceled || pick.filePaths.length === 0) return null;
+    const parent = pick.filePaths[0];
+
+    // Derive a folder name from the repo, and refuse to overwrite existing
+    // content so a clone never clobbers a folder the user already uses.
+    const repoName =
+      (repoUrl.match(/github\.com\/[^/]+\/([^/#?]+)/i)?.[1] ?? 'repository')
+        .replace(/\.git$/i, '')
+        .replace(/[^a-zA-Z0-9._-]+/g, '-') || 'repository';
+    const destDir = join(parent, repoName);
+    try {
+      const existing = await readdir(destDir);
+      if (existing.length > 0) {
+        throw new Error(`"${repoName}" already exists in that folder and is not empty`);
+      }
+    } catch (err) {
+      // ENOENT is expected (folder doesn't exist yet); rethrow the not-empty error.
+      if (err instanceof Error && err.message.includes('already exists')) throw err;
+    }
+    await mkdir(destDir, { recursive: true });
+
+    const buf = await downloadArchive(archiveUrl);
+    await extractZip(buf, destDir);
+
+    const wsPath = await findWorkspaceSpector(destDir);
+    const parsed = JSON.parse(await readFile(wsPath, 'utf8')) as Workspace;
+    workspaceDir = dirname(wsPath);
+    workspaceFile = wsPath;
+    await loadGlobals(workspaceDir);
+    await saveLastWorkspacePath(wsPath);
+    setSecretsConfig(parsed.settings?.secrets);
+    return { workspace: parsed, workspacePath: wsPath };
+  });
 }
 
 /** Look for a `*.spector` file in `dir`. If exactly one is present (or the
@@ -553,6 +603,127 @@ function looksLikeCollection(obj: unknown): boolean {
   if (!obj || typeof obj !== 'object') return false;
   const o = obj as Record<string, unknown>;
   return !Array.isArray(o['collections']) && (!!o['rootFolder'] || !!o['requests']);
+}
+
+// ─── Open from Git (public repos, download + extract, no git binary) ─────────
+
+/** Cap the download so a hostile or mistyped URL can't fill the disk. */
+const MAX_ARCHIVE_BYTES = 100 * 1024 * 1024; // 100 MB
+
+/** Turn a public repo URL into a downloadable .zip archive URL.
+ *  Supports GitHub repo URLs (with optional `/tree/<branch>`) and any direct
+ *  link ending in `.zip`. For GitHub, resolves the default branch via the API
+ *  when no branch is given. Returns null for anything we can't map. */
+async function resolveArchiveUrl(input: string): Promise<string | null> {
+  let url: URL;
+  try {
+    url = new URL(input.trim());
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:') return null;
+
+  // Already a zip archive — download it directly.
+  if (url.pathname.toLowerCase().endsWith('.zip')) return url.toString();
+
+  // GitHub repository URL: https://github.com/<owner>/<repo>[/tree/<branch>]
+  if (url.hostname === 'github.com' || url.hostname === 'www.github.com') {
+    const parts = url.pathname.replace(/^\/+|\/+$/g, '').split('/');
+    if (parts.length < 2) return null;
+    const owner = parts[0];
+    const repo = parts[1].replace(/\.git$/i, '');
+    let branch: string | null = null;
+    if (parts[2] === 'tree' && parts[3]) branch = parts.slice(3).join('/');
+    if (!branch) {
+      // Ask the API for the repo's default branch. Needs a User-Agent header.
+      try {
+        const resp = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+          headers: { 'User-Agent': 'API-Spector', Accept: 'application/vnd.github+json' },
+        });
+        if (!resp.ok) return null;
+        const meta = (await resp.json()) as { default_branch?: string };
+        branch = meta.default_branch ?? 'main';
+      } catch {
+        return null;
+      }
+    }
+    return `https://codeload.github.com/${owner}/${repo}/zip/refs/heads/${branch}`;
+  }
+
+  return null;
+}
+
+/** Download an archive to memory, enforcing the size cap. */
+async function downloadArchive(archiveUrl: string): Promise<Buffer> {
+  const resp = await fetch(archiveUrl, { headers: { 'User-Agent': 'API-Spector' } });
+  if (!resp.ok) throw new Error(`download failed (HTTP ${resp.status})`);
+  const buf = Buffer.from(await resp.arrayBuffer());
+  if (buf.byteLength > MAX_ARCHIVE_BYTES) throw new Error('archive is too large');
+  return buf;
+}
+
+/** Extract a zip into `destDir`, stripping the single top-level folder that
+ *  GitHub (and most `git archive` zips) wrap every entry in. Guards against
+ *  path traversal by resolving each entry under destDir. */
+async function extractZip(buf: Buffer, destDir: string): Promise<void> {
+  const zip = await JSZip.loadAsync(buf);
+  const paths = Object.keys(zip.files);
+
+  // Detect a common single root folder (e.g. "repo-main/") to strip.
+  let root: string | null = null;
+  for (const p of paths) {
+    const top = p.split('/')[0];
+    if (root === null) root = top;
+    else if (root !== top) { root = null; break; }
+  }
+  const prefix = root ? `${root}/` : '';
+
+  for (const p of paths) {
+    const entry = zip.files[p];
+    const rel = prefix && p.startsWith(prefix) ? p.slice(prefix.length) : p;
+    if (!rel) continue;
+    const outPath = resolve(destDir, rel);
+    if (outPath !== destDir && !outPath.startsWith(destDir + sep)) {
+      throw new Error('archive contains an unsafe path');
+    }
+    if (entry.dir) {
+      await mkdir(outPath, { recursive: true });
+    } else {
+      await mkdir(dirname(outPath), { recursive: true });
+      await writeFile(outPath, Buffer.from(await entry.async('nodebuffer')));
+    }
+  }
+}
+
+/** Recursively find the single workspace `.spector` file under `dir`.
+ *  Skips collection `.spector` files. Returns the path, or throws when zero
+ *  or more than one workspace is present (ambiguous — the user should pick). */
+async function findWorkspaceSpector(dir: string): Promise<string> {
+  const found: string[] = [];
+  async function walk(d: string): Promise<void> {
+    let entries: import('fs').Dirent[];
+    try {
+      entries = await readdir(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const full = join(d, e.name);
+      if (e.isDirectory()) {
+        if (e.name === 'node_modules' || e.name === '.git') continue;
+        await walk(full);
+      } else if (e.isFile() && e.name.endsWith('.spector')) {
+        try {
+          const parsed = JSON.parse(await readFile(full, 'utf8')) as unknown;
+          if (!looksLikeCollection(parsed)) found.push(full);
+        } catch { /* skip unparseable */ }
+      }
+    }
+  }
+  await walk(dir);
+  if (found.length === 0) throw new Error('no workspace (.spector) file found in the repository');
+  if (found.length > 1) throw new Error('multiple workspace files found — open the folder and pick one');
+  return found[0];
 }
 
 /** Turn a collection file into a proper workspace: write the collection under

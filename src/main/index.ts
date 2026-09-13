@@ -16,7 +16,7 @@ if (process.env.ELECTRON_NO_SANDBOX === '1') {
   app.commandLine.appendSwitch('no-sandbox');
   app.commandLine.appendSwitch('disable-features', 'RendererCodeIntegrity');
 }
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { existsSync, readFileSync } from 'fs';
 import { registerFileHandlers } from './ipc/file-handler';
 import { registerRequestHandler } from './ipc/request-handler';
@@ -38,6 +38,71 @@ import { registerRecordHandlers }  from './ipc/record-handler';
 import { registerCloudHandlers }   from './ipc/cloud-handler';
 import { checkForUpdate }          from './update-check';
 import { stopAll } from './mock-server';
+
+// ─── Deep links (spector://) ─────────────────────────────────────────────────
+//
+// The web courses embed an "Open in API Spector" button that links to
+//   spector://open-from-git?url=<public repo url>
+// Clicking it launches (or focuses) the app and opens that repo via the same
+// Open-from-Git flow as the welcome-screen button. Public repos only.
+
+const PROTOCOL = 'spector';
+
+// A deep link can arrive before the window (or app) is ready. Hold the latest
+// pending repo URL until a renderer is loaded, then flush it.
+let pendingRepoUrl: string | null = null;
+
+/** Pull the first `spector://` argument out of a process argv list (Windows/
+ *  Linux deliver deep links this way, both on cold start and second-instance). */
+function deepLinkFromArgv(argv: string[]): string | null {
+  return argv.find(a => a.startsWith(`${PROTOCOL}://`)) ?? null;
+}
+
+/** Parse `spector://open-from-git?url=<repo>` into the repo URL it carries.
+ *  Returns null for any other action or a malformed link. */
+function parseOpenFromGit(deepLink: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(deepLink);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== `${PROTOCOL}:`) return null;
+  // The action is the host or the first path segment, tolerating both
+  // spector://open-from-git?… and spector:open-from-git?… shapes.
+  const action = u.hostname || u.pathname.replace(/^\/+/, '').split('/')[0];
+  if (action !== 'open-from-git') return null;
+  const repo = u.searchParams.get('url');
+  return repo && repo.trim() ? repo.trim() : null;
+}
+
+/** Route a deep link to the renderer, focusing an existing window or creating
+ *  one. If no window is loaded yet, stash the repo URL for flushDeepLink(). */
+function handleDeepLink(deepLink: string): void {
+  const repo = parseOpenFromGit(deepLink);
+  if (!repo) return;
+  const win = BrowserWindow.getAllWindows()[0];
+  if (!win) {
+    pendingRepoUrl = repo;
+    if (app.isReady()) createWindow();
+    return;
+  }
+  if (win.isMinimized()) win.restore();
+  win.focus();
+  if (win.webContents.isLoading()) {
+    pendingRepoUrl = repo;
+  } else {
+    win.webContents.send(IPC.file.openFromGitDeepLink, repo);
+  }
+}
+
+/** After a window finishes loading, deliver any deep link that arrived early. */
+function flushDeepLink(win: BrowserWindow): void {
+  if (!pendingRepoUrl) return;
+  const repo = pendingRepoUrl;
+  pendingRepoUrl = null;
+  win.webContents.send(IPC.file.openFromGitDeepLink, repo);
+}
 
 function createSplashWindow(): BrowserWindow {
   const splash = new BrowserWindow({
@@ -131,6 +196,8 @@ function createWindow(): void {
     setTimeout(() => {
       splash.close();
       win.show();
+      // Deliver a deep link that arrived before the renderer was ready.
+      flushDeepLink(win);
     }, remaining);
   });
 
@@ -150,6 +217,36 @@ function createWindow(): void {
     if (devToolsShortcut) win.webContents.toggleDevTools();
   });
 }
+
+// Register spector:// as this app's protocol handler. On Windows during dev the
+// launcher is electron.exe, so the app path must be passed explicitly.
+if (process.defaultApp && process.argv.length >= 2) {
+  app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [resolve(process.argv[1])]);
+} else {
+  app.setAsDefaultProtocolClient(PROTOCOL);
+}
+
+// Single-instance: a deep link fired while the app is running must reach the
+// already-open instance, not spawn a second one.
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (_e, argv) => {
+    const url = deepLinkFromArgv(argv);
+    if (url) handleDeepLink(url);
+    else {
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win) { if (win.isMinimized()) win.restore(); win.focus(); }
+    }
+  });
+}
+
+// macOS delivers deep links via open-url, which can fire before `whenReady`.
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  handleDeepLink(url);
+});
 
 app.whenReady().then(async () => {
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null);
@@ -176,6 +273,13 @@ app.whenReady().then(async () => {
   handleIpc(ipcMain, IPC.app.checkUpdate, () => checkForUpdate());
 
   createWindow();
+
+  // Cold start via a deep link on Windows/Linux: the URL is in our own argv.
+  // (macOS routes it through open-url instead, handled above.)
+  if (process.platform !== 'darwin') {
+    const url = deepLinkFromArgv(process.argv);
+    if (url) handleDeepLink(url);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

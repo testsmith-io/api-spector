@@ -52,6 +52,14 @@ const api = {
     ipcRenderer.invoke(IPC.file.getRecentWorkspaces),
   openWorkspacePath: (path: string): Promise<{ workspace: Workspace; workspacePath: string } | null> =>
     ipcRenderer.invoke(IPC.file.openWorkspacePath, path),
+  openFromGit: (repoUrl: string): Promise<{ workspace: Workspace; workspacePath: string } | null> =>
+    ipcRenderer.invoke(IPC.file.openFromGit, repoUrl),
+  onOpenFromGit: (cb: (repoUrl: string) => void): void => {
+    ipcRenderer.on(IPC.file.openFromGitDeepLink, (_e, repoUrl: string) => cb(repoUrl));
+  },
+  offOpenFromGit: (): void => {
+    ipcRenderer.removeAllListeners(IPC.file.openFromGitDeepLink);
+  },
   saveWorkspace: (ws: Workspace): Promise<void> =>
     ipcRenderer.invoke(IPC.file.saveWorkspace, ws),
   newWorkspace: (): Promise<{ workspace: Workspace; workspacePath: string } | null> =>

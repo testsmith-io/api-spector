@@ -19,6 +19,10 @@ export const IPC = {
   file: {
     openWorkspace:       'file:openWorkspace',
     openWorkspacePath:   'file:openWorkspacePath',
+    openFromGit:         'file:openFromGit',
+    /** Event (main→renderer): a `spector://open-from-git?url=…` deep link was
+     *  received; the renderer runs the same open-from-Git flow as the button. */
+    openFromGitDeepLink: 'file:openFromGitDeepLink',
     getLastWorkspace:    'file:getLastWorkspace',
     getRecentWorkspaces: 'file:getRecentWorkspaces',
     saveWorkspace:       'file:saveWorkspace',
