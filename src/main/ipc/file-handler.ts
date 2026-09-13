@@ -5,6 +5,7 @@ import { type IpcMain, dialog, app } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
 import { readFile, writeFile, mkdir, readdir, unlink } from 'fs/promises';
+import type { Dirent } from 'fs';
 import { join, dirname, resolve, basename, sep } from 'path';
 import { randomUUID } from 'crypto';
 import JSZip from 'jszip';
@@ -701,7 +702,7 @@ async function extractZip(buf: Buffer, destDir: string): Promise<void> {
 async function findWorkspaceSpector(dir: string): Promise<string> {
   const found: string[] = [];
   async function walk(d: string): Promise<void> {
-    let entries: import('fs').Dirent[];
+    let entries: Dirent[];
     try {
       entries = await readdir(d, { withFileTypes: true });
     } catch {
