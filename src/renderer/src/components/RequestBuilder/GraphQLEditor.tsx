@@ -22,6 +22,7 @@ import {
   fetchSchemaFromUrl,
 } from '../../lib/graphql-introspection';
 import { insertField, validateQuery, type OperationType } from '../../lib/graphql-query-builder';
+import { useT } from '../../i18n';
 
 type InsertHandler = (field: GqlField, path: string[], opType: OperationType, allFields?: boolean) => void;
 
@@ -47,6 +48,7 @@ function FieldNode({
   opType: OperationType
   onInsert: InsertHandler
 }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const baseTypeName = getBaseTypeName(field.type);
   const baseKind     = getBaseKind(field.type);
@@ -95,15 +97,15 @@ function FieldNode({
           <button
             onClick={() => onInsert(field, path, opType, true)}
             className="opacity-0 group-hover:opacity-100 text-[10px] text-surface-600 hover:text-blue-400 px-1 transition-opacity flex-shrink-0"
-            title="Insert with all of this type's fields"
+            title={t("Insert with all of this type's fields")}
           >
-            all
+            {t('all')}
           </button>
         )}
         <button
           onClick={() => onInsert(field, path, opType)}
           className="opacity-0 group-hover:opacity-100 text-[10px] text-surface-600 hover:text-blue-400 px-1 transition-opacity ml-0.5 flex-shrink-0"
-          title="Insert into query"
+          title={t('Insert into query')}
         >
           +
         </button>
@@ -131,6 +133,7 @@ function RootTypeSection({
   listOnly: boolean
   onInsert: InsertHandler
 }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(true);
   const type = typeMap.get(typeName);
   const opType = opTypeForLabel(label);
@@ -145,7 +148,7 @@ function RootTypeSection({
       >
         <span className="text-[9px]">{expanded ? '▾' : '▸'}</span>
         {label}
-        <span className="text-surface-400 normal-case tracking-normal font-normal ml-auto">{fields.length} fields</span>
+        <span className="text-surface-400 normal-case tracking-normal font-normal ml-auto">{t(':count field|:count fields', { count: fields.length })}</span>
       </button>
       {expanded && fields.map(f => (
         <FieldNode key={f.name} field={f} typeMap={typeMap} depth={0} path={[]} opType={opType} onInsert={onInsert} />
@@ -161,6 +164,7 @@ function SchemaExplorer({
   schema: ParsedSchema
   onInsert: InsertHandler
 }) {
+  const t = useT();
   const [search, setSearch] = useState('');
   const [listOnly, setListOnly] = useState(false);
 
@@ -188,12 +192,12 @@ function SchemaExplorer({
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search fields…"
+          placeholder={t('Search fields…')}
           className="w-full bg-surface-800 border border-surface-700 rounded px-2 py-0.5 text-[11px] focus:outline-none focus:border-blue-500 placeholder-surface-700"
         />
-        <label className="flex items-center gap-1 text-[10px] text-surface-500 cursor-pointer" title="Hide the by-id lookups (e.g. product(id!)); show list/collection fields">
+        <label className="flex items-center gap-1 text-[10px] text-surface-500 cursor-pointer" title={t('Hide the by-id lookups (e.g. product(id!)); show list/collection fields')}>
           <input type="checkbox" checked={listOnly} onChange={e => setListOnly(e.target.checked)} />
-          Hide fields that require arguments
+          {t('Hide fields that require arguments')}
         </label>
       </div>
 
@@ -204,7 +208,7 @@ function SchemaExplorer({
               <FieldNode field={field} typeMap={schema.typeMap} depth={0} path={[]} opType={opTypeForLabel(rootLabel)} onInsert={onInsert} />
             </div>
           )) : (
-            <p className="text-[11px] text-surface-400 px-3 py-4 text-center">No fields match "{search}"</p>
+            <p className="text-[11px] text-surface-400 px-3 py-4 text-center">{t('No fields match ":query"', { query: search })}</p>
           )
         ) : (
           <>
@@ -234,6 +238,7 @@ interface Props {
 const EMPTY_GQL: GraphQLBody = { query: '', variables: '' };
 
 export function GraphQLEditor({ request, onChange }: Props) {
+  const t = useT();
   const gql = useMemo(
     () => request.body.graphql ?? EMPTY_GQL,
     [request.body.graphql],
@@ -380,7 +385,7 @@ export function GraphQLEditor({ request, onChange }: Props) {
         <input
           value={gql.operationName ?? ''}
           onChange={e => updateGql({ operationName: e.target.value })}
-          placeholder="operationName (optional)"
+          placeholder={t('operationName (optional)')}
           className="bg-surface-800 border border-surface-700 rounded px-2 py-0.5 text-xs font-mono focus:outline-none focus:border-blue-500 placeholder-surface-700 w-44"
         />
 
@@ -389,7 +394,7 @@ export function GraphQLEditor({ request, onChange }: Props) {
           disabled={schemaState === 'loading' || !request.url.trim()}
           className="px-2.5 py-0.5 text-[11px] bg-surface-800 hover:bg-surface-700 disabled:text-surface-400 rounded transition-colors"
         >
-          {schemaState === 'loading' ? 'Loading…' : 'Fetch schema'}
+          {schemaState === 'loading' ? t('Loading…') : t('Fetch schema')}
         </button>
 
         {schemaError && (
@@ -403,7 +408,7 @@ export function GraphQLEditor({ request, onChange }: Props) {
               showExplorer ? 'bg-blue-700 text-white' : 'bg-surface-800 hover:bg-surface-700'
             }`}
           >
-            Explorer
+            {t('Explorer')}
           </button>
         )}
       </div>
@@ -414,7 +419,7 @@ export function GraphQLEditor({ request, onChange }: Props) {
         {hasSchema && showExplorer && (
           <div className="w-56 flex-shrink-0 min-h-0 border border-surface-700 rounded overflow-hidden flex flex-col">
             <div className="px-2 py-1 border-b border-surface-800 flex-shrink-0">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-surface-600">Schema</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-surface-600">{t('Schema')}</span>
             </div>
             <SchemaExplorer schema={schema!} onInsert={handleInsert} />
           </div>
@@ -426,11 +431,11 @@ export function GraphQLEditor({ request, onChange }: Props) {
           <div className="flex-1 min-h-0 rounded overflow-hidden border border-surface-700 flex flex-col">
             <div className="flex items-center justify-between px-2 py-0.5 bg-surface-800/50 border-b border-surface-700 shrink-0">
               {!gql.query.trim() ? <span /> : errors.length ? (
-                <span className="text-[10px] text-red-400" title={errors.map(e => e.message).join('\n')}>✗ {errors.length} error{errors.length !== 1 ? 's' : ''}</span>
+                <span className="text-[10px] text-red-400" title={errors.map(e => e.message).join('\n')}>✗ {t(':count error|:count errors', { count: errors.length })}</span>
               ) : warnings.length ? (
-                <span className="text-[10px] text-amber-400" title={warnings.map(w => w.message).join('\n')}>▲ {warnings.length} warning{warnings.length !== 1 ? 's' : ''}</span>
+                <span className="text-[10px] text-amber-400" title={warnings.map(w => w.message).join('\n')}>▲ {t(':count warning|:count warnings', { count: warnings.length })}</span>
               ) : (
-                <span className="text-[10px] text-emerald-400">✓ valid</span>
+                <span className="text-[10px] text-emerald-400">✓ {t('valid')}</span>
               )}
               <button
                 onClick={() => {
@@ -448,9 +453,9 @@ export function GraphQLEditor({ request, onChange }: Props) {
                   } catch { /* invalid query */ }
                 }}
                 className="text-[10px] text-surface-500 hover:text-white transition-colors"
-                title="Format GraphQL query (comments will not be preserved)"
+                title={t('Format GraphQL query (comments will not be preserved)')}
               >
-                Format
+                {t('Format')}
               </button>
             </div>
             <div className="flex-1 min-h-0">
@@ -473,7 +478,7 @@ export function GraphQLEditor({ request, onChange }: Props) {
                 onClick={() => setShowVars(v => !v)}
                 className="text-[10px] text-surface-600 hover:text-surface-300 uppercase tracking-wider font-medium flex items-center gap-1"
               >
-                <span>{showVars ? '▾' : '▸'}</span> Variables
+                <span>{showVars ? '▾' : '▸'}</span> {t('Variables')}
                 {gql.variables?.trim() && <span className="text-blue-400 ml-1">●</span>}
               </button>
               {showVars && gql.variables?.trim() && (
@@ -482,9 +487,9 @@ export function GraphQLEditor({ request, onChange }: Props) {
                     try { updateGql({ variables: JSON.stringify(JSON.parse(gql.variables), null, 2) }); } catch { /* invalid json */ }
                   }}
                   className="text-[10px] text-surface-500 hover:text-white transition-colors"
-                  title="Format JSON variables"
+                  title={t('Format JSON variables')}
                 >
-                  Format
+                  {t('Format')}
                 </button>
               )}
             </div>

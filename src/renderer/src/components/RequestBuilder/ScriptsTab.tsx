@@ -12,6 +12,7 @@ import { atCompletionExtension, varHoverTooltipExtension } from './atCompletions
 import { useVarNames } from '../../hooks/useVarNames';
 import { useVarValues } from '../../hooks/useVarValues';
 import { useStore } from '../../store';
+import { useT } from '../../i18n';
 
 interface Props {
   request: ApiRequest
@@ -21,6 +22,7 @@ interface Props {
 type ScriptType = 'pre' | 'post' | 'gql'
 
 export function ScriptsTab({ request, onChange }: Props) {
+  const t = useT();
   const activeTabId     = useStore(s => s.activeTabId);
   const activeAppTab    = useStore(s => s.tabs.find(t => t.id === s.activeTabId));
   const setTabScriptTab = useStore(s => s.setTabScriptTab);
@@ -69,25 +71,25 @@ export function ScriptsTab({ request, onChange }: Props) {
       <div className="flex flex-col flex-1 min-w-0 gap-2">
         {/* Sub-tabs */}
         <div className="flex gap-0 border-b border-surface-700">
-          {(['pre', 'post', ...(isGraphQL ? ['gql' as ScriptType] : [])] as ScriptType[]).map(t => (
+          {(['pre', 'post', ...(isGraphQL ? ['gql' as ScriptType] : [])] as ScriptType[]).map(st => (
             <button
-              key={t}
-              onClick={() => setScriptType(t)}
+              key={st}
+              onClick={() => setScriptType(st)}
               className={`px-3 py-1 text-xs border-b-2 -mb-px transition-colors ${
-                scriptType === t
+                scriptType === st
                   ? 'border-blue-500 text-white'
                   : 'border-transparent text-surface-400 hover:text-white'
               }`}
             >
-              {t === 'pre' ? 'Pre-request' : t === 'post' ? 'Post-response' : 'GQL Introspect'}
+              {st === 'pre' ? t('Pre-request') : st === 'post' ? t('Post-response') : t('GQL Introspect')}
             </button>
           ))}
         </div>
 
         <div className="text-[10px] text-surface-400">
-          {scriptType === 'pre'  && 'Runs before the request is sent. Use sp.variables.set() to generate dynamic data.'}
-          {scriptType === 'post' && 'Runs after the response is received. Use sp.test() to assert and sp.environment.set() to extract values.'}
-          {scriptType === 'gql'  && 'Runs before GraphQL schema introspection. Use sp.environment.set() or sp.collectionVariables.set() to inject auth headers or tokens.'}
+          {scriptType === 'pre'  && t('Runs before the request is sent. Use sp.variables.set() to generate dynamic data.')}
+          {scriptType === 'post' && t('Runs after the response is received. Use sp.test() to assert and sp.environment.set() to extract values.')}
+          {scriptType === 'gql'  && t('Runs before GraphQL schema introspection. Use sp.environment.set() or sp.collectionVariables.set() to inject auth headers or tokens.')}
         </div>
 
         <div className="flex-1 rounded overflow-hidden border border-surface-700" style={{ minHeight: 160 }}>
@@ -110,16 +112,16 @@ export function ScriptsTab({ request, onChange }: Props) {
             className="flex items-center gap-1 text-[10px] font-semibold text-surface-400 uppercase tracking-wider mb-2 hover:text-white transition-colors w-full"
           >
             <span>▾</span>
-            <span>Quick inserts</span>
+            <span>{t('Quick inserts')}</span>
           </button>
         ) : (
           <button
             onClick={() => setSnippetsOpen(true)}
             className="flex-1 flex items-center justify-center hover:bg-surface-800 transition-colors rounded-sm"
-            title="Expand quick inserts"
+            title={t('Expand quick inserts')}
           >
             <span className="text-[10px] font-semibold text-surface-400 uppercase tracking-wider [writing-mode:vertical-rl] rotate-180">
-              Quick inserts
+              {t('Quick inserts')}
             </span>
           </button>
         )}
@@ -129,7 +131,7 @@ export function ScriptsTab({ request, onChange }: Props) {
               onClick={() => setExpandedGroup(prev => prev === group.group ? null : group.group)}
               className="w-full text-left text-xs font-medium text-surface-400 hover:text-white flex items-center justify-between py-0.5"
             >
-              <span>{group.group}</span>
+              <span>{t(group.group)}</span>
               <span className="text-[10px]">{expandedGroup === group.group ? '▾' : '▸'}</span>
             </button>
             {expandedGroup === group.group && (
@@ -140,7 +142,7 @@ export function ScriptsTab({ request, onChange }: Props) {
                     onClick={() => insertSnippet(item.code)}
                     className="text-left text-[11px] text-blue-400 hover:text-blue-300 px-1 py-0.5 rounded hover:bg-surface-800 transition-colors"
                   >
-                    {item.label}
+                    {t(item.label)}
                   </button>
                 ))}
               </div>

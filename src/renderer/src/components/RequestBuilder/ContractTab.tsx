@@ -7,6 +7,7 @@ import { json } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
 import type { ApiRequest, ContractExpectation } from '../../../../shared/types';
 import { useStore } from '../../store';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
@@ -18,7 +19,8 @@ interface Props {
 const EMPTY: ContractExpectation = { statusCode: 200, headers: [], bodySchema: '' };
 
 export function ContractTab({ request, onChange }: Props) {
-  const activeTab      = useStore(s => s.tabs.find(t => t.id === s.activeTabId));
+  const t = useT();
+  const activeTab      = useStore(s => s.tabs.find(tab => tab.id === s.activeTabId));
   const lastResponse   = activeTab?.lastResponse ?? null;
   const contract       = request.contract ?? EMPTY;
   const [inferring, setInferring] = useState(false);
@@ -58,8 +60,8 @@ export function ContractTab({ request, onChange }: Props) {
     <div className="flex flex-col gap-4 h-full min-h-0">
       {/* What this tab is, and how it differs from Schema. */}
       <div className="rounded-lg border border-blue-700/50 bg-blue-950/30 px-3 py-2 text-[11px] leading-relaxed text-blue-200/90">
-        <span className="font-semibold text-blue-300">Contract.</span>{' '}
-        What this request <em>expects</em> from the provider: status, headers, and body shape (a JSON Schema). It is checked against the response in the <strong>Contract</strong> panel and is the consumer side of contract testing (consumer &amp; bi-directional verify), feeding the <span className="font-mono">deploy-check</span> gate. For a quick body check that runs on every send, use the <strong>Schema</strong> tab.
+        <span className="font-semibold text-blue-300">{t('Contract.')}</span>{' '}
+        {t('What this request')} <em>{t('expects')}</em> {t('from the provider: status, headers, and body shape (a JSON Schema). It is checked against the response in the')} <strong>{t('Contract')}</strong> {t('panel and is the consumer side of contract testing (consumer & bi-directional verify), feeding the')} <span className="font-mono">deploy-check</span> {t('gate. For a quick body check that runs on every send, use the')} <strong>{t('Schema')}</strong> {t('tab.')}
       </div>
 
       {/* Status indicator */}
@@ -69,13 +71,13 @@ export function ContractTab({ request, onChange }: Props) {
           : 'bg-surface-800 border-surface-700 text-surface-500'
       }`}>
         <span className={`w-2 h-2 rounded-full ${hasContract ? 'bg-blue-400' : 'bg-surface-600'}`} />
-        {hasContract ? 'Contract defined - will be verified in Contract panel' : 'No contract defined yet'}
+        {hasContract ? t('Contract defined - will be verified in Contract panel') : t('No contract defined yet')}
       </div>
 
       {/* Expected status code */}
       <div>
         <label className="text-[10px] text-surface-500 uppercase tracking-wider font-medium block mb-1.5">
-          Expected Status Code
+          {t('Expected Status Code')}
         </label>
         <input
           type="number"
@@ -90,17 +92,17 @@ export function ContractTab({ request, onChange }: Props) {
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <label className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">
-            Required Response Headers
+            {t('Required Response Headers')}
           </label>
           <button
             onClick={addHeader}
             className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors"
           >
-            + Add
+            {t('+ Add')}
           </button>
         </div>
         {(contract.headers ?? []).length === 0 ? (
-          <p className="text-[11px] text-surface-600 italic">No required headers</p>
+          <p className="text-[11px] text-surface-600 italic">{t('No required headers')}</p>
         ) : (
           <div className="flex flex-col gap-1">
             {(contract.headers ?? []).map((h, i) => (
@@ -110,18 +112,18 @@ export function ContractTab({ request, onChange }: Props) {
                   readOnly
                   onClick={() => updateHeader(i, { required: !h.required })}
                   className="w-6 text-center text-xs bg-surface-800 border border-surface-700 rounded px-1 py-1 cursor-pointer text-blue-400"
-                  title="Click to toggle required"
+                  title={t('Click to toggle required')}
                 />
                 <input
                   value={h.key}
                   onChange={e => updateHeader(i, { key: e.target.value })}
-                  placeholder="Header name"
+                  placeholder={t('Header name')}
                   className="flex-1 text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
                 />
                 <input
                   value={h.value}
                   onChange={e => updateHeader(i, { value: e.target.value })}
-                  placeholder="Expected value (optional)"
+                  placeholder={t('Expected value (optional)')}
                   className="flex-1 text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
                 />
                 <button onClick={() => removeHeader(i)} className="text-surface-600 hover:text-red-400 text-sm leading-none px-1">×</button>
@@ -135,15 +137,15 @@ export function ContractTab({ request, onChange }: Props) {
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
           <label className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">
-            Expected Response Body Schema (JSON Schema)
+            {t('Expected Response Body Schema (JSON Schema)')}
           </label>
           <button
             onClick={inferSchema}
             disabled={!lastResponse?.body || inferring}
             className="text-[10px] text-blue-400 hover:text-blue-300 disabled:text-surface-600 transition-colors"
-            title={lastResponse?.body ? 'Generate schema from last response' : 'Send the request first'}
+            title={lastResponse?.body ? t('Generate schema from last response') : t('Send the request first')}
           >
-            {inferring ? 'Inferring…' : '⚡ Infer from response'}
+            {inferring ? t('Inferring…') : t('⚡ Infer from response')}
           </button>
         </div>
         <div className="border border-surface-700 rounded overflow-hidden">
@@ -153,9 +155,9 @@ export function ContractTab({ request, onChange }: Props) {
                 try { update({ bodySchema: JSON.stringify(JSON.parse(contract.bodySchema ?? ''), null, 2) }); } catch { /* invalid json */ }
               }}
               className="text-[10px] text-surface-500 hover:text-white transition-colors"
-              title="Format JSON"
+              title={t('Format JSON')}
             >
-              Format
+              {t('Format')}
             </button>
           </div>
           <CodeMirror

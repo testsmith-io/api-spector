@@ -12,6 +12,7 @@ import type {
   Oauth2Auth,
 } from '../../../../shared/types';
 import { VarInput } from './VarInput';
+import { useT } from '../../i18n';
 
 // ─── Shared auth field editor ─────────────────────────────────────────────────
 //
@@ -73,23 +74,24 @@ export function AuthEditor({
   className = '',
   children,
 }: AuthEditorProps) {
+  const t = useT();
   return (
     <div className={`flex flex-col gap-3${className ? ` ${className}` : ''}`}>
       {intro}
 
       {/* Type selector */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-surface-400">Type:</span>
-        {types.map(t => (
-          <label key={t} className="flex items-center gap-1 cursor-pointer">
+        <span className="text-surface-400">{t('Type:')}</span>
+        {types.map(authType => (
+          <label key={authType} className="flex items-center gap-1 cursor-pointer">
             <input
               type="radio"
-              value={t}
-              checked={auth.type === t}
-              onChange={() => onChange({ type: t })}
+              value={authType}
+              checked={auth.type === authType}
+              onChange={() => onChange({ type: authType })}
               className="accent-blue-500"
             />
-            <span className={auth.type === t ? 'text-white' : 'text-surface-400'}>{t}</span>
+            <span className={auth.type === authType ? 'text-white' : 'text-surface-400'}>{authType}</span>
           </label>
         ))}
       </div>
@@ -107,11 +109,11 @@ export function AuthEditor({
           />
         ) : (
           <div className="flex flex-col gap-1">
-            <label className="text-surface-400">Token</label>
+            <label className="text-surface-400">{t('Token')}</label>
             <input
               value={auth.token ?? ''}
               onChange={e => onChange({ token: e.target.value })}
-              placeholder="Bearer token"
+              placeholder={t('Bearer token')}
               className="bg-surface-800 border border-surface-700 rounded px-2 py-1 font-mono focus:outline-none focus:border-blue-500"
             />
           </div>
@@ -128,7 +130,7 @@ export function AuthEditor({
             saved={secrets.saved}
             setAuth={onChange}
             saveSecret={secrets.saveSecret}
-            label="Basic Auth"
+            label={t('Basic Auth')}
           />
         ) : (
           <PlainCredentialsFields auth={auth} onChange={onChange} />
@@ -145,8 +147,8 @@ export function AuthEditor({
             saved={secrets.saved}
             setAuth={onChange}
             saveSecret={secrets.saveSecret}
-            label="Digest Auth"
-            note="Digest uses a two-round-trip MD5 challenge-response. Username/password sent with first request to negotiate the challenge."
+            label={t('Digest Auth')}
+            note={t('Digest uses a two-round-trip MD5 challenge-response. Username/password sent with first request to negotiate the challenge.')}
           />
         ) : (
           <PlainCredentialsFields auth={auth} onChange={onChange} />
@@ -159,7 +161,7 @@ export function AuthEditor({
           <div className="flex flex-col gap-2">
             <div className="flex gap-2">
               <div className="flex-1">
-                <label className="text-surface-400">Username</label>
+                <label className="text-surface-400">{t('Username')}</label>
                 <input
                   value={auth.username ?? ''}
                   onChange={e => onChange({ username: e.target.value })}
@@ -167,27 +169,27 @@ export function AuthEditor({
                 />
               </div>
               <div className="flex-1">
-                <label className="text-surface-400">Password</label>
+                <label className="text-surface-400">{t('Password')}</label>
                 <div className="flex gap-1 mt-1">
                   <input
                     type="password"
                     value={secrets.secretValue}
                     onChange={e => secrets.setSecretValue(e.target.value)}
-                    placeholder={auth.passwordSecretRef ? `Stored as "${auth.passwordSecretRef}"` : 'Password'}
+                    placeholder={auth.passwordSecretRef ? t('Stored as ":ref"', { ref: auth.passwordSecretRef }) : t('Password')}
                     className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
                   />
                   <button
                     onClick={() => { const ref = auth.passwordSecretRef ?? 'NTLM_PASSWORD'; onChange({ passwordSecretRef: ref }); void secrets.saveSecret(ref); }}
                     className="px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded transition-colors"
                   >
-                    {secrets.saved ? '✓' : 'Save'}
+                    {secrets.saved ? '✓' : t('Save')}
                   </button>
                 </div>
               </div>
             </div>
             <div className="flex gap-2">
               <div className="flex-1">
-                <label className="text-surface-400">Domain <span className="text-surface-600">(optional)</span></label>
+                <label className="text-surface-400">{t('Domain')} <span className="text-surface-600">{t('(optional)')}</span></label>
                 <input
                   value={auth.ntlmDomain ?? ''}
                   onChange={e => onChange({ ntlmDomain: e.target.value })}
@@ -196,7 +198,7 @@ export function AuthEditor({
                 />
               </div>
               <div className="flex-1">
-                <label className="text-surface-400">Workstation <span className="text-surface-600">(optional)</span></label>
+                <label className="text-surface-400">{t('Workstation')} <span className="text-surface-600">{t('(optional)')}</span></label>
                 <input
                   value={auth.ntlmWorkstation ?? ''}
                   onChange={e => onChange({ ntlmWorkstation: e.target.value })}
@@ -206,7 +208,7 @@ export function AuthEditor({
               </div>
             </div>
             <p className="text-surface-400 text-[10px] bg-surface-800 border border-surface-700 rounded px-2 py-1">
-              Uses NTLMv2 over a single keep-alive connection. Not supported through a proxy.
+              {t('Uses NTLMv2 over a single keep-alive connection. Not supported through a proxy.')}
             </p>
           </div>
         ) : (
@@ -214,7 +216,7 @@ export function AuthEditor({
             <PlainCredentialsFields auth={auth} onChange={onChange} />
             <div className="flex gap-2">
               <div className="flex-1">
-                <label className="text-surface-400">Domain</label>
+                <label className="text-surface-400">{t('Domain')}</label>
                 <input
                   value={auth.ntlmDomain ?? ''}
                   onChange={e => onChange({ ntlmDomain: e.target.value })}
@@ -223,7 +225,7 @@ export function AuthEditor({
                 />
               </div>
               <div className="flex-1">
-                <label className="text-surface-400">Workstation</label>
+                <label className="text-surface-400">{t('Workstation')}</label>
                 <input
                   value={auth.ntlmWorkstation ?? ''}
                   onChange={e => onChange({ ntlmWorkstation: e.target.value })}
@@ -241,7 +243,7 @@ export function AuthEditor({
         <div className="flex flex-col gap-1.5">
           <div className="flex gap-2">
             <div>
-              <label className="text-surface-400">Key name</label>
+              <label className="text-surface-400">{t('Key name')}</label>
               <input
                 value={auth.apiKeyName ?? 'X-API-Key'}
                 onChange={e => onChange({ apiKeyName: e.target.value })}
@@ -249,39 +251,39 @@ export function AuthEditor({
               />
             </div>
             <div>
-              <label className="text-surface-400">In</label>
+              <label className="text-surface-400">{t('In')}</label>
               <select
                 value={auth.apiKeyIn ?? 'header'}
                 onChange={e => onChange({ apiKeyIn: e.target.value as 'header' | 'query' })}
                 className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
               >
-                <option value="header">Header</option>
-                <option value="query">Query</option>
+                <option value="header">{t('Header')}</option>
+                <option value="query">{t('Query')}</option>
               </select>
             </div>
             <div className="flex-1">
-              <label className="text-surface-400">Value</label>
+              <label className="text-surface-400">{t('Value')}</label>
               {secrets ? (
                 <div className="flex gap-1 mt-1">
                   <input
                     type="password"
                     value={secrets.secretValue}
                     onChange={e => secrets.setSecretValue(e.target.value)}
-                    placeholder={auth.apiKeySecretRef ? `Stored as "${auth.apiKeySecretRef}"` : 'API key value'}
+                    placeholder={auth.apiKeySecretRef ? t('Stored as ":ref"', { ref: auth.apiKeySecretRef }) : t('API key value')}
                     className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
                   />
                   <button
                     onClick={() => { const ref = auth.apiKeySecretRef ?? 'API_KEY'; onChange({ apiKeySecretRef: ref }); void secrets.saveSecret(ref); }}
                     className="px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded transition-colors"
                   >
-                    {secrets.saved ? '✓' : 'Save'}
+                    {secrets.saved ? '✓' : t('Save')}
                   </button>
                 </div>
               ) : (
                 <input
                   value={auth.apiKeyValue ?? ''}
                   onChange={e => onChange({ apiKeyValue: e.target.value })}
-                  placeholder="API key value"
+                  placeholder={t('API key value')}
                   className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 font-mono focus:outline-none focus:border-blue-500"
                 />
               )}
@@ -304,10 +306,11 @@ function PlainCredentialsFields({
   auth: { username?: string; password?: string }
   onChange: (p: AuthEditorPatch) => void
 }) {
+  const t = useT();
   return (
     <div className="flex gap-2">
       <div className="flex-1">
-        <label className="text-surface-400">Username</label>
+        <label className="text-surface-400">{t('Username')}</label>
         <input
           value={auth.username ?? ''}
           onChange={e => onChange({ username: e.target.value })}
@@ -315,7 +318,7 @@ function PlainCredentialsFields({
         />
       </div>
       <div className="flex-1">
-        <label className="text-surface-400">Password</label>
+        <label className="text-surface-400">{t('Password')}</label>
         <input
           type="password"
           value={auth.password ?? ''}
@@ -348,6 +351,7 @@ function BasicCredentialsFields({
   label: string
   note?: string
 }) {
+  const t = useT();
   const [keychainOpen, setKeychainOpen] = useState(!!auth.passwordSecretRef);
 
   return (
@@ -355,23 +359,23 @@ function BasicCredentialsFields({
       {label && <span className="text-surface-500 text-[10px] uppercase tracking-wide">{label}</span>}
       <div className="flex gap-2">
         <div className="flex-1">
-          <label className="text-surface-400">Username</label>
+          <label className="text-surface-400">{t('Username')}</label>
           <VarInput
             value={auth.username ?? ''}
             onChange={v => setAuth({ username: v })}
-            placeholder="username"
+            placeholder={t('username')}
             className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
           />
         </div>
         <div className="flex-1">
           <label className="text-surface-400">
-            Password{' '}
-            <span className="text-surface-500 text-[10px]">- supports {'{{variables}}'}</span>
+            {t('Password')}{' '}
+            <span className="text-surface-500 text-[10px]">{t('- supports :variables', { variables: '{{variables}}' })}</span>
           </label>
           <VarInput
             value={auth.password ?? ''}
             onChange={v => setAuth({ password: v })}
-            placeholder="password or API token"
+            placeholder={t('password or API token')}
             className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
           />
         </div>
@@ -381,26 +385,26 @@ function BasicCredentialsFields({
         onClick={() => setKeychainOpen(o => !o)}
         className="text-[10px] text-surface-500 hover:text-surface-300 text-left transition-colors w-fit"
       >
-        {keychainOpen ? '▾' : '▸'} Store password in OS keychain instead
+        {keychainOpen ? '▾' : '▸'} {t('Store password in OS keychain instead')}
       </button>
 
       {keychainOpen && (
         <div className="flex flex-col gap-1 pl-3 border-l border-surface-800">
           <p className="text-surface-500 text-[10px]">
-            Encrypt the password in your OS keychain rather than saving it with the request. Leave the Password field above empty to use the keychain value.
+            {t('Encrypt the password in your OS keychain rather than saving it with the request. Leave the Password field above empty to use the keychain value.')}
           </p>
           <div className="flex gap-2">
             <input
               type="password"
               value={secretValue}
               onChange={e => setSecretValue(e.target.value)}
-              placeholder={auth.passwordSecretRef ? `Stored as "${auth.passwordSecretRef}"` : 'Password'}
+              placeholder={auth.passwordSecretRef ? t('Stored as ":ref"', { ref: auth.passwordSecretRef }) : t('Password')}
               className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
             />
             <input
               value={auth.passwordSecretRef ?? 'API_PASSWORD'}
               onChange={e => setAuth({ passwordSecretRef: e.target.value })}
-              placeholder="Keychain key"
+              placeholder={t('Keychain key')}
               className="w-32 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
             />
             <button
@@ -413,7 +417,7 @@ function BasicCredentialsFields({
               }}
               className="px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded transition-colors"
             >
-              {saved ? '✓' : 'Save'}
+              {saved ? '✓' : t('Save')}
             </button>
           </div>
         </div>
@@ -437,19 +441,20 @@ function BearerPanel({
   setAuth: (p: AuthEditorPatch) => void
   saveSecret: (ref: string) => Promise<void>
 }) {
+  const t = useT();
   const [keychainOpen, setKeychainOpen] = useState(!!auth.tokenSecretRef);
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-col gap-1">
         <label className="text-surface-400">
-          Token{' '}
-          <span className="text-surface-500 text-[10px]">- supports {'{{variables}}'}</span>
+          {t('Token')}{' '}
+          <span className="text-surface-500 text-[10px]">{t('- supports :variables', { variables: '{{variables}}' })}</span>
         </label>
         <VarInput
           value={auth.token ?? ''}
           onChange={v => setAuth({ token: v })}
-          placeholder="{{token}}  or paste a raw token"
+          placeholder={t('{{token}}  or paste a raw token')}
           className="bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono text-xs"
         />
       </div>
@@ -458,33 +463,33 @@ function BearerPanel({
         onClick={() => setKeychainOpen(o => !o)}
         className="text-[10px] text-surface-500 hover:text-surface-300 text-left transition-colors w-fit"
       >
-        {keychainOpen ? '▾' : '▸'} Store in OS keychain instead
+        {keychainOpen ? '▾' : '▸'} {t('Store in OS keychain instead')}
       </button>
 
       {keychainOpen && (
         <div className="flex flex-col gap-1 pl-3 border-l border-surface-800">
           <p className="text-surface-500 text-[10px]">
-            Paste a raw token here to encrypt it in your OS keychain. Useful for static long-lived API tokens. Leave the value field above empty to use the keychain.
+            {t('Paste a raw token here to encrypt it in your OS keychain. Useful for static long-lived API tokens. Leave the value field above empty to use the keychain.')}
           </p>
           <div className="flex gap-2">
             <input
               type="password"
               value={secretValue}
               onChange={e => setSecretValue(e.target.value)}
-              placeholder={auth.tokenSecretRef ? `Stored as "${auth.tokenSecretRef}"` : 'Paste token'}
+              placeholder={auth.tokenSecretRef ? t('Stored as ":ref"', { ref: auth.tokenSecretRef }) : t('Paste token')}
               className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
             />
             <input
               value={auth.tokenSecretRef ?? 'API_TOKEN'}
               onChange={e => setAuth({ tokenSecretRef: e.target.value })}
-              placeholder="Keychain key"
+              placeholder={t('Keychain key')}
               className="w-32 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
             />
             <button
               onClick={() => { const ref = auth.tokenSecretRef ?? 'API_TOKEN'; setAuth({ tokenSecretRef: ref }); void saveSecret(ref); }}
               className="px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded transition-colors"
             >
-              {saved ? '✓' : 'Save'}
+              {saved ? '✓' : t('Save')}
             </button>
           </div>
         </div>

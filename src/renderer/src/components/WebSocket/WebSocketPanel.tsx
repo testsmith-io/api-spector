@@ -3,6 +3,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../../store';
+import { useT } from '../../i18n';
 import type { ApiRequest, WsMessage } from '../../../../shared/types';
 
 const { electron } = window;
@@ -22,6 +23,7 @@ function formatTime(ts: number): string {
 }
 
 export function WebSocketPanel({ request }: Props) {
+  const t = useT();
   const wsConnections    = useStore(s => s.wsConnections);
   const setWsStatus      = useStore(s => s.setWsStatus);
   const addWsMessage     = useStore(s => s.addWsMessage);
@@ -130,7 +132,7 @@ export function WebSocketPanel({ request }: Props) {
             disabled={isConnecting}
             className="px-4 py-1.5 bg-red-700 hover:bg-red-600 disabled:bg-surface-800 disabled:text-surface-600 rounded text-sm font-medium transition-colors min-w-[100px]"
           >
-            {isConnecting ? 'Connecting…' : 'Disconnect'}
+            {isConnecting ? t('Connecting…') : t('Disconnect')}
           </button>
         ) : (
           <button
@@ -138,7 +140,7 @@ export function WebSocketPanel({ request }: Props) {
             disabled={!request.url}
             className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:bg-surface-800 disabled:text-surface-600 rounded text-sm font-medium transition-colors min-w-[100px]"
           >
-            Connect
+            {t('Connect')}
           </button>
         )}
       </div>
@@ -153,7 +155,7 @@ export function WebSocketPanel({ request }: Props) {
       {/* URL edit hint */}
       <div className="px-4 mb-1 flex-shrink-0">
         <p className="text-[10px] text-surface-600">
-          Edit URL and headers in the <span className="text-surface-500">Headers</span> tab above. Connect then send messages below.
+          {t('Edit URL and headers in the ')}<span className="text-surface-500">{t('Headers')}</span>{t(' tab above. Connect then send messages below.')}
         </p>
       </div>
 
@@ -161,7 +163,7 @@ export function WebSocketPanel({ request }: Props) {
       <div className="flex-1 min-h-0 mx-4 mb-2 border border-surface-800 rounded overflow-y-auto bg-surface-950 relative">
         {conn.messages.length === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center text-xs text-surface-400">
-            No messages yet
+            {t('No messages yet')}
           </div>
         ) : (
           <div className="p-2 flex flex-col gap-1">
@@ -198,7 +200,7 @@ export function WebSocketPanel({ request }: Props) {
             onClick={() => clearWsMessages(request.id)}
             className="text-[10px] text-surface-600 hover:text-surface-400 transition-colors"
           >
-            Clear messages
+            {t('Clear messages')}
           </button>
         </div>
       )}
@@ -211,7 +213,7 @@ export function WebSocketPanel({ request }: Props) {
           onKeyDown={handleKeyDown}
           disabled={!isConnected}
           rows={2}
-          placeholder={isConnected ? 'Type a message… (Ctrl+Enter to send)' : 'Connect first to send messages'}
+          placeholder={isConnected ? t('Type a message… (Ctrl+Enter to send)') : t('Connect first to send messages')}
           className="flex-1 resize-none bg-surface-800 border border-surface-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-500 placeholder-surface-700 disabled:opacity-50"
         />
         <button
@@ -219,7 +221,7 @@ export function WebSocketPanel({ request }: Props) {
           disabled={!isConnected || !sendText.trim()}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-surface-800 disabled:text-surface-400 rounded text-sm font-medium transition-colors self-end"
         >
-          Send
+          {t('Send')}
         </button>
       </div>
     </div>

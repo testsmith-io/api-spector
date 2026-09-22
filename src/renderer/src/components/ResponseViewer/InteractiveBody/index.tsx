@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import React, { useState } from 'react';
+import { useT } from '../../../i18n';
 import type { JsonPath } from './utils/jsonPath';
 import type { PopoverState } from './types';
 import { JsonNode } from './JsonNode';
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function InteractiveBody({ body, contentType, onAssert }: Props) {
+  const t = useT();
   const [popover, setPopover] = useState<PopoverState | null>(null);
 
   const isJson = contentType.includes('json');
@@ -37,18 +39,18 @@ export function InteractiveBody({ body, contentType, onAssert }: Props) {
 
   const treeContent = isJson ? (() => {
     if (parsedJson === null) {
-      return <div className="p-4 text-xs text-surface-600">Unable to parse JSON response body</div>;
+      return <div className="p-4 text-xs text-surface-600">{t('Unable to parse JSON response body')}</div>;
     }
     return <JsonNode nodeKey={null} value={parsedJson} path={[]} depth={0} onLeaf={handleJsonLeaf} />;
   })() : isXml ? (() => {
     const doc = new DOMParser().parseFromString(body, 'text/xml');
     const root = doc.documentElement;
     if (root.tagName === 'parsererror') {
-      return <div className="p-4 text-xs text-surface-600">Unable to parse XML response body</div>;
+      return <div className="p-4 text-xs text-surface-600">{t('Unable to parse XML response body')}</div>;
     }
     return <XmlNode element={root} depth={0} onLeaf={handleXmlLeaf} />;
   })() : (
-    <div className="p-4 text-xs text-surface-600">Interactive tree not available for this content type. Use Raw view.</div>
+    <div className="p-4 text-xs text-surface-600">{t('Interactive tree not available for this content type. Use Raw view.')}</div>
   );
 
   return (

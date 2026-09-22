@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useStore } from '../../store';
 import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
 import { ContractDesignerModal } from './ContractDesignerModal';
+import { useT } from '../../i18n';
 import type { ContractMode, FuzzReport } from '../../../../shared/types';
 
 const { electron } = window;
@@ -33,6 +34,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
   const loadContractSnapshot  = useStore(s => s.loadContractSnapshot);
   const removeContractSnapshot = useStore(s => s.removeContractSnapshot);
   const workspace = useStore(s => s.workspace);
+  const t = useT();
 
   const [mode, setMode]               = useState<PanelMode>('consumer');
   const [showDesigner, setShowDesigner] = useState(false);
@@ -50,7 +52,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
         version: specVersion.trim(),
         specUrl: specUrl.trim(),
       });
-      setPublishNote(`Published ${providerName.trim()}@${specVersion.trim()} — ${res.verified_contracts} contract(s) re-verified`);
+      setPublishNote(t('Published :name@:version — :count contract(s) re-verified', { name: providerName.trim(), version: specVersion.trim(), count: res.verified_contracts }));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -106,12 +108,12 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
     if (mode === 'fuzz') return; // fuzz has its own runner
     // Spec-driven modes need a live URL or a pinned snapshot.
     if (needsSpec && !specUrl.trim() && !activeSnapshotRelPath) {
-      setError('Provide an OpenAPI spec URL or pick a pinned snapshot for provider / bi-directional mode.');
+      setError(t('Provide an OpenAPI spec URL or pick a pinned snapshot for provider / bi-directional mode.'));
       return;
     }
     // Live provider verification needs a provider base URL to replay against.
     if (mode === 'provider-live' && !providerBaseUrl.trim()) {
-      setError('Provide a provider base URL (e.g. http://localhost:3000) to replay contracts against.');
+      setError(t('Provide a provider base URL (e.g. http://localhost:3000) to replay contracts against.'));
       return;
     }
     setRunning(true);
@@ -155,7 +157,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
   async function runFuzz() {
     // Fuzzing replays live requests, so it always needs a provider base URL.
     if (!providerBaseUrl.trim()) {
-      setError('Provide a provider base URL (e.g. http://localhost:3000) to fuzz against.');
+      setError(t('Provide a provider base URL (e.g. http://localhost:3000) to fuzz against.'));
       return;
     }
     setRunning(true);
@@ -187,7 +189,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
 
   async function captureSnapshot() {
     if (!specUrl.trim()) {
-      setError('Enter a spec URL before pinning a snapshot.');
+      setError(t('Enter a spec URL before pinning a snapshot.'));
       return;
     }
     setCapturing(true);
@@ -227,9 +229,9 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
         <button
           onClick={() => setShowDesigner(true)}
           className="flex items-center justify-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-dashed border-surface-600 text-surface-300 hover:border-blue-500 hover:text-white transition-colors"
-          title="Design a consumer-driven contract up front, with no endpoints, then publish it to the cloud"
+          title={t('Design a consumer-driven contract up front, with no endpoints, then publish it to the cloud')}
         >
-          ✎ Design a contract (no endpoint needed)
+          ✎ {t('Design a contract (no endpoint needed)')}
         </button>
         {/* Mode tabs */}
         <div className="flex gap-1 bg-surface-800 rounded-lg p-0.5">
@@ -247,7 +249,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
                 mode === m ? 'bg-blue-600 text-white' : 'text-surface-400 hover:text-surface-200'
               }`}
             >
-              {label}
+              {t(label)}
             </button>
           ))}
         </div>
@@ -255,14 +257,14 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
         {/* Mode description */}
         <p className="text-[10px] text-surface-500 leading-relaxed">
           {mode === 'consumer'
-            ? 'Sends requests to the real provider and validates each response against the contract defined in the Contract tab. Set a base URL below to send host-less (design-first) contracts.'
+            ? t('Sends requests to the real provider and validates each response against the contract defined in the Contract tab. Set a base URL below to send host-less (design-first) contracts.')
             : mode === 'provider'
-            ? 'Static analysis: validates that your requests conform to the provider\'s published OpenAPI spec (no HTTP calls).'
+            ? t('Static analysis: validates that your requests conform to the provider\'s published OpenAPI spec (no HTTP calls).')
             : mode === 'provider-live'
-            ? 'Replays each contract against a running provider, seeding provider states first. The real provider verification.'
+            ? t('Replays each contract against a running provider, seeding provider states first. The real provider verification.')
             : mode === 'fuzz'
-            ? 'Sends malformed inputs generated from the spec (or, with no spec, the request body) and flags responses that crash (5xx) or accept invalid input.'
-            : 'Checks static schema compatibility between consumer contracts and provider spec, then verifies live responses.'}
+            ? t('Sends malformed inputs generated from the spec (or, with no spec, the request body) and flags responses that crash (5xx) or accept invalid input.')
+            : t('Checks static schema compatibility between consumer contracts and provider spec, then verifies live responses.')}
         </p>
 
         {/* Provider base URL + state handler (consumer / provider-live / fuzz) */}
@@ -270,7 +272,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
           <div className="flex flex-col gap-2">
             <div>
               <label className="text-[10px] text-surface-500 uppercase tracking-wider font-medium block mb-1">
-                Provider base URL {mode === 'consumer' && <span className="normal-case text-surface-600">(optional)</span>}
+                {t('Provider base URL')} {mode === 'consumer' && <span className="normal-case text-surface-600">{t('(optional)')}</span>}
               </label>
               <input
                 value={providerBaseUrl}
@@ -280,16 +282,16 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
               />
               <p className="text-[10px] text-surface-600 mt-1 leading-relaxed">
                 {isFuzz
-                  ? 'Required. Each fuzzed request is rebased onto this origin before it is sent.'
+                  ? t('Required. Each fuzzed request is rebased onto this origin before it is sent.')
                   : mode === 'consumer'
-                  ? 'Optional. Rebase each request onto this origin before sending, so design-first contracts that carry only a path (e.g. /brands) can run. Requests with a full URL are sent as-is.'
-                  : 'Each request is rebased onto this origin before being replayed against the live provider.'}
+                  ? t('Optional. Rebase each request onto this origin before sending, so design-first contracts that carry only a path (e.g. /brands) can run. Requests with a full URL are sent as-is.')
+                  : t('Each request is rebased onto this origin before being replayed against the live provider.')}
               </p>
             </div>
             {mode === 'provider-live' && (
             <div>
               <label className="text-[10px] text-surface-500 uppercase tracking-wider font-medium block mb-1">
-                State handler URL <span className="normal-case text-surface-600">(optional)</span>
+                {t('State handler URL')} <span className="normal-case text-surface-600">{t('(optional)')}</span>
               </label>
               <input
                 value={stateHandlerUrl}
@@ -298,7 +300,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
                 className="w-full text-xs bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
               />
               <p className="text-[10px] text-surface-600 mt-1 leading-relaxed">
-                Before each interaction we POST {'{ state, action }'} here so the provider can be seeded into a known state (Pact <code>given</code>).
+                {t('Before each interaction we POST')} {'{ state, action }'} {t('here so the provider can be seeded into a known state (Pact')} <code>given</code>{t(').')}
               </p>
             </div>
             )}
@@ -311,7 +313,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
             {/* Snapshot picker */}
             <div>
               <label className="text-[10px] text-surface-500 uppercase tracking-wider font-medium block mb-1">
-                Spec version {isFuzz && <span className="normal-case text-surface-600">(optional)</span>}
+                {t('Spec version')} {isFuzz && <span className="normal-case text-surface-600">{t('(optional)')}</span>}
               </label>
               <div className="flex gap-1">
                 <select
@@ -320,7 +322,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
                   disabled={!workspace}
                   className="flex-1 text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500 disabled:opacity-50"
                 >
-                  <option value="">Live URL (latest from provider)</option>
+                  <option value="">{t('Live URL (latest from provider)')}</option>
                   {snapshotList.map(({ relPath, snapshot }) => (
                     <option key={relPath} value={relPath}>
                       {snapshot.name}
@@ -331,7 +333,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
                 {activeSnapshotRelPath && (
                   <button
                     onClick={deleteActiveSnapshot}
-                    title="Delete this snapshot"
+                    title={t('Delete this snapshot')}
                     className="px-2 text-xs text-surface-500 hover:text-red-400 bg-surface-800 hover:bg-surface-700 rounded transition-colors"
                   >
                     ✕
@@ -340,7 +342,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
               </div>
               {activeSnapshot && (
                 <p className="text-[10px] text-surface-600 mt-1 font-mono truncate">
-                  Captured {activeSnapshot.capturedAt.slice(0, 19).replace('T', ' ')} - sha {activeSnapshot.sha256.slice(0, 8)}
+                  {t('Captured :when - sha :sha', { when: activeSnapshot.capturedAt.slice(0, 19).replace('T', ' '), sha: activeSnapshot.sha256.slice(0, 8) })}
                 </p>
               )}
             </div>
@@ -349,7 +351,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
             {!activeSnapshotRelPath && (
               <div>
                 <label className="text-[10px] text-surface-500 uppercase tracking-wider font-medium block mb-1">
-                  OpenAPI Spec URL
+                  {t('OpenAPI Spec URL')}
                 </label>
                 <div className="flex gap-1">
                   <input
@@ -361,42 +363,42 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
                   <button
                     onClick={captureSnapshot}
                     disabled={capturing || !specUrl.trim() || !workspace}
-                    title="Fetch and pin this spec as a versioned snapshot"
+                    title={t('Fetch and pin this spec as a versioned snapshot')}
                     className="px-2.5 text-xs bg-surface-800 hover:bg-surface-700 disabled:opacity-50 disabled:hover:bg-surface-800 rounded transition-colors"
                   >
-                    {capturing ? '…' : 'Pin'}
+                    {capturing ? '…' : t('Pin')}
                   </button>
                 </div>
                 <p className="text-[10px] text-surface-600 mt-1 leading-relaxed">
-                  Pin a snapshot to run against a specific spec version later, even after the provider ships an update.
+                  {t('Pin a snapshot to run against a specific spec version later, even after the provider ships an update.')}
                 </p>
 
                 {/* Provider side of bi-directional: publish the spec to the cloud broker. */}
                 {cloudConnected && (
                   <div className="mt-2 pt-2 border-t border-surface-800 flex flex-col gap-1.5">
                     <label className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">
-                      Publish spec to cloud <span className="text-surface-600 normal-case tracking-normal">(provider side of bi-directional)</span>
+                      {t('Publish spec to cloud')} <span className="text-surface-600 normal-case tracking-normal">{t('(provider side of bi-directional)')}</span>
                     </label>
                     <div className="flex gap-1">
                       <input
                         value={providerName}
                         onChange={e => setProviderName(e.target.value)}
-                        placeholder="provider name"
+                        placeholder={t('provider name')}
                         className="flex-1 text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500 placeholder-surface-600"
                       />
                       <input
                         value={specVersion}
                         onChange={e => setSpecVersion(e.target.value)}
-                        placeholder="version (git SHA)"
+                        placeholder={t('version (git SHA)')}
                         className="w-32 text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
                       />
                       <button
                         onClick={publishSpecToCloud}
                         disabled={publishingSpec || !specUrl.trim() || !providerName.trim() || !specVersion.trim()}
-                        title="Publish this OpenAPI spec to the broker; consumers' pacts are re-verified against it"
+                        title={t('Publish this OpenAPI spec to the broker; consumers\' pacts are re-verified against it')}
                         className="px-2.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors"
                       >
-                        {publishingSpec ? '…' : 'Publish'}
+                        {publishingSpec ? '…' : t('Publish')}
                       </button>
                     </div>
                     {publishNote && <p className="text-[10px] text-emerald-400 leading-relaxed">{publishNote}</p>}
@@ -407,7 +409,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
 
             <div>
               <label className="text-[10px] text-surface-500 uppercase tracking-wider font-medium block mb-1">
-                Request base URL <span className="normal-case text-surface-600">(optional)</span>
+                {t('Request base URL')} <span className="normal-case text-surface-600">{t('(optional)')}</span>
               </label>
               <input
                 value={requestBaseUrl}
@@ -416,7 +418,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
                 className="w-full text-xs bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
               />
               <p className="text-[10px] text-surface-600 mt-1 leading-relaxed">
-                If your requests point at a different host than the spec, enter that host here so paths match correctly.
+                {t('If your requests point at a different host than the spec, enter that host here so paths match correctly.')}
               </p>
             </div>
           </div>
@@ -428,7 +430,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
             <div className="flex gap-2">
               <div className="flex-1">
                 <label className="text-[10px] text-surface-500 uppercase tracking-wider font-medium block mb-1">
-                  Cases per operation
+                  {t('Cases per operation')}
                 </label>
                 <input
                   type="number"
@@ -440,7 +442,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
               </div>
               <div className="flex-1">
                 <label className="text-[10px] text-surface-500 uppercase tracking-wider font-medium block mb-1">
-                  Seed
+                  {t('Seed')}
                 </label>
                 <input
                   type="number"
@@ -458,11 +460,11 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
                 onChange={e => setIncludeWrites(e.target.checked)}
                 className="accent-blue-600"
               />
-              Include write methods (POST/PUT/PATCH/DELETE)
+              {t('Include write methods (POST/PUT/PATCH/DELETE)')}
             </label>
             {includeWrites && (
               <p className="text-[10px] text-amber-400 leading-relaxed -mt-1 ml-6">
-                This sends malformed writes to the provider. Target staging or a mock, not production.
+                {t('This sends malformed writes to the provider. Target staging or a mock, not production.')}
               </p>
             )}
 
@@ -473,7 +475,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
                 onChange={e => setStrictStatus(e.target.checked)}
                 className="accent-blue-600"
               />
-              Strict status
+              {t('Strict status')}
             </label>
 
             <label className="flex items-center gap-2 text-[11px] text-surface-300 cursor-pointer">
@@ -483,7 +485,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
                 onChange={e => setCheckResponses(e.target.checked)}
                 className="accent-blue-600"
               />
-              Check response schemas
+              {t('Check response schemas')}
             </label>
 
             <label className="flex items-center gap-2 text-[11px] text-surface-300 cursor-pointer">
@@ -493,7 +495,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
                 onChange={e => setTrace(e.target.checked)}
                 className="accent-blue-600"
               />
-              Record all cases
+              {t('Record all cases')}
             </label>
           </div>
         )}
@@ -502,8 +504,8 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
         <div className="flex items-center justify-between">
           <span className="text-[10px] text-surface-500">
             {mode === 'provider' || isFuzz
-              ? `${allRequests.length} request${allRequests.length !== 1 ? 's' : ''}`
-              : `${contractRequests.length + designInteractionCount} contract${(contractRequests.length + designInteractionCount) !== 1 ? 's' : ''} defined`}
+              ? t(':count request|:count requests', { count: allRequests.length })
+              : t(':count contract defined|:count contracts defined', { count: contractRequests.length + designInteractionCount })}
           </span>
           <button
             onClick={isFuzz ? runFuzz : runContracts}
@@ -512,7 +514,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
               || ((mode === 'provider-live' || isFuzz) && !providerBaseUrl.trim())}
             className="px-3 py-1 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors font-medium"
           >
-            {running ? 'Running…' : isFuzz ? 'Run fuzz' : 'Run'}
+            {running ? t('Running…') : isFuzz ? t('Run fuzz') : t('Run')}
           </button>
         </div>
 
@@ -522,14 +524,14 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
       {/* Status / hint */}
       <div className="flex-1 overflow-y-auto min-h-0 p-3">
         {running && (
-          <p className="text-xs text-surface-500 text-center mt-4">Running…</p>
+          <p className="text-xs text-surface-500 text-center mt-4">{t('Running…')}</p>
         )}
         {isFuzz ? (
           !fuzzReport && !running && (
             <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
-              <p className="text-xs text-surface-500">Configure fuzzing above and click Run fuzz.</p>
+              <p className="text-xs text-surface-500">{t('Configure fuzzing above and click Run fuzz.')}</p>
               <p className="text-[10px] text-surface-600 max-w-[180px]">
-                Fuzzing needs a provider base URL. A spec is optional: without one, request bodies are mutated.
+                {t('Fuzzing needs a provider base URL. A spec is optional: without one, request bodies are mutated.')}
               </p>
             </div>
           )
@@ -537,10 +539,10 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
           <>
             {!report && !running && (
               <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
-                <p className="text-xs text-surface-500">Configure a mode above and click Run.</p>
+                <p className="text-xs text-surface-500">{t('Configure a mode above and click Run.')}</p>
                 {mode !== 'provider' && contractRequests.length === 0 && (
                   <p className="text-[10px] text-surface-600 max-w-[180px]">
-                    Define a contract on a request via the Contract tab first.
+                    {t('Define a contract on a request via the Contract tab first.')}
                   </p>
                 )}
               </div>
@@ -551,7 +553,7 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
                   ? 'bg-emerald-800/30 border-emerald-400/50 text-emerald-400'
                   : 'bg-red-900/30 border-red-700 text-red-300'
               }`}>
-                <span className="font-semibold">{report.failed === 0 ? '✓ All passed' : `✗ ${report.failed} failed`}</span>
+                <span className="font-semibold">{report.failed === 0 ? t('✓ All passed') : t('✗ :count failed', { count: report.failed })}</span>
                 <span className="text-surface-500 ml-auto">{report.passed}/{report.total}</span>
               </div>
             )}
@@ -565,10 +567,10 @@ export function ContractPanel({ fuzzReport, setFuzzReport }: ContractPanelProps)
           }`}>
             <span className="font-semibold">
               {fuzzReport.totalFindings === 0
-                ? '✓ No findings'
-                : `✗ ${fuzzReport.totalFindings} finding${fuzzReport.totalFindings !== 1 ? 's' : ''}`}
+                ? t('✓ No findings')
+                : t('✗ :count finding|✗ :count findings', { count: fuzzReport.totalFindings })}
             </span>
-            <span className="text-surface-500 ml-auto">{fuzzReport.totalCases} cases</span>
+            <span className="text-surface-500 ml-auto">{t(':count cases', { count: fuzzReport.totalCases })}</span>
           </div>
         )}
       </div>

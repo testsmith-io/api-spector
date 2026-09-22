@@ -7,6 +7,7 @@ import { Modal } from '../common/Modal';
 import { computeCoverage, flattenValuePaths, type CoverageReport, type CoverageRequestInput, type CoverageObservation } from '../../../../shared/coverage';
 import { generateTests, toApiRequest } from '../../../../shared/openapi-testgen';
 import type { ApiRequest, Collection } from '../../../../shared/types';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
@@ -29,6 +30,7 @@ function Stat({ value, label }: { value: React.ReactNode; label: string }) {
 }
 
 export function CoverageModal() {
+  const t = useT();
   const open           = useStore(s => s.coverageOpen);
   const setOpen        = useStore(s => s.setCoverageOpen);
   const collections    = useStore(s => s.collections);
@@ -101,22 +103,22 @@ export function CoverageModal() {
       requestMap[id] = toApiRequest(t, id);
       requestIds.push(id);
     }
-    const name = `${report.spec.title ?? 'API'} tests (generated)`;
+    const name = t(':title tests (generated)', { title: report.spec.title ?? 'API' });
     const collection: Collection = {
       version: '1.0',
       id: crypto.randomUUID(),
       name,
-      description: 'Generated for untested operations from the OpenAPI spec.',
+      description: t('Generated for untested operations from the OpenAPI spec.'),
       rootFolder: { id: crypto.randomUUID(), name: 'root', description: '', folders: [], requestIds },
       requests: requestMap,
     };
     addCollectionObject(collection);
-    setGenerated(`Added ${tests.length} tests for ${only.size} untested operations as "${collection.name}".`);
+    setGenerated(t('Added :count tests for :ops untested operations as ":name".', { count: tests.length, ops: only.size, name: collection.name }));
   }
 
   if (!open) return null;
 
-  const t = report?.totals;
+  const totals = report?.totals;
   const shownOps = report?.operations.filter(o => !onlyGaps || !o.tested || !o.hasNegativeTest) ?? [];
 
   return (
@@ -124,12 +126,12 @@ export function CoverageModal() {
       onClose={() => setOpen(false)}
       overlayClassName="bg-black/50 z-50 flex items-start justify-center pt-16"
       panelClassName="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl flex flex-col w-[760px] max-h-[82vh]"
-      title="API test coverage"
-      subtitle="How much of an OpenAPI contract this workspace tests"
+      title={t('API test coverage')}
+      subtitle={t('How much of an OpenAPI contract this workspace tests')}
     >
       {/* Spec source */}
       <div className="px-4 py-3 border-b border-surface-800 flex flex-col gap-2 flex-shrink-0">
-        <label className="text-[11px] text-surface-400">OpenAPI spec (file path or URL)</label>
+        <label className="text-[11px] text-surface-400">{t('OpenAPI spec (file path or URL)')}</label>
         <div className="flex gap-2">
           <input
             value={source}
@@ -142,16 +144,16 @@ export function CoverageModal() {
             disabled={busy || (!source.trim() && !pasted.trim())}
             className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-surface-800 disabled:text-surface-500 rounded text-sm font-medium"
           >
-            {busy ? '…' : 'Measure'}
+            {busy ? '…' : t('Measure')}
           </button>
         </div>
         <details className="text-[11px] text-surface-500">
-          <summary className="cursor-pointer hover:text-surface-300">or paste spec</summary>
+          <summary className="cursor-pointer hover:text-surface-300">{t('or paste spec')}</summary>
           <textarea
             value={pasted}
             onChange={e => setPasted(e.target.value)}
             rows={4}
-            placeholder="Paste OpenAPI JSON or YAML here"
+            placeholder={t('Paste OpenAPI JSON or YAML here')}
             className="mt-1 w-full resize-y bg-surface-950 border border-surface-800 rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-blue-500"
           />
         </details>
@@ -162,45 +164,45 @@ export function CoverageModal() {
       <div className="px-4 py-3 flex-1 overflow-y-auto min-h-0">
         {!report ? (
           <div className="text-sm text-surface-500 text-center py-10">
-            Point at your OpenAPI spec and choose <span className="text-surface-300">Measure</span> to see which operations are tested.
+            {t('Point at your OpenAPI spec and choose')} <span className="text-surface-300">{t('Measure')}</span> {t('to see which operations are tested.')}
           </div>
         ) : (
           <>
             <div className="mb-3">
               <div className="flex justify-between text-xs mb-1">
                 <span className="text-surface-300">{report.spec.title ?? 'API'}{report.spec.version ? ` v${report.spec.version}` : ''}</span>
-                <span className="text-surface-400">{t!.operationPct}% operations tested</span>
+                <span className="text-surface-400">{t(':pct% operations tested', { pct: totals!.operationPct })}</span>
               </div>
-              <Bar pct={t!.operationPct} />
+              <Bar pct={totals!.operationPct} />
             </div>
             <div className="flex gap-4 mb-4 border-b border-surface-800 pb-3">
-              <Stat value={`${t!.tested}/${t!.operations}`} label="operations tested" />
-              <Stat value={`${t!.coveredStatuses}/${t!.declaredStatuses}`} label="response codes covered" />
-              {t!.declaredProperties > 0 && (
-                <Stat value={`${t!.propertyPct}%`} label="response shape seen in runs" />
+              <Stat value={`${totals!.tested}/${totals!.operations}`} label={t('operations tested')} />
+              <Stat value={`${totals!.coveredStatuses}/${totals!.declaredStatuses}`} label={t('response codes covered')} />
+              {totals!.declaredProperties > 0 && (
+                <Stat value={`${totals!.propertyPct}%`} label={t('response shape seen in runs')} />
               )}
-              <Stat value={<span className={t!.untested ? 'text-amber-400' : 'text-emerald-400'}>{t!.untested}</span>} label="never tested" />
-              <Stat value={<span className={t!.withoutNegativeTest ? 'text-amber-400' : 'text-emerald-400'}>{t!.withoutNegativeTest}</span>} label="no negative test" />
+              <Stat value={<span className={totals!.untested ? 'text-amber-400' : 'text-emerald-400'}>{totals!.untested}</span>} label={t('never tested')} />
+              <Stat value={<span className={totals!.withoutNegativeTest ? 'text-amber-400' : 'text-emerald-400'}>{totals!.withoutNegativeTest}</span>} label={t('no negative test')} />
             </div>
 
             <div className="flex items-center justify-between mb-2 gap-3">
               <label className="flex items-center gap-2 text-xs text-surface-400">
                 <input type="checkbox" checked={onlyGaps} onChange={e => setOnlyGaps(e.target.checked)} />
-                Show only gaps (untested or missing a negative test)
+                {t('Show only gaps (untested or missing a negative test)')}
               </label>
-              {t!.untested > 0 && (
+              {totals!.untested > 0 && (
                 <button
                   onClick={generateForGaps}
-                  title="Generate happy-path, negative, and boundary tests for the untested operations"
+                  title={t('Generate happy-path, negative, and boundary tests for the untested operations')}
                   className="px-3 py-1 text-xs bg-violet-600 hover:bg-violet-500 rounded font-medium shrink-0"
                 >
-                  Generate tests for {t!.untested} gap{t!.untested !== 1 ? 's' : ''}
+                  {t('Generate tests for :count gap|Generate tests for :count gaps', { count: totals!.untested })}
                 </button>
               )}
             </div>
             {generated && (
               <div className="mb-2 px-3 py-1.5 rounded bg-emerald-900/20 border border-emerald-800/40 text-xs text-emerald-300">
-                {generated} Re-measure to see the coverage rise.
+                {generated} {t('Re-measure to see the coverage rise.')}
               </div>
             )}
 
@@ -211,9 +213,9 @@ export function CoverageModal() {
                   <span className="font-mono font-bold text-surface-300 w-14 shrink-0">{op.method}</span>
                   <span className={`font-mono flex-1 ${op.tested ? 'text-white' : 'text-surface-500'}`}>{op.path}</span>
                   {op.declaredStatuses.length > 0 && (
-                    <span className="text-surface-500 shrink-0">{op.coveredStatuses.length}/{op.declaredStatuses.length} codes</span>
+                    <span className="text-surface-500 shrink-0">{op.coveredStatuses.length}/{op.declaredStatuses.length} {t('codes')}</span>
                   )}
-                  {op.tested && !op.hasNegativeTest && <span className="text-amber-400 shrink-0">no negative</span>}
+                  {op.tested && !op.hasNegativeTest && <span className="text-amber-400 shrink-0">{t('no negative')}</span>}
                 </div>
               ))}
             </div>

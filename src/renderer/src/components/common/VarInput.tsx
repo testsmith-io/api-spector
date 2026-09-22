@@ -5,6 +5,7 @@ import React, { useRef, useState, useCallback, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { useVarNames } from '../../hooks/useVarNames';
 import { useVarValues } from '../../hooks/useVarValues';
+import { useT } from '../../i18n';
 
 // ─── Parse {{varname}} tokens ─────────────────────────────────────────────────
 
@@ -82,6 +83,7 @@ interface Props extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onCha
 }
 
 export function VarInput({ value, onChange, className, wrapperClassName, staticSuggestions, ...rest }: Props) {
+  const t         = useT();
   const varNames  = useVarNames();
   const varValues = useVarValues();
   const inputRef  = useRef<HTMLInputElement>(null);
@@ -240,7 +242,7 @@ export function VarInput({ value, onChange, className, wrapperClassName, staticS
               <span className="text-surface-500 mx-0.5">→</span>
               {resolved !== null
                 ? <span className="font-mono text-emerald-400 truncate">{resolved}</span>
-                : <span className="text-orange-400 italic">undefined</span>
+                : <span className="text-orange-400 italic">{t('undefined')}</span>
               }
             </div>
           ))}

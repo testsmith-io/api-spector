@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../../store';
 import { Modal } from './Modal';
+import { LOCALES, useLocale, useT, type Locale } from '../../i18n';
 
 const { electron } = window;
 
@@ -22,6 +23,8 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
   const zoom    = useStore(s => s.zoom);
   const setTheme = useStore(s => s.setTheme);
   const setZoom  = useStore(s => s.setZoom);
+  const [locale, setLocale] = useLocale();
+  const t = useT();
 
   const existing = workspace?.settings ?? {};
 
@@ -56,7 +59,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
     try {
       if (cloudToken.trim()) await electron.setSecret('cloud:token', cloudToken.trim());
       const me = await electron.cloudTest();
-      setCloudTest({ status: 'ok', msg: `Connected as ${me.email} · ${me.organization} (${me.plan})` });
+      setCloudTest({ status: 'ok', msg: t('Connected as :email · :organization (:plan)', { email: me.email, organization: me.organization, plan: me.plan }) });
     } catch (e) {
       setCloudTest({ status: 'err', msg: (e as Error).message });
     }
@@ -81,7 +84,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
   const [oidc, setOidc] = useState<{ status: 'idle' | 'busy' | 'ok' | 'err'; msg?: string }>({ status: 'idle' });
 
   async function vaultOidcLogin() {
-    setOidc({ status: 'busy', msg: 'Complete the sign-in in your browser…' });
+    setOidc({ status: 'busy', msg: t('Complete the sign-in in your browser…') });
     try {
       const r = await electron.vaultOidcLogin({
         address: vAddress.trim(),
@@ -91,7 +94,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
         skipVerify: vSkipVerify,
       });
       const mins = Math.round((r.expiresInSeconds ?? 0) / 60);
-      setOidc({ status: 'ok', msg: `Signed in${mins ? ` · token expires in ~${mins} min` : ''}` });
+      setOidc({ status: 'ok', msg: mins ? t('Signed in · token expires in ~:mins min', { mins }) : t('Signed in') });
     } catch (e) {
       setOidc({ status: 'err', msg: (e as Error).message });
     }
@@ -203,13 +206,13 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
   }
 
   const tabs: { id: SettingsTab; label: string }[] = [
-    { id: 'general',    label: 'General' },
-    { id: 'appearance', label: 'Appearance' },
-    { id: 'proxy',      label: 'Proxy' },
-    { id: 'tls',        label: 'TLS / Certificates' },
-    { id: 'privacy',    label: 'Privacy' },
-    { id: 'secrets',    label: 'Secrets' },
-    { id: 'cloud',      label: 'Cloud' },
+    { id: 'general',    label: t('General') },
+    { id: 'appearance', label: t('Appearance') },
+    { id: 'proxy',      label: t('Proxy') },
+    { id: 'tls',        label: t('TLS / Certificates') },
+    { id: 'privacy',    label: t('Privacy') },
+    { id: 'secrets',    label: t('Secrets') },
+    { id: 'cloud',      label: t('Cloud') },
   ];
 
   return (
@@ -217,21 +220,21 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
       onClose={onClose}
       overlayClassName="bg-black/50 z-50 flex items-start justify-center pt-16"
       panelClassName="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl w-[560px] flex flex-col max-h-[80vh]"
-      title="Workspace Settings"
+      title={t('Workspace Settings')}
     >
         {/* Tabs */}
         <div className="flex border-b border-surface-800 flex-shrink-0 px-4">
-          {tabs.map(t => (
+          {tabs.map(tab => (
             <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
               className={`px-3 py-2 text-xs border-b-2 -mb-px transition-colors ${
-                activeTab === t.id
+                activeTab === tab.id
                   ? 'border-blue-500 text-white'
                   : 'border-transparent text-surface-600 hover:text-white'
               }`}
             >
-              {t.label}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -242,22 +245,21 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
             <>
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">
-                  Default environment
+                  {t('Default environment')}
                 </label>
                 <select
                   value={defaultEnvironment}
                   onChange={e => setDefaultEnvironment(e.target.value)}
                   className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500"
                 >
-                  <option value="">(none)</option>
+                  <option value="">{t('(none)')}</option>
                   {Object.values(environments).map(({ data: env }) => (
                     <option key={env.id} value={env.name}>{env.name}</option>
                   ))}
                 </select>
               </div>
               <p className="text-surface-600 text-[11px]">
-                CLI runs without --environment use this environment, and the app selects it
-                when no environment is active.
+                {t('CLI runs without --environment use this environment, and the app selects it when no environment is active.')}
               </p>
 
               <label className="flex items-start gap-2 mt-2 cursor-pointer">
@@ -268,10 +270,9 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
                   className="mt-0.5"
                 />
                 <span className="flex flex-col gap-0.5">
-                  <span className="text-surface-200">Persist request history</span>
+                  <span className="text-surface-200">{t('Persist request history')}</span>
                   <span className="text-surface-600 text-[11px]">
-                    Save history to history.json in the workspace folder so it survives restarts.
-                    The file is gitignored. Off by default; history stays in memory otherwise.
+                    {t('Save history to history.json in the workspace folder so it survives restarts. The file is gitignored. Off by default; history stays in memory otherwise.')}
                   </span>
                 </span>
               </label>
@@ -282,20 +283,35 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
             <>
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">
-                  Theme
+                  {t('Language')}
+                </label>
+                <select
+                  value={locale}
+                  onChange={e => setLocale(e.target.value as Locale)}
+                  className="bg-surface-800 hover:bg-surface-700 text-surface-300 text-xs rounded py-1.5 px-2 outline-none"
+                >
+                  {Object.entries(LOCALES).map(([code, name]) => (
+                    <option key={code} value={code}>{name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">
+                  {t('Theme')}
                 </label>
                 <div className="flex gap-1">
-                  {(['system', 'dark', 'light'] as const).map(t => (
+                  {(['system', 'dark', 'light'] as const).map(th => (
                     <button
-                      key={t}
-                      onClick={() => setTheme(t)}
+                      key={th}
+                      onClick={() => setTheme(th)}
                       className={`flex-1 py-1.5 text-xs rounded capitalize transition-colors ${
-                        theme === t
+                        theme === th
                           ? 'bg-blue-600 text-white'
                           : 'bg-surface-800 hover:bg-surface-700 text-surface-300'
                       }`}
                     >
-                      {t === 'system' ? '⊙ Auto' : t === 'dark' ? '☾ Dark' : '☀ Light'}
+                      {th === 'system' ? t('⊙ Auto') : th === 'dark' ? t('☾ Dark') : t('☀ Light')}
                     </button>
                   ))}
                 </div>
@@ -303,7 +319,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
 
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">
-                  Interface size
+                  {t('Interface size')}
                 </label>
                 <div className="flex items-center gap-2">
                   <button
@@ -338,7 +354,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
               </div>
 
               <p className="text-surface-600 text-[11px]">
-                Theme and interface size are stored with the workspace and travel with it to other machines.
+                {t('Theme and interface size are stored with the workspace and travel with it to other machines.')}
               </p>
             </>
           )}
@@ -347,7 +363,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
             <>
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">
-                  Proxy URL
+                  {t('Proxy URL')}
                 </label>
                 <input
                   value={proxyUrl}
@@ -359,20 +375,20 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
 
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">
-                  Proxy Authentication (optional)
+                  {t('Proxy Authentication (optional)')}
                 </label>
                 <div className="flex gap-2">
                   <input
                     value={proxyUser}
                     onChange={e => setProxyUser(e.target.value)}
-                    placeholder="Username"
+                    placeholder={t('Username')}
                     className="flex-1 bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 placeholder-surface-600"
                   />
                   <input
                     type="password"
                     value={proxyPass}
                     onChange={e => setProxyPass(e.target.value)}
-                    placeholder="Password"
+                    placeholder={t('Password')}
                     className="flex-1 bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 placeholder-surface-600"
                   />
                 </div>
@@ -390,27 +406,26 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
                   className="mt-0.5 accent-blue-500"
                 />
                 <span className="flex flex-col gap-0.5">
-                  <span className="text-surface-200">Enable API Spector Cloud</span>
+                  <span className="text-surface-200">{t('Enable API Spector Cloud')}</span>
                   <span className="text-surface-600 text-[11px]">
-                    Push mocks and monitors to a hosted instance. When on, "Push to cloud" actions
-                    appear on mocks and requests.
+                    {t('Push mocks and monitors to a hosted instance. When on, "Push to cloud" actions appear on mocks and requests.')}
                   </span>
                 </span>
               </label>
 
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">
-                  API token
+                  {t('API token')}
                 </label>
                 <input
                   type="password"
                   value={cloudToken}
                   onChange={e => setCloudToken(e.target.value)}
-                  placeholder={cloudTokenSet ? '•••••••• (saved — type to replace)' : 'Paste a token from the cloud dashboard'}
+                  placeholder={cloudTokenSet ? t('•••••••• (saved — type to replace)') : t('Paste a token from the cloud dashboard')}
                   className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
                 />
                 <span className="text-surface-600 text-[11px]">
-                  Stored in your OS keychain, never in the workspace file. Create one under Tokens in the cloud dashboard.
+                  {t('Stored in your OS keychain, never in the workspace file. Create one under Tokens in the cloud dashboard.')}
                 </span>
               </div>
 
@@ -420,7 +435,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
                   disabled={cloudTest.status === 'testing'}
                   className="px-3 py-1.5 bg-surface-700 hover:bg-surface-600 disabled:opacity-40 rounded transition-colors"
                 >
-                  {cloudTest.status === 'testing' ? 'Testing…' : 'Test connection'}
+                  {cloudTest.status === 'testing' ? t('Testing…') : t('Test connection')}
                 </button>
                 {cloudTest.status === 'ok'  && <span className="text-green-400 text-[11px]">✓ {cloudTest.msg}</span>}
                 {cloudTest.status === 'err' && <span className="text-red-400 text-[11px]">✗ {cloudTest.msg}</span>}
@@ -432,7 +447,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
             <>
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">
-                  CA Certificate path
+                  {t('CA Certificate path')}
                 </label>
                 <input
                   value={caCertPath}
@@ -444,7 +459,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
 
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">
-                  Client certificate path
+                  {t('Client certificate path')}
                 </label>
                 <input
                   value={clientCertPath}
@@ -456,7 +471,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
 
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">
-                  Client key path
+                  {t('Client key path')}
                 </label>
                 <input
                   value={clientKeyPath}
@@ -473,7 +488,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
                   onChange={e => setRejectUnauthorized(e.target.checked)}
                   className="accent-blue-500"
                 />
-                <span>Reject unauthorized / self-signed certificates</span>
+                <span>{t('Reject unauthorized / self-signed certificates')}</span>
               </label>
             </>
           )}
@@ -481,7 +496,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
           {activeTab === 'privacy' && (
             <>
               <p className="text-surface-600 text-[11px]">
-                Header and variable names matching these patterns will be masked in logs and history.
+                {t('Header and variable names matching these patterns will be masked in logs and history.')}
               </p>
 
               <div className="flex flex-col gap-1">
@@ -494,7 +509,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
                     <button
                       onClick={() => removePattern(p)}
                       className="text-surface-600 hover:text-red-400 transition-colors text-sm leading-none ml-2"
-                      title="Remove pattern"
+                      title={t('Remove pattern')}
                     >
                       ×
                     </button>
@@ -507,7 +522,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
                   value={newPattern}
                   onChange={e => setNewPattern(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') addPattern(); }}
-                  placeholder="Add pattern…"
+                  placeholder={t('Add pattern…')}
                   className="flex-1 bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
                 />
                 <button
@@ -515,7 +530,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
                   disabled={!newPattern.trim()}
                   className="px-3 py-1.5 bg-surface-700 hover:bg-surface-600 disabled:opacity-40 rounded transition-colors"
                 >
-                  Add
+                  {t('Add')}
                 </button>
               </div>
             </>
@@ -523,59 +538,57 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
           {activeTab === 'secrets' && (
             <>
               <p className="text-surface-600 text-[11px]">
-                Reference secrets from an external manager instead of storing them. Put a reference like{' '}
-                <span className="font-mono text-surface-400">vault:secret/data/app#token</span> in an environment
-                variable or an auth field; it is resolved at send-time and never written to the workspace. This
-                connection config is non-secret — tokens and secret-ids come from your environment (or the Vault
-                sign-in below).
+                {t('Reference secrets from an external manager instead of storing them. Put a reference like')}{' '}
+                <span className="font-mono text-surface-400">vault:secret/data/app#token</span>{' '}
+                {t('in an environment variable or an auth field; it is resolved at send-time and never written to the workspace. This connection config is non-secret — tokens and secret-ids come from your environment (or the Vault sign-in below).')}
               </p>
 
               {/* HashiCorp Vault */}
               <div className="flex flex-col gap-2 border border-surface-800 rounded p-3">
                 <div className="text-[10px] uppercase tracking-wider text-surface-500 font-semibold">HashiCorp Vault</div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Address (VAULT_ADDR)</label>
+                  <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Address (VAULT_ADDR)')}</label>
                   <input value={vAddress} onChange={e => setVAddress(e.target.value)} placeholder="https://vault.acme.internal:8200"
                     className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600" />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Namespace</label>
-                    <input value={vNamespace} onChange={e => setVNamespace(e.target.value)} placeholder="(Enterprise)"
+                    <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Namespace')}</label>
+                    <input value={vNamespace} onChange={e => setVNamespace(e.target.value)} placeholder={t('(Enterprise)')}
                       className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600" />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Auth method</label>
+                    <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Auth method')}</label>
                     <select value={vAuthMethod} onChange={e => setVAuthMethod(e.target.value as 'token' | 'approle' | 'jwt')}
                       className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500">
-                      <option value="token">Token / OIDC</option>
-                      <option value="approle">AppRole</option>
-                      <option value="jwt">JWT (CI)</option>
+                      <option value="token">{t('Token / OIDC')}</option>
+                      <option value="approle">{t('AppRole')}</option>
+                      <option value="jwt">{t('JWT (CI)')}</option>
                     </select>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Role (AppRole/JWT/OIDC)</label>
+                    <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Role (AppRole/JWT/OIDC)')}</label>
                     <input value={vJwtRole} onChange={e => setVJwtRole(e.target.value)} placeholder="apispector"
                       className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600" />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Login mount</label>
+                    <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Login mount')}</label>
                     <input value={vLoginMount} onChange={e => setVLoginMount(e.target.value)} placeholder="oidc / approle / jwt"
                       className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600" />
                   </div>
                 </div>
                 {vAuthMethod === 'approle' && (
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Role ID <span className="text-surface-600 normal-case">(secret id via VAULT_SECRET_ID)</span></label>
+                    <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Role ID')} <span className="text-surface-600 normal-case">{t('(secret id via VAULT_SECRET_ID)')}</span></label>
                     <input value={vRoleId} onChange={e => setVRoleId(e.target.value)}
                       className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono" />
                   </div>
                 )}
                 <div className="flex items-center gap-3">
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">KV version</label>
+                    <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('KV version')}</label>
                     <select value={vKvVersion} onChange={e => setVKvVersion(e.target.value as 'auto' | '1' | '2')}
                       className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500">
                       <option value="auto">auto</option>
@@ -585,46 +598,46 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
                   </div>
                   <label className="flex items-center gap-2 mt-4 cursor-pointer">
                     <input type="checkbox" checked={vSkipVerify} onChange={e => setVSkipVerify(e.target.checked)} />
-                    <span className="text-surface-300">Skip TLS verify (dev)</span>
+                    <span className="text-surface-300">{t('Skip TLS verify (dev)')}</span>
                   </label>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
                   <button onClick={vaultOidcLogin} disabled={!vAddress.trim() || oidc.status === 'busy'}
                     className="px-3 py-1.5 bg-surface-700 hover:bg-surface-600 disabled:opacity-40 rounded transition-colors">
-                    {oidc.status === 'busy' ? 'Waiting for browser…' : 'Sign in with OIDC'}
+                    {oidc.status === 'busy' ? t('Waiting for browser…') : t('Sign in with OIDC')}
                   </button>
                   {oidc.msg && (
                     <span className={`text-[11px] ${oidc.status === 'ok' ? 'text-green-400' : oidc.status === 'err' ? 'text-red-400' : 'text-surface-500'}`}>{oidc.msg}</span>
                   )}
                 </div>
-                <p className="text-surface-600 text-[11px]">Opens your browser to sign in; the short-lived token is used for this session only.</p>
+                <p className="text-surface-600 text-[11px]">{t('Opens your browser to sign in; the short-lived token is used for this session only.')}</p>
               </div>
 
               {/* AWS / Azure / 1Password */}
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">AWS region <span className="text-surface-600 normal-case">(credentials from AWS_* env)</span></label>
+                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('AWS region')} <span className="text-surface-600 normal-case">{t('(credentials from AWS_* env)')}</span></label>
                 <input value={awsRegion} onChange={e => setAwsRegion(e.target.value)} placeholder="eu-west-1"
                   className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600" />
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Azure vault</label>
+                  <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Azure vault')}</label>
                   <input value={azVault} onChange={e => setAzVault(e.target.value)} placeholder="acme-kv"
                     className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600" />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Tenant id</label>
+                  <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Tenant id')}</label>
                   <input value={azTenantId} onChange={e => setAzTenantId(e.target.value)}
                     className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono" />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Client id</label>
+                  <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Client id')}</label>
                   <input value={azClientId} onChange={e => setAzClientId(e.target.value)}
                     className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono" />
                 </div>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">1Password Connect host <span className="text-surface-600 normal-case">(token from OP_CONNECT_TOKEN)</span></label>
+                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('1Password Connect host')} <span className="text-surface-600 normal-case">{t('(token from OP_CONNECT_TOKEN)')}</span></label>
                 <input value={opConnectHost} onChange={e => setOpConnectHost(e.target.value)} placeholder="https://op.acme.internal"
                   className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600" />
               </div>
@@ -638,13 +651,13 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
             onClick={save}
             className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-xs font-medium transition-colors"
           >
-            Save
+            {t('Save')}
           </button>
           <button
             onClick={onClose}
             className="px-4 py-1.5 bg-surface-800 hover:bg-surface-700 rounded text-xs transition-colors"
           >
-            Cancel
+            {t('Cancel')}
           </button>
         </div>
     </Modal>

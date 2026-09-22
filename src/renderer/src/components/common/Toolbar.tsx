@@ -10,12 +10,14 @@ import { DocsGeneratorModal } from './DocsGeneratorModal';
 import { ImportModal } from './ImportModal';
 import { useWorkspaceLoader } from '../../hooks/useWorkspaceLoader';
 import { colRelPath } from '../../store';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
 // ─── Toolbar ──────────────────────────────────────────────────────────────────
 
 export function Toolbar({ onOpenDocs: _onOpenDocs }: { onOpenDocs?: () => void }) {
+  const t = useT();
   const { applyWorkspace } = useWorkspaceLoader();
   const workspace = useStore(s => s.workspace);
   const closeWorkspace = useStore(s => s.closeWorkspace);
@@ -138,7 +140,7 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { onOpenDocs?: () => void }
                 className="text-[9px] tracking-wide hover:underline focus:outline-none text-left"
                 style={{ color: 'var(--text-muted)' }}
               >
-                by Testsmith
+                {t('by Testsmith')}
               </button>
             </div>
           </div>
@@ -147,16 +149,16 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { onOpenDocs?: () => void }
           <button
             onClick={() => setImportOpen(true)}
             className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors shrink-0"
-            title="Import collection (Postman, OpenAPI, Insomnia, Bruno)"
+            title={t('Import collection (Postman, OpenAPI, Insomnia, Bruno)')}
           >
-            Import
+            {t('Import')}
           </button>
 
           {/* Separator */}
           <div className="w-px h-4 bg-surface-800 mx-1 shrink-0" />
 
           {/* Environment controls (inline) */}
-          <span className="text-surface-600 text-xs shrink-0">ENV</span>
+          <span className="text-surface-600 text-xs shrink-0">{t('ENV')}</span>
           <EnvironmentBar inline />
         </div>
 
@@ -169,9 +171,9 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { onOpenDocs?: () => void }
               if (result) await applyWorkspace(result.workspace, result.workspacePath);
             }}
             className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
-            title="Open a different workspace"
+            title={t('Open a different workspace')}
           >
-            Open WS
+            {t('Open WS')}
           </button>
           <button
             onClick={async () => {
@@ -179,9 +181,9 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { onOpenDocs?: () => void }
               if (result) await applyWorkspace(result.workspace, result.workspacePath);
             }}
             className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
-            title="Create a new workspace"
+            title={t('Create a new workspace')}
           >
-            New WS
+            {t('New WS')}
           </button>
           <button
             onClick={async () => {
@@ -189,9 +191,9 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { onOpenDocs?: () => void }
               closeWorkspace();
             }}
             className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
-            title="Close current workspace"
+            title={t('Close current workspace')}
           >
-            Close WS
+            {t('Close WS')}
           </button>
 
           {/* Save */}
@@ -203,16 +205,16 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { onOpenDocs?: () => void }
                 ? 'bg-blue-700 hover:bg-blue-600 text-white'
                 : 'bg-surface-800 hover:bg-surface-700 text-surface-500'
             }`}
-            title="Save all unsaved changes"
+            title={t('Save all unsaved changes')}
           >
             {hasDirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />}
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? t('Saving…') : t('Save')}
           </button>
 
           <button
             onClick={() => setWorkspaceSettingsOpen(true)}
             className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
-            title="Workspace settings"
+            title={t('Workspace settings')}
           >
             <span style={{ fontSize: '16px', lineHeight: 1 }}>⚙</span>
           </button>
@@ -220,9 +222,9 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { onOpenDocs?: () => void }
           <button
             onClick={() => setDocsOpen(true)}
             className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
-            title="Generate API documentation"
+            title={t('Generate API documentation')}
           >
-            Docs
+            {t('Docs')}
           </button>
 
           <button
@@ -230,7 +232,7 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { onOpenDocs?: () => void }
             className={`px-2.5 py-1 text-xs rounded transition-colors font-mono ${
               showGeneratorPanel ? 'bg-blue-700 text-white' : 'bg-surface-800 hover:bg-surface-700'
             }`}
-            title="Toggle code generator"
+            title={t('Toggle code generator')}
           >
             &lt;/&gt;
           </button>

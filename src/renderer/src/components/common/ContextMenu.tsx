@@ -4,6 +4,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { DotsHorizontalIcon } from './icons';
+import { useT } from '../../i18n';
 
 // ─── Context menu ─────────────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ export function ContextMenu ( { items, x, y, onClose }: {
 }
 
 export function DotsBtn ( { items }: { items: MenuItem[] } ) {
+  const t = useT();
   const [menu, setMenu] = useState<{ x: number; y: number } | null>( null );
 
   return (
@@ -85,7 +87,7 @@ export function DotsBtn ( { items }: { items: MenuItem[] } ) {
           setMenu( { x: rect.right + 4, y: rect.top } );
         }}
         className="opacity-0 group-hover:opacity-100 px-1 py-0.5 rounded text-surface-400 hover:text-white hover:bg-surface-700 transition-all"
-        title="Options"
+        title={t('Options')}
       >
         <DotsHorizontalIcon />
       </button>

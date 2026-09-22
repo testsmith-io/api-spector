@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { FuzzReport, FuzzTargetResult, FuzzFinding, FuzzOracle, FuzzCaseTrace } from '../../../../shared/types';
 import { getMethodColor } from '../../../../shared/colors';
 import { Toast, useToast } from '../common/Toast';
+import { useT } from '../../i18n';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,7 @@ const ORACLE_META: Record<FuzzOracle, { label: string; badge: string; border: st
 // ─── Finding row ──────────────────────────────────────────────────────────────
 
 function FindingRow({ finding, onCopy }: { finding: FuzzFinding; onCopy: (text: string) => void }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const meta = ORACLE_META[finding.oracle];
   const req = finding.request;
@@ -36,10 +38,10 @@ function FindingRow({ finding, onCopy }: { finding: FuzzFinding; onCopy: (text: 
     <div className={`flex flex-col gap-1.5 px-4 py-2.5 border-l-2 ${meta.border} bg-red-950/20 rounded-r`}>
       <div className="flex items-center gap-2 flex-wrap">
         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${meta.badge}`}>
-          {meta.label}
+          {t(meta.label)}
         </span>
         <span className={`text-xs font-mono font-bold ${statusColor(finding.status)}`}>
-          {finding.status === 0 ? 'ERR' : finding.status}
+          {finding.status === 0 ? t('ERR') : finding.status}
         </span>
         <span className="text-[10px] font-mono text-surface-500 bg-surface-800 px-1.5 py-0.5 rounded">
           {finding.mutation.target}
@@ -56,7 +58,7 @@ function FindingRow({ finding, onCopy }: { finding: FuzzFinding; onCopy: (text: 
         onClick={() => setOpen(v => !v)}
         className="text-[10px] text-surface-500 hover:text-surface-300 transition-colors self-start"
       >
-        {open ? '▲ Hide sent request' : '▼ Show sent request'}
+        {open ? t('▲ Hide sent request') : t('▼ Show sent request')}
       </button>
 
       {open && (
@@ -70,9 +72,9 @@ function FindingRow({ finding, onCopy }: { finding: FuzzFinding; onCopy: (text: 
               <button
                 onClick={() => onCopy(sentText)}
                 className="text-[10px] text-surface-500 hover:text-surface-200 transition-colors shrink-0"
-                title="Copy the sent request"
+                title={t('Copy the sent request')}
               >
-                Copy
+                {t('Copy')}
               </button>
             </div>
             {req.body && (
@@ -85,7 +87,7 @@ function FindingRow({ finding, onCopy }: { finding: FuzzFinding; onCopy: (text: 
           {finding.responseSample && (
             <div className="rounded border border-surface-800 bg-surface-900 overflow-hidden">
               <div className="px-2.5 py-1.5 border-b border-surface-800 text-[10px] uppercase tracking-wider text-surface-500 font-medium">
-                Response sample
+                {t('Response sample')}
               </div>
               <pre className="text-[11px] font-mono text-surface-300 px-2.5 py-2 overflow-x-auto whitespace-pre-wrap break-words">
                 {finding.responseSample}
@@ -101,6 +103,7 @@ function FindingRow({ finding, onCopy }: { finding: FuzzFinding; onCopy: (text: 
 // ─── Operation card ───────────────────────────────────────────────────────────
 
 function OperationCard({ result, onCopy }: { result: FuzzTargetResult; onCopy: (text: string) => void }) {
+  const t = useT();
   const [open, setOpen] = useState(true);
 
   return (
@@ -117,9 +120,9 @@ function OperationCard({ result, onCopy }: { result: FuzzTargetResult; onCopy: (
           {result.url}
         </span>
         <span className="shrink-0 text-[10px] bg-red-900/50 text-red-300 rounded px-1.5 py-0.5 font-medium">
-          {result.findings.length} {result.findings.length === 1 ? 'finding' : 'findings'}
+          {t(':count finding|:count findings', { count: result.findings.length })}
         </span>
-        <span className="shrink-0 text-[11px] text-surface-500">{result.cases} cases</span>
+        <span className="shrink-0 text-[11px] text-surface-500">{t(':count cases', { count: result.cases })}</span>
         <span className="shrink-0 text-surface-600 text-xs ml-1">{open ? '▲' : '▼'}</span>
       </button>
 
@@ -145,6 +148,7 @@ function statusTone(status: number, finding: boolean): string {
 /** One case in the trace: a compact clickable summary that expands to the full
  *  request body and response. */
 function TraceRow({ trace, onCopy }: { trace: FuzzCaseTrace; onCopy: (t: string) => void }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   return (
     <div className="border-t border-surface-800 first:border-t-0">
@@ -154,23 +158,23 @@ function TraceRow({ trace, onCopy }: { trace: FuzzCaseTrace; onCopy: (t: string)
       >
         <span className="shrink-0 text-surface-600 w-3">{open ? '▾' : '▸'}</span>
         <span className={`shrink-0 font-bold w-9 ${statusTone(trace.status, trace.finding)}`}>
-          {trace.status || 'ERR'}
+          {trace.status || t('ERR')}
         </span>
         <span className="shrink-0 text-surface-300">{trace.mutation.target}</span>
         <span className="text-surface-500 truncate">{trace.mutation.kind}</span>
-        {trace.finding && <span className="ml-auto shrink-0 text-[10px] bg-red-900/50 text-red-300 rounded px-1.5 py-0.5">finding</span>}
+        {trace.finding && <span className="ml-auto shrink-0 text-[10px] bg-red-900/50 text-red-300 rounded px-1.5 py-0.5">{t('finding')}</span>}
       </button>
       {open && (
         <div className="px-3 pb-3 pt-1 flex flex-col gap-2 bg-surface-950/40">
           <p className="text-[11px] text-surface-400">{trace.mutation.description}</p>
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Request</span>
+              <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Request')}</span>
               <button
                 onClick={() => onCopy(`${trace.request.method} ${trace.request.url}\n\n${trace.request.body ?? ''}`)}
                 className="text-[10px] text-surface-500 hover:text-surface-200 transition-colors"
               >
-                copy
+                {t('copy')}
               </button>
             </div>
             <p className="text-[10px] font-mono text-surface-500 break-all">{trace.request.method} {trace.request.url}</p>
@@ -179,8 +183,8 @@ function TraceRow({ trace, onCopy }: { trace: FuzzCaseTrace; onCopy: (t: string)
             )}
           </div>
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Response ({trace.status || 'no response'})</span>
-            <pre className="text-[11px] font-mono text-surface-300 bg-surface-900 border border-surface-800 rounded px-2.5 py-2 overflow-x-auto whitespace-pre-wrap break-words">{trace.responseSample || '(empty)'}</pre>
+            <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Response (:status)', { status: trace.status || t('no response') })}</span>
+            <pre className="text-[11px] font-mono text-surface-300 bg-surface-900 border border-surface-800 rounded px-2.5 py-2 overflow-x-auto whitespace-pre-wrap break-words">{trace.responseSample || t('(empty)')}</pre>
           </div>
         </div>
       )}
@@ -189,6 +193,7 @@ function TraceRow({ trace, onCopy }: { trace: FuzzCaseTrace; onCopy: (t: string)
 }
 
 function TraceCard({ result, onCopy }: { result: FuzzTargetResult; onCopy: (t: string) => void }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   if (!result.trace?.length) return null;
   const findingCount = result.trace.filter(t => t.finding).length;
@@ -201,7 +206,7 @@ function TraceCard({ result, onCopy }: { result: FuzzTargetResult; onCopy: (t: s
         <span className={`shrink-0 text-xs font-bold font-mono w-14 ${getMethodColor(result.method)}`}>{result.method}</span>
         <span className="flex-1 text-xs text-surface-200 truncate">{result.requestName}</span>
         {findingCount > 0 && <span className="shrink-0 text-[10px] bg-red-900/50 text-red-300 rounded px-1.5 py-0.5">{findingCount}</span>}
-        <span className="shrink-0 text-[11px] text-surface-500">{result.trace.length} cases sent</span>
+        <span className="shrink-0 text-[11px] text-surface-500">{t(':count cases sent', { count: result.trace.length })}</span>
         <span className="shrink-0 text-surface-600 text-xs">{open ? '▲' : '▼'}</span>
       </button>
       {open && (
@@ -217,13 +222,14 @@ function TraceCard({ result, onCopy }: { result: FuzzTargetResult; onCopy: (t: s
 
 export function FuzzResultsPanel({ report, onClear }: { report: FuzzReport; onClear: () => void }) {
   const { toast, show: showToast } = useToast();
+  const t = useT();
 
   async function copy(text: string) {
     try {
       await navigator.clipboard.writeText(text);
-      showToast('Sent request copied to clipboard.', true);
+      showToast(t('Sent request copied to clipboard.'), true);
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Copy failed.', false);
+      showToast(e instanceof Error ? e.message : t('Copy failed.'), false);
     }
   }
 
@@ -239,25 +245,25 @@ export function FuzzResultsPanel({ report, onClear }: { report: FuzzReport; onCl
       }`}>
         <span className={`text-base font-bold ${clean5xx ? 'text-emerald-400' : 'text-red-400'}`}>
           {clean5xx
-            ? '✓ No findings'
-            : `✗ ${report.totalFindings} finding${report.totalFindings !== 1 ? 's' : ''}`}
+            ? t('✓ No findings')
+            : t('✗ :count finding|✗ :count findings', { count: report.totalFindings })}
         </span>
         <span className="text-sm text-surface-400">
-          {report.totalCases} case{report.totalCases !== 1 ? 's' : ''} across {report.results.length} operation{report.results.length !== 1 ? 's' : ''}
+          {t(':cases across :operations', { cases: t(':count case|:count cases', { count: report.totalCases }), operations: t(':count operation|:count operations', { count: report.results.length }) })}
         </span>
         <span className="text-[11px] bg-surface-800 text-surface-400 px-2 py-0.5 rounded font-mono">
-          {report.inputSource === 'spec' ? 'spec' : 'request body'}
+          {report.inputSource === 'spec' ? t('spec') : t('request body')}
         </span>
         <span className="text-[11px] bg-surface-800 text-surface-400 px-2 py-0.5 rounded font-mono">
-          seed {report.seed}
+          {t('seed :seed', { seed: report.seed })}
         </span>
         <span className="text-xs text-surface-500 ml-auto">{report.durationMs}ms</span>
         <button
           onClick={onClear}
           className="text-[11px] text-surface-600 hover:text-surface-300 transition-colors"
-          title="Clear results"
+          title={t('Clear results')}
         >
-          Clear
+          {t('Clear')}
         </button>
       </div>
 
@@ -266,12 +272,12 @@ export function FuzzResultsPanel({ report, onClear }: { report: FuzzReport; onCl
         <div className="flex flex-col gap-1 px-6 py-2 border-b border-surface-800 bg-surface-900/60 flex-shrink-0">
           {report.skippedWrites > 0 && (
             <p className="text-[11px] text-amber-400">
-              {report.skippedWrites} write-method request{report.skippedWrites !== 1 ? 's' : ''} skipped (enable Include write methods).
+              {t(':count write-method request skipped (enable Include write methods).|:count write-method requests skipped (enable Include write methods).', { count: report.skippedWrites })}
             </p>
           )}
           {report.skippedNoBody > 0 && (
             <p className="text-[11px] text-surface-500">
-              {report.skippedNoBody} request{report.skippedNoBody !== 1 ? 's' : ''} had no body to fuzz.
+              {t(':count request had no body to fuzz.|:count requests had no body to fuzz.', { count: report.skippedNoBody })}
             </p>
           )}
         </div>
@@ -286,7 +292,7 @@ export function FuzzResultsPanel({ report, onClear }: { report: FuzzReport; onCl
           {clean.length > 0 && (
             <div className="rounded-lg border border-surface-700 bg-surface-800 px-4 py-3">
               <p className="text-xs text-emerald-400 font-medium mb-1.5">
-                {clean.length} operation{clean.length !== 1 ? 's' : ''} clean
+                {t(':count operation clean|:count operations clean', { count: clean.length })}
               </p>
               <div className="flex flex-col gap-0.5">
                 {clean.map(r => (
@@ -295,7 +301,7 @@ export function FuzzResultsPanel({ report, onClear }: { report: FuzzReport; onCl
                       {r.method}
                     </span>
                     <span className="text-surface-300 truncate">{r.requestName}</span>
-                    <span className="text-surface-600 ml-auto shrink-0">{r.cases} cases</span>
+                    <span className="text-surface-600 ml-auto shrink-0">{t(':count cases', { count: r.cases })}</span>
                   </div>
                 ))}
               </div>
@@ -304,14 +310,14 @@ export function FuzzResultsPanel({ report, onClear }: { report: FuzzReport; onCl
 
           {report.results.some(r => r.trace?.length) && (
             <div className="flex flex-col gap-2">
-              <p className="text-[10px] uppercase tracking-wider text-surface-600 font-medium mt-2">All cases sent</p>
+              <p className="text-[10px] uppercase tracking-wider text-surface-600 font-medium mt-2">{t('All cases sent')}</p>
               {report.results.filter(r => r.trace?.length).map(r => <TraceCard key={r.requestId} result={r} onCopy={copy} />)}
             </div>
           )}
 
           {report.results.length === 0 && (
             <p className="text-xs text-surface-500 text-center mt-4">
-              No operations were fuzzed. Check that requests have a body or a matching spec operation.
+              {t('No operations were fuzzed. Check that requests have a body or a matching spec operation.')}
             </p>
           )}
         </div>

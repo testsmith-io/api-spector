@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: MIT
 
 import type { SentRequest } from '../../../../shared/types';
+import { useT } from '../../i18n';
 
 export function RequestPanel({ sentRequest }: { sentRequest: SentRequest | null }) {
+  const t = useT();
   if (!sentRequest) {
     return (
       <div className="flex items-center justify-center h-full text-surface-400 text-xs">
-        Send a request to see what was transmitted.
+        {t('Send a request to see what was transmitted.')}
       </div>
     );
   }
@@ -24,9 +26,9 @@ export function RequestPanel({ sentRequest }: { sentRequest: SentRequest | null 
 
       {/* Headers */}
       <div className="px-4 py-2 border-b border-surface-800">
-        <p className="text-[10px] text-surface-400 uppercase tracking-wider font-medium mb-1.5">Headers</p>
+        <p className="text-[10px] text-surface-400 uppercase tracking-wider font-medium mb-1.5">{t('Headers')}</p>
         {Object.keys(sentRequest.headers).length === 0 ? (
-          <span className="text-surface-600">No headers sent</span>
+          <span className="text-surface-600">{t('No headers sent')}</span>
         ) : (
           <table className="w-full">
             <tbody>
@@ -44,7 +46,7 @@ export function RequestPanel({ sentRequest }: { sentRequest: SentRequest | null 
       {/* Body */}
       {hasBody && (
         <div className="px-4 py-2">
-          <p className="text-[10px] text-surface-400 uppercase tracking-wider font-medium mb-1.5">Body</p>
+          <p className="text-[10px] text-surface-400 uppercase tracking-wider font-medium mb-1.5">{t('Body')}</p>
           <pre className="text-white whitespace-pre-wrap break-all text-[11px]">{sentRequest.body}</pre>
         </div>
       )}

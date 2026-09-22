@@ -7,6 +7,7 @@ import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
 import CodeMirror from '@uiw/react-codemirror';
 import { oneDark } from '@codemirror/theme-one-dark';
 import type { GeneratedFile, GenerateTarget } from '../../../../shared/types';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
@@ -29,6 +30,7 @@ const TARGETS: TargetDef[] = [
 ];
 
 export function GeneratorPanel() {
+  const t = useT();
   const setShowGeneratorPanel = useStore(s => s.setShowGeneratorPanel);
   const collections           = useStore(s => s.collections);
   const environments          = useStore(s => s.environments);
@@ -82,13 +84,13 @@ export function GeneratorPanel() {
   }
 
   const selectedContent = files.find(f => f.path === selectedFile)?.content ?? '';
-  const activeTarget = TARGETS.find(t => t.id === target);
+  const activeTarget = TARGETS.find(tgt => tgt.id === target);
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-surface-800 flex-shrink-0">
-        <h2 className="text-sm font-semibold">Code Generator</h2>
+        <h2 className="text-sm font-semibold">{t('Code Generator')}</h2>
         <button
           onClick={() => setShowGeneratorPanel(false)}
           className="text-surface-400 hover:text-white text-lg leading-none"
@@ -99,7 +101,7 @@ export function GeneratorPanel() {
       <div className="px-4 py-3 border-b border-surface-800 flex flex-col gap-3 flex-shrink-0">
         {/* Collection selector */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-surface-400">Collection</label>
+          <label className="text-xs text-surface-400">{t('Collection')}</label>
           <select
             value={selectedCollectionId}
             onChange={e => setSelectedCollectionId(e.target.value)}
@@ -113,30 +115,30 @@ export function GeneratorPanel() {
 
         {/* Target selector */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-surface-400">Output format</label>
+          <label className="text-xs text-surface-400">{t('Output format')}</label>
           <div className="grid grid-cols-2 gap-1.5">
-            {TARGETS.map(t => (
+            {TARGETS.map(tgt => (
               <label
-                key={t.id}
+                key={tgt.id}
                 className={`flex items-center gap-1.5 cursor-pointer rounded px-2 py-1 border transition-colors ${
-                  target === t.id
+                  target === tgt.id
                     ? 'border-blue-500 bg-blue-900/20 text-white'
                     : 'border-surface-700 text-surface-400 hover:border-surface-500 hover:text-white'
                 }`}
               >
                 <input
                   type="radio"
-                  value={t.id}
-                  checked={target === t.id}
-                  onChange={() => setTarget(t.id)}
+                  value={tgt.id}
+                  checked={target === tgt.id}
+                  onChange={() => setTarget(tgt.id)}
                   className="sr-only"
                 />
-                <span className="text-xs font-medium">{t.label}</span>
+                <span className="text-xs font-medium">{tgt.label}</span>
               </label>
             ))}
           </div>
           {activeTarget && (
-            <p className="text-[10px] text-surface-400">{activeTarget.description}</p>
+            <p className="text-[10px] text-surface-400">{t(activeTarget.description)}</p>
           )}
         </div>
 
@@ -147,14 +149,14 @@ export function GeneratorPanel() {
             disabled={generating || !selectedCollectionId}
             className="flex-1 px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 disabled:bg-surface-800 disabled:text-surface-400 rounded transition-colors"
           >
-            {generating ? 'Generating…' : 'Generate'}
+            {generating ? t('Generating…') : t('Generate')}
           </button>
           {files.length > 0 && (
             <button
               onClick={saveZip}
               className="px-3 py-1.5 text-xs bg-emerald-700 hover:bg-emerald-600 rounded transition-colors"
             >
-              Save as ZIP
+              {t('Save as ZIP')}
             </button>
           )}
         </div>
@@ -201,7 +203,7 @@ export function GeneratorPanel() {
 
       {files.length === 0 && !generating && (
         <div className="flex-1 flex items-center justify-center text-surface-400 text-xs text-center px-6">
-          Select a collection and hit Generate to preview the output code.
+          {t('Select a collection and hit Generate to preview the output code.')}
         </div>
       )}
     </div>

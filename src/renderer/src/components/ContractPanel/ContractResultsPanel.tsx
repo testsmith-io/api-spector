@@ -6,6 +6,7 @@ import { useStore } from '../../store';
 import type { ContractResult, ContractViolation } from '../../../../shared/types';
 import { getMethodColor } from '../../../../shared/colors';
 import { Toast, useToast } from '../common/Toast';
+import { useT } from '../../i18n';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -17,6 +18,7 @@ function statusColor(code: number): string {
 // ─── Violation row ────────────────────────────────────────────────────────────
 
 function ViolationRow({ v }: { v: ContractViolation }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-1 px-4 py-2.5 border-l-2 border-red-600 bg-red-950/20 rounded-r">
       <div className="flex items-center gap-2 flex-wrap">
@@ -34,13 +36,13 @@ function ViolationRow({ v }: { v: ContractViolation }) {
         <div className="flex gap-4 text-[11px] font-mono mt-0.5">
           {v.expected && (
             <span>
-              <span className="text-surface-500">expected </span>
+              <span className="text-surface-500">{t('expected')} </span>
               <span className="text-emerald-400">{v.expected}</span>
             </span>
           )}
           {v.actual && (
             <span>
-              <span className="text-surface-500">actual </span>
+              <span className="text-surface-500">{t('actual')} </span>
               <span className="text-red-400">{v.actual}</span>
             </span>
           )}
@@ -53,6 +55,7 @@ function ViolationRow({ v }: { v: ContractViolation }) {
 // ─── Result card ─────────────────────────────────────────────────────────────
 
 function ResultCard({ result }: { result: ContractResult }) {
+  const t = useT();
   const [open, setOpen] = useState(!result.passed);
 
   return (
@@ -72,7 +75,7 @@ function ResultCard({ result }: { result: ContractResult }) {
             ? 'bg-emerald-900/50 text-emerald-400'
             : 'bg-red-900/50 text-red-400'
         }`}>
-          {result.passed ? 'PASS' : 'FAIL'}
+          {result.passed ? t('PASS') : t('FAIL')}
         </span>
 
         {/* Method */}
@@ -105,7 +108,7 @@ function ResultCard({ result }: { result: ContractResult }) {
         {/* Violation count */}
         {result.violations.length > 0 && (
           <span className="shrink-0 text-[10px] bg-red-900/50 text-red-300 rounded px-1.5 py-0.5 font-medium">
-            {result.violations.length} {result.violations.length === 1 ? 'issue' : 'issues'}
+            {t(':count issue|:count issues', { count: result.violations.length })}
           </span>
         )}
 
@@ -116,7 +119,7 @@ function ResultCard({ result }: { result: ContractResult }) {
       {open && (
         <div className="px-4 py-3 bg-surface-900 border-t border-surface-800 flex flex-col gap-2">
           {result.violations.length === 0 ? (
-            <p className="text-xs text-emerald-400">All expectations met.</p>
+            <p className="text-xs text-emerald-400">{t('All expectations met.')}</p>
           ) : (
             result.violations.map((v, i) => <ViolationRow key={i} v={v} />)
           )}
@@ -140,11 +143,12 @@ export function ContractResultsPanel() {
   const [version, setVersion]         = useState('');
   const [saving, setSaving]           = useState(false);
   const { toast, show: showToast }    = useToast();
+  const t = useT();
 
   async function recordRun() {
     if (!report) return;
     if (!pacticipant.trim() || !version.trim()) {
-      showToast('Pacticipant and version are required to record.', false);
+      showToast(t('Pacticipant and version are required to record.'), false);
       return;
     }
     setSaving(true);
@@ -154,7 +158,7 @@ export function ContractResultsPanel() {
         version: version.trim(),
         report,
       });
-      showToast(`Recorded ${pacticipant.trim()}@${version.trim()} for the dashboard and can-i-deploy.`, true);
+      showToast(t('Recorded :name@:version for the dashboard and can-i-deploy.', { name: pacticipant.trim(), version: version.trim() }), true);
       setRecordOpen(false);
     } catch (e) {
       showToast(e instanceof Error ? e.message : String(e), false);
@@ -167,13 +171,13 @@ export function ContractResultsPanel() {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
         <span className="text-4xl opacity-30">🔬</span>
-        <p className="text-sm text-surface-500">No contract run yet.</p>
-        <p className="text-xs text-surface-600">Configure a mode in the Contracts panel and click Run.</p>
+        <p className="text-sm text-surface-500">{t('No contract run yet.')}</p>
+        <p className="text-xs text-surface-600">{t('Configure a mode in the Contracts panel and click Run.')}</p>
       </div>
     );
   }
 
-  const modeLabel = report.mode === 'bidirectional' ? 'Bi-directional' : report.mode.charAt(0).toUpperCase() + report.mode.slice(1);
+  const modeLabel = report.mode === 'bidirectional' ? t('Bi-directional') : report.mode.charAt(0).toUpperCase() + report.mode.slice(1);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -184,10 +188,10 @@ export function ContractResultsPanel() {
           : 'bg-red-950/30 border-red-800/50'
       }`}>
         <span className={`text-base font-bold ${report.failed === 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-          {report.failed === 0 ? '✓ All passed' : `✗ ${report.failed} failed`}
+          {report.failed === 0 ? t('✓ All passed') : t('✗ :count failed', { count: report.failed })}
         </span>
         <span className="text-sm text-surface-400">
-          {report.passed} / {report.total} passed
+          {t(':passed / :total passed', { passed: report.passed, total: report.total })}
         </span>
         <span className="text-[11px] bg-surface-800 text-surface-400 px-2 py-0.5 rounded font-mono">
           {modeLabel}
@@ -201,25 +205,25 @@ export function ContractResultsPanel() {
             setRecordOpen(o => !o);
           }}
           className="text-[11px] text-surface-500 hover:text-surface-200 transition-colors"
-          title="Record this run for the contract dashboard and can-i-deploy gate"
+          title={t('Record this run for the contract dashboard and can-i-deploy gate')}
         >
-          Record
+          {t('Record')}
         </button>
         <button
           onClick={() => window.electron.exportContractReportHtml(report, {
             spec: runMeta?.spec, provider: runMeta?.provider,
           })}
           className="text-[11px] text-surface-500 hover:text-surface-200 transition-colors"
-          title="Export a self-contained HTML report"
+          title={t('Export a self-contained HTML report')}
         >
-          Export HTML
+          {t('Export HTML')}
         </button>
         <button
           onClick={() => clearReport(null)}
           className="text-[11px] text-surface-600 hover:text-surface-300 transition-colors"
-          title="Clear results"
+          title={t('Clear results')}
         >
-          Clear
+          {t('Clear')}
         </button>
       </div>
 
@@ -229,13 +233,13 @@ export function ContractResultsPanel() {
           <input
             value={pacticipant}
             onChange={e => setPacticipant(e.target.value)}
-            placeholder="pacticipant (e.g. web-app)"
+            placeholder={t('pacticipant (e.g. web-app)')}
             className="bg-surface-800 border border-surface-700 rounded px-2 py-1 text-xs w-48 focus:outline-none focus:border-blue-500"
           />
           <input
             value={version}
             onChange={e => setVersion(e.target.value)}
-            placeholder="version (e.g. 1.4.0)"
+            placeholder={t('version (e.g. 1.4.0)')}
             className="bg-surface-800 border border-surface-700 rounded px-2 py-1 text-xs w-32 focus:outline-none focus:border-blue-500"
           />
           <button
@@ -243,10 +247,10 @@ export function ContractResultsPanel() {
             disabled={saving}
             className="text-[11px] px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold disabled:opacity-50 transition-colors"
           >
-            {saving ? 'Recording...' : 'Record result'}
+            {saving ? t('Recording...') : t('Record result')}
           </button>
           <span className="text-[10px] text-surface-500">
-            Writes to contracts/results/ in the workspace; the dashboard picks it up on refresh.
+            {t('Writes to contracts/results/ in the workspace; the dashboard picks it up on refresh.')}
           </span>
         </div>
       )}

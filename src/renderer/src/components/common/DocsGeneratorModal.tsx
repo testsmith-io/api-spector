@@ -6,6 +6,7 @@ import { useStore } from '../../store';
 import CodeMirror from '@uiw/react-codemirror';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { Modal } from './Modal';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export function DocsGeneratorModal({ onClose }: Props) {
+  const t = useT();
   const collections = useStore(s => s.collections);
 
   const collectionList = Object.values(collections);
@@ -40,12 +42,12 @@ export function DocsGeneratorModal({ onClose }: Props) {
     // generated docs include real example bodies, not just templates.
     const tabs = useStore.getState().tabs;
     const examples: Record<string, { sent?: unknown; response?: unknown }> = {};
-    for (const t of tabs) {
-      if (!t.requestId) continue;
-      if (!t.lastSentRequest && !t.lastResponse) continue;
-      examples[t.requestId] = {
-        sent:     t.lastSentRequest ?? undefined,
-        response: t.lastResponse    ?? undefined,
+    for (const tab of tabs) {
+      if (!tab.requestId) continue;
+      if (!tab.lastSentRequest && !tab.lastResponse) continue;
+      examples[tab.requestId] = {
+        sent:     tab.lastSentRequest ?? undefined,
+        response: tab.lastResponse    ?? undefined,
       };
     }
     return {
@@ -93,7 +95,7 @@ export function DocsGeneratorModal({ onClose }: Props) {
     >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-surface-800 flex-shrink-0">
-          <span className="text-sm font-semibold text-white">Generate API Documentation</span>
+          <span className="text-sm font-semibold text-white">{t('Generate API Documentation')}</span>
           <button
             onClick={onClose}
             className="text-surface-600 hover:text-white transition-colors text-lg leading-none"
@@ -106,10 +108,10 @@ export function DocsGeneratorModal({ onClose }: Props) {
           {/* Collection selector */}
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-600 mb-2">
-              Collections to include
+              {t('Collections to include')}
             </p>
             {collectionList.length === 0 ? (
-              <p className="text-xs text-surface-600">No collections loaded.</p>
+              <p className="text-xs text-surface-600">{t('No collections loaded.')}</p>
             ) : (
               <div className="flex flex-col gap-1">
                 {collectionList.map(c => (
@@ -122,7 +124,7 @@ export function DocsGeneratorModal({ onClose }: Props) {
                     />
                     <span className="text-sm text-surface-300">{c.data.name}</span>
                     <span className="text-xs text-surface-600">
-                      ({Object.keys(c.data.requests).length} requests)
+                      {t('(:count request)|(:count requests)', { count: Object.keys(c.data.requests).length })}
                     </span>
                   </label>
                 ))}
@@ -132,7 +134,7 @@ export function DocsGeneratorModal({ onClose }: Props) {
 
           {/* Format selector */}
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-600 mb-2">Format</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-600 mb-2">{t('Format')}</p>
             <div className="flex gap-3">
               {(['markdown', 'html'] as const).map(f => (
                 <label key={f} className="flex items-center gap-1.5 cursor-pointer">
@@ -144,7 +146,7 @@ export function DocsGeneratorModal({ onClose }: Props) {
                     className="accent-blue-500"
                   />
                   <span className={`text-sm ${format === f ? 'text-white' : 'text-surface-600'}`}>
-                    {f === 'markdown' ? 'Markdown (.md)' : 'HTML (.html)'}
+                    {f === 'markdown' ? t('Markdown (.md)') : t('HTML (.html)')}
                   </span>
                 </label>
               ))}
@@ -160,12 +162,12 @@ export function DocsGeneratorModal({ onClose }: Props) {
           {preview !== null && (
             <div>
               <div className="flex items-center justify-between mb-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-600">Preview</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-600">{t('Preview')}</p>
                 <button
                   onClick={() => setPreview(null)}
                   className="text-[10px] text-surface-600 hover:text-surface-400 transition-colors"
                 >
-                  Close preview
+                  {t('Close preview')}
                 </button>
               </div>
               <div className="rounded overflow-hidden border border-surface-700" style={{ height: 280 }}>
@@ -188,21 +190,21 @@ export function DocsGeneratorModal({ onClose }: Props) {
             onClick={onClose}
             className="px-3 py-1.5 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
           >
-            Cancel
+            {t('Cancel')}
           </button>
           <button
             onClick={handlePreview}
             disabled={generating || selectedIds.size === 0}
             className="px-3 py-1.5 text-xs bg-surface-700 hover:bg-surface-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors"
           >
-            {generating ? 'Generating…' : 'Preview'}
+            {generating ? t('Generating…') : t('Preview')}
           </button>
           <button
             onClick={handleGenerateAndSave}
             disabled={generating || selectedIds.size === 0}
             className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors"
           >
-            {generating ? 'Generating…' : 'Generate & Save'}
+            {generating ? t('Generating…') : t('Generate & Save')}
           </button>
         </div>
     </Modal>

@@ -5,6 +5,7 @@ import { useState, useMemo } from 'react';
 import { useStore } from '../../store';
 import type { ApiRequest } from '../../../../shared/types';
 import { Modal } from '../common/Modal';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
@@ -78,6 +79,7 @@ export function SchemaSyncModal({
   scope?: SchemaSyncScope
   onClose: () => void
 }) {
+  const t = useT();
   const collections = useStore(s => s.collections);
   const updateRequest = useStore(s => s.updateRequest);
   const markCollectionClean = useStore(s => s.markCollectionClean);
@@ -149,10 +151,10 @@ export function SchemaSyncModal({
   }
 
   const scopeLabel = scope.type === 'request'
-    ? (col ? Object.values(col.requests).find(r => r.id === scope.requestId)?.name : '') ?? 'request'
+    ? (col ? Object.values(col.requests).find(r => r.id === scope.requestId)?.name : '') ?? t('request')
     : scope.type === 'folder'
-      ? findFolder(col?.rootFolder, scope.folderId)?.name ?? 'folder'
-      : col?.name ?? 'collection';
+      ? findFolder(col?.rootFolder, scope.folderId)?.name ?? t('folder')
+      : col?.name ?? t('collection');
 
   async function loadFromFile() {
     setLoading(true);
@@ -234,26 +236,26 @@ export function SchemaSyncModal({
       >
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-surface-100">
-              Sync schemas - {scopeLabel}
+              {t('Sync schemas - :name', { name: scopeLabel })}
             </h2>
             <button onClick={onClose} className="text-surface-500 hover:text-surface-300 text-lg leading-none">×</button>
           </div>
 
           {/* Stats */}
           <div className="flex items-center gap-3 text-xs">
-            <span className="text-surface-400">{specEntries.length} operations in spec</span>
+            <span className="text-surface-400">{t(':count operations in spec', { count: specEntries.length })}</span>
             <span className="text-surface-400">·</span>
-            <span className="text-surface-400">{matches.length} matched to existing requests</span>
+            <span className="text-surface-400">{t(':count matched to existing requests', { count: matches.length })}</span>
             {changedCount > 0 && (
               <>
                 <span className="text-surface-400">·</span>
-                <span className="text-amber-400 font-medium">{changedCount} changed</span>
+                <span className="text-amber-400 font-medium">{t(':count changed', { count: changedCount })}</span>
               </>
             )}
             {unchangedCount > 0 && (
               <>
                 <span className="text-surface-400">·</span>
-                <span className="text-emerald-400">{unchangedCount} unchanged</span>
+                <span className="text-emerald-400">{t(':count unchanged', { count: unchangedCount })}</span>
               </>
             )}
           </div>
@@ -261,11 +263,11 @@ export function SchemaSyncModal({
           {/* Controls */}
           <div className="flex items-center justify-between">
             <p className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">
-              Select schemas to update ({selected.size})
+              {t('Select schemas to update (:count)', { count: selected.size })}
             </p>
             <div className="flex gap-2">
-              <button onClick={selectAllChanged} className="text-[10px] text-blue-400 hover:text-blue-300">Select changed</button>
-              <button onClick={selectNone} className="text-[10px] text-blue-400 hover:text-blue-300">Select none</button>
+              <button onClick={selectAllChanged} className="text-[10px] text-blue-400 hover:text-blue-300">{t('Select changed')}</button>
+              <button onClick={selectNone} className="text-[10px] text-blue-400 hover:text-blue-300">{t('Select none')}</button>
             </div>
           </div>
 
@@ -273,8 +275,7 @@ export function SchemaSyncModal({
           <div className="flex-1 min-h-0 overflow-y-auto border border-surface-800 rounded-lg">
             {matches.length === 0 ? (
               <p className="p-4 text-xs text-surface-500">
-                No operations from the spec matched any request in this collection.
-                Matching uses HTTP method + URL path.
+                {t('No operations from the spec matched any request in this collection. Matching uses HTTP method + URL path.')}
               </p>
             ) : (
               matches.map(m => {
@@ -300,7 +301,7 @@ export function SchemaSyncModal({
                       <div className="text-[10px] text-surface-500 font-mono truncate">{m.specEntry.pathTemplate}</div>
                     </div>
                     <span className={`text-[10px] shrink-0 ${m.changed ? 'text-amber-400' : 'text-emerald-400'}`}>
-                      {m.changed ? 'changed' : 'up to date'}
+                      {m.changed ? t('changed') : t('up to date')}
                     </span>
                   </label>
                 );
@@ -310,7 +311,7 @@ export function SchemaSyncModal({
             {specEntries.length > matches.length && (
               <div className="px-3 py-2 border-t border-surface-700">
                 <p className="text-[10px] text-surface-500">
-                  {specEntries.length - matches.length} operations not matched (no request with matching method + path)
+                  {t(':count operations not matched (no request with matching method + path)', { count: specEntries.length - matches.length })}
                 </p>
               </div>
             )}
@@ -323,21 +324,21 @@ export function SchemaSyncModal({
               onClick={() => setSpecEntries(null)}
               className="px-3 py-1.5 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
             >
-              Back
+              {t('Back')}
             </button>
             <div className="flex gap-2">
               <button
                 onClick={onClose}
                 className="px-3 py-1.5 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
               >
-                Cancel
+                {t('Cancel')}
               </button>
               <button
                 disabled={loading || selected.size === 0}
                 onClick={applySync}
                 className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors"
               >
-                {loading ? 'Updating…' : `Update ${selected.size} schema${selected.size !== 1 ? 's' : ''}`}
+                {loading ? t('Updating…') : t('Update :count schema|Update :count schemas', { count: selected.size })}
               </button>
             </div>
           </div>
@@ -353,14 +354,12 @@ export function SchemaSyncModal({
       panelClassName="bg-surface-900 border border-surface-700 rounded-xl shadow-2xl w-[420px] p-5 flex flex-col gap-4"
     >
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-surface-100">Sync schemas from OpenAPI</h2>
+          <h2 className="text-sm font-semibold text-surface-100">{t('Sync schemas from OpenAPI')}</h2>
           <button onClick={onClose} className="text-surface-500 hover:text-surface-300 text-lg leading-none">×</button>
         </div>
 
         <p className="text-xs text-surface-400">
-          Load an OpenAPI spec to update response schemas on existing requests.
-          Matching uses HTTP method + URL path. Only schemas are touched - URLs,
-          params, headers, auth, and scripts are preserved.
+          {t('Load an OpenAPI spec to update response schemas on existing requests. Matching uses HTTP method + URL path. Only schemas are touched - URLs, params, headers, auth, and scripts are preserved.')}
         </p>
 
         <button
@@ -368,11 +367,11 @@ export function SchemaSyncModal({
           disabled={loading}
           className="px-3 py-2 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors font-medium"
         >
-          {loading ? 'Loading…' : 'Choose file…'}
+          {loading ? t('Loading…') : t('Choose file…')}
         </button>
 
         <div className="flex flex-col gap-2">
-          <p className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">Or load from URL</p>
+          <p className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">{t('Or load from URL')}</p>
           <div className="flex gap-2">
             <input
               value={url}
@@ -386,7 +385,7 @@ export function SchemaSyncModal({
               disabled={!url.trim() || loading}
               className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors whitespace-nowrap"
             >
-              {loading ? 'Loading…' : 'From URL'}
+              {loading ? t('Loading…') : t('From URL')}
             </button>
           </div>
         </div>
@@ -398,7 +397,7 @@ export function SchemaSyncModal({
             onClick={onClose}
             className="px-3 py-1.5 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
           >
-            Cancel
+            {t('Cancel')}
           </button>
         </div>
     </Modal>

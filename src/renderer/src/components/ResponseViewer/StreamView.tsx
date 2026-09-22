@@ -3,6 +3,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import type { StreamEvent, StreamClose } from '../../../../shared/types';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
@@ -47,6 +48,7 @@ interface Props {
 }
 
 export function StreamView({ events, streaming, streamId, streamClose, firstEventMs }: Props) {
+  const t = useT();
   const [mode, setMode] = useState<'events' | 'merged'>('events');
   const [stopping, setStopping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -73,20 +75,20 @@ export function StreamView({ events, streaming, streamId, streamClose, firstEven
           {streaming ? (
             <>
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-emerald-400 font-medium">streaming</span>
+              <span className="text-emerald-400 font-medium">{t('streaming')}</span>
             </>
           ) : (
             <>
               <span className={`w-2 h-2 rounded-full ${streamClose === 'error' ? 'bg-red-400' : streamClose === 'timeout' ? 'bg-amber-400' : 'bg-surface-500'}`} />
               <span className={streamClose ? CLOSE_COLOR[streamClose] : 'text-surface-400'}>
-                {streamClose ? CLOSE_LABEL[streamClose] : 'closed'}
+                {streamClose ? t(CLOSE_LABEL[streamClose]) : t('closed')}
               </span>
             </>
           )}
         </span>
-        <span className="text-surface-400 font-mono">{events.length} {events.length === 1 ? 'event' : 'events'}</span>
+        <span className="text-surface-400 font-mono">{t(':count event|:count events', { count: events.length })}</span>
         {firstMs !== undefined && (
-          <span className="text-surface-500 font-mono" title="Time to first event">first +{firstMs}ms</span>
+          <span className="text-surface-500 font-mono" title={t('Time to first event')}>{t('first +:ms ms', { ms: firstMs })}</span>
         )}
 
         <div className="ml-auto flex items-center gap-2">
@@ -94,18 +96,18 @@ export function StreamView({ events, streaming, streamId, streamClose, firstEven
             <button
               onClick={() => setMode('events')}
               className={`px-2 py-0.5 text-[10px] transition-colors ${mode === 'events' ? 'bg-surface-700 text-white' : 'text-surface-500 hover:text-white'}`}
-            >Events</button>
+            >{t('Events')}</button>
             <button
               onClick={() => setMode('merged')}
               className={`px-2 py-0.5 text-[10px] transition-colors ${mode === 'merged' ? 'bg-surface-700 text-white' : 'text-surface-500 hover:text-white'}`}
-            >Merged</button>
+            >{t('Merged')}</button>
           </div>
           {streaming && streamId && (
             <button
               onClick={stop}
               disabled={stopping}
               className="px-2 py-0.5 text-[10px] rounded bg-red-900/40 text-red-300 hover:bg-red-900/60 disabled:opacity-50 transition-colors"
-            >{stopping ? 'Stopping…' : 'Stop'}</button>
+            >{stopping ? t('Stopping…') : t('Stop')}</button>
           )}
         </div>
       </div>
@@ -113,7 +115,7 @@ export function StreamView({ events, streaming, streamId, streamClose, firstEven
       {/* Body */}
       {events.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-surface-500 text-xs">
-          {streaming ? 'Waiting for the first event…' : 'No events received.'}
+          {streaming ? t('Waiting for the first event…') : t('No events received.')}
         </div>
       ) : mode === 'merged' ? (
         <pre className="flex-1 overflow-auto m-0 px-3 py-2 text-[11px] font-mono text-surface-300 whitespace-pre-wrap break-words">
@@ -123,7 +125,7 @@ export function StreamView({ events, streaming, streamId, streamClose, firstEven
         <div className="flex-1 overflow-auto min-h-0">
           {events.length > RENDER_TAIL && (
             <p className="px-3 py-1 text-[10px] text-surface-500 bg-surface-900/50 sticky top-0">
-              showing the last {RENDER_TAIL} of {events.length} events
+              {t('showing the last :max of :total events', { max: RENDER_TAIL, total: events.length })}
             </p>
           )}
           {shown.map(ev => {
@@ -134,7 +136,7 @@ export function StreamView({ events, streaming, streamId, streamClose, firstEven
                 {name && (
                   <span className="text-[9px] font-mono px-1 py-px rounded bg-surface-700/60 text-surface-300 shrink-0">{name}</span>
                 )}
-                <span className="text-[9px] font-mono text-surface-600 shrink-0 tabular-nums" title="Time since request start">+{ev.tMs}ms</span>
+                <span className="text-[9px] font-mono text-surface-600 shrink-0 tabular-nums" title={t('Time since request start')}>+{ev.tMs}ms</span>
                 <span className="text-[11px] font-mono text-surface-200 truncate" title={ev.data}>{preview(ev)}</span>
               </div>
             );

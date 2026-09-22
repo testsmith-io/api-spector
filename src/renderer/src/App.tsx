@@ -27,6 +27,7 @@ import { GitDiffPane } from './components/GitPanel/GitDiffPane';
 import { GitPanel } from './components/GitPanel/GitPanel';
 import { CommandPalette } from './components/common/CommandPalette';
 import { DocsGeneratorModal } from './components/common/DocsGeneratorModal';
+import { useT } from './i18n';
 
 const { electron } = window;
 
@@ -149,6 +150,7 @@ interface TabRowProps {
 const TabRow = React.memo( function TabRow ( {
   tabId, method, name, isActive, onActivate, onClose, onContextMenu,
 }: TabRowProps ) {
+  const t = useT();
   return (
     <div
       onClick={() => onActivate( tabId )}
@@ -172,7 +174,7 @@ const TabRow = React.memo( function TabRow ( {
       <button
         onClick={e => { e.stopPropagation(); onClose( tabId ); }}
         className="ml-auto opacity-0 group-hover:opacity-100 shrink-0 text-surface-600 hover:text-white transition-all leading-none"
-        title="Close tab"
+        title={t( 'Close tab' )}
       >
         ×
       </button>
@@ -181,6 +183,7 @@ const TabRow = React.memo( function TabRow ( {
 } );
 
 export default function App () {
+  const t = useT();
   useAutoSave();
   const { applyWorkspace } = useWorkspaceLoader();
   const workspace = useStore( s => s.workspace );
@@ -412,14 +415,14 @@ export default function App () {
             <ActivityBarBtn
               active={sidebarOpen && sidebarTab === 'collections'}
               onClick={() => selectPanel( 'collections' )}
-              title="Collections"
+              title={t( 'Collections' )}
             >
               <IconCollections />
             </ActivityBarBtn>
             <ActivityBarBtn
               active={sidebarOpen && sidebarTab === 'history'}
               onClick={() => selectPanel( 'history' )}
-              title="History"
+              title={t( 'History' )}
               badge={historyCount}
             >
               <IconHistory />
@@ -427,21 +430,21 @@ export default function App () {
             <ActivityBarBtn
               active={sidebarOpen && sidebarTab === 'mocks'}
               onClick={() => selectPanel( 'mocks' )}
-              title="Mock servers"
+              title={t( 'Mock servers' )}
             >
               <IconMock />
             </ActivityBarBtn>
             <ActivityBarBtn
               active={sidebarOpen && sidebarTab === 'contracts'}
               onClick={() => selectPanel( 'contracts' )}
-              title="Contract testing"
+              title={t( 'Contract testing' )}
             >
               <IconContract />
             </ActivityBarBtn>
             <ActivityBarBtn
               active={sidebarOpen && sidebarTab === 'git'}
               onClick={() => selectPanel( 'git' )}
-              title="Git"
+              title={t( 'Git' )}
             >
               <IconGit />
             </ActivityBarBtn>
@@ -453,7 +456,7 @@ export default function App () {
               <aside style={{ width: sidebarWidth }} className="flex-shrink-0 flex flex-col overflow-hidden">
                 <div className="px-3 py-2 flex items-center justify-between border-b border-surface-800 flex-shrink-0">
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-600">
-                    {sidebarTab === 'collections' ? 'Collections' : sidebarTab === 'history' ? 'History' : sidebarTab === 'mocks' ? 'Mocks' : sidebarTab === 'git' ? 'Git' : 'Contracts'}
+                    {sidebarTab === 'collections' ? t( 'Collections' ) : sidebarTab === 'history' ? t( 'History' ) : sidebarTab === 'mocks' ? t( 'Mocks' ) : sidebarTab === 'git' ? t( 'Git' ) : t( 'Contracts' )}
                   </span>
                   <div className="flex items-center gap-1.5">
                     {sidebarTab === 'history' && historyCount > 0 && (
@@ -464,13 +467,13 @@ export default function App () {
                     {sidebarTab === 'collections' && (
                       <button
                         onClick={() => addCollection( 'New Collection' )}
-                        title="New collection"
+                        title={t( 'New collection' )}
                         className="text-surface-600 hover:text-surface-300 transition-colors text-sm leading-none px-0.5"
                       >+</button>
                     )}
                     <button
                       onClick={() => setSidebarOpen( false )}
-                      title="Collapse sidebar"
+                      title={t( 'Collapse sidebar' )}
                       className="text-surface-600 hover:text-surface-300 transition-colors text-sm leading-none px-0.5"
                     >‹</button>
                   </div>
@@ -496,7 +499,7 @@ export default function App () {
           ) : (
             <button
               onClick={() => setSidebarOpen( true )}
-              title="Expand sidebar"
+              title={t( 'Expand sidebar' )}
               className="flex-shrink-0 w-5 flex items-center justify-center border-r border-surface-800 bg-surface-950 hover:bg-surface-800 text-surface-700 hover:text-surface-300 transition-colors"
             >
               <span className="text-xs">›</span>
@@ -517,7 +520,7 @@ export default function App () {
                         key={tab.id}
                         tabId={tab.id}
                         method={req?.method}
-                        name={exampleName ? `${req?.name ?? 'Untitled'} · ${exampleName}` : ( req?.name ?? 'Untitled' )}
+                        name={exampleName ? `${req?.name ?? t( 'Untitled' )} · ${exampleName}` : ( req?.name ?? t( 'Untitled' ) )}
                         isActive={tab.id === activeTabId}
                         onActivate={setActiveTabId}
                         onClose={closeTab}
@@ -529,10 +532,10 @@ export default function App () {
                 {/* Close-all button, always at the far right of the tab strip */}
                 <button
                   onClick={closeAllTabs}
-                  title="Close all tabs"
+                  title={t( 'Close all tabs' )}
                   className="flex-shrink-0 px-2 py-1.5 text-surface-500 hover:text-white hover:bg-surface-900/50 border-l border-surface-800 text-xs leading-none transition-colors"
                 >
-                  ⨯ all
+                  {t( '⨯ all' )}
                 </button>
               </div>
             )}
@@ -553,20 +556,20 @@ export default function App () {
                     onClick={() => { closeTab( tabContextMenu.tabId ); setTabContextMenu( null ); }}
                     className="w-full text-left px-3 py-1.5 text-surface-300 hover:bg-surface-800 hover:text-white transition-colors"
                   >
-                    Close
+                    {t( 'Close' )}
                   </button>
                   <button
                     onClick={() => { closeOtherTabs( tabContextMenu.tabId ); setTabContextMenu( null ); }}
                     disabled={tabs.length < 2}
                     className="w-full text-left px-3 py-1.5 text-surface-300 hover:bg-surface-800 hover:text-white disabled:text-surface-600 disabled:hover:bg-transparent transition-colors"
                   >
-                    Close others
+                    {t( 'Close others' )}
                   </button>
                   <button
                     onClick={() => { closeAllTabs(); setTabContextMenu( null ); }}
                     className="w-full text-left px-3 py-1.5 text-surface-300 hover:bg-surface-800 hover:text-white transition-colors"
                   >
-                    Close all
+                    {t( 'Close all' )}
                   </button>
                 </div>
               </>
@@ -651,7 +654,7 @@ export default function App () {
                 >
                   <button
                     onClick={() => setResponseOpen( v => !v )}
-                    title={responseOpen ? 'Collapse response' : 'Expand response'}
+                    title={responseOpen ? t( 'Collapse response' ) : t( 'Expand response' )}
                     className="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 w-4 h-8 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 bg-surface-800 text-surface-400 hover:text-white transition-all text-xs z-10"
                   >
                     {responseOpen ? '›' : '‹'}

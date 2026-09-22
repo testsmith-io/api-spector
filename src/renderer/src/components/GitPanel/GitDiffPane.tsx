@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../../store';
 import { DiffViewer } from './GitPanel';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
@@ -11,6 +12,7 @@ const { electron } = window;
  *  clicks a changed file in the Git sidebar. Avoids the cramped 12rem strip
  *  that used to live inside the sidebar. */
 export function GitDiffPane() {
+  const t             = useT();
   const active        = useStore(s => s.activeGitDiff);
   const setActive     = useStore(s => s.setActiveGitDiff);
   const [diff, setDiff]       = useState('');
@@ -40,7 +42,7 @@ export function GitDiffPane() {
   if (!active) {
     return (
       <div className="flex-1 flex items-center justify-center text-xs text-surface-500">
-        Select a changed file in the sidebar to view its diff.
+        {t('Select a changed file in the sidebar to view its diff.')}
       </div>
     );
   }
@@ -54,13 +56,13 @@ export function GitDiffPane() {
             active.staged ? 'text-emerald-400' : 'text-amber-400'
           }`}
         >
-          {active.staged ? 'Staged' : 'Working tree'}
+          {active.staged ? t('Staged') : t('Working tree')}
         </span>
         <span className="text-xs font-mono text-surface-200 truncate flex-1">{active.path}</span>
         <button
           onClick={() => setActive(null)}
           className="text-surface-500 hover:text-white text-xs leading-none"
-          title="Close diff"
+          title={t('Close diff')}
         >
           ✕
         </button>
@@ -68,7 +70,7 @@ export function GitDiffPane() {
 
       {/* Body */}
       <div className="flex-1 overflow-auto min-h-0">
-        {loading && <p className="text-xs text-surface-500 p-4">Loading diff…</p>}
+        {loading && <p className="text-xs text-surface-500 p-4">{t('Loading diff…')}</p>}
         {error   && <p className="text-xs text-red-400 p-4">{error}</p>}
         {!loading && !error && <DiffViewer diff={diff} />}
       </div>

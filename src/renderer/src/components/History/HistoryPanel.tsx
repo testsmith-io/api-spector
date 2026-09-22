@@ -6,8 +6,11 @@ import { useStore } from '../../store';
 import type { HistoryEntry } from '../../../../shared/types';
 import { historyToHar } from '../../../../shared/har';
 import { MethodBadge } from '../common/MethodBadge';
+import { useT } from '../../i18n';
 
 const { electron } = window;
+
+type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
 const STATUS_COLOR: Record<string, string> = {
   '2': 'text-emerald-400',
@@ -24,17 +27,18 @@ function formatTime(ts: number): string {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-function formatDate(ts: number): string {
+function formatDate(ts: number, t: TFn): string {
   const d = new Date(ts);
   const today = new Date();
-  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === today.toDateString()) return t('Today');
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  if (d.toDateString() === yesterday.toDateString()) return t('Yesterday');
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 export function HistoryPanel() {
+  const t = useT();
   const history = useStore(s => s.history);
   const clearHistory = useStore(s => s.clearHistory);
   const activeTabId = useStore(s => s.activeTabId);
@@ -56,7 +60,7 @@ export function HistoryPanel() {
   // Group by date label
   const groups: { label: string; entries: HistoryEntry[] }[] = [];
   for (const entry of filtered) {
-    const label = formatDate(entry.timestamp);
+    const label = formatDate(entry.timestamp, t);
     const last = groups.at(-1);
     if (last?.label === label) {
       last.entries.push(entry);
@@ -104,7 +108,7 @@ export function HistoryPanel() {
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Filter history…"
+          placeholder={t('Filter history…')}
           className="flex-1 bg-surface-800 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
         {history.length > 0 && (
@@ -112,16 +116,16 @@ export function HistoryPanel() {
             <button
               onClick={downloadHar}
               className="text-xs text-surface-400 hover:text-surface-100 transition-colors px-1"
-              title="Download history as a HAR file"
+              title={t('Download history as a HAR file')}
             >
               HAR
             </button>
             <button
               onClick={() => { clearHistory(); setSelected(null); }}
               className="text-xs text-surface-400 hover:text-red-400 transition-colors px-1"
-              title="Clear all history"
+              title={t('Clear all history')}
             >
-              Clear
+              {t('Clear')}
             </button>
           </>
         )}
@@ -129,12 +133,12 @@ export function HistoryPanel() {
 
       {history.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-xs text-surface-400 px-4 text-center">
-          No history yet. Send a request to start recording.
+          {t('No history yet. Send a request to start recording.')}
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto">
           {filtered.length === 0 && (
-            <p className="px-3 py-4 text-xs text-surface-400">No matches.</p>
+            <p className="px-3 py-4 text-xs text-surface-400">{t('No matches.')}</p>
           )}
           {groups.map(group => (
             <div key={group.label}>
@@ -166,6 +170,7 @@ function HistoryRow({
   onSelect: () => void
   onResend?: () => void
 }) {
+  const t = useT();
   const status = entry.response.status;
   const hasError = !!entry.response.error;
 
@@ -185,14 +190,14 @@ function HistoryRow({
         {onResend && (
           <button
             onClick={e => { e.stopPropagation(); onResend(); }}
-            title="Send this request again"
+            title={t('Send this request again')}
             className="text-[10px] text-emerald-400 hover:text-emerald-300 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
           >
-            resend
+            {t('resend')}
           </button>
         )}
         {hasError ? (
-          <span className="text-red-400 text-[10px] font-medium shrink-0">ERR</span>
+          <span className="text-red-400 text-[10px] font-medium shrink-0">{t('ERR')}</span>
         ) : (
           <span className={`text-[10px] font-bold shrink-0 ${statusColor(status)}`}>{status}</span>
         )}
@@ -205,7 +210,7 @@ function HistoryRow({
         </div>
       </div>
       {entry.environmentName && (
-        <div className="text-[10px] text-surface-400 mt-0.5">env: {entry.environmentName}</div>
+        <div className="text-[10px] text-surface-400 mt-0.5">{t('env: :name', { name: entry.environmentName })}</div>
       )}
     </div>
   );

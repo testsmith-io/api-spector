@@ -5,6 +5,7 @@ import type { ResponsePayload } from '../../../../shared/types';
 import { getStatusColor } from '../../../../shared/colors';
 import { prettyJson } from './utils/formatters';
 import { computeLineDiff, type DiffLineType } from './utils/diffEngine';
+import { useT } from '../../i18n';
 
 const lineStyle: Record<DiffLineType, string> = {
   equal: 'text-surface-400',
@@ -19,6 +20,7 @@ const linePrefix: Record<DiffLineType, string> = {
 };
 
 export function DiffView({ pinned, current }: { pinned: ResponsePayload; current: ResponsePayload }) {
+  const t = useT();
   const pinnedBody = prettyJson(pinned.body);
   const currentBody = prettyJson(current.body);
   const diffLines = computeLineDiff(pinnedBody, currentBody);
@@ -28,13 +30,13 @@ export function DiffView({ pinned, current }: { pinned: ResponsePayload; current
       {/* Status row */}
       <div className="flex items-center gap-6 px-4 py-2 border-b border-surface-800 text-xs shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-surface-600 font-medium uppercase text-[10px] tracking-wider">Pinned</span>
+          <span className="text-surface-600 font-medium uppercase text-[10px] tracking-wider">{t('Pinned')}</span>
           <span className={`font-bold ${getStatusColor(pinned.status)}`}>{pinned.status} {pinned.statusText}</span>
           <span className="text-surface-400">{pinned.durationMs}ms</span>
         </div>
-        <span className="text-surface-400">vs</span>
+        <span className="text-surface-400">{t('vs')}</span>
         <div className="flex items-center gap-2">
-          <span className="text-surface-600 font-medium uppercase text-[10px] tracking-wider">Current</span>
+          <span className="text-surface-600 font-medium uppercase text-[10px] tracking-wider">{t('Current')}</span>
           <span className={`font-bold ${getStatusColor(current.status)}`}>{current.status} {current.statusText}</span>
           <span className="text-surface-400">{current.durationMs}ms</span>
         </div>
@@ -53,7 +55,7 @@ export function DiffView({ pinned, current }: { pinned: ResponsePayload; current
         ))}
         {diffLines.length === 0 && (
           <div className="flex items-center justify-center h-full text-surface-600">
-            No differences found
+            {t('No differences found')}
           </div>
         )}
       </div>

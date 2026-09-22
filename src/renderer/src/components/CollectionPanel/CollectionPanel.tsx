@@ -5,10 +5,12 @@ import { useState } from 'react';
 import { useStore } from '../../store';
 import type { DataSet } from '../../../../shared/types';
 import { DataSetEditor } from '../common/DataSetEditor';
+import { useT } from '../../i18n';
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function CollectionPanel() {
+  const t = useT();
   const activeCollectionId        = useStore(s => s.activeCollectionId);
   const collections               = useStore(s => s.collections);
   const updateCollectionDataSet   = useStore(s => s.updateCollectionDataSet);
@@ -21,7 +23,7 @@ export function CollectionPanel() {
   if (!activeCollectionId) {
     return (
       <div className="flex items-center justify-center h-full text-surface-400 text-sm">
-        Select a request from the sidebar
+        {t('Select a request from the sidebar')}
       </div>
     );
   }
@@ -44,24 +46,24 @@ export function CollectionPanel() {
         <div>
           <h1 className="text-sm font-semibold">{col.name}</h1>
           <p className="text-[10px] text-surface-400 mt-0.5">
-            {Object.keys(col.requests).length} requests
-            {iterCount > 0 ? ` · ${iterCount} data row${iterCount !== 1 ? 's' : ''}` : ''}
+            {t(':count requests', { count: Object.keys(col.requests).length })}
+            {iterCount > 0 ? ` · ${t(':count data row|:count data rows', { count: iterCount })}` : ''}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setCoverageOpen(true)}
-            title="Measure how much of an OpenAPI spec this workspace tests"
+            title={t('Measure how much of an OpenAPI spec this workspace tests')}
             className="px-3 py-1.5 text-xs border border-surface-700 text-surface-300 hover:text-white hover:border-surface-500 rounded font-medium transition-colors"
           >
-            Coverage
+            {t('Coverage')}
           </button>
           <button
             onClick={() => setCompareOpen(true)}
-            title="Diff two OpenAPI versions: breaking changes and which tests they affect"
+            title={t('Diff two OpenAPI versions: breaking changes and which tests they affect')}
             className="px-3 py-1.5 text-xs border border-surface-700 text-surface-300 hover:text-white hover:border-surface-500 rounded font-medium transition-colors"
           >
-            Compare
+            {t('Compare')}
           </button>
           <button
             onClick={() => openRunner(activeCollectionId)}
@@ -70,7 +72,7 @@ export function CollectionPanel() {
             <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"/>
             </svg>
-            Run collection
+            {t('Run collection')}
           </button>
         </div>
       </div>
@@ -90,7 +92,7 @@ export function CollectionPanel() {
                 : 'border-transparent text-surface-400 hover:text-white'
             }`}
           >
-            {tab.label}
+            {t(tab.label)}
             {tab.badge > 0 && (
               <span className="ml-1 text-[10px] bg-surface-600 text-white rounded px-1 font-medium">{tab.badge}</span>
             )}
@@ -107,13 +109,13 @@ export function CollectionPanel() {
         {activeTab === 'variables' && (
           <div className="flex flex-col gap-2 text-xs text-surface-600">
             {Object.keys(col.collectionVariables ?? {}).length === 0 ? (
-              <p>No collection variables. Scripts can set them via <code className="text-surface-500">sp.collectionVariables.set(…)</code>.</p>
+              <p>{t('No collection variables. Scripts can set them via')} <code className="text-surface-500">sp.collectionVariables.set(…)</code>.</p>
             ) : (
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-surface-700 text-surface-500">
-                    <th className="px-2 py-1 text-left font-medium">Key</th>
-                    <th className="px-2 py-1 text-left font-medium">Value</th>
+                    <th className="px-2 py-1 text-left font-medium">{t('Key')}</th>
+                    <th className="px-2 py-1 text-left font-medium">{t('Value')}</th>
                   </tr>
                 </thead>
                 <tbody>

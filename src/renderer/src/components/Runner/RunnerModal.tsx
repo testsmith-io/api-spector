@@ -12,6 +12,7 @@ import { getMethodColor } from '../../../../shared/colors';
 import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
 import { EmptyState } from '../common/EmptyState';
 import { Modal } from '../common/Modal';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
@@ -64,6 +65,7 @@ function StatusDot({ status }: { status: RunRequestResult['status'] }) {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function RunnerModal() {
+  const t = useT();
   const runnerModal         = useStore(s => s.runnerModal);
   const collections         = useStore(s => s.collections);
   const environments        = useStore(s => s.environments);
@@ -86,9 +88,9 @@ export function RunnerModal() {
 
   const { collectionId, folderId } = runnerModal;
   const colEntry   = collectionId ? collections[collectionId] : null;
-  const colName    = colEntry?.data.name ?? 'Collection';
+  const colName    = colEntry?.data.name ?? t('Collection');
   const folderName = folderId && colEntry
-    ? (findFolder(colEntry.data.rootFolder, folderId)?.name ?? 'Folder')
+    ? (findFolder(colEntry.data.rootFolder, folderId)?.name ?? t('Folder'))
     : null;
 
   // When running a folder, its own dataset wins; otherwise use the collection's.
@@ -115,7 +117,7 @@ export function RunnerModal() {
   }, [runnerModal.open]);
 
   const toggleTag = (tag: string) =>
-    setFilterTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    setFilterTags(prev => prev.includes(tag) ? prev.filter(tg => tg !== tag) : [...prev, tag]);
 
   // ── Run ───────────────────────────────────────────────────────────────────
 
@@ -218,11 +220,11 @@ export function RunnerModal() {
       onClose={closeRunner}
       overlayClassName="bg-black/50 z-50 flex items-start justify-center pt-16"
       panelClassName="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl flex flex-col w-[680px] max-h-[80vh]"
-      title={folderName ? `Run: ${folderName}` : `Run: ${colName}`}
+      title={folderName ? t('Run: :name', { name: folderName }) : t('Run: :name', { name: colName })}
       subtitle={
         <>
-          {folderName ? `Folder in ${colName}` : 'Full collection'}
-          {iterCount > 0 ? ` · ${iterCount} data iteration${iterCount !== 1 ? 's' : ''}` : ''}
+          {folderName ? t('Folder in :name', { name: colName }) : t('Full collection')}
+          {iterCount > 0 ? t(' · :count data iteration| · :count data iterations', { count: iterCount }) : ''}
         </>
       }
     >
@@ -232,20 +234,20 @@ export function RunnerModal() {
           {/* Env + Delay + Run */}
           <div className="flex gap-4 items-end">
             <div className="flex flex-col gap-1 flex-1">
-              <label className="text-[10px] text-surface-400 font-medium uppercase tracking-wider">Environment</label>
+              <label className="text-[10px] text-surface-400 font-medium uppercase tracking-wider">{t('Environment')}</label>
               <select
                 value={selectedEnvId}
                 onChange={e => setSelectedEnvId(e.target.value)}
                 className="text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
               >
-                <option value="">(no environment)</option>
+                <option value="">{t('(no environment)')}</option>
                 {Object.values(environments).map(({ data: env }) => (
                   <option key={env.id} value={env.id}>{env.name}</option>
                 ))}
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] text-surface-400 font-medium uppercase tracking-wider">Delay (ms)</label>
+              <label className="text-[10px] text-surface-400 font-medium uppercase tracking-wider">{t('Delay (ms)')}</label>
               <input
                 type="number"
                 min={0}
@@ -263,7 +265,7 @@ export function RunnerModal() {
               <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"/>
               </svg>
-              {runnerRunning ? 'Running…' : 'Run'}
+              {runnerRunning ? t('Running…') : t('Run')}
             </button>
           </div>
 
@@ -271,7 +273,7 @@ export function RunnerModal() {
           {availableTags.length > 0 && (
             <div className="flex flex-col gap-1">
               <label className="text-[10px] text-surface-400 font-medium uppercase tracking-wider">
-                Filter by tags {filterTags.length > 0 ? `(${filterTags.length} active)` : '(all)'}
+                {t('Filter by tags')} {filterTags.length > 0 ? t('(:count active)', { count: filterTags.length }) : t('(all)')}
               </label>
               <div className="flex flex-wrap gap-1">
                 {availableTags.map(tag => (
@@ -294,37 +296,37 @@ export function RunnerModal() {
           {/* Data info */}
           {iterCount > 0 && (
             <p className="text-[10px] text-surface-500">
-              Data: {iterCount} iteration{iterCount !== 1 ? 's' : ''} · {dataSet.columns.join(', ')}
+              {t('Data: :count iteration · :columns|Data: :count iterations · :columns', { count: iterCount, columns: dataSet.columns.join(', ') })}
             </p>
           )}
 
           {/* CI/CD export */}
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] text-surface-400 font-medium uppercase tracking-wider">Export CI/CD</label>
+            <label className="text-[10px] text-surface-400 font-medium uppercase tracking-wider">{t('Export CI/CD')}</label>
             <div className="flex flex-wrap gap-1.5">
               <button
                 className="px-2 py-1 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors whitespace-nowrap"
                 onClick={() => copyCI('cli', buildCliArgs('./workspace.json', envName, filterTags))}
               >
-                {copiedKey === 'cli' ? '✓ Copied' : '⊞ CLI command'}
+                {copiedKey === 'cli' ? t('✓ Copied') : t('⊞ CLI command')}
               </button>
               <button
                 className="px-2 py-1 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors whitespace-nowrap"
                 onClick={() => copyCI('gh', generateGitHub(envName, filterTags))}
               >
-                {copiedKey === 'gh' ? '✓ Copied' : '⊞ GitHub Actions'}
+                {copiedKey === 'gh' ? t('✓ Copied') : t('⊞ GitHub Actions')}
               </button>
               <button
                 className="px-2 py-1 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors whitespace-nowrap"
                 onClick={() => copyCI('az', generateAzure(envName, filterTags))}
               >
-                {copiedKey === 'az' ? '✓ Copied' : '⊞ Azure Pipelines'}
+                {copiedKey === 'az' ? t('✓ Copied') : t('⊞ Azure Pipelines')}
               </button>
               <button
                 className="px-2 py-1 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors whitespace-nowrap"
                 onClick={() => copyCI('gl', generateGitLab(envName, filterTags))}
               >
-                {copiedKey === 'gl' ? '✓ Copied' : '⊞ GitLab CI'}
+                {copiedKey === 'gl' ? t('✓ Copied') : t('⊞ GitLab CI')}
               </button>
             </div>
           </div>
@@ -334,7 +336,7 @@ export function RunnerModal() {
         {/* Results */}
         <div className="flex-1 overflow-y-auto">
           {runnerResults.length === 0 ? (
-            <EmptyState message="Configure the run above and press Run." />
+            <EmptyState message={t('Configure the run above and press Run.')} />
           ) : (
             <table className="w-full text-xs">
               <tbody>
@@ -360,7 +362,7 @@ export function RunnerModal() {
                     <td className="py-2 pr-2 w-20">
                       {r.isHook && r.hookType ? (
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide whitespace-nowrap ${HOOK_BADGE[r.hookType]?.cls ?? ''}`}>
-                          {HOOK_BADGE[r.hookType]?.label}
+                          {t(HOOK_BADGE[r.hookType]?.label ?? '')}
                         </span>
                       ) : (
                         <span className={`text-[10px] font-bold ${getMethodColor(r.method)}`}>{r.method}</span>
@@ -381,7 +383,7 @@ export function RunnerModal() {
                           {r.httpStatus}
                         </span>
                       ) : r.error ? (
-                        <span className="text-red-400 text-[10px]">error</span>
+                        <span className="text-red-400 text-[10px]">{t('error')}</span>
                       ) : null}
                     </td>
                     <td className="py-2 pr-4 text-right w-16 text-surface-400">
@@ -390,16 +392,16 @@ export function RunnerModal() {
                     <td className="py-2 pr-4 w-24">
                       {r.testResults && r.testResults.length > 0 && (
                         <span className={`text-[10px] ${
-                          r.testResults.every(t => t.passed) ? 'text-emerald-400' : 'text-red-400'
+                          r.testResults.every(tr => tr.passed) ? 'text-emerald-400' : 'text-red-400'
                         }`}>
-                          {r.testResults.filter(t => t.passed).length}/{r.testResults.length} tests
+                          {t(':passed/:total tests', { passed: r.testResults.filter(tr => tr.passed).length, total: r.testResults.length })}
                         </span>
                       )}
                       {r.error && !r.error.startsWith('Skipped') && (
-                        <span className="text-[10px] text-orange-400" title={r.error}>⚠ {r.error.slice(0, 30)}</span>
+                        <span className="text-[10px] text-orange-400" title={r.error}>{t('⚠ :error', { error: r.error.slice(0, 30) })}</span>
                       )}
                       {r.error?.startsWith('Skipped') && (
-                        <span className="text-[10px] text-surface-500 italic">skipped</span>
+                        <span className="text-[10px] text-surface-500 italic">{t('skipped')}</span>
                       )}
                     </td>
                   </tr>
@@ -414,15 +416,15 @@ export function RunnerModal() {
         {/* Summary bar */}
         {summary && (
           <div className="flex items-center gap-3 px-4 py-2 border-t border-surface-800 bg-surface-800/30 flex-shrink-0 text-xs">
-            <span className="text-emerald-400 font-medium">{summary.passed} passed</span>
-            {summary.failed > 0 && <span className="text-red-400 font-medium">{summary.failed} failed</span>}
-            {summary.errors > 0 && <span className="text-orange-400 font-medium">{summary.errors} errors</span>}
+            <span className="text-emerald-400 font-medium">{t(':count passed', { count: summary.passed })}</span>
+            {summary.failed > 0 && <span className="text-red-400 font-medium">{t(':count failed', { count: summary.failed })}</span>}
+            {summary.errors > 0 && <span className="text-orange-400 font-medium">{t(':count errors', { count: summary.errors })}</span>}
             {summary.skipped > 0 && (
-              <span className="text-surface-400 font-medium" title="Requests with no assertions to verify">
-                {summary.skipped} no tests
+              <span className="text-surface-400 font-medium" title={t('Requests with no assertions to verify')}>
+                {t(':count no tests', { count: summary.skipped })}
               </span>
             )}
-            <span className="text-surface-400">{summary.total} total · {summary.durationMs}ms</span>
+            <span className="text-surface-400">{t(':count total', { count: summary.total })} · {summary.durationMs}ms</span>
 
             <div className="ml-auto flex items-center gap-1.5">
               <select
@@ -450,7 +452,7 @@ export function RunnerModal() {
                 }}
                 className="px-2.5 py-0.5 bg-surface-800 hover:bg-surface-700 rounded transition-colors text-[11px] whitespace-nowrap"
               >
-                Export results
+                {t('Export results')}
               </button>
             </div>
           </div>

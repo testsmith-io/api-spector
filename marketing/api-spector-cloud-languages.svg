@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img" aria-label="API Spector Cloud is now available in seven languages: German, English, Spanish, French, Italian, Dutch and Portuguese" font-family="'Segoe UI', Arial, Helvetica, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a1420"/><stop offset="55" stop-color="#0d2038"/><stop offset="100" stop-color="#123a60"/></linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5497c8"/><stop offset="1" stop-color="#205d96"/></linearGradient>
+    <radialGradient id="g-body" cx="35%" cy="22%" r="70%"><stop offset="0%" stop-color="#5497c8"/><stop offset="55%" stop-color="#205d96"/><stop offset="100%" stop-color="#123a60"/></radialGradient>
+    <linearGradient id="g-gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="white" stop-opacity="0.45"/><stop offset="100%" stop-color="white" stop-opacity="0.0"/></linearGradient>
+    <clipPath id="g-clip"><path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z"/></clipPath>
+  </defs>
+
+  <rect width="1080" height="1080" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1080" height="8" fill="url(#brand)"/>
+
+  <!-- ghost logo, top-right -->
+  <g transform="translate(724,70) scale(0.56)">
+    <ellipse cx="256" cy="420" rx="130" ry="18" fill="black" opacity="0.18"/>
+    <path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z" fill="url(#g-body)"/>
+    <ellipse cx="198" cy="262" rx="29" ry="33" fill="white"/><ellipse cx="314" cy="262" rx="29" ry="33" fill="white"/>
+    <ellipse cx="204" cy="268" rx="16" ry="20" fill="#0b1624"/><ellipse cx="320" cy="268" rx="16" ry="20" fill="#0b1624"/>
+    <ellipse cx="192" cy="252" rx="6" ry="7" fill="white" opacity="0.65"/><ellipse cx="308" cy="252" rx="6" ry="7" fill="white" opacity="0.65"/>
+    <ellipse cx="256" cy="100" rx="200" ry="180" fill="url(#g-gloss)" clip-path="url(#g-clip)"/>
+  </g>
+
+  <!-- pill -->
+  <g>
+    <rect x="90" y="118" width="320" height="52" rx="26" fill="none" stroke="#5497c8" stroke-width="2"/>
+    <circle cx="120" cy="144" r="6" fill="#3fb950"/>
+    <text x="140" y="152" fill="#8fb0cf" font-size="22" font-weight="700" letter-spacing="1">API SPECTOR CLOUD</text>
+  </g>
+
+  <text x="92" y="248" fill="#5497c8" font-size="27" font-weight="700" letter-spacing="4">SPEAKS YOUR LANGUAGE</text>
+
+  <text x="90" y="344" fill="#eaf2fb" font-size="82" font-weight="800" letter-spacing="-1">Now available</text>
+  <text x="90" y="432" fill="#eaf2fb" font-size="82" font-weight="800" letter-spacing="-1">in <tspan fill="#5497c8">7 languages</tspan></text>
+
+  <text x="92" y="492" fill="#b7cde3" font-size="31" font-weight="600">One workspace for your whole team &#183; in their own language</text>
+
+  <!-- language panel -->
+  <rect x="90" y="524" width="900" height="404" rx="14" fill="#0b1624" stroke="#21344a" stroke-width="2"/>
+  <g transform="translate(126,600)">
+    <g transform="translate(0,-20)"><clipPath id="clDE"><rect width="60" height="40" rx="5"/></clipPath><g clip-path="url(#clDE)"><rect width="60" height="13.33" y="0" fill="#000"/><rect width="60" height="13.33" y="13.33" fill="#DD0000"/><rect width="60" height="13.34" y="26.66" fill="#FFCE00"/></g><rect width="60" height="40" rx="5" fill="none" stroke="#0b1624" stroke-opacity="0.6" stroke-width="1.5"/></g>
+    <text x="82" y="-2" font-size="30" font-weight="700" fill="#eaf2fb">Deutsch</text>
+    <text x="82" y="26" font-size="20" font-weight="500" fill="#7f9cb8">German &#183; de</text>
+  </g><g transform="translate(126,690)">
+    <g transform="translate(0,-20)"><clipPath id="clES"><rect width="60" height="40" rx="5"/></clipPath><g clip-path="url(#clES)"><rect width="60" height="10" y="0" fill="#AA151B"/><rect width="60" height="20" y="10" fill="#F1BF00"/><rect width="60" height="10" y="30" fill="#AA151B"/></g><rect width="60" height="40" rx="5" fill="none" stroke="#0b1624" stroke-opacity="0.6" stroke-width="1.5"/></g>
+    <text x="82" y="-2" font-size="30" font-weight="700" fill="#eaf2fb">Español</text>
+    <text x="82" y="26" font-size="20" font-weight="500" fill="#7f9cb8">Spanish &#183; es</text>
+  </g><g transform="translate(126,780)">
+    <g transform="translate(0,-20)"><clipPath id="clIT"><rect width="60" height="40" rx="5"/></clipPath><g clip-path="url(#clIT)"><rect width="20" height="40" x="0" fill="#009246"/><rect width="20" height="40" x="20" fill="#fff"/><rect width="20" height="40" x="40" fill="#CE2B37"/></g><rect width="60" height="40" rx="5" fill="none" stroke="#0b1624" stroke-opacity="0.6" stroke-width="1.5"/></g>
+    <text x="82" y="-2" font-size="30" font-weight="700" fill="#eaf2fb">Italiano</text>
+    <text x="82" y="26" font-size="20" font-weight="500" fill="#7f9cb8">Italian &#183; it</text>
+  </g><g transform="translate(126,870)">
+    <g transform="translate(0,-20)"><clipPath id="clNL"><rect width="60" height="40" rx="5"/></clipPath><g clip-path="url(#clNL)"><rect width="60" height="13.33" y="0" fill="#AE1C28"/><rect width="60" height="13.33" y="13.33" fill="#fff"/><rect width="60" height="13.34" y="26.66" fill="#21468B"/></g><rect width="60" height="40" rx="5" fill="none" stroke="#0b1624" stroke-opacity="0.6" stroke-width="1.5"/></g>
+    <text x="82" y="-2" font-size="30" font-weight="700" fill="#eaf2fb">Nederlands</text>
+    <text x="82" y="26" font-size="20" font-weight="500" fill="#7f9cb8">Dutch &#183; nl</text>
+  </g><g transform="translate(560,600)">
+    <g transform="translate(0,-20)"><clipPath id="clEN"><rect width="60" height="40" rx="5"/></clipPath><g clip-path="url(#clEN)"><rect width="60" height="40" fill="#012169"/><path d="M0,0 60,40 M60,0 0,40" stroke="#fff" stroke-width="8"/><path d="M0,0 60,40 M60,0 0,40" stroke="#C8102E" stroke-width="4"/><rect x="24" width="12" height="40" fill="#fff"/><rect y="14" width="60" height="12" fill="#fff"/><rect x="26.5" width="7" height="40" fill="#C8102E"/><rect y="16.5" width="60" height="7" fill="#C8102E"/></g><rect width="60" height="40" rx="5" fill="none" stroke="#0b1624" stroke-opacity="0.6" stroke-width="1.5"/></g>
+    <text x="82" y="-2" font-size="30" font-weight="700" fill="#eaf2fb">English</text>
+    <text x="82" y="26" font-size="20" font-weight="500" fill="#7f9cb8">English &#183; en</text>
+  </g><g transform="translate(560,690)">
+    <g transform="translate(0,-20)"><clipPath id="clFR"><rect width="60" height="40" rx="5"/></clipPath><g clip-path="url(#clFR)"><rect width="20" height="40" x="0" fill="#0055A4"/><rect width="20" height="40" x="20" fill="#fff"/><rect width="20" height="40" x="40" fill="#EF4135"/></g><rect width="60" height="40" rx="5" fill="none" stroke="#0b1624" stroke-opacity="0.6" stroke-width="1.5"/></g>
+    <text x="82" y="-2" font-size="30" font-weight="700" fill="#eaf2fb">Français</text>
+    <text x="82" y="26" font-size="20" font-weight="500" fill="#7f9cb8">French &#183; fr</text>
+  </g><g transform="translate(560,780)">
+    <g transform="translate(0,-20)"><clipPath id="clPT"><rect width="60" height="40" rx="5"/></clipPath><g clip-path="url(#clPT)"><rect width="60" height="40" fill="#DA291C"/><rect width="24" height="40" fill="#046A38"/><circle cx="24" cy="20" r="7" fill="#FFCC00" stroke="#7a1200" stroke-width="1"/><circle cx="24" cy="20" r="3.2" fill="#fff" stroke="#003399" stroke-width="1"/></g><rect width="60" height="40" rx="5" fill="none" stroke="#0b1624" stroke-opacity="0.6" stroke-width="1.5"/></g>
+    <text x="82" y="-2" font-size="30" font-weight="700" fill="#eaf2fb">Português</text>
+    <text x="82" y="26" font-size="20" font-weight="500" fill="#7f9cb8">Portuguese &#183; pt</text>
+  </g>
+
+  <line x1="90" y1="962" x2="990" y2="962" stroke="#21344a" stroke-width="2"/>
+  <text x="90" y="1010" fill="#eaf2fb" font-size="32" font-weight="800">API Spector Cloud</text>
+  <text x="90" y="1046" fill="#7f9cb8" font-size="22" font-weight="500">Test, mock &amp; contract-test your APIs &#183; EU-built</text>
+  <text x="990" y="1030" text-anchor="end" fill="#8fb0cf" font-size="27" font-weight="700">api-spector.dev</text>
+</svg>
