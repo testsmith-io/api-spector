@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useStore } from '../../store';
 import type { MockRoute, ResponsePayload } from '../../../../shared/types';
 import { Modal } from '../common/Modal';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
@@ -20,6 +21,7 @@ function extractPath(url: string): string {
 }
 
 export function SaveAsMockModal({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const mocks = useStore(s => s.mocks);
   const addMock = useStore(s => s.addMock);
   const updateMock = useStore(s => s.updateMock);
@@ -90,13 +92,13 @@ export function SaveAsMockModal({ onClose }: { onClose: () => void }) {
       closeOnBackdrop={false}
       overlayClassName="bg-black/50 z-50 flex items-start justify-center pt-20"
       panelClassName="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl w-[520px] flex flex-col"
-      title="Save as mock route"
+      title={t('Save as mock route')}
     >
         <div className="px-4 py-4 flex flex-col gap-3 text-xs overflow-y-auto max-h-[70vh]">
 
           {/* Server selection */}
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] text-surface-400 uppercase tracking-wider font-medium">Mock server</label>
+            <label className="text-[10px] text-surface-400 uppercase tracking-wider font-medium">{t('Mock server')}</label>
             {mockList.length > 0 ? (
               <select
                 value={targetMockId}
@@ -107,7 +109,7 @@ export function SaveAsMockModal({ onClose }: { onClose: () => void }) {
                 {mockList.map(m => (
                   <option key={m.data.id} value={m.data.id}>{m.data.name} :{m.data.port}</option>
                 ))}
-                <option value="__new__">+ Create new server</option>
+                <option value="__new__">{t('+ Create new server')}</option>
               </select>
             ) : null}
           </div>
@@ -118,13 +120,13 @@ export function SaveAsMockModal({ onClose }: { onClose: () => void }) {
               <input
                 value={newServerName}
                 onChange={e => setNewServerName(e.target.value)}
-                placeholder="Server name"
+                placeholder={t('Server name')}
                 className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
               />
               <input
                 value={newServerPort}
                 onChange={e => setNewServerPort(e.target.value)}
-                placeholder="Port"
+                placeholder={t('Port')}
                 className="w-20 bg-surface-800 border border-surface-700 rounded px-2 py-1 font-mono focus:outline-none focus:border-blue-500"
               />
             </div>
@@ -145,7 +147,7 @@ export function SaveAsMockModal({ onClose }: { onClose: () => void }) {
             <input
               value={path}
               onChange={e => setPath(e.target.value)}
-              placeholder="/path"
+              placeholder={t('/path')}
               className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 font-mono focus:outline-none focus:border-blue-500"
             />
             <input
@@ -158,7 +160,7 @@ export function SaveAsMockModal({ onClose }: { onClose: () => void }) {
 
           {/* Body */}
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] text-surface-400 uppercase tracking-wider font-medium">Response body</label>
+            <label className="text-[10px] text-surface-400 uppercase tracking-wider font-medium">{t('Response body')}</label>
             <textarea
               value={body}
               onChange={e => setBody(e.target.value)}
@@ -173,13 +175,13 @@ export function SaveAsMockModal({ onClose }: { onClose: () => void }) {
               disabled={saving}
               className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-surface-800 disabled:text-surface-400 rounded font-medium transition-colors"
             >
-              {saving ? 'Saving…' : 'Add route'}
+              {saving ? t('Saving…') : t('Add route')}
             </button>
             <button
               onClick={onClose}
               className="px-4 py-1.5 bg-surface-800 hover:bg-surface-700 rounded transition-colors"
             >
-              Cancel
+              {t('Cancel')}
             </button>
           </div>
         </div>

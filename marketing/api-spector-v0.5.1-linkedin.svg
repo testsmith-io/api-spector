@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img" aria-label="API Spector version 0.5.1: visualize array responses as a sortable table, for JSON and XML, with drill-into nested data and breadcrumbs" font-family="'Segoe UI', Arial, Helvetica, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a1420"/>
+      <stop offset="55" stop-color="#0d2038"/>
+      <stop offset="100" stop-color="#123a60"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5497c8"/>
+      <stop offset="1" stop-color="#205d96"/>
+    </linearGradient>
+    <radialGradient id="g-body" cx="35%" cy="22%" r="70%">
+      <stop offset="0%" stop-color="#5497c8"/>
+      <stop offset="55%" stop-color="#205d96"/>
+      <stop offset="100%" stop-color="#123a60"/>
+    </radialGradient>
+    <linearGradient id="g-gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="white" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0.0"/>
+    </linearGradient>
+    <clipPath id="g-clip">
+      <path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1080" height="1080" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1080" height="8" fill="url(#brand)"/>
+
+  <!-- ghost logo, top-right -->
+  <g transform="translate(724,70) scale(0.56)">
+    <ellipse cx="256" cy="420" rx="130" ry="18" fill="black" opacity="0.18"/>
+    <path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z" fill="url(#g-body)"/>
+    <ellipse cx="198" cy="262" rx="29" ry="33" fill="white"/>
+    <ellipse cx="314" cy="262" rx="29" ry="33" fill="white"/>
+    <ellipse cx="204" cy="268" rx="16" ry="20" fill="#0b1624"/>
+    <ellipse cx="320" cy="268" rx="16" ry="20" fill="#0b1624"/>
+    <ellipse cx="192" cy="252" rx="6" ry="7" fill="white" opacity="0.65"/>
+    <ellipse cx="308" cy="252" rx="6" ry="7" fill="white" opacity="0.65"/>
+    <ellipse cx="256" cy="100" rx="200" ry="180" fill="url(#g-gloss)" clip-path="url(#g-clip)"/>
+  </g>
+
+  <!-- version pill -->
+  <g>
+    <rect x="90" y="118" width="256" height="52" rx="26" fill="none" stroke="#5497c8" stroke-width="2"/>
+    <circle cx="120" cy="144" r="6" fill="#3fb950"/>
+    <text x="140" y="152" fill="#8fb0cf" font-size="22" font-weight="700" letter-spacing="1">RELEASE v0.5.1</text>
+  </g>
+
+  <!-- kicker -->
+  <text x="92" y="248" fill="#5497c8" font-size="27" font-weight="700" letter-spacing="4">NEW IN API SPECTOR</text>
+
+  <!-- headline -->
+  <text x="90" y="344" fill="#eaf2fb" font-size="82" font-weight="800" letter-spacing="-1">Array responses<tspan fill="#5497c8">,</tspan></text>
+  <text x="90" y="432" fill="#eaf2fb" font-size="82" font-weight="800" letter-spacing="-1">as a sortable <tspan fill="#5497c8">table</tspan></text>
+
+  <!-- subhead -->
+  <text x="92" y="492" fill="#b7cde3" font-size="31" font-weight="600">JSON or XML  &#183;  sort any column  &#183;  drill into nested data</text>
+
+  <!-- ── response table mock (the feature) ── -->
+  <g>
+    <rect x="90" y="524" width="900" height="330" rx="14" fill="#0b1624" stroke="#21344a" stroke-width="2"/>
+
+    <!-- body-tab toggles -->
+    <rect x="112" y="546" width="66" height="32" rx="8" fill="none" stroke="#21344a" stroke-width="1.5"/>
+    <text x="145" y="568" text-anchor="middle" fill="#7f9cb8" font-size="19" font-weight="600">Tree</text>
+    <rect x="186" y="546" width="60" height="32" rx="8" fill="none" stroke="#21344a" stroke-width="1.5"/>
+    <text x="216" y="568" text-anchor="middle" fill="#7f9cb8" font-size="19" font-weight="600">Raw</text>
+    <rect x="254" y="546" width="78" height="32" rx="8" fill="#205d96"/>
+    <text x="293" y="568" text-anchor="middle" fill="#ffffff" font-size="19" font-weight="700">Table</text>
+
+    <!-- breadcrumb / path -->
+    <text x="360" y="568" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="19"><tspan fill="#7f9cb8">root</tspan><tspan fill="#4a5e78">  &#8250;  </tspan><tspan fill="#7f9cb8">data</tspan><tspan fill="#4a5e78">  &#8250;  </tspan><tspan fill="#5497c8">items</tspan></text>
+
+    <!-- header row -->
+    <line x1="112" y1="600" x2="968" y2="600" stroke="#21344a" stroke-width="1.5"/>
+    <g font-size="20" font-weight="700" fill="#8fb0cf">
+      <text x="122" y="638">#</text>
+      <text x="176" y="638">name</text>
+      <text x="470" y="638" fill="#5497c8">price &#9660;</text>
+      <text x="660" y="638">tags</text>
+      <text x="828" y="638">details</text>
+    </g>
+    <line x1="112" y1="654" x2="968" y2="654" stroke="#21344a" stroke-width="1.5"/>
+
+    <!-- rows (sorted by price desc; # = original position) -->
+    <g font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="21" fill="#cfe0f2">
+      <text x="122" y="694" fill="#6b86a3">3</text>
+      <text x="176" y="694">Monitor</text>
+      <text x="470" y="694">199.00</text>
+      <text x="660" y="694" fill="#5497c8">[2]</text>
+      <text x="828" y="694" fill="#5497c8">{&#8230;}</text>
+
+      <text x="122" y="736" fill="#6b86a3">1</text>
+      <text x="176" y="736">Keyboard</text>
+      <text x="470" y="736">45.00</text>
+      <text x="660" y="736" fill="#5497c8">[3]</text>
+      <text x="828" y="736" fill="#5497c8">{&#8230;}</text>
+
+      <text x="122" y="778" fill="#6b86a3">5</text>
+      <text x="176" y="778">Mouse</text>
+      <text x="470" y="778">29.00</text>
+      <text x="660" y="778" fill="#5497c8">[1]</text>
+      <text x="828" y="778" fill="#5497c8">{&#8230;}</text>
+
+      <text x="122" y="820" fill="#6b86a3">2</text>
+      <text x="176" y="820">Cable</text>
+      <text x="470" y="820">9.00</text>
+      <text x="660" y="820" fill="#5497c8">[0]</text>
+      <text x="828" y="820" fill="#5497c8">{&#8230;}</text>
+    </g>
+    <!-- row separators -->
+    <g stroke="#141f30" stroke-width="1">
+      <line x1="112" y1="710" x2="968" y2="710"/>
+      <line x1="112" y1="752" x2="968" y2="752"/>
+      <line x1="112" y1="794" x2="968" y2="794"/>
+    </g>
+  </g>
+
+  <!-- callout -->
+  <g>
+    <rect x="90" y="872" width="900" height="60" rx="12" fill="#0f2a49" stroke="#205d96" stroke-width="2"/>
+    <text x="112" y="910" fill="#5497c8" font-size="24" font-weight="800">NEW</text>
+    <text x="176" y="909" fill="#cfe0f2" font-size="22" font-weight="600">Nested arrays and objects are clickable, so you can drill in.</text>
+  </g>
+
+  <!-- divider -->
+  <line x1="90" y1="978" x2="990" y2="978" stroke="#21344a" stroke-width="2"/>
+
+  <!-- footer -->
+  <text x="90" y="1022" fill="#eaf2fb" font-size="32" font-weight="800">API Spector</text>
+  <text x="90" y="1058" fill="#7f9cb8" font-size="22" font-weight="500">Local-first API testing &#183; EU-built &#183; open</text>
+  <text x="990" y="1042" text-anchor="end" fill="#8fb0cf" font-size="27" font-weight="700">api-spector.dev</text>
+</svg>

@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img" aria-label="Gedemonstreerd bij SSC-ICT: het Nederlandse alternatief voor Postman of Bruno. Eerder deze week mocht ik API Spector demonstreren en het werd goed ontvangen." font-family="'Segoe UI', Arial, Helvetica, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a1420"/>
+      <stop offset="55" stop-color="#0d2038"/>
+      <stop offset="100" stop-color="#123a60"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5497c8"/>
+      <stop offset="1" stop-color="#205d96"/>
+    </linearGradient>
+    <radialGradient id="g-body" cx="35%" cy="22%" r="70%">
+      <stop offset="0%" stop-color="#5497c8"/>
+      <stop offset="55%" stop-color="#205d96"/>
+      <stop offset="100%" stop-color="#123a60"/>
+    </radialGradient>
+    <linearGradient id="g-gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="white" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0.0"/>
+    </linearGradient>
+    <clipPath id="g-clip">
+      <path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1080" height="1080" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1080" height="8" fill="url(#brand)"/>
+
+  <!-- ghost logo, top-right -->
+  <g transform="translate(710,72) scale(0.58)">
+    <ellipse cx="256" cy="420" rx="130" ry="18" fill="black" opacity="0.18"/>
+    <path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z" fill="url(#g-body)"/>
+    <ellipse cx="198" cy="262" rx="29" ry="33" fill="white"/>
+    <ellipse cx="314" cy="262" rx="29" ry="33" fill="white"/>
+    <ellipse cx="204" cy="268" rx="16" ry="20" fill="#0b1624"/>
+    <ellipse cx="320" cy="268" rx="16" ry="20" fill="#0b1624"/>
+    <ellipse cx="192" cy="252" rx="6" ry="7" fill="white" opacity="0.65"/>
+    <ellipse cx="308" cy="252" rx="6" ry="7" fill="white" opacity="0.65"/>
+    <ellipse cx="256" cy="100" rx="200" ry="180" fill="url(#g-gloss)" clip-path="url(#g-clip)"/>
+  </g>
+
+  <!-- kicker: social proof -->
+  <g>
+    <circle cx="100" cy="212" r="7" fill="#3fb950"/>
+    <text x="120" y="221" fill="#5497c8" font-size="27" font-weight="700" letter-spacing="4">GEDEMONSTREERD BIJ SSC-ICT</text>
+  </g>
+  <rect x="90" y="240" width="72" height="5" rx="2.5" fill="url(#brand)"/>
+
+  <!-- headline: the positioning hook -->
+  <text x="90" y="360" fill="#eaf2fb" font-size="82" font-weight="800" letter-spacing="-1">Het <tspan fill="#5497c8">Nederlandse</tspan></text>
+  <text x="90" y="452" fill="#eaf2fb" font-size="82" font-weight="800" letter-spacing="-1">alternatief voor</text>
+  <text x="90" y="544" fill="#eaf2fb" font-size="82" font-weight="800" letter-spacing="-1">Postman of Bruno.</text>
+
+  <!-- body -->
+  <text x="92" y="632" fill="#b7cde3" font-size="33" font-weight="500">Eerder deze week mocht ik API Spector demonstreren</text>
+  <text x="92" y="676" fill="#b7cde3" font-size="33" font-weight="500">bij SSC-ICT, en het werd goed ontvangen.</text>
+
+  <!-- trust chips -->
+  <g font-size="25" font-weight="600">
+    <g>
+      <rect x="90" y="740" width="212" height="60" rx="10" fill="#12253c" stroke="#21344a" stroke-width="1.5"/>
+      <text x="112" y="778" fill="#cfe0f2">Lokaal-first</text>
+    </g>
+    <g>
+      <rect x="322" y="740" width="270" height="60" rx="10" fill="#12253c" stroke="#21344a" stroke-width="1.5"/>
+      <text x="344" y="778" fill="#cfe0f2">In de EU gebouwd</text>
+    </g>
+    <g>
+      <rect x="612" y="740" width="150" height="60" rx="10" fill="#12253c" stroke="#21344a" stroke-width="1.5"/>
+      <text x="634" y="778" fill="#cfe0f2">Open</text>
+    </g>
+  </g>
+
+  <!-- privacy note that lands with the Dutch/gov audience -->
+  <g>
+    <rect x="90" y="828" width="900" height="66" rx="12" fill="#0f2a49" stroke="#205d96" stroke-width="2"/>
+    <text x="112" y="869" fill="#5497c8" font-size="25" font-weight="800">PRIVACY</text>
+    <text x="232" y="869" fill="#cfe0f2" font-size="25" font-weight="600">Je data blijft lokaal, geen verplichte cloud-account.</text>
+  </g>
+
+  <!-- divider -->
+  <line x1="90" y1="978" x2="990" y2="978" stroke="#21344a" stroke-width="2"/>
+
+  <!-- footer -->
+  <text x="90" y="1022" fill="#eaf2fb" font-size="32" font-weight="800">API Spector</text>
+  <text x="90" y="1058" fill="#7f9cb8" font-size="22" font-weight="500">Lokaal-first API-testing &#183; in de EU gebouwd &#183; open</text>
+  <text x="990" y="1042" text-anchor="end" fill="#8fb0cf" font-size="27" font-weight="700">api-spector.dev</text>
+</svg>

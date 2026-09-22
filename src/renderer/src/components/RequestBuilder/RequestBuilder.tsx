@@ -19,6 +19,7 @@ import { StreamTab } from './StreamTab';
 import { WebSocketPanel } from '../WebSocket/WebSocketPanel';
 import { GrpcPanel } from '../Grpc/GrpcPanel';
 import { FuzzModal } from './FuzzModal';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
@@ -63,6 +64,7 @@ const TAB_HINTS: Record<string, string> = {
 };
 
 export function RequestBuilder({ request }: Props) {
+  const t = useT();
   const updateRequest       = useStore(s => s.updateRequest);
   const updateExampleRequest  = useStore(s => s.updateExampleRequest);
   const activeEnvironmentId = useStore(s => s.activeEnvironmentId);
@@ -372,7 +374,7 @@ export function RequestBuilder({ request }: Props) {
           )}
           {activeAppTab?.exampleId && (
             <span className="shrink-0 text-[10px] uppercase tracking-wider text-amber-400 border border-amber-500/30 rounded px-1.5 py-0.5">
-              Example: {request.examples?.find(e => e.id === activeAppTab.exampleId)?.name ?? ''}
+              {t('Example:')} {request.examples?.find(e => e.id === activeAppTab.exampleId)?.name ?? ''}
             </span>
           )}
         </div>
@@ -385,14 +387,14 @@ export function RequestBuilder({ request }: Props) {
           <button
             onClick={() => update({ protocol: 'http' })}
             className={`px-2 py-1.5 transition-colors ${!isWs && !isSoap && !isGrpc ? 'bg-blue-600 text-white' : 'text-surface-500 hover:text-white'}`}
-            title="HTTP request"
+            title={t('HTTP request')}
           >
             HTTP
           </button>
           <button
             onClick={() => update({ protocol: 'websocket' })}
             className={`px-2 py-1.5 transition-colors ${isWs ? 'bg-cyan-700 text-cyan-200' : 'text-surface-500 hover:text-white'}`}
-            title="WebSocket"
+            title={t('WebSocket')}
           >
             WS
           </button>
@@ -409,7 +411,7 @@ export function RequestBuilder({ request }: Props) {
               if (activeTabId) setTabRequestTab(activeTabId, 'body');
             }}
             className={`px-2 py-1.5 transition-colors ${isSoap ? 'bg-amber-700 text-amber-100' : 'text-surface-500 hover:text-white'}`}
-            title="SOAP - endpoint and method are derived from the WSDL"
+            title={t('SOAP - endpoint and method are derived from the WSDL')}
           >
             SOAP
           </button>
@@ -419,7 +421,7 @@ export function RequestBuilder({ request }: Props) {
               body: request.body.mode === 'grpc' ? request.body : { ...request.body, mode: 'grpc', grpc: request.body.grpc ?? { message: '{}', metadata: [], plaintext: false } },
             })}
             className={`px-2 py-1.5 transition-colors ${isGrpc ? 'bg-violet-700 text-violet-100' : 'text-surface-500 hover:text-white'}`}
-            title="gRPC - proto-defined services over HTTP/2"
+            title={t('gRPC - proto-defined services over HTTP/2')}
           >
             gRPC
           </button>
@@ -434,8 +436,8 @@ export function RequestBuilder({ request }: Props) {
             onChange={e => update({ method: e.target.value.toUpperCase() })}
             onBlur={() => setCustomVerb(false)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); setCustomVerb(false); } }}
-            placeholder="VERB"
-            title="Type any HTTP method"
+            placeholder={t('VERB')}
+            title={t('Type any HTTP method')}
             className="w-24 bg-surface-800 border border-blue-500 rounded px-2 py-1.5 text-xs font-bold uppercase focus:outline-none text-fuchsia-400 placeholder-surface-600"
           />
         ) : (
@@ -453,13 +455,13 @@ export function RequestBuilder({ request }: Props) {
             {!METHODS.includes(request.method) && (
               <option value="__current__" className="text-white">{request.method}</option>
             )}
-            <option value="__custom__" className="text-white">Custom…</option>
+            <option value="__custom__" className="text-white">{t('Custom…')}</option>
           </select>
         ))}
         {isSoap && (
           <span
             className="bg-surface-900 border border-surface-700 rounded px-2 py-1.5 text-xs font-bold text-amber-400 select-none"
-            title="SOAP requests are always POST"
+            title={t('SOAP requests are always POST')}
           >
             POST
           </span>
@@ -467,7 +469,7 @@ export function RequestBuilder({ request }: Props) {
         {isGrpc && (
           <span
             className="bg-surface-900 border border-surface-700 rounded px-2 py-1.5 text-xs font-bold text-violet-400 select-none"
-            title="gRPC target is host:port"
+            title={t('gRPC target is host:port')}
           >
             gRPC
           </span>
@@ -479,7 +481,7 @@ export function RequestBuilder({ request }: Props) {
           onPaste={handleUrlPaste}
           placeholder={
             isWs   ? 'ws://example.com/socket'
-            : isSoap ? 'Endpoint (auto-filled from WSDL <soap:address>)'
+            : isSoap ? t('Endpoint (auto-filled from WSDL <soap:address>)')
             : isGrpc ? 'localhost:50051'
             : 'https://api.example.com/endpoint'
           }
@@ -496,22 +498,22 @@ export function RequestBuilder({ request }: Props) {
           <>
             <button
               onClick={toggleRunHooks}
-              title={runHooks ? 'Hooks enabled - click to disable' : 'Hooks disabled - click to enable'}
+              title={runHooks ? t('Hooks enabled - click to disable') : t('Hooks disabled - click to enable')}
               className={`px-2 py-1.5 rounded text-xs font-medium transition-colors border ${
                 runHooks
                   ? 'border-violet-500 text-violet-400 hover:bg-violet-500/10'
                   : 'border-surface-700 text-surface-500 hover:text-surface-300'
               }`}
             >
-              hooks
+              {t('hooks')}
             </button>
             <button
               onClick={sendRequest}
               disabled={isSending || !request.url}
-              title="Send (Cmd/Ctrl+Enter)"
+              title={t('Send (Cmd/Ctrl+Enter)')}
               className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-surface-800 disabled:text-surface-400 rounded text-sm font-medium transition-colors min-w-[72px]"
             >
-              {isSending ? '...' : 'Send'}
+              {isSending ? '...' : t('Send')}
             </button>
           </>
         )}
@@ -536,14 +538,14 @@ export function RequestBuilder({ request }: Props) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                title={TAB_HINTS[tab.id]}
+                title={TAB_HINTS[tab.id] ? t(TAB_HINTS[tab.id]) : undefined}
                 className={`px-3 py-1.5 text-xs transition-colors border-b-2 -mb-px ${
                   activeTab === tab.id
                     ? 'border-blue-500 text-white'
                     : 'border-transparent text-surface-400 hover:text-white'
                 }`}
               >
-                {tab.label}
+                {t(tab.label)}
                 {tab.count > 0 && (
                   <span className="ml-1 text-[10px] bg-surface-600 text-white rounded px-1 font-medium">{tab.count}</span>
                 )}
@@ -552,10 +554,10 @@ export function RequestBuilder({ request }: Props) {
             <button
               onClick={() => setShowFuzz(true)}
               disabled={!request.url}
-              title="Fuzz this request with malformed inputs (opens a dialog; nothing is sent until you confirm)"
+              title={t('Fuzz this request with malformed inputs (opens a dialog; nothing is sent until you confirm)')}
               className="ml-auto my-1 self-center px-2 py-0.5 rounded text-[11px] border border-surface-700 text-surface-500 hover:text-fuchsia-400 hover:border-fuchsia-500 transition-colors disabled:opacity-40"
             >
-              fuzz
+              {t('fuzz')}
             </button>
           </div>
 

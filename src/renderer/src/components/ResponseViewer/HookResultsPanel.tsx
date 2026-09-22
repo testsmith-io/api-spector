@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import type { RunRequestResult } from '../../../../shared/types';
+import { useT } from '../../i18n';
 
 const HOOK_BADGE: Record<string, { label: string; cls: string }> = {
   beforeAll: { label: 'BEFORE ALL', cls: 'bg-violet-700 text-white' },
@@ -12,6 +13,7 @@ const HOOK_BADGE: Record<string, { label: string; cls: string }> = {
 };
 
 export function HookResultsPanel({ results }: { results: RunRequestResult[] }) {
+  const t = useT();
   const [open, setOpen] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -33,10 +35,10 @@ export function HookResultsPanel({ results }: { results: RunRequestResult[] }) {
         className="w-full flex items-center gap-2 px-4 py-1.5 text-xs hover:bg-surface-800/30 transition-colors"
       >
         <span className="text-surface-400">{open ? '▾' : '▸'}</span>
-        <span className="font-medium text-surface-400">Hooks</span>
-        <span className="text-surface-500">{results.length} ran</span>
+        <span className="font-medium text-surface-400">{t('Hooks')}</span>
+        <span className="text-surface-500">{t(':count ran', { count: results.length })}</span>
         {failed > 0 && (
-          <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-red-800/60 text-red-300">{failed} failed</span>
+          <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-red-800/60 text-red-300">{t(':count failed', { count: failed })}</span>
         )}
       </button>
 
@@ -59,7 +61,7 @@ export function HookResultsPanel({ results }: { results: RunRequestResult[] }) {
                   }`} />
                   {badge && (
                     <span className={`text-[9px] font-bold px-1 py-0.5 rounded uppercase tracking-wide shrink-0 ${badge.cls}`}>
-                      {badge.label}
+                      {t(badge.label)}
                     </span>
                   )}
                   <span className="text-surface-300 truncate">{r.name}</span>

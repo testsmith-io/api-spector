@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img" aria-label="Team en security: single sign-on via API Spector Cloud, en externe secret managers zoals HashiCorp Vault, AWS, Azure en 1Password. Secrets blijven lokaal." font-family="'Segoe UI', Arial, Helvetica, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a1420"/>
+      <stop offset="55" stop-color="#0d2038"/>
+      <stop offset="100" stop-color="#123a60"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5497c8"/>
+      <stop offset="1" stop-color="#205d96"/>
+    </linearGradient>
+    <radialGradient id="g-body" cx="35%" cy="22%" r="70%">
+      <stop offset="0%" stop-color="#5497c8"/>
+      <stop offset="55%" stop-color="#205d96"/>
+      <stop offset="100%" stop-color="#123a60"/>
+    </radialGradient>
+    <linearGradient id="g-gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="white" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0.0"/>
+    </linearGradient>
+    <clipPath id="g-clip">
+      <path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1080" height="1080" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1080" height="8" fill="url(#brand)"/>
+
+  <!-- ghost logo, top-right -->
+  <g transform="translate(742,74) scale(0.5)">
+    <ellipse cx="256" cy="420" rx="130" ry="18" fill="black" opacity="0.18"/>
+    <path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z" fill="url(#g-body)"/>
+    <ellipse cx="198" cy="262" rx="29" ry="33" fill="white"/>
+    <ellipse cx="314" cy="262" rx="29" ry="33" fill="white"/>
+    <ellipse cx="204" cy="268" rx="16" ry="20" fill="#0b1624"/>
+    <ellipse cx="320" cy="268" rx="16" ry="20" fill="#0b1624"/>
+    <ellipse cx="192" cy="252" rx="6" ry="7" fill="white" opacity="0.65"/>
+    <ellipse cx="308" cy="252" rx="6" ry="7" fill="white" opacity="0.65"/>
+    <ellipse cx="256" cy="100" rx="200" ry="180" fill="url(#g-gloss)" clip-path="url(#g-clip)"/>
+  </g>
+
+  <!-- kicker -->
+  <text x="92" y="212" fill="#5497c8" font-size="27" font-weight="700" letter-spacing="4">TEAM &amp; SECURITY</text>
+  <rect x="90" y="232" width="72" height="5" rx="2.5" fill="url(#brand)"/>
+
+  <!-- headline -->
+  <text x="90" y="340" fill="#eaf2fb" font-size="90" font-weight="800" letter-spacing="-1.5">Klaar voor je</text>
+  <text x="90" y="436" fill="#eaf2fb" font-size="90" font-weight="800" letter-spacing="-1.5">team<tspan fill="#5497c8">.</tspan></text>
+
+  <!-- subhead -->
+  <text x="92" y="506" fill="#b7cde3" font-size="32" font-weight="500">Single sign-on via de Cloud, en secrets uit je eigen vault.</text>
+
+  <!-- Card A: SSO -->
+  <g>
+    <rect x="90" y="558" width="430" height="286" rx="16" fill="#12253c" stroke="#21344a" stroke-width="1.5"/>
+    <rect x="398" y="578" width="102" height="34" rx="17" fill="none" stroke="#5497c8" stroke-width="1.5"/>
+    <text x="449" y="601" text-anchor="middle" fill="#5497c8" font-size="18" font-weight="700" letter-spacing="2">CLOUD</text>
+    <!-- shield-key icon -->
+    <g transform="translate(120,592)" stroke="#5497c8" stroke-width="4" fill="none" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M26,3 L49,13 V31 C49,45 26,55 26,55 C26,55 3,45 3,31 V13 Z"/>
+      <circle cx="26" cy="26" r="7" fill="#5497c8" stroke="none"/>
+      <rect x="23" y="30" width="6" height="12" rx="2" fill="#5497c8" stroke="none"/>
+    </g>
+    <text x="120" y="712" fill="#eaf2fb" font-size="36" font-weight="800">Single sign-on</text>
+    <text x="120" y="754" fill="#b7cde3" font-size="24" font-weight="500">Log in via je eigen identity</text>
+    <text x="120" y="786" fill="#b7cde3" font-size="24" font-weight="500">provider.</text>
+    <text x="120" y="822" fill="#7f9cb8" font-size="21" font-weight="600">Bij gebruik van API Spector Cloud</text>
+  </g>
+
+  <!-- Card B: Secret managers -->
+  <g>
+    <rect x="560" y="558" width="430" height="286" rx="16" fill="#12253c" stroke="#21344a" stroke-width="1.5"/>
+    <rect x="792" y="578" width="178" height="34" rx="17" fill="none" stroke="#3fb950" stroke-width="1.5"/>
+    <text x="881" y="601" text-anchor="middle" fill="#3fb950" font-size="18" font-weight="700" letter-spacing="2">OPEN SOURCE</text>
+    <!-- padlock icon -->
+    <g transform="translate(590,590)">
+      <path d="M14,24 V17 a12,12 0 0 1 24,0 V24" fill="none" stroke="#5497c8" stroke-width="4" stroke-linecap="round"/>
+      <rect x="6" y="24" width="40" height="32" rx="7" fill="#5497c8"/>
+      <circle cx="26" cy="38" r="5" fill="#12253c"/>
+      <rect x="23.5" y="40" width="5" height="10" rx="2" fill="#12253c"/>
+    </g>
+    <text x="590" y="712" fill="#eaf2fb" font-size="36" font-weight="800">Secret managers</text>
+    <text x="590" y="754" fill="#b7cde3" font-size="24" font-weight="500">Vault, AWS, Azure, 1Password.</text>
+    <text x="590" y="786" fill="#b7cde3" font-size="24" font-family="ui-monospace, Menlo, Consolas, monospace">{{vault:secret/app#key}}</text>
+    <text x="590" y="822" fill="#7f9cb8" font-size="21" font-weight="600">Pluggable backends</text>
+  </g>
+
+  <!-- reassurance strip -->
+  <g>
+    <rect x="90" y="866" width="900" height="64" rx="12" fill="#0f2a49" stroke="#205d96" stroke-width="2"/>
+    <text x="112" y="905" fill="#5497c8" font-size="24" font-weight="800">&#10003;</text>
+    <text x="146" y="905" fill="#cfe0f2" font-size="25" font-weight="600">Secrets blijven buiten je workspace, resultaten en console.</text>
+  </g>
+
+  <!-- footer -->
+  <line x1="90" y1="984" x2="990" y2="984" stroke="#21344a" stroke-width="2"/>
+  <text x="90" y="1028" fill="#eaf2fb" font-size="30" font-weight="800">API Spector</text>
+  <text x="990" y="1024" text-anchor="end" fill="#8fb0cf" font-size="26" font-weight="700">api-spector.dev</text>
+  <text x="90" y="1062" fill="#7f9cb8" font-size="21" font-weight="500">Lokaal-first API-testing &#183; in de EU gebouwd &#183; open</text>
+</svg>

@@ -7,6 +7,7 @@ import { useStore } from '../../store';
 import { KVTable } from '../RequestBuilder/KVTable';
 import { Modal } from '../common/Modal';
 import { AuthEditor, type AuthEditorPatch } from '../common/AuthEditor';
+import { useT } from '../../i18n';
 
 type ModalTab = 'auth' | 'headers' | 'tls'
 
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function CollectionSettingsModal({ collection, onClose }: Props) {
+  const t = useT();
   const updateCollectionTls             = useStore(s => s.updateCollectionTls);
   const updateCollectionAuthAndHeaders  = useStore(s => s.updateCollectionAuthAndHeaders);
 
@@ -59,25 +61,25 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-surface-800 shrink-0">
           <div>
-            <h2 className="text-sm font-semibold">Collection settings</h2>
-            <p className="text-[10px] text-surface-600 mt-0.5">{collection.name} - auth and headers inherited by all requests in this collection</p>
+            <h2 className="text-sm font-semibold">{t('Collection settings')}</h2>
+            <p className="text-[10px] text-surface-600 mt-0.5">{t(':name - auth and headers inherited by all requests in this collection', { name: collection.name })}</p>
           </div>
           <button onClick={onClose} className="text-surface-400 hover:text-white text-lg leading-none">×</button>
         </div>
 
         {/* Tabs */}
         <div className="flex border-b border-surface-800 px-4 shrink-0">
-          {(['auth', 'headers', 'tls'] as ModalTab[]).map(t => (
+          {(['auth', 'headers', 'tls'] as ModalTab[]).map(tab => (
             <button
-              key={t}
-              onClick={() => setActiveTab(t)}
+              key={tab}
+              onClick={() => setActiveTab(tab)}
               className={`px-3 py-1.5 text-xs transition-colors border-b-2 -mb-px capitalize ${
-                activeTab === t
+                activeTab === tab
                   ? 'border-blue-500 text-white'
                   : 'border-transparent text-surface-400 hover:text-white'
               }`}
             >
-              {t === 'tls' ? 'TLS' : t}
+              {tab === 'tls' ? 'TLS' : tab}
             </button>
           ))}
         </div>
@@ -90,7 +92,7 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
               onChange={patchAuth}
               intro={
                 <p className="text-[10px] text-surface-600">
-                  Auth configured here is inherited by all requests in this collection unless a folder or request overrides it with its own non-none auth type.
+                  {t('Auth configured here is inherited by all requests in this collection unless a folder or request overrides it with its own non-none auth type.')}
                 </p>
               }
             />
@@ -99,40 +101,40 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
             <KVTable
               rows={headers}
               onChange={setHeaders}
-              keyPlaceholder="Header-Name"
-              valuePlaceholder="value"
+              keyPlaceholder={t('Header-Name')}
+              valuePlaceholder={t('value')}
               headerMode
             />
           )}
           {activeTab === 'tls' && (
             <div className="flex flex-col gap-3">
               <p className="text-surface-500">
-                TLS settings override the workspace-level configuration for every request in this collection. Leave all paths empty to inherit from the workspace.
+                {t('TLS settings override the workspace-level configuration for every request in this collection. Leave all paths empty to inherit from the workspace.')}
               </p>
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">CA Certificate path</label>
+                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('CA Certificate path')}</label>
                 <input
                   value={caCertPath}
                   onChange={e => setCaCertPath(e.target.value)}
-                  placeholder="/path/to/ca.crt  (leave empty to inherit)"
+                  placeholder={t('/path/to/ca.crt  (leave empty to inherit)')}
                   className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Client certificate path</label>
+                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Client certificate path')}</label>
                 <input
                   value={clientCertPath}
                   onChange={e => setClientCertPath(e.target.value)}
-                  placeholder="/path/to/client.crt  (leave empty to inherit)"
+                  placeholder={t('/path/to/client.crt  (leave empty to inherit)')}
                   className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Client key path</label>
+                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Client key path')}</label>
                 <input
                   value={clientKeyPath}
                   onChange={e => setClientKeyPath(e.target.value)}
-                  placeholder="/path/to/client.key  (leave empty to inherit)"
+                  placeholder={t('/path/to/client.key  (leave empty to inherit)')}
                   className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
                 />
               </div>
@@ -143,7 +145,7 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
                   onChange={e => setRejectUnauthorized(e.target.checked)}
                   className="accent-blue-500"
                 />
-                <span>Reject unauthorized / self-signed certificates</span>
+                <span>{t('Reject unauthorized / self-signed certificates')}</span>
               </label>
             </div>
           )}
@@ -155,13 +157,13 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
             onClick={save}
             className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-xs font-medium transition-colors"
           >
-            Save
+            {t('Save')}
           </button>
           <button
             onClick={onClose}
             className="px-4 py-1.5 bg-surface-800 hover:bg-surface-700 rounded text-xs transition-colors"
           >
-            Cancel
+            {t('Cancel')}
           </button>
         </div>
     </Modal>

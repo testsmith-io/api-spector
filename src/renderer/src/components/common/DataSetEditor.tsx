@@ -3,6 +3,7 @@
 
 import React, { useRef } from 'react';
 import type { DataSet } from '../../../../shared/types';
+import { useT } from '../../i18n';
 
 // ─── CSV helpers ──────────────────────────────────────────────────────────────
 
@@ -46,6 +47,7 @@ interface Props {
 /** Column/row table editor for a data-driven DataSet, with CSV import/export.
  *  Shared by the collection panel and the folder settings modal. */
 export function DataSetEditor({ ds, onChange, exportName, scopeLabel = 'collection' }: Props) {
+  const t = useT();
   const csvFileRef = useRef<HTMLInputElement>(null);
 
   // ── Column ops ──
@@ -96,22 +98,23 @@ export function DataSetEditor({ ds, onChange, exportName, scopeLabel = 'collecti
   return (
     <div className="flex flex-col gap-3 text-xs">
       <p className="text-surface-600 text-[11px]">
-        Define variables here - each row runs the entire {scopeLabel} once with those values injected.
-        Columns become <code className="text-surface-500">{'{{variable}}'}</code> placeholders.
+        {t('Define variables here - each row runs the entire :scope once with those values injected. Columns become', { scope: t(scopeLabel) })}{' '}
+        <code className="text-surface-500">{'{{variable}}'}</code>{' '}
+        {t('placeholders.')}
       </p>
 
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={addColumn} className="px-2.5 py-1 bg-surface-700 hover:bg-surface-600 rounded transition-colors">+ Column</button>
-        <button onClick={addRow} disabled={!hasColumns} className="px-2.5 py-1 bg-surface-700 hover:bg-surface-600 disabled:opacity-40 rounded transition-colors">+ Row</button>
+        <button onClick={addColumn} className="px-2.5 py-1 bg-surface-700 hover:bg-surface-600 rounded transition-colors">{t('+ Column')}</button>
+        <button onClick={addRow} disabled={!hasColumns} className="px-2.5 py-1 bg-surface-700 hover:bg-surface-600 disabled:opacity-40 rounded transition-colors">{t('+ Row')}</button>
         <div className="flex-1" />
         <button
           onClick={() => csvFileRef.current?.click()}
           className="px-2.5 py-1 bg-surface-700 hover:bg-surface-600 rounded transition-colors"
-          title="Import CSV - first row is column headers"
-        >↑ Import CSV</button>
+          title={t('Import CSV - first row is column headers')}
+        >{t('↑ Import CSV')}</button>
         {hasColumns && iterCount > 0 && (
-          <button onClick={exportCSV} className="px-2.5 py-1 bg-surface-700 hover:bg-surface-600 rounded transition-colors">↓ Export CSV</button>
+          <button onClick={exportCSV} className="px-2.5 py-1 bg-surface-700 hover:bg-surface-600 rounded transition-colors">{t('↓ Export CSV')}</button>
         )}
         <input ref={csvFileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={importCSV} />
       </div>
@@ -120,8 +123,8 @@ export function DataSetEditor({ ds, onChange, exportName, scopeLabel = 'collecti
       {hasColumns && (
         <p className="text-surface-500">
           {iterCount === 0
-            ? 'No rows yet - add rows or import a CSV.'
-            : `${iterCount} iteration${iterCount !== 1 ? 's' : ''} · columns: ${ds.columns.join(', ')}`}
+            ? t('No rows yet - add rows or import a CSV.')
+            : t(':count iteration · columns: :columns|:count iterations · columns: :columns', { count: iterCount, columns: ds.columns.join(', ') })}
         </p>
       )}
 
@@ -139,7 +142,7 @@ export function DataSetEditor({ ds, onChange, exportName, scopeLabel = 'collecti
                         value={col}
                         onChange={e => renameColumn(ci, e.target.value)}
                         className="flex-1 bg-surface-800 border border-surface-700 rounded px-1.5 py-0.5 font-mono text-blue-400 focus:outline-none focus:border-blue-500"
-                        title="Variable name"
+                        title={t('Variable name')}
                       />
                       <button onClick={() => removeColumn(ci)} className="text-surface-400 hover:text-red-400 transition-colors shrink-0">×</button>
                     </div>
@@ -169,7 +172,7 @@ export function DataSetEditor({ ds, onChange, exportName, scopeLabel = 'collecti
               {iterCount === 0 && (
                 <tr>
                   <td colSpan={ds.columns.length + 2} className="px-2 py-3 text-surface-600 text-center">
-                    No rows - click "+ Row" or import a CSV
+                    {t('No rows - click "+ Row" or import a CSV')}
                   </td>
                 </tr>
               )}
@@ -178,9 +181,9 @@ export function DataSetEditor({ ds, onChange, exportName, scopeLabel = 'collecti
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center gap-2 py-8 text-surface-600">
-          <p>No columns defined.</p>
+          <p>{t('No columns defined.')}</p>
           <p className="text-[10px]">
-            Click <strong>+ Column</strong> to add a variable, or <strong>↑ Import CSV</strong> to load from a file.
+            {t('Click')}{' '}<strong>{t('+ Column')}</strong>{' '}{t('to add a variable, or')}{' '}<strong>{t('↑ Import CSV')}</strong>{' '}{t('to load from a file.')}
           </p>
         </div>
       )}

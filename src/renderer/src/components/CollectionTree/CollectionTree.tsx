@@ -18,6 +18,7 @@ import {
   PlayIcon, PlusIcon, FolderIcon, TagIcon, PencilIcon, TrashIcon, TableIcon,
   CopyIcon, KeyIcon, ExpandAllIcon, CollapseAllIcon, SyncIcon, GearIcon,
 } from '../common/icons';
+import { useT } from '../../i18n';
 
 // ─── Drag-and-drop context ────────────────────────────────────────────────────
 
@@ -55,6 +56,7 @@ export function TagChips ( {
   forceAdding?: boolean
   onDoneAdding?: () => void
 } ) {
+  const t = useT();
   const [adding, setAdding] = useState( false );
   const [draft, setDraft] = useState( '' );
   const inputRef = useRef<HTMLInputElement>( null );
@@ -94,7 +96,7 @@ export function TagChips ( {
           onKeyDown={e => { if ( e.key === 'Enter' ) commit(); if ( e.key === 'Escape' ) { setAdding( false ); setDraft( '' ); onDoneAdding?.(); } e.stopPropagation(); }}
           onBlur={commit}
           className="w-16 text-[9px] bg-surface-700 rounded px-1 py-px focus:outline-none focus:ring-1 focus:ring-blue-500"
-          placeholder="tag…"
+          placeholder={t( 'tag…' )}
         />
       ) : null}
     </div>
@@ -137,6 +139,7 @@ function collectMatches ( col: Collection, q: string ): SearchMatch[] {
 }
 
 export function CollectionTree () {
+  const t = useT();
   const collections = useStore( s => s.collections );
   const activeCollectionId = useStore( s => s.activeCollectionId );
   const activeTabId = useStore( s => s.activeTabId );
@@ -228,13 +231,13 @@ export function CollectionTree () {
                 value={query}
                 onChange={e => setQuery( e.target.value )}
                 onKeyDown={e => { if ( e.key === 'Escape' ) setQuery( '' ); }}
-                placeholder="Search requests…"
+                placeholder={t( 'Search requests…' )}
                 className="w-full text-xs bg-surface-800 border border-surface-700 rounded pl-2 pr-6 py-1 focus:outline-none focus:border-blue-500 placeholder-surface-500"
               />
               {query && (
                 <button
                   onClick={() => setQuery( '' )}
-                  title="Clear (Esc)"
+                  title={t( 'Clear (Esc)' )}
                   className="absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center text-surface-500 hover:text-surface-200 leading-none"
                 >
                   ×
@@ -247,12 +250,12 @@ export function CollectionTree () {
           {q ? (
             matches.length === 0 ? (
               <p className="px-3 py-3 text-xs text-surface-500">
-                No requests match &ldquo;{query.trim()}&rdquo;.
+                {t( 'No requests match “:query”.', { query: query.trim() } )}
               </p>
             ) : (
               <div className="py-1">
                 <p className="px-3 pb-1 text-[10px] uppercase tracking-wider text-surface-500">
-                  {matches.length} {matches.length === 1 ? 'match' : 'matches'}
+                  {t( ':count match|:count matches', { count: matches.length } )}
                 </p>
                 {matches.map( ( { collectionId, collectionName, req, path } ) => (
                   <button
@@ -284,10 +287,10 @@ export function CollectionTree () {
               onAddRequest={folderId => setNewRequestId( addRequest( col.id, folderId ) )}
               onAddFolder={( parentId, name ) => addFolder( col.id, parentId, name )}
               onRenameCollection={name => renameCollection( col.id, name )}
-              onDeleteCollection={() => confirmThen( `Delete collection "${col.name}"?`, () => deleteCollection( col.id ) )}
+              onDeleteCollection={() => confirmThen( t( 'Delete collection ":name"?', { name: col.name } ), () => deleteCollection( col.id ) )}
               onDuplicateCollection={() => duplicateCollection( col.id )}
               onRenameFolder={( folderId, name ) => renameFolder( col.id, folderId, name )}
-              onDeleteFolder={folderId => confirmThen( 'Delete this folder and all its requests?', () => deleteFolder( col.id, folderId ) )}
+              onDeleteFolder={folderId => confirmThen( t( 'Delete this folder and all its requests?' ), () => deleteFolder( col.id, folderId ) )}
               onDuplicateFolder={folderId => duplicateFolder( col.id, folderId )}
               onRenameRequest={renameRequest}
               onDeleteRequest={reqId => deleteRequest( col.id, reqId )}
@@ -306,11 +309,11 @@ export function CollectionTree () {
 
           {colList.length === 0 && (
             <div className="px-3 py-4 text-xs text-surface-400 space-y-1">
-              <p>No collections yet.</p>
+              <p>{t( 'No collections yet.' )}</p>
               <button onClick={() => addCollection( 'New Collection' )} className="text-blue-400 hover:text-blue-300 transition-colors">
-                + New collection
+                {t( '+ New collection' )}
               </button>
-              <p className="pt-1">or import from Postman / OpenAPI above.</p>
+              <p className="pt-1">{t( 'or import from Postman / OpenAPI above.' )}</p>
             </div>
           )}
           </>
@@ -319,32 +322,32 @@ export function CollectionTree () {
 
         {selected.size > 0 && (
           <div className="shrink-0 border-t border-surface-700 bg-surface-900 px-2 py-1.5 flex items-center gap-1 text-xs">
-            <span className="text-surface-300 mr-auto">{selected.size} selected</span>
+            <span className="text-surface-300 mr-auto">{t( ':count selected', { count: selected.size } )}</span>
             <button
               onClick={() => forEachSelected( ( _c, r ) => updateRequest( r, { disabled: false } ) )}
               className="px-2 py-0.5 rounded hover:bg-surface-800 text-surface-300 transition-colors"
-              title="Enable selected requests"
-            >Enable</button>
+              title={t( 'Enable selected requests' )}
+            >{t( 'Enable' )}</button>
             <button
               onClick={() => forEachSelected( ( _c, r ) => updateRequest( r, { disabled: true } ) )}
               className="px-2 py-0.5 rounded hover:bg-surface-800 text-surface-300 transition-colors"
-              title="Disable selected requests"
-            >Disable</button>
+              title={t( 'Disable selected requests' )}
+            >{t( 'Disable' )}</button>
             <button
               onClick={() => { forEachSelected( ( c, r ) => duplicateRequest( c, r ) ); selectionCtx.clear(); }}
               className="px-2 py-0.5 rounded hover:bg-surface-800 text-surface-300 transition-colors"
-            >Duplicate</button>
+            >{t( 'Duplicate' )}</button>
             <button
               onClick={() => confirmThen(
-                `Delete ${selected.size} request${selected.size === 1 ? '' : 's'}?`,
+                t( 'Delete :count request?|Delete :count requests?', { count: selected.size } ),
                 () => { forEachSelected( ( c, r ) => deleteRequest( c, r ) ); selectionCtx.clear(); },
               )}
               className="px-2 py-0.5 rounded hover:bg-red-900/40 text-red-400 transition-colors"
-            >Delete</button>
+            >{t( 'Delete' )}</button>
             <button
               onClick={selectionCtx.clear}
               className="px-1.5 py-0.5 rounded hover:bg-surface-800 text-surface-500 transition-colors"
-              title="Clear selection"
+              title={t( 'Clear selection' )}
             >×</button>
           </div>
         )}
@@ -395,6 +398,7 @@ function CollectionNode ( {
   onRunCollection: () => void
   onRunFolder: ( folderId: string ) => void
 } ) {
+  const t = useT();
   const [expanded, setExpanded] = useState( true );
   const [renaming, setRenaming] = useState( false );
   const [showSettings, setShowSettings] = useState( false );
@@ -431,7 +435,7 @@ function CollectionNode ( {
               onCancel={() => setRenaming( false )}
               className="w-full text-xs"
               validate={v => existingCollectionNames.filter( n => n !== col.name ).includes( v )
-                ? `"${v}" already exists` : null}
+                ? t( '":name" already exists', { name: v } ) : null}
             />
           ) : (
             <span className="text-xs font-semibold truncate block">{col.name}</span>
@@ -440,22 +444,22 @@ function CollectionNode ( {
 
         <div className="shrink-0">
           <DotsBtn items={[
-            { type: 'item', label: 'Run collection', icon: <PlayIcon />, onClick: onRunCollection },
+            { type: 'item', label: t( 'Run collection' ), icon: <PlayIcon />, onClick: onRunCollection },
             { type: 'separator' },
-            { type: 'item', label: 'Add request', icon: <PlusIcon />, onClick: () => onAddRequest( col.rootFolder.id ) },
-            { type: 'item', label: 'Add folder', icon: <FolderIcon />, onClick: () => onAddFolder( col.rootFolder.id, 'New Folder' ) },
+            { type: 'item', label: t( 'Add request' ), icon: <PlusIcon />, onClick: () => onAddRequest( col.rootFolder.id ) },
+            { type: 'item', label: t( 'Add folder' ), icon: <FolderIcon />, onClick: () => onAddFolder( col.rootFolder.id, 'New Folder' ) },
             { type: 'separator' },
-            { type: 'item', label: 'Expand all', icon: <ExpandAllIcon />, onClick: expandAll },
-            { type: 'item', label: 'Collapse all', icon: <CollapseAllIcon />, onClick: collapseAll },
+            { type: 'item', label: t( 'Expand all' ), icon: <ExpandAllIcon />, onClick: expandAll },
+            { type: 'item', label: t( 'Collapse all' ), icon: <CollapseAllIcon />, onClick: collapseAll },
             { type: 'separator' },
-            { type: 'item', label: 'Collection data', icon: <TableIcon />, onClick: onSelectCollection },
-            { type: 'item', label: 'Settings', icon: <GearIcon />, onClick: () => setShowSettings( true ) },
-            { type: 'item', label: 'Sync schemas', icon: <SyncIcon />, onClick: () => setShowSchemaSync( true ) },
-            ...( cloudEnabled() ? [{ type: 'item' as const, label: 'Push contract to cloud', icon: <SyncIcon />, onClick: () => setShowPushContract( true ) }] : [] ),
-            { type: 'item', label: 'Rename', icon: <PencilIcon />, onClick: () => setRenaming( true ) },
-            { type: 'item', label: 'Duplicate', icon: <CopyIcon />, onClick: onDuplicateCollection },
+            { type: 'item', label: t( 'Collection data' ), icon: <TableIcon />, onClick: onSelectCollection },
+            { type: 'item', label: t( 'Settings' ), icon: <GearIcon />, onClick: () => setShowSettings( true ) },
+            { type: 'item', label: t( 'Sync schemas' ), icon: <SyncIcon />, onClick: () => setShowSchemaSync( true ) },
+            ...( cloudEnabled() ? [{ type: 'item' as const, label: t( 'Push contract to cloud' ), icon: <SyncIcon />, onClick: () => setShowPushContract( true ) }] : [] ),
+            { type: 'item', label: t( 'Rename' ), icon: <PencilIcon />, onClick: () => setRenaming( true ) },
+            { type: 'item', label: t( 'Duplicate' ), icon: <CopyIcon />, onClick: onDuplicateCollection },
             { type: 'separator' },
-            { type: 'item', label: 'Delete collection', icon: <TrashIcon />, danger: true, onClick: onDeleteCollection },
+            { type: 'item', label: t( 'Delete collection' ), icon: <TrashIcon />, danger: true, onClick: onDeleteCollection },
           ]} />
         </div>
       </div>
@@ -527,6 +531,7 @@ function FolderRow ( {
   onRun: () => void
   children: React.ReactNode
 } ) {
+  const t = useT();
   // Folders start collapsed so expanding a collection doesn't blow the whole
   // tree open. The user can still use "Expand all" from the collection
   // context menu, which propagates through expandCtrl.
@@ -624,19 +629,19 @@ function FolderRow ( {
 
         <div className="shrink-0">
           <DotsBtn items={[
-            { type: 'item', label: 'Run folder', icon: <PlayIcon />, onClick: onRun },
+            { type: 'item', label: t( 'Run folder' ), icon: <PlayIcon />, onClick: onRun },
             { type: 'separator' },
-            { type: 'item', label: 'Add request', icon: <PlusIcon />, onClick: onAddRequest },
-            { type: 'item', label: 'Add sub-folder', icon: <FolderIcon />, onClick: onAddFolder },
+            { type: 'item', label: t( 'Add request' ), icon: <PlusIcon />, onClick: onAddRequest },
+            { type: 'item', label: t( 'Add sub-folder' ), icon: <FolderIcon />, onClick: onAddFolder },
             { type: 'separator' },
-            { type: 'item', label: 'Settings', icon: <KeyIcon />, onClick: () => setShowSettings( true ) },
-            { type: 'item', label: 'Sync schemas', icon: <SyncIcon />, onClick: () => setShowSchemaSync( true ) },
-            ...( cloudEnabled() ? [{ type: 'item' as const, label: 'Push contract to cloud', icon: <SyncIcon />, onClick: () => setShowPushContract( true ) }] : [] ),
-            { type: 'item', label: 'Add tag', icon: <TagIcon />, onClick: () => setAddingTag( true ) },
-            { type: 'item', label: 'Rename', icon: <PencilIcon />, onClick: () => setRenaming( true ) },
-            { type: 'item', label: 'Duplicate', icon: <CopyIcon />, onClick: onDuplicate },
+            { type: 'item', label: t( 'Settings' ), icon: <KeyIcon />, onClick: () => setShowSettings( true ) },
+            { type: 'item', label: t( 'Sync schemas' ), icon: <SyncIcon />, onClick: () => setShowSchemaSync( true ) },
+            ...( cloudEnabled() ? [{ type: 'item' as const, label: t( 'Push contract to cloud' ), icon: <SyncIcon />, onClick: () => setShowPushContract( true ) }] : [] ),
+            { type: 'item', label: t( 'Add tag' ), icon: <TagIcon />, onClick: () => setAddingTag( true ) },
+            { type: 'item', label: t( 'Rename' ), icon: <PencilIcon />, onClick: () => setRenaming( true ) },
+            { type: 'item', label: t( 'Duplicate' ), icon: <CopyIcon />, onClick: onDuplicate },
             { type: 'separator' },
-            { type: 'item', label: 'Delete folder', icon: <TrashIcon />, danger: true, onClick: onDelete },
+            { type: 'item', label: t( 'Delete folder' ), icon: <TrashIcon />, danger: true, onClick: onDelete },
           ]} />
         </div>
       </div>

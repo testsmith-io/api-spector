@@ -8,6 +8,7 @@ import { KVTable } from '../RequestBuilder/KVTable';
 import { Modal } from '../common/Modal';
 import { AuthEditor, type AuthEditorPatch } from '../common/AuthEditor';
 import { DataSetEditor } from '../common/DataSetEditor';
+import { useT } from '../../i18n';
 
 type ModalTab = 'auth' | 'headers' | 'variables' | 'data'
 
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
+  const t = useT();
   const updateFolder = useStore(s => s.updateFolder);
 
   const [activeTab, setActiveTab] = useState<ModalTab>('auth');
@@ -51,25 +53,25 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-surface-800 shrink-0">
           <div>
-            <h2 className="text-sm font-semibold">Folder settings</h2>
-            <p className="text-[10px] text-surface-600 mt-0.5">{folder.name} - auth, headers and variables inherited by all requests in this folder</p>
+            <h2 className="text-sm font-semibold">{t('Folder settings')}</h2>
+            <p className="text-[10px] text-surface-600 mt-0.5">{t(':name - auth, headers and variables inherited by all requests in this folder', { name: folder.name })}</p>
           </div>
           <button onClick={onClose} className="text-surface-400 hover:text-white text-lg leading-none">×</button>
         </div>
 
         {/* Tabs */}
         <div className="flex border-b border-surface-800 px-4 shrink-0">
-          {(['auth', 'headers', 'variables', 'data'] as ModalTab[]).map(t => (
+          {(['auth', 'headers', 'variables', 'data'] as ModalTab[]).map(tab => (
             <button
-              key={t}
-              onClick={() => setActiveTab(t)}
+              key={tab}
+              onClick={() => setActiveTab(tab)}
               className={`px-3 py-1.5 text-xs transition-colors border-b-2 -mb-px capitalize ${
-                activeTab === t
+                activeTab === tab
                   ? 'border-blue-500 text-white'
                   : 'border-transparent text-surface-400 hover:text-white'
               }`}
             >
-              {t}
+              {tab}
             </button>
           ))}
         </div>
@@ -82,7 +84,7 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
               onChange={patchAuth}
               intro={
                 <p className="text-[10px] text-surface-600">
-                  Auth configured here is inherited by all requests in this folder unless the request overrides it with its own non-none auth type.
+                  {t('Auth configured here is inherited by all requests in this folder unless the request overrides it with its own non-none auth type.')}
                 </p>
               }
             />
@@ -91,15 +93,15 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
             <KVTable
               rows={headers}
               onChange={setHeaders}
-              keyPlaceholder="Header-Name"
-              valuePlaceholder="value"
+              keyPlaceholder={t('Header-Name')}
+              valuePlaceholder={t('value')}
               headerMode
             />
           )}
           {activeTab === 'variables' && (
             <div className="flex flex-col gap-2">
               <p className="text-[10px] text-surface-600">
-                Variables scoped to this folder. They override collection variables and are overridden by an inner folder, the active environment, and script-set values. Reference them anywhere with {'{{name}}'}.
+                {t('Variables scoped to this folder. They override collection variables and are overridden by an inner folder, the active environment, and script-set values. Reference them anywhere with :token.', { token: '{{name}}' })}
               </p>
               <KVTable
                 rows={varRows}
@@ -120,13 +122,13 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
             onClick={save}
             className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-xs font-medium transition-colors"
           >
-            Save
+            {t('Save')}
           </button>
           <button
             onClick={onClose}
             className="px-4 py-1.5 bg-surface-800 hover:bg-surface-700 rounded text-xs transition-colors"
           >
-            Cancel
+            {t('Cancel')}
           </button>
         </div>
     </Modal>

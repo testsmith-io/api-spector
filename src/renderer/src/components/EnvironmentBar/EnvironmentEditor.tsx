@@ -8,6 +8,7 @@ import { MasterKeyModal } from './MasterKeyModal';
 import { Modal } from '../common/Modal';
 import { envRelPath } from '../../../../shared/naming-utils';
 import { resolveEnvironmentChain } from '../../../../shared/environments';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
@@ -68,6 +69,7 @@ function getSourceMode(v: EnvVariable): SourceMode {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const environments         = useStore(s => s.environments);
   const activeEnvironmentId  = useStore(s => s.activeEnvironmentId);
   const updateEnvironment    = useStore(s => s.updateEnvironment);
@@ -109,7 +111,7 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
       const ownKeys = new Set(env.variables.map(v => v.key));
       const resolved = resolveEnvironmentChain(env, allEnvDatas);
       const inheritedCount = resolved.variables.filter(v => !ownKeys.has(v.key)).length;
-      inheritSummary = `Inherits ${inheritedCount} variable${inheritedCount === 1 ? '' : 's'} from ${parentNames.join(', ')}`;
+      inheritSummary = t('Inherits :count variable from :names|Inherits :count variables from :names', { count: inheritedCount, names: parentNames.join(', ') });
     }
   }
 
@@ -197,7 +199,7 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
       e => e.data.id !== env.id && e.data.name.toLowerCase() === env.name.trim().toLowerCase()
     );
     if (duplicate) {
-      setNameError(`"${env.name.trim()}" already exists`);
+      setNameError(t('":name" already exists', { name: env.name.trim() }));
       return;
     }
     setNameError(null);
@@ -244,7 +246,7 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
           {/* Sidebar */}
           <div className="w-44 border-r border-surface-800 flex flex-col flex-shrink-0">
             <div className="px-3 py-2 text-xs font-semibold text-surface-400 uppercase tracking-wider border-b border-surface-800">
-              Environments
+              {t('Environments')}
             </div>
             <div className="flex-1 overflow-y-auto py-1">
               {envList.map(({ data: e }) => (
@@ -265,12 +267,12 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                   <button
                     onClick={() => handleDuplicate(e.id)}
                     className="opacity-0 group-hover:opacity-100 text-surface-400 hover:text-white transition-all px-1 text-xs leading-none shrink-0"
-                    title="Duplicate environment"
+                    title={t('Duplicate environment')}
                   >⧉</button>
                   <button
                     onClick={() => handleDelete(e.id)}
                     className="opacity-0 group-hover:opacity-100 text-surface-400 hover:text-red-400 transition-all px-1 text-sm leading-none shrink-0"
-                    title="Delete environment"
+                    title={t('Delete environment')}
                   >×</button>
                 </div>
               ))}
@@ -283,7 +285,7 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
               }}
               className="px-3 py-2 text-xs text-surface-400 hover:text-white border-t border-surface-800 transition-colors text-left"
             >
-              + Add environment
+              {t('+ Add environment')}
             </button>
           </div>
 
@@ -299,7 +301,7 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                     className={`flex-1 bg-surface-800 rounded px-2 py-1 text-sm font-semibold focus:outline-none focus:ring-1 ${
                       nameError ? 'ring-1 ring-red-500 focus:ring-red-500' : 'focus:ring-blue-500'
                     }`}
-                    placeholder="Environment name"
+                    placeholder={t('Environment name')}
                   />
                   <button onClick={onClose} className="text-surface-400 hover:text-white text-lg leading-none">×</button>
                 </div>
@@ -308,14 +310,14 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                 {/* Extends: inherit variables from another environment */}
                 <div className="flex items-center gap-2 mt-2">
                   <label className="text-[10px] uppercase tracking-wider text-surface-400 font-medium shrink-0">
-                    Extends
+                    {t('Extends')}
                   </label>
                   <select
                     value={env.extends ?? ''}
                     onChange={e => updateEnvironment(env.id, { ...env, extends: e.target.value || undefined })}
                     className="bg-surface-800 border border-surface-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
                   >
-                    <option value="">(none)</option>
+                    <option value="">{t('(none)')}</option>
                     {envList
                       .filter(({ data: other }) => other.id !== env.id)
                       .map(({ data: other }) => (
@@ -333,11 +335,11 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-surface-400 text-left border-b border-surface-800">
-                      <th className="px-3 py-2 w-8">On</th>
+                      <th className="px-3 py-2 w-8">{t('On')}</th>
                       {/* Variable name column — was 144px which truncated typical names
                           like OAUTH2_CLIENT_SECRET. 224px fits ~25 chars comfortably. */}
-                      <th className="px-2 py-2 w-56">Variable</th>
-                      <th className="px-2 py-2">Value / Encrypted / Env var</th>
+                      <th className="px-2 py-2 w-56">{t('Variable')}</th>
+                      <th className="px-2 py-2">{t('Value / Encrypted / Env var')}</th>
                       <th className="px-2 py-2 w-6"></th>
                     </tr>
                   </thead>
@@ -364,7 +366,7 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                             <input
                               value={v.key}
                               onChange={e => updateVar(idx, { key: e.target.value })}
-                              placeholder="variable_name"
+                              placeholder={t('variable_name')}
                               className="w-full bg-surface-800 rounded px-2 py-1 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
                             />
                           </td>
@@ -375,7 +377,7 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                               <input
                                 value={v.value}
                                 onChange={e => updateVar(idx, { value: e.target.value })}
-                                placeholder="value"
+                                placeholder={t('value')}
                                 className="w-full bg-surface-800 rounded px-2 py-1 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
                               />
                             )}
@@ -388,8 +390,8 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                                   onChange={e => setSecretInputs(s => ({ ...s, [idx]: e.target.value }))}
                                   placeholder={
                                     v.secretHash
-                                      ? `Encrypted  ·  sha256: ${v.secretHash}…`
-                                      : 'Enter secret value to encrypt…'
+                                      ? t('Encrypted  ·  sha256: :hash…', { hash: v.secretHash })
+                                      : t('Enter secret value to encrypt…')
                                   }
                                   className="flex-1 bg-surface-800 rounded px-2 py-1 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
@@ -398,12 +400,12 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                                   disabled={!secretInputs[idx]}
                                   className="px-2 py-1 bg-blue-700 hover:bg-blue-600 disabled:opacity-40 rounded whitespace-nowrap transition-colors"
                                 >
-                                  {savedIdx === idx ? '✓ Saved' : 'Encrypt'}
+                                  {savedIdx === idx ? t('✓ Saved') : t('Encrypt')}
                                 </button>
                                 {v.secretHash && savedIdx !== idx && (
                                   <span
                                     className="text-[10px] text-emerald-400 font-mono shrink-0"
-                                    title={`SHA-256 fingerprint of encrypted value: ${v.secretHash}…`}
+                                    title={t('SHA-256 fingerprint of encrypted value: :hash…', { hash: v.secretHash })}
                                   >
                                     ●&nbsp;{v.secretHash}…
                                   </span>
@@ -417,12 +419,12 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                                 <input
                                   value={v.envRef ?? ''}
                                   onChange={e => updateVar(idx, { envRef: e.target.value })}
-                                  placeholder="OS_ENV_VAR_NAME"
+                                  placeholder={t('OS_ENV_VAR_NAME')}
                                   className="flex-1 bg-surface-800 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
                                 <span
                                   className="text-[10px] text-surface-400 shrink-0"
-                                  title="Value read from OS env at send-time. Never stored in project."
+                                  title={t('Value read from OS env at send-time. Never stored in project.')}
                                 >
                                   process.env
                                 </span>
@@ -450,21 +452,21 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                               <input
                                 value={v.description ?? ''}
                                 onChange={e => updateVar(idx, { description: e.target.value })}
-                                placeholder="Optional description…"
+                                placeholder={t('Optional description…')}
                                 className="flex-1 bg-surface-800/50 rounded px-2 py-1 text-[10px] text-surface-300 placeholder-surface-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                               />
                               <button
                                 onClick={() => cycleSource(idx)}
                                 title={
-                                  mode === 'plain'     ? 'Plain text - click to switch to encrypted secret'  :
-                                  mode === 'encrypted' ? 'Encrypted secret - click to switch to env var ref' :
-                                                         'OS env var reference - click to switch to plain text'
+                                  mode === 'plain'     ? t('Plain text - click to switch to encrypted secret')  :
+                                  mode === 'encrypted' ? t('Encrypted secret - click to switch to env var ref') :
+                                                         t('OS env var reference - click to switch to plain text')
                                 }
                                 className="flex items-center justify-center gap-1 px-1.5 py-0.5 rounded border transition-colors text-[10px] font-medium w-16 shrink-0 border-surface-700 hover:border-surface-500"
                               >
-                                {mode === 'plain'     && <span>abc</span>}
-                                {mode === 'encrypted' && <><span className="text-amber-400">🔒</span><span className="text-amber-400">enc</span></>}
-                                {mode === 'env'       && <><span className="text-blue-400">$</span><span className="text-blue-400">env</span></>}
+                                {mode === 'plain'     && <span>{t('abc')}</span>}
+                                {mode === 'encrypted' && <><span className="text-amber-400">🔒</span><span className="text-amber-400">{t('enc')}</span></>}
+                                {mode === 'env'       && <><span className="text-blue-400">$</span><span className="text-blue-400">{t('env')}</span></>}
                               </button>
                             </div>
                           </td>
@@ -479,46 +481,46 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
                   onClick={addVar}
                   className="mx-3 my-2 text-xs text-surface-400 hover:text-white transition-colors"
                 >
-                  + Add variable
+                  {t('+ Add variable')}
                 </button>
               </div>
 
               {/* Usage hint */}
               <div className="px-4 py-2 border-t border-surface-800 bg-surface-950/50 flex flex-col gap-0.5">
                 <p className="text-[10px] text-surface-400">
-                  Use <code className="text-surface-200">{'{{variable_name}}'}</code> in URLs, headers, and body.
+                  {t('Use')} <code className="text-surface-200">{'{{variable_name}}'}</code> {t('in URLs, headers, and body.')}
                 </p>
                 <p className="text-[10px] text-surface-400">
-                  <span className="text-amber-400">🔒 Encrypted</span>: AES-256-GCM, key from{' '}
+                  <span className="text-amber-400">{t('🔒 Encrypted')}</span>{t(': AES-256-GCM, key from')}{' '}
                   <code className="text-surface-200">API_SPECTOR_MASTER_KEY</code>.
                 </p>
                 <p className="text-[10px] text-surface-400">
-                  <span className="text-blue-400">$ Env var</span>: read from{' '}
-                  <code className="text-surface-200">process.env</code> at send-time. Ideal for CI/CD.
+                  <span className="text-blue-400">{t('$ Env var')}</span>{t(': read from')}{' '}
+                  <code className="text-surface-200">process.env</code> {t('at send-time. Ideal for CI/CD.')}
                 </p>
               </div>
 
               {/* Footer */}
               <div className="px-4 py-2 border-t border-surface-800 flex justify-end gap-2">
                 <button onClick={onClose} className="px-3 py-1.5 text-xs text-surface-400 hover:text-white">
-                  Cancel
+                  {t('Cancel')}
                 </button>
                 <button
                   onClick={() => { saveEnv(); onClose(); }}
                   className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 rounded transition-colors"
                 >
-                  Save
+                  {t('Save')}
                 </button>
               </div>
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 text-surface-400 text-xs">
-              <p>No environment selected.</p>
+              <p>{t('No environment selected.')}</p>
               <button
                 onClick={() => { useStore.getState().addEnvironment(); const id = Object.keys(useStore.getState().environments).at(-1) ?? ''; selectEnv(id); }}
                 className="text-blue-400 hover:text-blue-300"
               >
-                + Create environment
+                {t('+ Create environment')}
               </button>
             </div>
           )}

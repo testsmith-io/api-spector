@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import React, { useState } from 'react';
+import { useT } from '../../../i18n';
 import { buildSelector } from './utils/xmlPath';
 
 interface Props {
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function XmlNode({ element, depth, onLeaf }: Props) {
+  const t = useT();
   // XML tends to be deeper than JSON; auto-expand the first three levels
   const [expanded, setExpanded] = useState(depth < 3);
   const childEls = Array.from(element.children);
@@ -29,9 +31,9 @@ export function XmlNode({ element, depth, onLeaf }: Props) {
         <button
           onClick={e => onLeaf(e, selector, text)}
           className="ml-auto opacity-0 group-hover:opacity-100 shrink-0 text-[10px] px-1.5 leading-4 py-0.5 text-blue-400 border border-blue-800 hover:border-blue-500 hover:text-blue-300 rounded transition-all"
-          title="Add assertion for this value"
+          title={t('Add assertion for this value')}
         >
-          + insert
+          {t('+ insert')}
         </button>
       </div>
     );

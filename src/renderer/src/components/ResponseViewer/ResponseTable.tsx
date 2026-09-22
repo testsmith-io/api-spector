@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   findPrimaryArray, getByPath, joinPath, tableColumns, sortedIndices, classify, cellPreview,
 } from '../../../../shared/response-table';
+import { useT } from '../../i18n';
 
 const MAX_ROWS = 1000;
 
@@ -55,6 +56,7 @@ export function bodyHasArray(body: string, contentType: string): boolean {
 interface Props { body: string; contentType: string }
 
 export function ResponseTable({ body, contentType }: Props) {
+  const t = useT();
   const parsed = useMemo(() => parseBody(body, contentType), [body, contentType]);
   const detected = useMemo(() => (parsed.ok ? findPrimaryArray(parsed.value) : null), [parsed]);
 
@@ -64,7 +66,7 @@ export function ResponseTable({ body, contentType }: Props) {
   // Reset to the auto-detected array whenever the response changes.
   useEffect(() => { setPath(detected?.path ?? ''); setSort(null); }, [detected]);
 
-  if (!parsed.ok) return <div className="p-4 text-xs text-red-400">Could not parse body: {parsed.error}</div>;
+  if (!parsed.ok) return <div className="p-4 text-xs text-red-400">{t('Could not parse body: :error', { error: parsed.error })}</div>;
 
   const target = getByPath(parsed.value, path);
   const rows = Array.isArray(target) ? target : null;
@@ -120,8 +122,8 @@ export function ResponseTable({ body, contentType }: Props) {
       <div className="border-b border-surface-800 flex-shrink-0">
         {path && (
           <div className="flex items-center gap-1 px-3 pt-2 text-xs flex-wrap">
-            <button onClick={() => navigate(parentPath)} title="Up one level" className="px-1.5 py-0.5 rounded bg-surface-800 hover:bg-surface-700 text-surface-300 mr-1">↑ up</button>
-            <button onClick={() => navigate('')} className="text-surface-400 hover:text-white">root</button>
+            <button onClick={() => navigate(parentPath)} title={t('Up one level')} className="px-1.5 py-0.5 rounded bg-surface-800 hover:bg-surface-700 text-surface-300 mr-1">{t('↑ up')}</button>
+            <button onClick={() => navigate('')} className="text-surface-400 hover:text-white">{t('root')}</button>
             {crumbs.map((c, i) => (
               <React.Fragment key={c.path}>
                 <span className="text-surface-600">›</span>
@@ -131,16 +133,16 @@ export function ResponseTable({ body, contentType }: Props) {
           </div>
         )}
         <div className="flex items-center gap-2 px-3 py-2 text-xs">
-          <span className="text-surface-500">Path</span>
+          <span className="text-surface-500">{t('Path')}</span>
           <input
             value={path}
             onChange={e => navigate(e.target.value)}
-            placeholder="(root) e.g. data.items"
+            placeholder={t('(root) e.g. data.items')}
             className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 font-mono text-[11px] focus:outline-none focus:border-blue-500"
           />
           <span className="text-surface-500 shrink-0">
-            {rows ? `${rows.length} rows${columns.length ? ` · ${columns.length} cols` : ''}`
-              : classify(target) === 'object' ? `${Object.keys(target as object).length} fields`
+            {rows ? `${t(':count row|:count rows', { count: rows.length })}${columns.length ? ` · ${t(':count col|:count cols', { count: columns.length })}` : ''}`
+              : classify(target) === 'object' ? t(':count field|:count fields', { count: Object.keys(target as object).length })
               : ''}
           </span>
         </div>
@@ -153,7 +155,7 @@ export function ResponseTable({ body, contentType }: Props) {
               <tr>
                 <th className="px-3 py-1.5 text-right text-surface-600 border-b border-surface-800 w-10">#</th>
                 {isPrimitiveRows ? (
-                  <th className={th} onClick={() => toggleSort('$value')}>value{arrow('$value')}</th>
+                  <th className={th} onClick={() => toggleSort('$value')}>{t('value')}{arrow('$value')}</th>
                 ) : (
                   columns.map(col => <th key={col} className={th} onClick={() => toggleSort(col)}>{col}{arrow(col)}</th>)
                 )}
@@ -195,12 +197,12 @@ export function ResponseTable({ body, contentType }: Props) {
           <div className="p-4 text-xs font-mono text-surface-300 whitespace-pre-wrap break-all">{String(target)}</div>
         ) : (
           <div className="p-4 text-xs text-surface-500">
-            Nothing at <span className="font-mono text-surface-400">{path || '(root)'}</span>.
-            {detected ? <> Detected array: <button className="font-mono text-blue-400" onClick={() => navigate(detected.path)}>{detected.path || '(root)'}</button></> : ''}
+            {t('Nothing at')} <span className="font-mono text-surface-400">{path || '(root)'}</span>.
+            {detected ? <> {t('Detected array:')} <button className="font-mono text-blue-400" onClick={() => navigate(detected.path)}>{detected.path || '(root)'}</button></> : ''}
           </div>
         )}
         {rows && rows.length > MAX_ROWS && (
-          <div className="p-2 text-[10px] text-surface-500">Showing first {MAX_ROWS} of {rows.length} rows.</div>
+          <div className="p-2 text-[10px] text-surface-500">{t('Showing first :max of :total rows.', { max: MAX_ROWS, total: rows.length })}</div>
         )}
       </div>
     </div>
@@ -208,10 +210,11 @@ export function ResponseTable({ body, contentType }: Props) {
 }
 
 function Cell({ value, onDrill }: { value: unknown; onDrill: () => void }) {
+  const t = useT();
   const kind = classify(value);
   if (kind === 'array' || kind === 'object') {
     return (
-      <button onClick={onDrill} title="Open this nested value" className="text-blue-400 hover:underline">
+      <button onClick={onDrill} title={t('Open this nested value')} className="text-blue-400 hover:underline">
         {kind === 'array' ? cellPreview(value) : '{…}'}
       </button>
     );

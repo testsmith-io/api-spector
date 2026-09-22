@@ -6,6 +6,7 @@ import { useStore } from '../../store';
 import { Modal } from '../common/Modal';
 import { useToast, Toast } from '../common/Toast';
 import { designContractToMock } from '../../../../shared/design-mock';
+import { useT } from '../../i18n';
 import type { ConsumerContract, DesignInteraction, Workspace, MockServer, KeyValuePair } from '../../../../shared/types';
 
 const { electron } = window;
@@ -40,21 +41,22 @@ function KVRows({ label, rows, onChange, keyPlaceholder = 'name', valuePlacehold
   keyPlaceholder?: string;
   valuePlaceholder?: string;
 }) {
+  const t = useT();
   const list = rows ?? [];
   const set = (i: number, patch: Partial<KeyValuePair>) => onChange(list.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[10px] uppercase tracking-wider text-surface-500">{label}</span>
+      <span className="text-[10px] uppercase tracking-wider text-surface-500">{t(label)}</span>
       {list.map((r, i) => (
         <div key={i} className="flex items-center gap-1.5">
-          <input value={r.key} onChange={e => set(i, { key: e.target.value })} placeholder={keyPlaceholder} spellCheck={false}
+          <input value={r.key} onChange={e => set(i, { key: e.target.value })} placeholder={t(keyPlaceholder)} spellCheck={false}
             className="flex-1 min-w-0 text-[11px] font-mono bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500" />
-          <input value={r.value} onChange={e => set(i, { value: e.target.value })} placeholder={valuePlaceholder} spellCheck={false}
+          <input value={r.value} onChange={e => set(i, { value: e.target.value })} placeholder={t(valuePlaceholder)} spellCheck={false}
             className="flex-1 min-w-0 text-[11px] font-mono bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500" />
-          <button onClick={() => onChange(list.filter((_, j) => j !== i))} className="text-surface-600 hover:text-red-400 text-xs px-0.5" title="Remove">✕</button>
+          <button onClick={() => onChange(list.filter((_, j) => j !== i))} className="text-surface-600 hover:text-red-400 text-xs px-0.5" title={t('Remove')}>✕</button>
         </div>
       ))}
-      <button onClick={() => onChange([...list, { key: '', value: '', enabled: true }])} className="self-start text-[11px] text-blue-400 hover:text-blue-300">+ add</button>
+      <button onClick={() => onChange([...list, { key: '', value: '', enabled: true }])} className="self-start text-[11px] text-blue-400 hover:text-blue-300">{t('+ add')}</button>
     </div>
   );
 }
@@ -67,6 +69,7 @@ export function ContractDesignerModal({ onClose }: { onClose: () => void }) {
   const updateMock    = useStore(s => s.updateMock);
   const cloudConnected = useStore(s => Boolean(s.workspace?.settings?.cloud?.enabled));
   const { toast, show } = useToast();
+  const t = useT();
 
   const contracts = workspace?.designContracts ?? [];
   const [selectedId, setSelectedId] = useState<string | null>(contracts[0]?.id ?? null);
@@ -112,7 +115,7 @@ export function ContractDesignerModal({ onClose }: { onClose: () => void }) {
     if (!selected) return;
     try {
       const relPath = await electron.exportDesignPact(selected);
-      if (relPath) show(`Saved ${relPath} in the workspace`, true);
+      if (relPath) show(t('Saved :path in the workspace', { path: relPath }), true);
     } catch (e) {
       show((e as Error).message, false);
     }
@@ -128,13 +131,13 @@ export function ContractDesignerModal({ onClose }: { onClose: () => void }) {
       const st = useStore.getState();
       const id = st.activeMockId;
       const entry = id ? st.mocks[id] : null;
-      if (!id || !entry) { show('Could not create the mock — open a workspace first.', false); return; }
-      const mock: MockServer = { ...designContractToMock(selected), id, name: `${selected.consumer} → ${selected.provider} (contract mock)` };
+      if (!id || !entry) { show(t('Could not create the mock — open a workspace first.'), false); return; }
+      const mock: MockServer = { ...designContractToMock(selected), id, name: t(':consumer → :provider (contract mock)', { consumer: selected.consumer, provider: selected.provider }) };
       updateMock(id, mock);
       await electron.saveMock(entry.relPath, mock);
       const ws = useStore.getState().workspace;
       if (ws) await electron.saveWorkspace(ws);
-      show(`Created mock with ${mock.routes.length} route${mock.routes.length === 1 ? '' : 's'} — open the Mocks panel to run it`, true);
+      show(t('Created mock with :count route — open the Mocks panel to run it|Created mock with :count routes — open the Mocks panel to run it', { count: mock.routes.length }), true);
     } catch (e) {
       show((e as Error).message, false);
     }
@@ -148,9 +151,9 @@ export function ContractDesignerModal({ onClose }: { onClose: () => void }) {
       const v = res.verification;
       if (v && !v.success) {
         const failed = v.checks.filter(c => !c.passed).map(c => c.interaction).join(', ');
-        show(`Published, but bi-directional check failed: ${failed || 'see matrix'}`, false);
+        show(t('Published, but bi-directional check failed: :detail', { detail: failed || t('see matrix') }), false);
       } else {
-        show(`Published ${selected.consumer}@${version} to the cloud`, true);
+        show(t('Published :consumer@:version to the cloud', { consumer: selected.consumer, version }), true);
       }
     } catch (e) {
       show((e as Error).message, false);
@@ -162,20 +165,20 @@ export function ContractDesignerModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal
       onClose={onClose}
-      title="Contract Designer"
-      subtitle="Design a consumer-driven contract up front — no endpoint required — then publish it to API Spector Cloud."
+      title={t('Contract Designer')}
+      subtitle={t('Design a consumer-driven contract up front — no endpoint required — then publish it to API Spector Cloud.')}
       panelClassName="bg-surface-900 border border-surface-700 rounded-xl w-[min(1000px,94vw)] h-[min(760px,90vh)] flex flex-col"
     >
       <div className="flex flex-1 min-h-0">
         {/* Contract list */}
         <div className="w-56 shrink-0 border-r border-surface-800 flex flex-col">
           <div className="px-3 py-2 border-b border-surface-800 flex items-center justify-between">
-            <span className="text-[10px] uppercase tracking-wider text-surface-500 font-semibold">Contracts</span>
-            <button onClick={addContract} className="text-xs text-blue-400 hover:text-blue-300" title="New contract">+ New</button>
+            <span className="text-[10px] uppercase tracking-wider text-surface-500 font-semibold">{t('Contracts')}</span>
+            <button onClick={addContract} className="text-xs text-blue-400 hover:text-blue-300" title={t('New contract')}>{t('+ New')}</button>
           </div>
           <div className="flex-1 overflow-y-auto">
             {contracts.length === 0 && (
-              <p className="px-3 py-3 text-xs text-surface-500">No contracts yet. Click <span className="text-blue-400">+ New</span>.</p>
+              <p className="px-3 py-3 text-xs text-surface-500">{t('No contracts yet. Click')} <span className="text-blue-400">{t('+ New')}</span>{'.'}</p>
             )}
             {contracts.map(c => (
               <button
@@ -184,7 +187,7 @@ export function ContractDesignerModal({ onClose }: { onClose: () => void }) {
                 className={`w-full text-left px-3 py-2 border-b border-surface-800/60 transition-colors ${c.id === selectedId ? 'bg-surface-800' : 'hover:bg-surface-800/50'}`}
               >
                 <div className="text-xs text-surface-200 truncate">{c.consumer} <span className="text-surface-600">→</span> {c.provider}</div>
-                <div className="text-[10px] text-surface-500">{c.interactions.length} interaction{c.interactions.length === 1 ? '' : 's'}</div>
+                <div className="text-[10px] text-surface-500">{t(':count interaction|:count interactions', { count: c.interactions.length })}</div>
               </button>
             ))}
           </div>
@@ -192,50 +195,50 @@ export function ContractDesignerModal({ onClose }: { onClose: () => void }) {
 
         {/* Editor */}
         {!selected ? (
-          <div className="flex-1 flex items-center justify-center text-surface-500 text-sm">Select or create a contract.</div>
+          <div className="flex-1 flex items-center justify-center text-surface-500 text-sm">{t('Select or create a contract.')}</div>
         ) : (
           <div className="flex-1 flex flex-col min-h-0">
             {/* Pacticipants + publish */}
             <div className="px-4 py-3 border-b border-surface-800 flex flex-wrap items-end gap-3">
               <label className="flex flex-col gap-1">
-                <span className="text-[10px] uppercase tracking-wider text-surface-500">Consumer</span>
+                <span className="text-[10px] uppercase tracking-wider text-surface-500">{t('Consumer')}</span>
                 <input value={selected.consumer} onChange={e => upsert({ ...selected, consumer: e.target.value })}
                   className="text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1 w-44 focus:outline-none focus:border-blue-500" />
               </label>
               <span className="text-surface-600 pb-1.5">→</span>
               <label className="flex flex-col gap-1">
-                <span className="text-[10px] uppercase tracking-wider text-surface-500">Provider</span>
+                <span className="text-[10px] uppercase tracking-wider text-surface-500">{t('Provider')}</span>
                 <input value={selected.provider} onChange={e => upsert({ ...selected, provider: e.target.value })}
                   className="text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1 w-44 focus:outline-none focus:border-blue-500" />
               </label>
               <div className="ml-auto flex items-end gap-2">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] uppercase tracking-wider text-surface-500">Version</span>
+                  <span className="text-[10px] uppercase tracking-wider text-surface-500">{t('Version')}</span>
                   <input value={version} onChange={e => setVersion(e.target.value)}
                     className="text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1 w-24 focus:outline-none focus:border-blue-500" />
                 </label>
                 <button onClick={createMock}
-                  title="Turn this contract into a runnable mock the consumer can develop against (no provider needed)"
+                  title={t('Turn this contract into a runnable mock the consumer can develop against (no provider needed)')}
                   className="px-3 py-1.5 text-xs border border-surface-600 text-surface-200 hover:border-blue-500 hover:text-white rounded transition-colors whitespace-nowrap">
-                  Create mock
+                  {t('Create mock')}
                 </button>
                 <button onClick={saveLocally}
-                  title="Write the compiled pact to pacts/ in this workspace (git-committable, no cloud needed)"
+                  title={t('Write the compiled pact to pacts/ in this workspace (git-committable, no cloud needed)')}
                   className="px-3 py-1.5 text-xs border border-surface-600 text-surface-200 hover:border-blue-500 hover:text-white rounded transition-colors whitespace-nowrap">
-                  Save to workspace
+                  {t('Save to workspace')}
                 </button>
                 <button onClick={publish} disabled={busy || !cloudConnected}
-                  title={cloudConnected ? 'Publish the compiled pact to API Spector Cloud' : 'Connect to cloud in Settings → Cloud first'}
+                  title={cloudConnected ? t('Publish the compiled pact to API Spector Cloud') : t('Connect to cloud in Settings → Cloud first')}
                   className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors whitespace-nowrap">
-                  {busy ? 'Publishing…' : 'Publish to Cloud'}
+                  {busy ? t('Publishing…') : t('Publish to Cloud')}
                 </button>
                 <button onClick={() => deleteContract(selected.id)}
-                  className="px-2 py-1.5 text-xs text-red-400 hover:bg-red-900/30 rounded transition-colors">Delete</button>
+                  className="px-2 py-1.5 text-xs text-red-400 hover:bg-red-900/30 rounded transition-colors">{t('Delete')}</button>
               </div>
             </div>
             {!cloudConnected && (
               <p className="px-4 py-1.5 text-[11px] text-amber-400 bg-amber-950/20 border-b border-surface-800">
-                Not connected to API Spector Cloud — connect in Settings → Cloud to publish. You can still design and save the contract.
+                {t('Not connected to API Spector Cloud — connect in Settings → Cloud to publish. You can still design and save the contract.')}
               </p>
             )}
 
@@ -245,10 +248,10 @@ export function ContractDesignerModal({ onClose }: { onClose: () => void }) {
                 <div key={it.id} className="border border-surface-800 rounded-lg p-3 flex flex-col gap-2.5">
                   <div className="flex items-center gap-2">
                     <input value={it.description} onChange={e => patchInteraction(ix, { description: e.target.value })}
-                      placeholder="what this interaction is"
+                      placeholder={t('what this interaction is')}
                       className="flex-1 text-xs font-medium bg-transparent border-b border-surface-800 focus:border-blue-500 focus:outline-none py-0.5" />
                     <button onClick={() => upsert({ ...selected, interactions: selected.interactions.filter((_, i) => i !== ix) })}
-                      className="text-surface-600 hover:text-red-400 text-xs" title="Remove interaction">✕</button>
+                      className="text-surface-600 hover:text-red-400 text-xs" title={t('Remove interaction')}>✕</button>
                   </div>
 
                   <div className="flex gap-2">
@@ -262,13 +265,13 @@ export function ContractDesignerModal({ onClose }: { onClose: () => void }) {
                   </div>
 
                   <input value={it.providerState ?? ''} onChange={e => patchInteraction(ix, { providerState: e.target.value })}
-                    placeholder="provider state (e.g. &quot;brand 1 exists&quot;) — optional"
+                    placeholder={t('provider state (e.g. "brand 1 exists") — optional')}
                     className="text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500" />
 
                   <div className="grid grid-cols-2 gap-4">
                     {/* Request contract */}
                     <div className="flex flex-col gap-2.5 border-r border-surface-800 pr-4">
-                      <span className="text-[10px] uppercase tracking-wider text-surface-400 font-semibold">Request</span>
+                      <span className="text-[10px] uppercase tracking-wider text-surface-400 font-semibold">{t('Request')}</span>
                       <KVRows label="Query params" rows={it.request.query}
                         onChange={q => patchInteraction(ix, { request: { ...it.request, query: q } })}
                         keyPlaceholder="e.g. discontinued" valuePlaceholder="true" />
@@ -276,7 +279,7 @@ export function ContractDesignerModal({ onClose }: { onClose: () => void }) {
                         onChange={h => patchInteraction(ix, { request: { ...it.request, headers: h } })}
                         keyPlaceholder="Accept" valuePlaceholder="application/json" />
                       <label className="flex flex-col gap-1">
-                        <span className="text-[10px] uppercase tracking-wider text-surface-500">Body (JSON, optional)</span>
+                        <span className="text-[10px] uppercase tracking-wider text-surface-500">{t('Body (JSON, optional)')}</span>
                         <textarea value={it.request.body ?? ''} onChange={e => patchInteraction(ix, { request: { ...it.request, body: e.target.value } })}
                           rows={3} placeholder="{ }" spellCheck={false}
                           className="text-[11px] font-mono bg-surface-800 border border-surface-700 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500 resize-y" />
@@ -286,8 +289,8 @@ export function ContractDesignerModal({ onClose }: { onClose: () => void }) {
                     {/* Expected response contract */}
                     <div className="flex flex-col gap-2.5">
                       <span className="text-[10px] uppercase tracking-wider text-surface-400 font-semibold flex items-center gap-2">
-                        Expected response
-                        <input type="number" value={it.response.status} title="expected status code"
+                        {t('Expected response')}
+                        <input type="number" value={it.response.status} title={t('expected status code')}
                           onChange={e => patchInteraction(ix, { response: { ...it.response, status: Number(e.target.value) || 0 } })}
                           className="w-16 text-[11px] bg-surface-900 border border-surface-700 rounded px-1 py-0.5 focus:outline-none focus:border-blue-500" />
                       </span>
@@ -295,12 +298,12 @@ export function ContractDesignerModal({ onClose }: { onClose: () => void }) {
                         onChange={h => patchInteraction(ix, { response: { ...it.response, headers: h } })}
                         keyPlaceholder="Content-Type" valuePlaceholder="application/json" />
                       <label className="flex flex-col gap-1">
-                        <span className="text-[10px] uppercase tracking-wider text-surface-500">Body</span>
+                        <span className="text-[10px] uppercase tracking-wider text-surface-500">{t('Body')}</span>
                         <textarea value={it.response.body ?? ''} onChange={e => patchInteraction(ix, { response: { ...it.response, body: e.target.value } })}
-                          rows={3} placeholder="[{ id: string, name: string, slug: string }]  — or a JSON example" spellCheck={false}
+                          rows={3} placeholder={t('[{ id: string, name: string, slug: string }]  — or a JSON example')} spellCheck={false}
                           className="text-[11px] font-mono bg-surface-800 border border-surface-700 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500 resize-y" />
                         <span className="text-[10px] text-surface-500 leading-relaxed">
-                          A JSON example (matched by type when the toggle is on), or a <span className="text-surface-300">type shape</span> to check each property&apos;s type: <span className="font-mono text-surface-300">string, number, integer, boolean, null</span> plus nested <span className="font-mono">{'{ }'}</span> / <span className="font-mono">[ ]</span>. E.g. <span className="font-mono text-surface-300">{'[{ id: string, qty: integer }]'}</span>. Compiles to Pact <span className="font-mono">matchingRules</span>.
+                          {t('A JSON example (matched by type when the toggle is on), or a')} <span className="text-surface-300">{t('type shape')}</span> {t('to check each property\'s type:')} <span className="font-mono text-surface-300">string, number, integer, boolean, null</span> {t('plus nested')} <span className="font-mono">{'{ }'}</span> / <span className="font-mono">[ ]</span>{t('. E.g.')} <span className="font-mono text-surface-300">{'[{ id: string, qty: integer }]'}</span>{t('. Compiles to Pact')} <span className="font-mono">matchingRules</span>{'.'}
                         </span>
                       </label>
                     </div>
@@ -309,12 +312,12 @@ export function ContractDesignerModal({ onClose }: { onClose: () => void }) {
                   <label className="flex items-center gap-2 text-[11px] text-surface-400">
                     <input type="checkbox" checked={it.looseMatch !== false}
                       onChange={e => patchInteraction(ix, { looseMatch: e.target.checked })} className="accent-blue-500" />
-                    Match a JSON example by type, not exact value (tolerant — recommended)
+                    {t('Match a JSON example by type, not exact value (tolerant — recommended)')}
                   </label>
                 </div>
               ))}
               <button onClick={() => upsert({ ...selected, interactions: [...selected.interactions, newInteraction()] })}
-                className="self-start text-xs text-blue-400 hover:text-blue-300">+ Add interaction</button>
+                className="self-start text-xs text-blue-400 hover:text-blue-300">{t('+ Add interaction')}</button>
             </div>
           </div>
         )}

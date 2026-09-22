@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { RecordedEntry, RecordingSession } from '../../../../shared/types';
 import { useStore } from '../../store';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
@@ -32,6 +33,7 @@ function methodColor(method: string): string {
 }
 
 export function RecorderPanel({ onImportMock, onClose, defaultTargetMockId }: Props) {
+  const t = useT();
   const [entries,      setEntries]      = useState<RecordedEntry[]>([]);
   const [selected,     setSelected]     = useState<RecordedEntry | null>(null);
   const [stopped,      setStopped]      = useState(false);
@@ -91,7 +93,7 @@ export function RecorderPanel({ onImportMock, onClose, defaultTargetMockId }: Pr
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
           )}
           <span className="text-sm font-semibold text-surface-100">
-            {stopped ? 'Recording stopped' : 'Recording…'}
+            {stopped ? t('Recording stopped') : t('Recording…')}
           </span>
           <span className="text-[10px] font-mono text-surface-400 truncate max-w-[260px]">
             → {upstream}
@@ -103,7 +105,7 @@ export function RecorderPanel({ onImportMock, onClose, defaultTargetMockId }: Pr
               onClick={handleStop}
               className="px-2.5 py-1 rounded text-[11px] bg-red-900/40 text-red-400 hover:bg-red-800/50 transition-colors"
             >
-              ■ Stop
+              ■ {t('Stop')}
             </button>
           ) : (
             <>
@@ -114,7 +116,7 @@ export function RecorderPanel({ onImportMock, onClose, defaultTargetMockId }: Pr
                     onChange={e => setImportTarget(e.target.value)}
                     className="bg-surface-800 border border-surface-700 rounded px-2 py-1 text-[11px] text-surface-200 focus:outline-none focus:border-blue-500"
                   >
-                    <option value="new">(new mock server)</option>
+                    <option value="new">{t('(new mock server)')}</option>
                     {mockList.map(entry => (
                       <option key={entry.data.id} value={entry.data.id}>
                         {entry.data.name}
@@ -126,7 +128,7 @@ export function RecorderPanel({ onImportMock, onClose, defaultTargetMockId }: Pr
                     disabled={importing}
                     className="px-2.5 py-1 rounded text-[11px] bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                   >
-                    {importing ? 'Importing…' : '⧉ Import'}
+                    {importing ? t('Importing…') : `⧉ ${t('Import')}`}
                   </button>
                 </div>
               )}
@@ -134,7 +136,7 @@ export function RecorderPanel({ onImportMock, onClose, defaultTargetMockId }: Pr
                 onClick={onClose}
                 className="px-2.5 py-1 rounded text-[11px] text-surface-500 hover:text-surface-300 transition-colors"
               >
-                ✕ Close
+                ✕ {t('Close')}
               </button>
             </>
           )}
@@ -143,9 +145,9 @@ export function RecorderPanel({ onImportMock, onClose, defaultTargetMockId }: Pr
 
       {/* ── Stats bar ── */}
       <div className="flex gap-4 px-4 py-1.5 border-b border-surface-800/50 flex-shrink-0 text-[11px]">
-        <span className="text-surface-400">Requests: <span className="text-surface-200 font-medium">{total}</span></span>
-        <span className="text-surface-400">Errors: <span className={errors > 0 ? 'text-red-400 font-medium' : 'text-surface-200 font-medium'}>{errors}</span></span>
-        {total > 0 && <span className="text-surface-400">Avg: <span className="text-surface-200 font-medium">{avgMs}ms</span></span>}
+        <span className="text-surface-400">{t('Requests:')} <span className="text-surface-200 font-medium">{total}</span></span>
+        <span className="text-surface-400">{t('Errors:')} <span className={errors > 0 ? 'text-red-400 font-medium' : 'text-surface-200 font-medium'}>{errors}</span></span>
+        {total > 0 && <span className="text-surface-400">{t('Avg:')} <span className="text-surface-200 font-medium">{avgMs}ms</span></span>}
       </div>
 
       {/* ── Content: entry list + detail ── */}
@@ -159,8 +161,8 @@ export function RecorderPanel({ onImportMock, onClose, defaultTargetMockId }: Pr
           {entries.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-surface-500 text-xs gap-2 p-4 text-center">
               <span className="text-2xl opacity-30">⏺</span>
-              <p>Waiting for requests…</p>
-              <p className="text-[10px]">Point your app at http://localhost:{useStore.getState().recorderPort}</p>
+              <p>{t('Waiting for requests…')}</p>
+              <p className="text-[10px]">{t('Point your app at')} http://localhost:{useStore.getState().recorderPort}</p>
             </div>
           ) : (
             entries.map(entry => {
@@ -197,7 +199,7 @@ export function RecorderPanel({ onImportMock, onClose, defaultTargetMockId }: Pr
         <div className="flex-1 overflow-y-auto p-4 min-w-0">
           {!selected ? (
             <div className="flex items-center justify-center h-full text-surface-500 text-xs">
-              Select a request to inspect
+              {t('Select a request to inspect')}
             </div>
           ) : (
             <EntryDetail entry={selected} />
@@ -211,13 +213,14 @@ export function RecorderPanel({ onImportMock, onClose, defaultTargetMockId }: Pr
 // ─── Entry detail ─────────────────────────────────────────────────────────────
 
 function EntryDetail({ entry }: { entry: RecordedEntry }) {
+  const t = useT();
   const [tab, setTab] = useState<'request' | 'response'>('request');
   const mc = methodColor(entry.request.method);
   const sc = statusColor(entry.response.status);
 
   const prettyBody = (raw: string | null): string => {
     if (!raw) return '';
-    if (raw.startsWith('base64:')) return '[binary content - base64 encoded]';
+    if (raw.startsWith('base64:')) return t('[binary content - base64 encoded]');
     try { return JSON.stringify(JSON.parse(raw), null, 2); } catch { return raw; }
   };
 
@@ -241,28 +244,28 @@ function EntryDetail({ entry }: { entry: RecordedEntry }) {
 
       {/* Tabs */}
       <div className="flex border-b border-surface-800">
-        {(['request', 'response'] as const).map(t => (
+        {(['request', 'response'] as const).map(tb => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={tb}
+            onClick={() => setTab(tb)}
             className={`px-3 py-1.5 text-[11px] capitalize transition-colors border-b-2 -mb-px ${
-              tab === t
+              tab === tb
                 ? 'border-blue-500 text-blue-300'
                 : 'border-transparent text-surface-400 hover:text-surface-200'
             }`}
           >
-            {t}
+            {t(tb)}
           </button>
         ))}
       </div>
 
       {tab === 'request' && (
         <div className="flex flex-col gap-3">
-          <Section label="Headers">
+          <Section label={t('Headers')}>
             <HeadersTable headers={entry.request.headers} />
           </Section>
           {entry.request.body && (
-            <Section label="Body">
+            <Section label={t('Body')}>
               <pre className="font-mono text-[11px] whitespace-pre-wrap break-all text-surface-200 bg-surface-900 border border-surface-700 rounded p-3 max-h-72 overflow-y-auto">
                 {prettyBody(entry.request.body)}
               </pre>
@@ -273,11 +276,11 @@ function EntryDetail({ entry }: { entry: RecordedEntry }) {
 
       {tab === 'response' && (
         <div className="flex flex-col gap-3">
-          <Section label="Headers">
+          <Section label={t('Headers')}>
             <HeadersTable headers={entry.response.headers} />
           </Section>
           {entry.response.body && (
-            <Section label="Body">
+            <Section label={t('Body')}>
               <pre className="font-mono text-[11px] whitespace-pre-wrap break-all text-surface-200 bg-surface-900 border border-surface-700 rounded p-3 max-h-72 overflow-y-auto">
                 {prettyBody(entry.response.body)}
               </pre>
@@ -285,7 +288,7 @@ function EntryDetail({ entry }: { entry: RecordedEntry }) {
           )}
           {entry.response.binary && (
             <p className="text-[10px] text-yellow-400">
-              Binary response - body stored as base64
+              {t('Binary response - body stored as base64')}
             </p>
           )}
         </div>
@@ -304,8 +307,9 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 }
 
 function HeadersTable({ headers }: { headers: Record<string, string> }) {
+  const t = useT();
   const entries = Object.entries(headers);
-  if (entries.length === 0) return <span className="text-surface-500 text-[11px]">none</span>;
+  if (entries.length === 0) return <span className="text-surface-500 text-[11px]">{t('none')}</span>;
   return (
     <div className="font-mono text-[11px] flex flex-col gap-0.5">
       {entries.map(([k, v]) => (

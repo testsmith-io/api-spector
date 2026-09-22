@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import React, { useState } from 'react';
+import { useT } from '../../../i18n';
 import type { JsonPath } from './utils/jsonPath';
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function JsonNode({ nodeKey, value, path, depth, onLeaf }: Props) {
+  const t = useT();
   // Auto-expand the first two levels for readability
   const [expanded, setExpanded] = useState(depth < 2);
 
@@ -48,9 +50,9 @@ export function JsonNode({ nodeKey, value, path, depth, onLeaf }: Props) {
         <button
           onClick={e => onLeaf(e, path, value)}
           className="ml-auto opacity-0 group-hover:opacity-100 shrink-0 text-[10px] px-1.5 leading-4 py-0.5 text-blue-400 border border-blue-800 hover:border-blue-500 hover:text-blue-300 rounded transition-all"
-          title="Add assertion for this value"
+          title={t('Add assertion for this value')}
         >
-          + insert
+          {t('+ insert')}
         </button>
       </div>
     );

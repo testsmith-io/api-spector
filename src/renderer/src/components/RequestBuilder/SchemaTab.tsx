@@ -8,6 +8,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import Ajv from 'ajv';
 import type { ApiRequest } from '../../../../shared/types';
 import { useStore } from '../../store';
+import { useT } from '../../i18n';
 
 const ajv = new Ajv({ allErrors: true, strict: false });
 
@@ -22,7 +23,8 @@ interface Props {
 }
 
 export function SchemaTab({ request, onChange }: Props) {
-  const activeTab      = useStore(s => s.tabs.find(t => t.id === s.activeTabId));
+  const t = useT();
+  const activeTab      = useStore(s => s.tabs.find(tab => tab.id === s.activeTabId));
   const lastResponse   = activeTab?.lastResponse ?? null;
   const [result, setResult] = useState<ValidationResult | null>(null);
   const [error, setError]   = useState<string | null>(null);
@@ -45,11 +47,11 @@ export function SchemaTab({ request, onChange }: Props) {
     setResult(null);
 
     if (!schemaValue.trim()) {
-      setError('No schema defined. Enter a JSON Schema above.');
+      setError(t('No schema defined. Enter a JSON Schema above.'));
       return;
     }
     if (!lastResponse) {
-      setError('No response yet. Send the request first, then validate.');
+      setError(t('No response yet. Send the request first, then validate.'));
       return;
     }
 
@@ -57,7 +59,7 @@ export function SchemaTab({ request, onChange }: Props) {
     try {
       schema = JSON.parse(schemaValue);
     } catch {
-      setError('Schema is not valid JSON. Fix the syntax and try again.');
+      setError(t('Schema is not valid JSON. Fix the syntax and try again.'));
       return;
     }
 
@@ -65,7 +67,7 @@ export function SchemaTab({ request, onChange }: Props) {
     try {
       data = JSON.parse(lastResponse.body);
     } catch {
-      setError('Response body is not valid JSON and cannot be validated against a schema.');
+      setError(t('Response body is not valid JSON and cannot be validated against a schema.'));
       return;
     }
 
@@ -80,7 +82,7 @@ export function SchemaTab({ request, onChange }: Props) {
         })),
       });
     } catch (e: unknown) {
-      setError(`Schema compile error: ${e instanceof Error ? e.message : String(e)}`);
+      setError(t('Schema compile error: :message', { message: e instanceof Error ? e.message : String(e) }));
     }
   }
 
@@ -88,35 +90,35 @@ export function SchemaTab({ request, onChange }: Props) {
     <div className="flex flex-col gap-3">
       {/* What this tab is — and how it differs from Contract. */}
       <div className="rounded-lg border border-amber-700/40 bg-amber-950/20 px-3 py-2 text-[11px] leading-relaxed text-amber-200/90">
-        <span className="font-semibold text-amber-300">Schema — a local scratch check.</span>{' '}
-        Validate this request&apos;s last response against a JSON Schema, right here. It is <strong>not saved to the contract and not published</strong> — a dev-time sanity check only. To define what the provider <em>must</em> return (which drives contract testing), use the <strong>Contract</strong> tab.
+        <span className="font-semibold text-amber-300">{t('Schema — a local scratch check.')}</span>{' '}
+        {t('Validate this request\'s last response against a JSON Schema, right here. It is')} <strong>{t('not saved to the contract and not published')}</strong> {t('— a dev-time sanity check only. To define what the provider')} <em>{t('must')}</em> {t('return (which drives contract testing), use the')} <strong>{t('Contract')}</strong> {t('tab.')}
       </div>
 
       <div className="flex items-center justify-between">
         <span className="text-[10px] text-surface-600 uppercase tracking-wider font-medium">
-          JSON Schema (draft-07+)
+          {t('JSON Schema (draft-07+)')}
         </span>
         <div className="flex items-center gap-2">
           <button
             onClick={deriveFromContract}
             disabled={!canDerive}
             title={canDerive
-              ? "Copy the body schema from this request's contract"
-              : 'No contract body schema defined yet'}
+              ? t("Copy the body schema from this request's contract")
+              : t('No contract body schema defined yet')}
             className="px-3 py-1 text-xs bg-surface-800 hover:bg-surface-700 disabled:bg-surface-900 disabled:text-surface-600 rounded transition-colors font-medium"
           >
-            Derive from contract
+            {t('Derive from contract')}
           </button>
           <button
             onClick={validate}
             className="px-3 py-1 text-xs bg-blue-700 hover:bg-blue-600 rounded transition-colors font-medium"
           >
-            Validate
+            {t('Validate')}
           </button>
         </div>
       </div>
       <p className="text-[10px] text-surface-600">
-        Standalone &mdash; edits here don&apos;t touch the contract. Use &ldquo;Derive from contract&rdquo; to start from it.
+        {t('Standalone — edits here don\'t touch the contract. Use “Derive from contract” to start from it.')}
       </p>
 
       {/* Schema editor */}
@@ -127,9 +129,9 @@ export function SchemaTab({ request, onChange }: Props) {
               try { setSchema(JSON.stringify(JSON.parse(schemaValue), null, 2)); } catch { /* invalid json */ }
             }}
             className="text-[10px] text-surface-500 hover:text-white transition-colors"
-            title="Format JSON"
+            title={t('Format JSON')}
           >
-            Format
+            {t('Format')}
           </button>
         </div>
         <CodeMirror
@@ -158,10 +160,10 @@ export function SchemaTab({ request, onChange }: Props) {
             : 'bg-red-900/20 border-red-700'
         }`}>
           {result.valid ? (
-            <span className="text-emerald-400 font-semibold">Valid: response matches the schema.</span>
+            <span className="text-emerald-400 font-semibold">{t('Valid: response matches the schema.')}</span>
           ) : (
             <div className="flex flex-col gap-1.5">
-              <span className="text-red-400 font-semibold">Invalid: {result.errors.length} error{result.errors.length !== 1 ? 's' : ''}</span>
+              <span className="text-red-400 font-semibold">{t('Invalid: :count error|Invalid: :count errors', { count: result.errors.length })}</span>
               {result.errors.map((e, i) => (
                 <div key={i} className="flex gap-2 text-red-300">
                   <span className="text-red-500 font-mono shrink-0">{e.instancePath || '/'}</span>

@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import type { KeyValuePair } from '../../../../shared/types';
 import { VarInput } from '../common/VarInput';
 import { HEADER_NAMES, getValueSuggestions } from './header-suggestions';
+import { useT } from '../../i18n';
 
 interface Props {
   rows: KeyValuePair[]
@@ -17,7 +18,10 @@ interface Props {
   paramMode?: boolean
 }
 
-export function KVTable({ rows, onChange, keyPlaceholder = 'Key', valuePlaceholder = 'Value', headerMode, paramMode }: Props) {
+export function KVTable({ rows, onChange, keyPlaceholder, valuePlaceholder, headerMode, paramMode }: Props) {
+  const t = useT();
+  const keyPh = keyPlaceholder ?? t('Key');
+  const valuePh = valuePlaceholder ?? t('Value');
   // Track which rows have their description input visible.
   // Initialise with indices of rows that already have a description.
   const [descVisible, setDescVisible] = useState<Set<number>>(
@@ -73,8 +77,8 @@ export function KVTable({ rows, onChange, keyPlaceholder = 'Key', valuePlacehold
                 value={row.paramType ?? 'query'}
                 onChange={e => update(idx, { paramType: e.target.value as 'query' | 'path' })}
                 title={(row.paramType ?? 'query') === 'path'
-                  ? 'Path variable - substituted into the URL via {{name}}'
-                  : 'Query string parameter - appended as ?key=value'}
+                  ? t('Path variable - substituted into the URL via {{name}}')
+                  : t('Query string parameter - appended as ?key=value')}
                 className={`flex-shrink-0 text-[10px] bg-surface-800 border border-surface-700 rounded px-1.5 py-1 focus:outline-none focus:border-blue-500 font-mono ${
                   (row.paramType ?? 'query') === 'path' ? 'text-violet-400' : 'text-surface-400'
                 }`}
@@ -86,7 +90,7 @@ export function KVTable({ rows, onChange, keyPlaceholder = 'Key', valuePlacehold
             <VarInput
               value={row.key}
               onChange={v => update(idx, { key: v })}
-              placeholder={keyPlaceholder}
+              placeholder={keyPh}
               wrapperClassName="flex-1"
               className="bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
               staticSuggestions={headerMode ? HEADER_NAMES : undefined}
@@ -94,7 +98,7 @@ export function KVTable({ rows, onChange, keyPlaceholder = 'Key', valuePlacehold
             <VarInput
               value={row.value}
               onChange={v => update(idx, { value: v })}
-              placeholder={valuePlaceholder}
+              placeholder={valuePh}
               wrapperClassName="flex-1"
               className="bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
               staticSuggestions={headerMode ? (getValueSuggestions(row.key) ?? undefined) : undefined}
@@ -102,7 +106,7 @@ export function KVTable({ rows, onChange, keyPlaceholder = 'Key', valuePlacehold
             {/* Description toggle */}
             <button
               onClick={() => toggleDesc(idx)}
-              title={descVisible.has(idx) ? 'Hide description' : 'Add description'}
+              title={descVisible.has(idx) ? t('Hide description') : t('Add description')}
               className={`flex-shrink-0 px-1 transition-colors opacity-0 group-hover:opacity-100 ${
                 descVisible.has(idx) || row.description
                   ? 'text-blue-400 opacity-100'
@@ -123,7 +127,7 @@ export function KVTable({ rows, onChange, keyPlaceholder = 'Key', valuePlacehold
               <input
                 value={row.description ?? ''}
                 onChange={e => update(idx, { description: e.target.value })}
-                placeholder="Description…"
+                placeholder={t('Description…')}
                 className="w-full bg-surface-800/50 border border-surface-700/50 rounded px-2 py-0.5 text-[10px] text-surface-300 placeholder-surface-600 focus:outline-none focus:border-blue-500/60"
               />
             </div>
@@ -131,7 +135,7 @@ export function KVTable({ rows, onChange, keyPlaceholder = 'Key', valuePlacehold
         </div>
       ))}
       <button onClick={add} className="mt-1 text-surface-400 hover:text-white transition-colors">
-        + Add
+        {t('+ Add')}
       </button>
     </div>
   );

@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img" aria-label="API Spector version 0.4.8: contract testing, design-first, CLI, and cloud broker, plus streaming responses" font-family="'Segoe UI', Arial, Helvetica, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a1420"/>
+      <stop offset="55" stop-color="#0d2038"/>
+      <stop offset="100" stop-color="#123a60"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5497c8"/>
+      <stop offset="1" stop-color="#205d96"/>
+    </linearGradient>
+    <!-- ghost logo gradients -->
+    <radialGradient id="g-body" cx="35%" cy="22%" r="70%">
+      <stop offset="0%" stop-color="#5497c8"/>
+      <stop offset="55%" stop-color="#205d96"/>
+      <stop offset="100%" stop-color="#123a60"/>
+    </radialGradient>
+    <linearGradient id="g-gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="white" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0.0"/>
+    </linearGradient>
+    <clipPath id="g-clip">
+      <path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1080" height="1080" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1080" height="8" fill="url(#brand)"/>
+
+  <!-- ghost logo, top-right -->
+  <g transform="translate(700,70) scale(0.62)">
+    <ellipse cx="256" cy="420" rx="130" ry="18" fill="black" opacity="0.18"/>
+    <path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z" fill="url(#g-body)"/>
+    <ellipse cx="198" cy="262" rx="29" ry="33" fill="white"/>
+    <ellipse cx="314" cy="262" rx="29" ry="33" fill="white"/>
+    <ellipse cx="204" cy="268" rx="16" ry="20" fill="#0b1624"/>
+    <ellipse cx="320" cy="268" rx="16" ry="20" fill="#0b1624"/>
+    <ellipse cx="192" cy="252" rx="6" ry="7" fill="white" opacity="0.65"/>
+    <ellipse cx="308" cy="252" rx="6" ry="7" fill="white" opacity="0.65"/>
+    <ellipse cx="256" cy="100" rx="200" ry="180" fill="url(#g-gloss)" clip-path="url(#g-clip)"/>
+  </g>
+
+  <!-- version pill -->
+  <g>
+    <rect x="90" y="118" width="256" height="52" rx="26" fill="none" stroke="#5497c8" stroke-width="2"/>
+    <circle cx="120" cy="144" r="6" fill="#3fb950"/>
+    <text x="140" y="152" fill="#8fb0cf" font-size="22" font-weight="700" letter-spacing="1">RELEASE v0.4.8</text>
+  </g>
+
+  <!-- kicker -->
+  <text x="92" y="250" fill="#5497c8" font-size="27" font-weight="700" letter-spacing="4">NEW IN API SPECTOR</text>
+
+  <!-- headline -->
+  <text x="90" y="352" fill="#eaf2fb" font-size="104" font-weight="800" letter-spacing="-2">Contract</text>
+  <text x="90" y="452" fill="#eaf2fb" font-size="104" font-weight="800" letter-spacing="-2">testing<tspan fill="#5497c8">,</tspan> built in.</text>
+
+  <!-- subhead: the trio -->
+  <text x="92" y="524" fill="#b7cde3" font-size="33" font-weight="600">Design-first  &#183;  CLI in CI  &#183;  Cloud broker</text>
+
+  <!-- CLI chip -->
+  <g>
+    <rect x="90" y="566" width="900" height="128" rx="14" fill="#0b1624" stroke="#21344a" stroke-width="2"/>
+    <circle cx="120" cy="598" r="6" fill="#f85149"/>
+    <circle cx="142" cy="598" r="6" fill="#d29922"/>
+    <circle cx="164" cy="598" r="6" fill="#3fb950"/>
+    <text x="118" y="650" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="27" fill="#8fb0cf"><tspan fill="#3fb950">$</tspan> api-spector contract run --broker</text>
+    <text x="118" y="686" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="24" fill="#3fb950">&#10003; consumer  &#10003; provider  &#10003; deploy-check</text>
+  </g>
+
+  <!-- feature chips -->
+  <g font-size="24" font-weight="600">
+    <g>
+      <rect x="90" y="732" width="250" height="58" rx="10" fill="#12253c" stroke="#21344a" stroke-width="1.5"/>
+      <text x="112" y="769" fill="#cfe0f2">Contract Designer</text>
+    </g>
+    <g>
+      <rect x="366" y="732" width="210" height="58" rx="10" fill="#12253c" stroke="#21344a" stroke-width="1.5"/>
+      <text x="388" y="769" fill="#cfe0f2">Pact v4 output</text>
+    </g>
+    <g>
+      <rect x="602" y="732" width="388" height="58" rx="10" fill="#12253c" stroke="#21344a" stroke-width="1.5"/>
+      <text x="624" y="769" fill="#cfe0f2">Cloud broker + deploy gate</text>
+    </g>
+  </g>
+
+  <!-- streaming callout -->
+  <g>
+    <rect x="90" y="812" width="900" height="66" rx="12" fill="#0f2a49" stroke="#205d96" stroke-width="2"/>
+    <text x="112" y="853" fill="#5497c8" font-size="25" font-weight="800">NEW</text>
+    <text x="176" y="853" fill="#cfe0f2" font-size="26" font-weight="600">Live streaming: SSE, NDJSON, chunked responses over HTTP/2</text>
+  </g>
+
+  <!-- divider -->
+  <line x1="90" y1="978" x2="990" y2="978" stroke="#21344a" stroke-width="2"/>
+
+  <!-- footer: wordmark + url + trust line -->
+  <text x="90" y="1022" fill="#eaf2fb" font-size="32" font-weight="800">API Spector</text>
+  <text x="90" y="1058" fill="#7f9cb8" font-size="22" font-weight="500">Local-first API testing &#183; EU-built &#183; open</text>
+  <text x="990" y="1042" text-anchor="end" fill="#8fb0cf" font-size="27" font-weight="700">api-spector.dev</text>
+</svg>

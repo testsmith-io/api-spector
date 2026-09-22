@@ -8,6 +8,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { commentKeymap } from './commentKeymap';
 import type { ApiRequest, SoapBody, WsdlParam, WsdlOperation, WsdlEndpoint } from '../../../../shared/types';
 import { contentTypeForSoap, withContentType } from '../../../../shared/soap';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
@@ -19,8 +20,9 @@ interface Props {
 // ─── Param tree (read-only) ──────────────────────────────────────────────────
 
 function ParamTree({ params, depth = 0 }: { params: WsdlParam[]; depth?: number }) {
+  const t = useT();
   if (params.length === 0) {
-    return <p className="text-[10px] text-surface-600 italic">No parameters declared in WSDL.</p>;
+    return <p className="text-[10px] text-surface-600 italic">{t('No parameters declared in WSDL.')}</p>;
   }
   return (
     <ul className={depth === 0 ? 'flex flex-col gap-0.5' : 'flex flex-col gap-0.5 ml-4 border-l border-surface-800 pl-3 mt-1'}>
@@ -39,6 +41,7 @@ function ParamTree({ params, depth = 0 }: { params: WsdlParam[]; depth?: number 
 // ─── Main editor ─────────────────────────────────────────────────────────────
 
 export function SoapEditor({ request, onChange }: Props) {
+  const t = useT();
   const soap: SoapBody = request.body.soap ?? { wsdlUrl: '', envelope: '' };
 
   const [operations, setOperations] = useState<WsdlOperation[]>([]);
@@ -152,7 +155,7 @@ export function SoapEditor({ request, onChange }: Props) {
       {/* ── WSDL URL row ──────────────────────────────────────────────────── */}
       <div className="flex gap-2 items-center">
         <label className="text-[10px] uppercase tracking-wider text-surface-500 font-medium whitespace-nowrap">
-          WSDL
+          {t('WSDL')}
         </label>
         <input
           value={soap.wsdlUrl}
@@ -166,7 +169,7 @@ export function SoapEditor({ request, onChange }: Props) {
           disabled={fetching || !soap.wsdlUrl.trim()}
           className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors whitespace-nowrap"
         >
-          {fetching ? 'Fetching…' : operations.length > 0 ? 'Refresh' : 'Fetch WSDL'}
+          {fetching ? t('Fetching…') : operations.length > 0 ? t('Refresh') : t('Fetch WSDL')}
         </button>
       </div>
 
@@ -180,17 +183,17 @@ export function SoapEditor({ request, onChange }: Props) {
       {operations.length > 0 && (
         <div className="bg-surface-900/40 border border-surface-800 rounded-md px-3 py-2 text-[11px] flex flex-col gap-1">
           <div className="flex items-center gap-2 text-surface-500">
-            <span className="uppercase tracking-wider text-[9px] font-semibold text-surface-600 w-20 shrink-0">Endpoint</span>
-            <code className="text-surface-200 font-mono truncate">{primaryEndpoint ?? '(not declared)'}</code>
+            <span className="uppercase tracking-wider text-[9px] font-semibold text-surface-600 w-20 shrink-0">{t('Endpoint')}</span>
+            <code className="text-surface-200 font-mono truncate">{primaryEndpoint ?? t('(not declared)')}</code>
           </div>
           {targetNs && (
             <div className="flex items-center gap-2 text-surface-500">
-              <span className="uppercase tracking-wider text-[9px] font-semibold text-surface-600 w-20 shrink-0">Namespace</span>
+              <span className="uppercase tracking-wider text-[9px] font-semibold text-surface-600 w-20 shrink-0">{t('Namespace')}</span>
               <code className="text-surface-200 font-mono truncate">{targetNs}</code>
             </div>
           )}
           <div className="flex items-center gap-2 text-surface-500">
-            <span className="uppercase tracking-wider text-[9px] font-semibold text-surface-600 w-20 shrink-0">Operations</span>
+            <span className="uppercase tracking-wider text-[9px] font-semibold text-surface-600 w-20 shrink-0">{t('Operations')}</span>
             <span className="text-surface-300">
               {operations.length}
               <span className="text-surface-600"> · SOAP {versions.join(', ')}</span>
@@ -205,7 +208,7 @@ export function SoapEditor({ request, onChange }: Props) {
           {/* Operations list */}
           <div className="w-44 shrink-0 flex flex-col bg-surface-900/40 border border-surface-800 rounded-md overflow-hidden">
             <div className="px-2.5 py-1.5 text-[9px] uppercase tracking-wider font-semibold text-surface-600 border-b border-surface-800">
-              Operations
+              {t('Operations')}
             </div>
             <div className="overflow-y-auto flex-1">
               {operations.map(op => {
@@ -248,7 +251,7 @@ export function SoapEditor({ request, onChange }: Props) {
                 {/* Inputs */}
                 <div className="bg-surface-900/40 border border-surface-800 rounded-md px-3 py-2">
                   <div className="text-[9px] uppercase tracking-wider font-semibold text-surface-600 mb-1.5">
-                    Inputs
+                    {t('Inputs')}
                   </div>
                   <ParamTree params={selected.params ?? []} />
                 </div>
@@ -256,19 +259,18 @@ export function SoapEditor({ request, onChange }: Props) {
                 {/* Envelope toggle + editor */}
                 <div className="flex items-center justify-between">
                   <span className="text-[9px] uppercase tracking-wider font-semibold text-surface-600">
-                    Envelope
+                    {t('Envelope')}
                   </span>
                   <button
                     onClick={() => setShowXml(v => !v)}
                     className="text-[10px] text-surface-500 hover:text-surface-300 transition-colors"
                   >
-                    {showXml ? '▾ Hide XML' : '▸ Edit XML'}
+                    {showXml ? t('▾ Hide XML') : t('▸ Edit XML')}
                   </button>
                 </div>
                 {!showXml && (
                   <p className="text-[10px] text-surface-600 leading-relaxed">
-                    Envelope auto-generated from the operation's input parameters.
-                    Method (POST), endpoint URL, and Content-Type are managed for you. Click <em>Edit XML</em> to tweak.
+                    {t('Envelope auto-generated from the operation\'s input parameters. Method (POST), endpoint URL, and Content-Type are managed for you. Click')} <em>{t('Edit XML')}</em> {t('to tweak.')}
                   </p>
                 )}
                 {showXml && (
@@ -305,8 +307,8 @@ export function SoapEditor({ request, onChange }: Props) {
               {!soap.operationName && !soap.soapAction && (
                 <div className="text-[10px] text-surface-500">
                   {soap.wsdlUrl?.trim()
-                    ? 'WSDL not loaded - the saved envelope below is still sent on Send.'
-                    : 'No WSDL - hand-crafted SOAP envelope.'}
+                    ? t('WSDL not loaded - the saved envelope below is still sent on Send.')
+                    : t('No WSDL - hand-crafted SOAP envelope.')}
                 </div>
               )}
             </div>
@@ -316,7 +318,7 @@ export function SoapEditor({ request, onChange }: Props) {
                 disabled={fetching}
                 className="px-2.5 py-1 text-[11px] bg-surface-800 hover:bg-surface-700 disabled:opacity-50 rounded transition-colors whitespace-nowrap"
               >
-                {fetching ? 'Loading…' : 'Reload WSDL'}
+                {fetching ? t('Loading…') : t('Reload WSDL')}
               </button>
             )}
           </div>
@@ -336,10 +338,9 @@ export function SoapEditor({ request, onChange }: Props) {
       {/* ── True empty state: nothing fetched, nothing saved. */}
       {showEmpty && (
         <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 border border-dashed border-surface-800 rounded-md py-8 px-4">
-          <p className="text-xs text-surface-400">Paste a WSDL URL above and click <em>Fetch WSDL</em>.</p>
+          <p className="text-xs text-surface-400">{t('Paste a WSDL URL above and click')} <em>{t('Fetch WSDL')}</em>.</p>
           <p className="text-[10px] text-surface-600 max-w-sm">
-            The endpoint, SOAP version, Content-Type header, and per-operation envelope are
-            derived from the WSDL - you only pick the operation and fill the parameters.
+            {t('The endpoint, SOAP version, Content-Type header, and per-operation envelope are derived from the WSDL - you only pick the operation and fill the parameters.')}
           </p>
         </div>
       )}

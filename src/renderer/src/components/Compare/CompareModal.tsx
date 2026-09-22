@@ -7,12 +7,14 @@ import { Modal } from '../common/Modal';
 import { diffSpecs, summarizeDiff, type SpecChange } from '../../../../shared/openapi-diff';
 import { pathMatches } from '../../../../shared/coverage';
 import type { ApiRequest } from '../../../../shared/types';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
 interface SpecInput { source: string; text: string }
 
 function SpecField({ label, value, onSource, onText }: { label: string; value: SpecInput; onSource: (s: string) => void; onText: (s: string) => void }) {
+  const t = useT();
   return (
     <div className="flex-1">
       <label className="text-[11px] text-surface-400">{label}</label>
@@ -23,7 +25,7 @@ function SpecField({ label, value, onSource, onText }: { label: string; value: S
         className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-500"
       />
       <details className="text-[10px] text-surface-500 mt-1">
-        <summary className="cursor-pointer hover:text-surface-300">or paste</summary>
+        <summary className="cursor-pointer hover:text-surface-300">{t('or paste')}</summary>
         <textarea value={value.text} onChange={e => onText(e.target.value)} rows={3}
           className="mt-1 w-full resize-y bg-surface-950 border border-surface-800 rounded px-2 py-1.5 text-[11px] font-mono focus:outline-none focus:border-blue-500" />
       </details>
@@ -32,6 +34,7 @@ function SpecField({ label, value, onSource, onText }: { label: string; value: S
 }
 
 export function CompareModal() {
+  const t = useT();
   const open        = useStore(s => s.compareOpen);
   const setOpen     = useStore(s => s.setCompareOpen);
   const collections = useStore(s => s.collections);
@@ -91,19 +94,19 @@ export function CompareModal() {
       onClose={() => setOpen(false)}
       overlayClassName="bg-black/50 z-50 flex items-start justify-center pt-16"
       panelClassName="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl flex flex-col w-[760px] max-h-[82vh]"
-      title="Compare API specs"
-      subtitle="Breaking-change detection and impact on your tests"
+      title={t('Compare API specs')}
+      subtitle={t('Breaking-change detection and impact on your tests')}
     >
       <div className="px-4 py-3 border-b border-surface-800 flex-shrink-0">
         <div className="flex gap-3 items-start">
-          <SpecField label="Baseline (old)" value={oldIn} onSource={s => setOldIn({ ...oldIn, source: s })} onText={t => setOldIn({ ...oldIn, text: t })} />
+          <SpecField label={t('Baseline (old)')} value={oldIn} onSource={s => setOldIn({ ...oldIn, source: s })} onText={txt => setOldIn({ ...oldIn, text: txt })} />
           <div className="text-surface-500 pt-6">-&gt;</div>
-          <SpecField label="Candidate (new)" value={newIn} onSource={s => setNewIn({ ...newIn, source: s })} onText={t => setNewIn({ ...newIn, text: t })} />
+          <SpecField label={t('Candidate (new)')} value={newIn} onSource={s => setNewIn({ ...newIn, source: s })} onText={txt => setNewIn({ ...newIn, text: txt })} />
         </div>
         <div className="flex justify-end mt-2">
           <button onClick={run} disabled={busy || !canRun}
             className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-surface-800 disabled:text-surface-500 rounded text-sm font-medium">
-            {busy ? '…' : 'Compare'}
+            {busy ? '…' : t('Compare')}
           </button>
         </div>
         {error && <div className="text-xs text-red-400 mt-2">{error}</div>}
@@ -111,14 +114,14 @@ export function CompareModal() {
 
       <div className="px-4 py-3 flex-1 overflow-y-auto min-h-0 text-xs">
         {!changes ? (
-          <div className="text-surface-500 text-center py-10">Point at two spec versions and choose <span className="text-surface-300">Compare</span>.</div>
+          <div className="text-surface-500 text-center py-10">{t('Point at two spec versions and choose')} <span className="text-surface-300">{t('Compare')}</span>.</div>
         ) : changes.length === 0 ? (
-          <div className="text-emerald-400 text-center py-10">No differences between the specs.</div>
+          <div className="text-emerald-400 text-center py-10">{t('No differences between the specs.')}</div>
         ) : (
           <>
             {sum!.breaking > 0 && (
               <div className="mb-3">
-                <div className="text-red-400 font-bold uppercase tracking-wide text-[11px] mb-1">Breaking changes</div>
+                <div className="text-red-400 font-bold uppercase tracking-wide text-[11px] mb-1">{t('Breaking changes')}</div>
                 {changes.filter(c => c.breaking).map((c, i) => (
                   <div key={i} className="flex gap-2 text-surface-300 py-0.5"><span className="text-red-400">✗</span>{c.detail}</div>
                 ))}
@@ -126,7 +129,7 @@ export function CompareModal() {
             )}
             {sum!.nonBreaking > 0 && (
               <div className="mb-3">
-                <div className="text-emerald-400 font-bold uppercase tracking-wide text-[11px] mb-1">Non-breaking</div>
+                <div className="text-emerald-400 font-bold uppercase tracking-wide text-[11px] mb-1">{t('Non-breaking')}</div>
                 {changes.filter(c => !c.breaking).map((c, i) => (
                   <div key={i} className="flex gap-2 text-surface-400 py-0.5"><span className="text-emerald-400">✓</span>{c.detail}</div>
                 ))}
@@ -136,21 +139,21 @@ export function CompareModal() {
             {/* Impact + verdict */}
             <div className="mt-3 pt-3 border-t border-surface-800">
               {sum!.breaking === 0 ? (
-                <div className="text-emerald-400 font-medium">No breaking changes. Safe to deploy.</div>
+                <div className="text-emerald-400 font-medium">{t('No breaking changes. Safe to deploy.')}</div>
               ) : impact!.hitTests === 0 ? (
                 <div className="text-amber-400">
-                  {sum!.breaking} breaking change{sum!.breaking !== 1 ? 's' : ''}, but no test in this workspace exercises the affected operations. Add tests, then re-check.
+                  {t(':count breaking change, but no test in this workspace exercises the affected operations. Add tests, then re-check.|:count breaking changes, but no test in this workspace exercises the affected operations. Add tests, then re-check.', { count: sum!.breaking })}
                 </div>
               ) : (
                 <>
                   {impact!.affected.filter(a => a.tests.length).map((a, i) => (
                     <div key={i} className="mb-1">
                       <div className="text-amber-300">{a.change.detail}</div>
-                      {a.tests.map(t => <div key={t} className="text-surface-500 pl-4">- {t}</div>)}
+                      {a.tests.map(testName => <div key={testName} className="text-surface-500 pl-4">- {testName}</div>)}
                     </div>
                   ))}
                   <div className="mt-2 text-red-400 font-bold">
-                    Block deployment: {sum!.breaking} breaking change{sum!.breaking !== 1 ? 's' : ''} affect {impact!.hitTests} test{impact!.hitTests !== 1 ? 's' : ''}.
+                    {t('Block deployment: :changes affect :tests.', { changes: t(':count breaking change|:count breaking changes', { count: sum!.breaking }), tests: t(':count test|:count tests', { count: impact!.hitTests }) })}
                   </div>
                 </>
               )}

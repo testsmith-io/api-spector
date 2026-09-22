@@ -3,6 +3,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../../store';
+import { useT } from '../../i18n';
 import type { GrpcCallState } from '../../store/slices/grpc-slice';
 import type { ApiRequest, GrpcBody, GrpcMessage, GrpcServiceInfo, KeyValuePair } from '../../../../shared/types';
 
@@ -36,6 +37,7 @@ function textToMeta(text: string): KeyValuePair[] {
 }
 
 export function GrpcPanel({ request, onChange }: Props) {
+  const t = useT();
   const grpc = { ...DEFAULT_GRPC, ...(request.body.grpc ?? {}) };
 
   const grpcCalls          = useStore(s => s.grpcCalls);
@@ -126,7 +128,7 @@ export function GrpcPanel({ request, onChange }: Props) {
     <div className="flex flex-col h-full min-h-0">
       <div className="px-4 pt-2 pb-1 flex-shrink-0 flex items-center gap-2">
         <span className="text-xs font-bold text-violet-400 bg-surface-800 border border-surface-700 rounded px-2 py-1">gRPC</span>
-        <span className="text-[10px] text-surface-600">Set the target (host:port) in the URL field above.</span>
+        <span className="text-[10px] text-surface-600">{t('Set the target (host:port) in the URL field above.')}</span>
         <span className={`ml-auto w-2 h-2 rounded-full ${statusColors[call.status] ?? 'bg-surface-600'}`} title={call.status} />
         {call.codeName && <span className="text-[10px] font-mono text-surface-400">{call.codeName}</span>}
       </div>
@@ -135,9 +137,9 @@ export function GrpcPanel({ request, onChange }: Props) {
         {/* Proto source */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="text-[11px] text-surface-400">Proto (paste .proto source, or a file path below)</label>
+            <label className="text-[11px] text-surface-400">{t('Proto (paste .proto source, or a file path below)')}</label>
             <button onClick={loadProto} disabled={loadingProto} className="text-[10px] px-2 py-0.5 rounded border border-surface-700 text-surface-300 hover:border-violet-500 hover:text-violet-400 disabled:opacity-40">
-              {loadingProto ? 'Loading…' : 'Load proto'}
+              {loadingProto ? t('Loading…') : t('Load proto')}
             </button>
           </div>
           <textarea
@@ -151,7 +153,7 @@ export function GrpcPanel({ request, onChange }: Props) {
           <input
             value={grpc.protoPath ?? ''}
             onChange={e => patchGrpc({ protoPath: e.target.value })}
-            placeholder="/path/to/service.proto (optional; used if source is empty)"
+            placeholder={t('/path/to/service.proto (optional; used if source is empty)')}
             className={`${inputCls} w-full font-mono mt-1`}
           />
           {call.protoError && <p className="text-[10px] text-red-400 mt-1">{call.protoError}</p>}
@@ -160,30 +162,30 @@ export function GrpcPanel({ request, onChange }: Props) {
         {/* Service / method / plaintext */}
         <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
           <div>
-            <label className="block text-[11px] text-surface-400 mb-1">Service</label>
+            <label className="block text-[11px] text-surface-400 mb-1">{t('Service')}</label>
             <select value={grpc.serviceName ?? ''} onChange={e => patchGrpc({ serviceName: e.target.value, methodName: call.services.find(s => s.name === e.target.value)?.methods[0]?.name })} className={`${inputCls} w-full`}>
-              <option value="">{call.services.length ? 'Select…' : 'Load a proto first'}</option>
+              <option value="">{call.services.length ? t('Select…') : t('Load a proto first')}</option>
               {call.services.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-[11px] text-surface-400 mb-1">Method</label>
+            <label className="block text-[11px] text-surface-400 mb-1">{t('Method')}</label>
             <select value={grpc.methodName ?? ''} onChange={e => patchGrpc({ methodName: e.target.value })} className={`${inputCls} w-full`}>
-              <option value="">Select…</option>
+              <option value="">{t('Select…')}</option>
               {selectedService?.methods.map(m => (
-                <option key={m.name} value={m.name}>{m.name}{m.responseStream ? ' (stream)' : ''}</option>
+                <option key={m.name} value={m.name}>{m.name}{m.responseStream ? t(' (stream)') : ''}</option>
               ))}
             </select>
           </div>
           <label className="flex items-center gap-1.5 text-xs text-surface-300 pb-1.5">
             <input type="checkbox" checked={!!grpc.plaintext} onChange={e => patchGrpc({ plaintext: e.target.checked })} />
-            Plaintext
+            {t('Plaintext')}
           </label>
         </div>
 
         {/* Request message */}
         <div>
-          <label className="block text-[11px] text-surface-400 mb-1">Request message (JSON)</label>
+          <label className="block text-[11px] text-surface-400 mb-1">{t('Request message (JSON)')}</label>
           <textarea
             value={grpc.message}
             onChange={e => patchGrpc({ message: e.target.value })}
@@ -196,7 +198,7 @@ export function GrpcPanel({ request, onChange }: Props) {
 
         {/* Metadata */}
         <div>
-          <label className="block text-[11px] text-surface-400 mb-1">Metadata (one <span className="font-mono">key: value</span> per line)</label>
+          <label className="block text-[11px] text-surface-400 mb-1">{t('Metadata (one ')}<span className="font-mono">key: value</span>{t(' per line)')}</label>
           <textarea
             value={metaToText(grpc.metadata)}
             onChange={e => patchGrpc({ metadata: textToMeta(e.target.value) })}
@@ -210,14 +212,14 @@ export function GrpcPanel({ request, onChange }: Props) {
         {/* Invoke / cancel */}
         <div className="flex items-center gap-2">
           {isRunning ? (
-            <button onClick={cancel} className="px-4 py-1.5 bg-red-700 hover:bg-red-600 rounded text-sm font-medium">Cancel</button>
+            <button onClick={cancel} className="px-4 py-1.5 bg-red-700 hover:bg-red-600 rounded text-sm font-medium">{t('Cancel')}</button>
           ) : (
             <button onClick={invoke} disabled={!request.url || !grpc.serviceName || !grpc.methodName} className="px-4 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:bg-surface-800 disabled:text-surface-500 rounded text-sm font-medium">
-              Invoke
+              {t('Invoke')}
             </button>
           )}
           {call.messages.length > 0 && (
-            <button onClick={() => clearGrpcMessages(request.id)} className="text-[10px] text-surface-600 hover:text-surface-400 ml-auto">Clear</button>
+            <button onClick={() => clearGrpcMessages(request.id)} className="text-[10px] text-surface-600 hover:text-surface-400 ml-auto">{t('Clear')}</button>
           )}
         </div>
 
@@ -228,7 +230,7 @@ export function GrpcPanel({ request, onChange }: Props) {
         {/* Message log */}
         <div className="border border-surface-800 rounded bg-surface-950 min-h-[120px]">
           {call.messages.length === 0 ? (
-            <div className="p-4 text-center text-xs text-surface-500">No messages yet</div>
+            <div className="p-4 text-center text-xs text-surface-500">{t('No messages yet')}</div>
           ) : (
             <div className="p-2 flex flex-col gap-1">
               {call.messages.map(msg => (

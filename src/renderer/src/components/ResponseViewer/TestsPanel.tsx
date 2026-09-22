@@ -2,14 +2,16 @@
 // SPDX-License-Identifier: MIT
 
 import type { ScriptExecutionMeta } from '../../../../shared/types';
+import { useT } from '../../i18n';
 
 export function TestsPanel({ scriptResult }: { scriptResult: ScriptExecutionMeta | null }) {
+  const t = useT();
   const sr = scriptResult;
 
   if (!sr || (sr.testResults.length === 0 && !sr.preScriptError && !sr.postScriptError)) {
     return (
       <div className="flex items-center justify-center h-full text-surface-400 text-xs">
-        No tests ran. Add <code className="mx-1 bg-surface-800 px-1 rounded">pm.test()</code> calls to your post-response script.
+        {t('No tests ran. Add')} <code className="mx-1 bg-surface-800 px-1 rounded">pm.test()</code> {t('calls to your post-response script.')}
       </div>
     );
   }
@@ -18,13 +20,13 @@ export function TestsPanel({ scriptResult }: { scriptResult: ScriptExecutionMeta
     <div className="p-4 flex flex-col gap-2">
       {sr.preScriptError && (
         <div className="flex items-start gap-2 p-2 rounded bg-red-900/30 border border-red-700">
-          <span className="text-red-400 text-xs font-bold shrink-0">PRE-SCRIPT ERROR</span>
+          <span className="text-red-400 text-xs font-bold shrink-0">{t('PRE-SCRIPT ERROR')}</span>
           <span className="text-red-300 text-xs font-mono">{sr.preScriptError}</span>
         </div>
       )}
       {sr.postScriptError && (
         <div className="flex items-start gap-2 p-2 rounded bg-red-900/30 border border-red-700">
-          <span className="text-red-400 text-xs font-bold shrink-0">POST-SCRIPT ERROR</span>
+          <span className="text-red-400 text-xs font-bold shrink-0">{t('POST-SCRIPT ERROR')}</span>
           <span className="text-red-300 text-xs font-mono">{sr.postScriptError}</span>
         </div>
       )}

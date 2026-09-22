@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useWorkspaceLoader } from '../../hooks/useWorkspaceLoader';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
@@ -10,6 +11,7 @@ interface Recent { path: string; name: string; lastOpened: number }
 interface UpdateInfo { current: string; latest: string; updateAvailable: boolean; command: string }
 
 export function WelcomeScreen() {
+  const t = useT();
   const { applyWorkspace } = useWorkspaceLoader();
   const [recents, setRecents] = useState<Recent[]>([]);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
@@ -46,7 +48,7 @@ export function WelcomeScreen() {
       if (!result) return; // user cancelled the folder picker
       await applyWorkspace(result.workspace, result.workspacePath);
     } catch (err) {
-      setGitError(err instanceof Error ? err.message : 'Could not open the repository');
+      setGitError(err instanceof Error ? err.message : t('Could not open the repository'));
     } finally {
       setGitBusy(false);
     }
@@ -66,7 +68,7 @@ export function WelcomeScreen() {
     <div className="flex-1 flex flex-col items-center justify-center gap-6 text-center p-8">
       {update && (
         <div className="flex flex-col items-center gap-1 px-4 py-2 rounded-lg border border-blue-800 bg-blue-950/40 text-xs">
-          <span className="text-blue-200">New version available (v{update.latest}, you have v{update.current})</span>
+          <span className="text-blue-200">{t('New version available (v:latest, you have v:current)', { latest: update.latest, current: update.current })}</span>
           <code className="text-[11px] text-blue-300 bg-surface-900 px-2 py-0.5 rounded select-all">{update.command}</code>
         </div>
       )}
@@ -76,7 +78,7 @@ export function WelcomeScreen() {
           <span style={{ color: '#6aa3c8' }}>Spector</span>
         </h1>
         <p className="text-[11px] mb-3" style={{ color: 'var(--text-muted)' }}>
-          by{' '}
+          {t('by')}{' '}
           <button
             onClick={() => window.electron.openExternal('https://testsmith.io')}
             className="hover:underline focus:outline-none"
@@ -86,12 +88,11 @@ export function WelcomeScreen() {
           </button>
         </p>
         <p className="text-surface-400 text-sm max-w-sm">
-          Local-first API testing with Robot Framework &amp; Playwright code generation.
-          Secrets stay on your machine.
+          {t('Local-first API testing with Robot Framework & Playwright code generation. Secrets stay on your machine.')}
         </p>
         {__APP_VERSION__ && (
           <p className="text-[11px] mt-3" style={{ color: 'var(--text-muted)' }}>
-            version {__APP_VERSION__}
+            {t('version :version', { version: __APP_VERSION__ })}
           </p>
         )}
       </div>
@@ -101,13 +102,13 @@ export function WelcomeScreen() {
           onClick={openWorkspace}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition-colors"
         >
-          Open Workspace
+          {t('Open Workspace')}
         </button>
         <button
           onClick={newWorkspace}
           className="px-4 py-2 bg-surface-800 hover:bg-surface-700 rounded text-sm font-medium transition-colors"
         >
-          New Workspace
+          {t('New Workspace')}
         </button>
         {gitOpen ? (
           <div className="flex flex-col gap-2">
@@ -126,7 +127,7 @@ export function WelcomeScreen() {
               disabled={gitBusy || !gitUrl.trim()}
               className="px-4 py-2 bg-surface-800 hover:bg-surface-700 rounded text-sm font-medium transition-colors disabled:opacity-50"
             >
-              {gitBusy ? 'Cloning…' : 'Clone & Open'}
+              {gitBusy ? t('Cloning…') : t('Clone & Open')}
             </button>
             {gitError && <p className="text-[11px] text-red-400 text-left px-1">{gitError}</p>}
           </div>
@@ -135,7 +136,7 @@ export function WelcomeScreen() {
             onClick={() => setGitOpen(true)}
             className="px-4 py-2 bg-surface-800 hover:bg-surface-700 rounded text-sm font-medium transition-colors"
           >
-            Open from Git
+            {t('Open from Git')}
           </button>
         )}
       </div>
@@ -143,7 +144,7 @@ export function WelcomeScreen() {
       {recents.length > 0 && (
         <div className="flex flex-col gap-1 w-72 text-left">
           <p className="text-[10px] uppercase tracking-wider font-semibold px-1" style={{ color: 'var(--text-muted)' }}>
-            Recent workspaces
+            {t('Recent workspaces')}
           </p>
           {recents.map(r => (
             <button
@@ -160,8 +161,9 @@ export function WelcomeScreen() {
       )}
 
       <p className="text-surface-400 text-xs max-w-xs">
-        A workspace is a <code className="text-surface-500">.spector</code> file.
-        Commit it and your collections to Git - secrets are stored in your OS keychain, never on disk.
+        {t('A workspace is a')}{' '}
+        <code className="text-surface-500">.spector</code>{' '}
+        {t('file. Commit it and your collections to Git - secrets are stored in your OS keychain, never on disk.')}
       </p>
     </div>
   );

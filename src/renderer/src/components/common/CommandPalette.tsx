@@ -5,8 +5,10 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../../store';
 import { MethodBadge } from './MethodBadge';
 import { Modal } from './Modal';
+import { useT } from '../../i18n';
 
 export function CommandPalette() {
+  const t = useT();
   const open               = useStore(s => s.commandPaletteOpen);
   const setOpen            = useStore(s => s.setCommandPaletteOpen);
   const collections        = useStore(s => s.collections);
@@ -92,7 +94,7 @@ export function CommandPalette() {
             value={query}
             onChange={e => { setQuery(e.target.value); setActiveIdx(0); }}
             onKeyDown={handleKeyDown}
-            placeholder="Search requests by name, URL, or method..."
+            placeholder={t('Search requests by name, URL, or method...')}
             className="flex-1 bg-transparent text-sm focus:outline-none placeholder-surface-600"
             style={{ color: 'var(--text-primary)' }}
           />
@@ -103,7 +105,7 @@ export function CommandPalette() {
         <div className="max-h-80 overflow-y-auto">
           {filtered.length === 0 ? (
             <div className="px-4 py-6 text-center text-sm text-surface-600">
-              No requests match "{query}"
+              {t('No requests match ":query"', { query })}
             </div>
           ) : (
             filtered.map((item, idx) => (
@@ -118,7 +120,7 @@ export function CommandPalette() {
                 <MethodBadge method={item.method} size="xs" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-white truncate">{item.name}</div>
-                  <div className="text-[11px] text-surface-600 font-mono truncate">{item.url || '(no URL)'}</div>
+                  <div className="text-[11px] text-surface-600 font-mono truncate">{item.url || t('(no URL)')}</div>
                 </div>
                 <span className="text-[10px] text-surface-600 shrink-0 truncate max-w-[120px]">
                   {item.collectionName}
@@ -131,8 +133,8 @@ export function CommandPalette() {
         {/* Footer hint */}
         {filtered.length > 0 && (
           <div className="px-4 py-2 border-t border-surface-800 flex items-center gap-3 text-[10px] text-surface-600">
-            <span><kbd className="bg-surface-800 border border-surface-700 rounded px-1">↑↓</kbd> navigate</span>
-            <span><kbd className="bg-surface-800 border border-surface-700 rounded px-1">↵</kbd> open</span>
+            <span><kbd className="bg-surface-800 border border-surface-700 rounded px-1">↑↓</kbd> {t('navigate')}</span>
+            <span><kbd className="bg-surface-800 border border-surface-700 rounded px-1">↵</kbd> {t('open')}</span>
           </div>
         )}
     </Modal>

@@ -12,6 +12,7 @@ import { PencilIcon, CopyIcon, TagIcon, SyncIcon, TrashIcon } from '../common/ic
 import { useStore } from '../../store';
 import { useToast, Toast } from '../common/Toast';
 import { pushRequestAsMonitor, cloudEnabled } from '../../lib/cloud-push';
+import { useT } from '../../i18n';
 
 /** The path portion of a request URL, for showing under the name in the tree.
  *  Strips a leading {{baseUrl}} token and the scheme+host so an imported
@@ -88,6 +89,7 @@ export function RequestRow({
   onSelect, onRename, onDelete, onDuplicate, onUpdateTags, onSetHookType, onToggleDisabled,
   onAddExample, onOpenExample, onRenameExample, onDeleteExample, onDuplicateExample,
 }: RequestRowProps) {
+  const t = useT();
   const [renaming, setRenaming] = useState(autoRename);
   const [examplesOpen, setExamplesOpen] = useState(true);
   const [addingTag, setAddingTag] = useState(false);
@@ -111,7 +113,7 @@ export function RequestRow({
     if (!req) return;
     try {
       const r = await pushRequestAsMonitor(req);
-      show(`Pushed "${req.name}" as monitor #${r.id} to the cloud`, true);
+      show(t('Pushed ":name" as monitor #:id to the cloud', { name: req.name, id: r.id }), true);
     } catch (e) {
       show((e as Error).message, false);
     }
@@ -119,7 +121,7 @@ export function RequestRow({
 
   const hookMenuItems: MenuItem[] = (['beforeAll', 'before', 'after', 'afterAll'] as const).map(ht => ({
     type: 'item' as const,
-    label: (hookType === ht ? '✓ ' : '    ') + HOOK_LABELS[ht],
+    label: (hookType === ht ? '✓ ' : '    ') + t(HOOK_LABELS[ht]),
     onClick: () => onSetHookType(hookType === ht ? undefined : ht),
   }));
 
@@ -166,7 +168,7 @@ export function RequestRow({
           checked={selected}
           onClick={e => e.stopPropagation()}
           onChange={() => sel.toggle(collectionId, reqId)}
-          title="Select request (or Cmd/Ctrl+click the row)"
+          title={t('Select request (or Cmd/Ctrl+click the row)')}
           className={`shrink-0 mt-0.5 accent-blue-500 cursor-pointer ${sel.active || selected ? '' : 'opacity-0 group-hover:opacity-100'}`}
         />
 
@@ -175,7 +177,7 @@ export function RequestRow({
           <button
             onClick={e => { e.stopPropagation(); setExamplesOpen(o => !o); }}
             className="shrink-0 w-3 text-surface-500 hover:text-white leading-none"
-            title={examplesOpen ? 'Hide examples' : `Show ${examples.length} example(s)`}
+            title={examplesOpen ? t('Hide examples') : t('Show :count example(s)', { count: examples.length })}
           >{examplesOpen ? '▾' : '▸'}</button>
         ) : (
           <span className="shrink-0 w-3" />
@@ -186,14 +188,14 @@ export function RequestRow({
         {protocol === 'soap' ? (
           <span
             className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-700/80 text-amber-50"
-            title="SOAP request"
+            title={t('SOAP request')}
           >
             SOAP
           </span>
         ) : protocol === 'websocket' ? (
           <span
             className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-700/80 text-cyan-50"
-            title="WebSocket"
+            title={t('WebSocket')}
           >
             WS
           </span>
@@ -214,13 +216,13 @@ export function RequestRow({
               <span className="text-xs truncate">{name}</span>
               {hookType && (
                 <span className={`shrink-0 text-[9px] font-bold px-1 py-px rounded ${HOOK_COLORS[hookType]}`}>
-                  {HOOK_LABELS[hookType].toUpperCase()}
+                  {t(HOOK_LABELS[hookType]).toUpperCase()}
                 </span>
               )}
               {authType !== 'none' && (
                 <span
                   className="shrink-0 text-[9px] px-1 py-px rounded bg-amber-800/40 text-amber-400"
-                  title={`Auth: ${AUTH_BADGE_LABELS[authType] ?? authType}`}
+                  title={t('Auth: :name', { name: AUTH_BADGE_LABELS[authType] ?? authType })}
                 >
                   {AUTH_BADGE_LABELS[authType] ?? authType}
                 </span>
@@ -246,20 +248,20 @@ export function RequestRow({
 
         <div className="shrink-0">
           <DotsBtn items={[
-            { type: 'item', label: 'Rename',     icon: <PencilIcon />, onClick: () => setRenaming(true) },
-            { type: 'item', label: 'Duplicate',  icon: <CopyIcon />,   onClick: onDuplicate },
-            ...(onAddExample ? [{ type: 'item' as const, label: 'Add Example', icon: <CopyIcon />, onClick: () => { onAddExample(); setExamplesOpen(true); } }] : []),
-            { type: 'item', label: 'Add tag',    icon: <TagIcon />,    onClick: () => setAddingTag(true) },
-            { type: 'item', label: 'Sync schema',icon: <SyncIcon />,   onClick: () => setShowSchemaSync(true) },
-            { type: 'item', label: disabled ? 'Enable' : 'Disable',    onClick: onToggleDisabled },
+            { type: 'item', label: t('Rename'),     icon: <PencilIcon />, onClick: () => setRenaming(true) },
+            { type: 'item', label: t('Duplicate'),  icon: <CopyIcon />,   onClick: onDuplicate },
+            ...(onAddExample ? [{ type: 'item' as const, label: t('Add Example'), icon: <CopyIcon />, onClick: () => { onAddExample(); setExamplesOpen(true); } }] : []),
+            { type: 'item', label: t('Add tag'),    icon: <TagIcon />,    onClick: () => setAddingTag(true) },
+            { type: 'item', label: t('Sync schema'),icon: <SyncIcon />,   onClick: () => setShowSchemaSync(true) },
+            { type: 'item', label: disabled ? t('Enable') : t('Disable'),    onClick: onToggleDisabled },
             ...(cloudEnabled()
-              ? [{ type: 'item' as const, label: 'Push as monitor to cloud', icon: <SyncIcon />, onClick: pushMonitor }]
+              ? [{ type: 'item' as const, label: t('Push as monitor to cloud'), icon: <SyncIcon />, onClick: pushMonitor }]
               : []),
             { type: 'separator' },
-            { type: 'header', label: 'Hook type' },
+            { type: 'header', label: t('Hook type') },
             ...hookMenuItems,
             { type: 'separator' },
-            { type: 'item', label: 'Delete', icon: <TrashIcon />, danger: true, onClick: onDelete },
+            { type: 'item', label: t('Delete'), icon: <TrashIcon />, danger: true, onClick: onDelete },
           ]} />
         </div>
         {toast && <div className="fixed bottom-4 right-4 z-[100] w-96"><Toast toast={toast} /></div>}
@@ -300,6 +302,7 @@ function ExampleRow({ name, indent, isActive, onOpen, onRename, onDelete, onDupl
   onDelete: () => void
   onDuplicate: () => void
 }) {
+  const t = useT();
   const [renaming, setRenaming] = useState(false);
   return (
     <div
@@ -310,7 +313,7 @@ function ExampleRow({ name, indent, isActive, onOpen, onRename, onDelete, onDupl
       onClick={onOpen}
       onDoubleClick={() => setRenaming(true)}
     >
-      <span className="shrink-0 text-[8px] font-bold px-1 py-px rounded bg-surface-700 text-surface-300" title="Example">EX</span>
+      <span className="shrink-0 text-[8px] font-bold px-1 py-px rounded bg-surface-700 text-surface-300" title={t('Example')}>EX</span>
       <div className="flex-1 min-w-0">
         {renaming ? (
           <InlineEdit
@@ -325,11 +328,11 @@ function ExampleRow({ name, indent, isActive, onOpen, onRename, onDelete, onDupl
       </div>
       <div className="shrink-0">
         <DotsBtn items={[
-          { type: 'item', label: 'Open', onClick: onOpen },
-          { type: 'item', label: 'Rename', icon: <PencilIcon />, onClick: () => setRenaming(true) },
-          { type: 'item', label: 'Duplicate', icon: <CopyIcon />, onClick: onDuplicate },
+          { type: 'item', label: t('Open'), onClick: onOpen },
+          { type: 'item', label: t('Rename'), icon: <PencilIcon />, onClick: () => setRenaming(true) },
+          { type: 'item', label: t('Duplicate'), icon: <CopyIcon />, onClick: onDuplicate },
           { type: 'separator' },
-          { type: 'item', label: 'Delete', icon: <TrashIcon />, danger: true, onClick: onDelete },
+          { type: 'item', label: t('Delete'), icon: <TrashIcon />, danger: true, onClick: onDelete },
         ]} />
       </div>
     </div>

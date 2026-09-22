@@ -10,16 +10,18 @@ import { varCompletionExtension, varHoverTooltipExtension } from './atCompletion
 import { jsonWithComments, xmlWithComments, commentKeymap } from './commentKeymap';
 import { useVarNames } from '../../hooks/useVarNames';
 import { useVarValues } from '../../hooks/useVarValues';
+import { useT } from '../../i18n';
 
 // GraphQL (graphql + cm6-graphql) and SOAP (WSDL/XML) editors are heavy and only
 // used for those body modes, so they load on demand to keep startup lean.
 const GraphQLEditor = lazy(() => import('./GraphQLEditor').then(m => ({ default: m.GraphQLEditor })));
 const SoapEditor = lazy(() => import('./SoapEditor').then(m => ({ default: m.SoapEditor })));
-const EditorFallback = <div className="p-4 text-xs text-surface-500">Loading editor…</div>;
 
 type BodyMode = RequestBody['mode']
 
 export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
+  const t = useT();
+  const editorFallback = <div className="p-4 text-xs text-surface-500">{t('Loading editor…')}</div>;
   const body     = request.body;
   const mode     = body.mode;
   const isSoap   = request.protocol === 'soap';
@@ -40,7 +42,7 @@ export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: 
   if (isSoap) {
     return (
       <div className="flex flex-col h-full min-h-0">
-        <Suspense fallback={EditorFallback}><SoapEditor request={request} onChange={onChange} /></Suspense>
+        <Suspense fallback={editorFallback}><SoapEditor request={request} onChange={onChange} /></Suspense>
       </div>
     );
   }
@@ -66,7 +68,7 @@ export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: 
       </div>
 
       {mode === 'none' && (
-        <p className="text-xs text-surface-400">No request body.</p>
+        <p className="text-xs text-surface-400">{t('No request body.')}</p>
       )}
 
       {mode === 'json' && (
@@ -77,9 +79,9 @@ export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: 
                 try { onChange({ body: { ...body, json: JSON.stringify(JSON.parse(body.json ?? ''), null, 2) } }); } catch { /* invalid json */ }
               }}
               className="text-[10px] text-surface-500 hover:text-white transition-colors"
-              title="Format JSON"
+              title={t('Format JSON')}
             >
-              Format
+              {t('Format')}
             </button>
           </div>
           <CodeMirror
@@ -98,8 +100,8 @@ export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: 
         <KVTable
           rows={body.form ?? []}
           onChange={rows => onChange({ body: { ...body, form: rows } })}
-          keyPlaceholder="field"
-          valuePlaceholder="value"
+          keyPlaceholder={t('field')}
+          valuePlaceholder={t('value')}
         />
       )}
 
@@ -130,13 +132,13 @@ export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: 
 
       {mode === 'graphql' && (
         <div className="flex-1 min-h-0">
-          <Suspense fallback={EditorFallback}><GraphQLEditor request={request} onChange={onChange} /></Suspense>
+          <Suspense fallback={editorFallback}><GraphQLEditor request={request} onChange={onChange} /></Suspense>
         </div>
       )}
 
       {mode === 'soap' && (
         <div className="flex-1 min-h-0">
-          <Suspense fallback={EditorFallback}><SoapEditor request={request} onChange={onChange} /></Suspense>
+          <Suspense fallback={editorFallback}><SoapEditor request={request} onChange={onChange} /></Suspense>
         </div>
       )}
     </div>

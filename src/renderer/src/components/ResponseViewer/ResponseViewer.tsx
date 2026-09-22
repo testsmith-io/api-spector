@@ -24,6 +24,7 @@ import { useToast } from '../common/Toast';
 import { ContextMenu } from '../common/ContextMenu';
 import { Modal } from '../common/Modal';
 import { validateHttpSemantics } from '../../../../shared/http-semantics';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
@@ -68,6 +69,7 @@ function KVBlock({ label, rows }: { label: string; rows: [string, string][] }) {
 /** One history entry, expandable to show the full request and response.
  *  Loading brings the response back into the main viewer. */
 function HistoryTabRow({ entry, onLoad, onResend }: { entry: HistoryEntry; onLoad: () => void; onResend?: () => void }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const reqBody = requestBodyText(entry.request.body);
   return (
@@ -84,25 +86,25 @@ function HistoryTabRow({ entry, onLoad, onResend }: { entry: HistoryEntry; onLoa
         <span className="text-[11px] text-surface-500 ml-auto shrink-0">
           {new Date(entry.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </span>
-        <button onClick={onLoad} title="Load this response into the viewer" className="text-[10px] text-blue-400 hover:text-blue-300 shrink-0">load</button>
+        <button onClick={onLoad} title={t('Load this response into the viewer')} className="text-[10px] text-blue-400 hover:text-blue-300 shrink-0">{t('load')}</button>
         {onResend && (
-          <button onClick={onResend} title="Send this request again" className="text-[10px] text-emerald-400 hover:text-emerald-300 shrink-0">resend</button>
+          <button onClick={onResend} title={t('Send this request again')} className="text-[10px] text-emerald-400 hover:text-emerald-300 shrink-0">{t('resend')}</button>
         )}
       </div>
       {open && (
         <div className="px-4 pb-3 pt-1 flex flex-col gap-3 bg-surface-950/40">
           <div className="flex flex-col gap-1.5">
-            <span className="text-[10px] uppercase tracking-wider text-surface-500 font-semibold">Request</span>
+            <span className="text-[10px] uppercase tracking-wider text-surface-500 font-semibold">{t('Request')}</span>
             <p className="font-mono text-[10px] text-surface-300 break-all">{entry.request.method} {entry.resolvedUrl}</p>
-            <KVBlock label="Headers" rows={entry.request.headers.filter(h => h.enabled && h.key).map(h => [h.key, h.value])} />
+            <KVBlock label={t('Headers')} rows={entry.request.headers.filter(h => h.enabled && h.key).map(h => [h.key, h.value])} />
             {reqBody && (
               <pre className="text-[10px] font-mono text-surface-300 bg-surface-900 border border-surface-800 rounded px-2 py-1.5 overflow-x-auto whitespace-pre-wrap break-words max-h-40 overflow-y-auto">{reqBody}</pre>
             )}
           </div>
           <div className="flex flex-col gap-1.5">
-            <span className="text-[10px] uppercase tracking-wider text-surface-500 font-semibold">Response</span>
+            <span className="text-[10px] uppercase tracking-wider text-surface-500 font-semibold">{t('Response')}</span>
             <p className="font-mono text-[10px]"><span className={getStatusColor(entry.response.status)}>{entry.response.status} {entry.response.statusText}</span></p>
-            <KVBlock label="Headers" rows={Object.entries(entry.response.headers)} />
+            <KVBlock label={t('Headers')} rows={Object.entries(entry.response.headers)} />
             {entry.response.body && (
               <pre className="text-[10px] font-mono text-surface-300 bg-surface-900 border border-surface-800 rounded px-2 py-1.5 overflow-x-auto whitespace-pre-wrap break-words max-h-56 overflow-y-auto">{entry.response.body}</pre>
             )}
@@ -116,6 +118,7 @@ function HistoryTabRow({ entry, onLoad, onResend }: { entry: HistoryEntry; onLoa
 type RespTab = 'body' | 'headers' | 'tests' | 'console' | 'request' | 'history' | 'http' | 'error'
 
 export function ResponseViewer() {
+  const t = useT();
   const activeTab = useStore(s => s.tabs.find(t => t.id === s.activeTabId));
   const activeTabId = useStore(s => s.activeTabId);
   const pinnedResponse = useStore(s => s.pinnedResponse);
@@ -203,7 +206,7 @@ export function ResponseViewer() {
       },
     });
     setTabRequestTab(activeTabId, 'contract');
-    contractToast.show('✓ Contract saved', true);
+    contractToast.show(t('✓ Contract saved'), true);
   }
 
   function handleAssert(snippet: string) {
@@ -222,7 +225,7 @@ export function ResponseViewer() {
     // insert — fold the Quick Inserts sidebar so it doesn't crowd the editor
     // they're now looking at. They can reopen it with the Snippets toggle.
     state.setQuickInsertsOpen(false);
-    assertToast.show('✓ Assertion added', true);
+    assertToast.show(t('✓ Assertion added'), true);
   }
 
   if (isSending) {
@@ -239,7 +242,7 @@ export function ResponseViewer() {
     }
     return (
       <div className="h-full flex items-center justify-center text-surface-400 text-sm">
-        Sending...
+        {t('Sending...')}
       </div>
     );
   }
@@ -247,7 +250,7 @@ export function ResponseViewer() {
   if (!response) {
     return (
       <div className="h-full flex items-center justify-center text-surface-400 text-sm">
-        Hit Send to see the response
+        {t('Hit Send to see the response')}
       </div>
     );
   }
@@ -275,24 +278,24 @@ export function ResponseViewer() {
   const historyBadge = requestHistory.length > 0 ? requestHistory.length : undefined;
   const tabList: { id: RespTab; label: string; badge?: number | string; error?: boolean }[] = response.error
     ? [
-        { id: 'error', label: 'Error', error: true },
-        { id: 'request', label: 'Request' },
-        { id: 'history', label: 'History', badge: historyBadge },
+        { id: 'error', label: t('Error'), error: true },
+        { id: 'request', label: t('Request') },
+        { id: 'history', label: t('History'), badge: historyBadge },
       ]
     : [
-        { id: 'request', label: 'Request' },
-        { id: 'body', label: 'Body', badge: bodyParseError ? '!' : undefined, error: bodyParseError },
-        { id: 'headers', label: 'Headers' },
-        { id: 'tests', label: 'Tests', badge: totalCount > 0 ? `${passedCount}/${totalCount}` : undefined },
-        { id: 'console', label: 'Console', badge: hasScriptError ? '!' : consoleCount > 0 ? consoleCount : undefined, error: hasScriptError },
-        { id: 'history', label: 'History', badge: historyBadge },
-        { id: 'http', label: 'HTTP', badge: httpFindings.length > 0 ? (httpErrors > 0 ? '!' : httpFindings.length) : undefined, error: httpErrors > 0 },
+        { id: 'request', label: t('Request') },
+        { id: 'body', label: t('Body'), badge: bodyParseError ? '!' : undefined, error: bodyParseError },
+        { id: 'headers', label: t('Headers') },
+        { id: 'tests', label: t('Tests'), badge: totalCount > 0 ? `${passedCount}/${totalCount}` : undefined },
+        { id: 'console', label: t('Console'), badge: hasScriptError ? '!' : consoleCount > 0 ? consoleCount : undefined, error: hasScriptError },
+        { id: 'history', label: t('History'), badge: historyBadge },
+        { id: 'http', label: t('HTTP'), badge: httpFindings.length > 0 ? (httpErrors > 0 ? '!' : httpFindings.length) : undefined, error: httpErrors > 0 },
       ];
 
   // Shared by the normal History tab and the error view's History tab.
   const historyContent = requestHistory.length === 0 ? (
     <p className="text-xs text-surface-500 text-center p-8">
-      No past responses for this request yet. Each send is recorded here.
+      {t('No past responses for this request yet. Each send is recorded here.')}
     </p>
   ) : (
     <div className="flex flex-col">
@@ -360,24 +363,24 @@ export function ResponseViewer() {
               <button
                 onClick={() => setBodyView('tree')}
                 className={`px-2 py-0.5 text-[10px] transition-colors ${bodyView === 'tree' ? 'bg-surface-700 text-white' : 'text-surface-600 hover:text-white'}`}
-                title="Interactive tree view - click values to add assertions"
+                title={t('Interactive tree view - click values to add assertions')}
               >
-                Tree
+                {t('Tree')}
               </button>
               <button
                 onClick={() => setBodyView('raw')}
                 className={`px-2 py-0.5 text-[10px] transition-colors ${bodyView === 'raw' ? 'bg-surface-700 text-white' : 'text-surface-600 hover:text-white'}`}
-                title="Raw body view"
+                title={t('Raw body view')}
               >
-                Raw
+                {t('Raw')}
               </button>
               {showTable && (
                 <button
                   onClick={() => setBodyView('table')}
                   className={`px-2 py-0.5 text-[10px] transition-colors ${bodyView === 'table' ? 'bg-surface-700 text-white' : 'text-surface-600 hover:text-white'}`}
-                  title="Show an array in the response as a sortable table"
+                  title={t('Show an array in the response as a sortable table')}
                 >
-                  Table
+                  {t('Table')}
                 </button>
               )}
             </div>
@@ -386,42 +389,42 @@ export function ResponseViewer() {
           {/* Pin button */}
           <button
             onClick={() => setPinned(response)}
-            title="Pin this response to compare against later responses"
+            title={t('Pin this response to compare against later responses')}
             className={`px-2 py-0.5 text-[10px] rounded transition-colors ${pinnedResponse === response
               ? 'bg-blue-700 text-white'
               : 'bg-surface-800 hover:bg-surface-700'
               }`}
           >
-            Pin
+            {t('Pin')}
           </button>
 
           {/* Diff toggle — only when a pinned response exists */}
           {pinnedResponse && (
             <button
               onClick={() => setDiffMode(d => !d)}
-              title="Toggle diff view against pinned response"
+              title={t('Toggle diff view against pinned response')}
               className={`px-2 py-0.5 text-[10px] rounded transition-colors ${diffMode
                 ? 'bg-amber-700 text-white'
                 : 'bg-surface-800 hover:bg-surface-700'
                 }`}
             >
-              Diff
+              {t('Diff')}
             </button>
           )}
 
           <button
             onClick={saveAsContract}
             className="px-2 py-0.5 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors"
-            title="Capture this response as a contract expectation"
+            title={t('Capture this response as a contract expectation')}
           >
-            ↓ Contract
+            ↓ {t('Contract')}
           </button>
           <button
             onClick={() => setShowMockModal(true)}
             className="px-2 py-0.5 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors"
-            title="Save this response as a mock route"
+            title={t('Save this response as a mock route')}
           >
-            ↓ Mock
+            ↓ {t('Mock')}
           </button>
         </div>}
       </div>
@@ -437,7 +440,7 @@ export function ResponseViewer() {
             <div className="flex-1 min-h-0 overflow-y-auto">{historyContent}</div>
           ) : (
             <div className="flex flex-col p-4 gap-2">
-              <div className="text-red-400 text-sm font-medium">Request failed</div>
+              <div className="text-red-400 text-sm font-medium">{t('Request failed')}</div>
               <pre className="text-xs text-red-300 whitespace-pre-wrap">{response.error}</pre>
             </div>
           )
@@ -478,7 +481,7 @@ export function ResponseViewer() {
                       e.preventDefault();
                       setHeaderMenu({ x: e.clientX, y: e.clientY, key: k, value: v });
                     }}
-                    title="Right-click to create an environment variable"
+                    title={t('Right-click to create an environment variable')}
                   >
                     <td className="py-1.5 px-4 text-surface-400 font-mono w-56 align-top">{k}</td>
                     <td className="py-1.5 px-4 text-white font-mono break-all">{v}</td>
@@ -498,8 +501,8 @@ export function ResponseViewer() {
             {httpFindings.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
                 <span className="text-2xl">✓</span>
-                <p className="text-sm text-emerald-400">Conforms to HTTP semantics</p>
-                <p className="text-xs text-surface-500 max-w-sm">No violations of the HTTP specification (RFC 9110/9111) in this response. This check is automatic and needs no test or spec.</p>
+                <p className="text-sm text-emerald-400">{t('Conforms to HTTP semantics')}</p>
+                <p className="text-xs text-surface-500 max-w-sm">{t('No violations of the HTTP specification (RFC 9110/9111) in this response. This check is automatic and needs no test or spec.')}</p>
               </div>
             ) : (
               <div className="flex flex-col gap-2 max-w-3xl">
@@ -539,23 +542,23 @@ export function ResponseViewer() {
             activeEnvironmentId
               ? {
                   type: 'item',
-                  label: `Create variable in "${activeEnvName}"`,
+                  label: t('Create variable in ":env"', { env: activeEnvName ?? '' }),
                   onClick: () => {
                     setVarDialog({ name: headerMenu.key.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, ''), value: headerMenu.value });
                     setHeaderMenu(null);
                   },
                 }
-              : { type: 'header', label: 'Select an environment first' },
+              : { type: 'header', label: t('Select an environment first') },
           ]}
         />
       )}
 
       {/* Name the new environment variable */}
       {varDialog && (
-        <Modal onClose={() => setVarDialog(null)} title="Create environment variable" panelClassName="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl w-[420px]">
+        <Modal onClose={() => setVarDialog(null)} title={t('Create environment variable')} panelClassName="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl w-[420px]">
           <div className="flex flex-col gap-3 p-4">
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Variable name</span>
+              <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Variable name')}</span>
               <input
                 autoFocus
                 value={varDialog.name}
@@ -564,7 +567,7 @@ export function ResponseViewer() {
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Value</span>
+              <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Value')}</span>
               <input
                 value={varDialog.value}
                 onChange={e => setVarDialog(d => d && { ...d, value: e.target.value })}
@@ -572,22 +575,22 @@ export function ResponseViewer() {
               />
             </label>
             <p className="text-[11px] text-surface-500">
-              Saved to {activeEnvName ? `"${activeEnvName}"` : 'the active environment'}. Use it as <code className="text-surface-300">{'{{'}{varDialog.name || 'name'}{'}}'}</code>.
+              {t('Saved to :env. Use it as', { env: activeEnvName ? `"${activeEnvName}"` : t('the active environment') })} <code className="text-surface-300">{'{{'}{varDialog.name || 'name'}{'}}'}</code>.
             </p>
             <div className="flex justify-end gap-2 mt-1">
-              <button onClick={() => setVarDialog(null)} className="px-3 py-1.5 text-xs text-surface-400 hover:text-surface-200 transition-colors">Cancel</button>
+              <button onClick={() => setVarDialog(null)} className="px-3 py-1.5 text-xs text-surface-400 hover:text-surface-200 transition-colors">{t('Cancel')}</button>
               <button
                 onClick={() => {
                   if (activeEnvironmentId && varDialog.name.trim()) {
                     upsertEnvVar(activeEnvironmentId, varDialog.name.trim(), varDialog.value);
-                    assertToast.show(`✓ Saved {{${varDialog.name.trim()}}}`, true);
+                    assertToast.show(t('✓ Saved {{:name}}', { name: varDialog.name.trim() }), true);
                   }
                   setVarDialog(null);
                 }}
                 disabled={!varDialog.name.trim()}
                 className="px-3 py-1.5 text-xs rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold disabled:opacity-50 transition-colors"
               >
-                Create
+                {t('Create')}
               </button>
             </div>
           </div>

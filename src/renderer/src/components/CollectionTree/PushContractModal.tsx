@@ -7,6 +7,7 @@ import { useStore } from '../../store';
 import { hasContract, pushContractToCloud, pushProviderSpecToCloud, openCloudMatrix } from '../../lib/cloud-push';
 import { getMethodColor } from '../../../../shared/colors';
 import type { ApiRequest } from '../../../../shared/types';
+import { useT } from '../../i18n';
 
 /** Push a contract to the cloud broker: either a consumer pact built from the
  *  requests that carry a contract, or a provider OpenAPI spec (from a pinned
@@ -16,6 +17,7 @@ export function PushContractModal({ requests, defaultConsumer, onClose }: {
   defaultConsumer: string;
   onClose: () => void;
 }) {
+  const t = useT();
   const snapshots = useStore(s => s.contractSnapshots);
   const snapshotEntries = Object.entries(snapshots);
   const withContract = requests.filter(hasContract);
@@ -45,25 +47,25 @@ export function PushContractModal({ requests, defaultConsumer, onClose }: {
       if (mode === 'consumer') {
         const chosen = withContract.filter(r => selected.has(r.id));
         const r = await pushContractToCloud(chosen, { consumer: consumer.trim(), provider: provider.trim(), version: version.trim() });
-        const published = `Published ${consumer} → ${provider} (${chosen.length} interactions).`;
+        const published = t('Published :consumer → :provider (:count interactions).', { consumer, provider, count: chosen.length });
         if (!r.verification) {
-          setStatus({ state: 'warn', msg: `${published} Not verified yet: ${provider} has not published its OpenAPI spec.` });
+          setStatus({ state: 'warn', msg: `${published} ${t('Not verified yet: :provider has not published its OpenAPI spec.', { provider })}` });
         } else if (r.verification.success) {
-          setStatus({ state: 'ok', msg: `${published} Compatible with ${provider}. ✓` });
+          setStatus({ state: 'ok', msg: `${published} ${t('Compatible with :provider. ✓', { provider })}` });
         } else {
           const failing = r.verification.checks.filter(c => !c.passed);
-          setStatus({ state: 'err', msg: `${published} NOT compatible with ${provider} (${failing.length} failing).`, detail: failing.map(c => `${c.interaction}: ${c.error}`) });
+          setStatus({ state: 'err', msg: `${published} ${t('NOT compatible with :provider (:count failing).', { provider, count: failing.length })}`, detail: failing.map(c => `${c.interaction}: ${c.error}`) });
         }
       } else {
         const spec = snapshots[snapshotPath]?.spec ?? '';
         const r = await pushProviderSpecToCloud({ pacticipant: pacticipant.trim(), version: version.trim(), spec });
         const failing = r.results.filter(x => !x.success);
         if (r.results.length === 0) {
-          setStatus({ state: 'warn', msg: `Published ${pacticipant} spec. No consumer contracts to verify yet.` });
+          setStatus({ state: 'warn', msg: t('Published :pacticipant spec. No consumer contracts to verify yet.', { pacticipant }) });
         } else if (failing.length === 0) {
-          setStatus({ state: 'ok', msg: `Published ${pacticipant} spec. All ${r.results.length} consumer contract(s) compatible. ✓` });
+          setStatus({ state: 'ok', msg: t('Published :pacticipant spec. All :count consumer contract(s) compatible. ✓', { pacticipant, count: r.results.length }) });
         } else {
-          setStatus({ state: 'err', msg: `Published ${pacticipant} spec. ${failing.length} of ${r.results.length} consumer(s) now incompatible.`, detail: failing.map(x => `${x.consumer} ${x.version}`) });
+          setStatus({ state: 'err', msg: t('Published :pacticipant spec. :count of :total consumer(s) now incompatible.', { pacticipant, count: failing.length, total: r.results.length }), detail: failing.map(x => `${x.consumer} ${x.version}`) });
         }
       }
     } catch (e) {
@@ -76,7 +78,7 @@ export function PushContractModal({ requests, defaultConsumer, onClose }: {
       onClose={onClose}
       overlayClassName="bg-black/50 z-50 flex items-start justify-center pt-24"
       panelClassName="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl w-[520px] flex flex-col max-h-[75vh]"
-      title="Push contract to cloud"
+      title={t('Push contract to cloud')}
     >
       {/* Mode */}
       <div className="flex gap-1 px-4 pt-3 flex-shrink-0">
@@ -89,7 +91,7 @@ export function PushContractModal({ requests, defaultConsumer, onClose }: {
               mode === m ? 'bg-blue-600 text-white' : 'bg-surface-800 hover:bg-surface-700 text-surface-300'
             }`}
           >
-            {m === 'consumer' ? 'Consumer pact' : 'Provider spec (OpenAPI)'}
+            {m === 'consumer' ? t('Consumer pact') : t('Provider spec (OpenAPI)')}
           </button>
         ))}
       </div>
@@ -98,18 +100,18 @@ export function PushContractModal({ requests, defaultConsumer, onClose }: {
         {mode === 'consumer' ? (
           <>
             <div className="grid grid-cols-2 gap-3">
-              <label className="flex flex-col gap-1"><span className="text-surface-500">Consumer</span>
+              <label className="flex flex-col gap-1"><span className="text-surface-500">{t('Consumer')}</span>
                 <input value={consumer} onChange={e => setConsumer(e.target.value)} className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500" /></label>
-              <label className="flex flex-col gap-1"><span className="text-surface-500">Provider</span>
+              <label className="flex flex-col gap-1"><span className="text-surface-500">{t('Provider')}</span>
                 <input value={provider} onChange={e => setProvider(e.target.value)} placeholder="orders-api" className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 placeholder-surface-600" /></label>
             </div>
-            <label className="flex flex-col gap-1"><span className="text-surface-500">Version <span className="text-surface-600">(git sha / build)</span></span>
+            <label className="flex flex-col gap-1"><span className="text-surface-500">{t('Version')} <span className="text-surface-600">{t('(git sha / build)')}</span></span>
               <input value={version} onChange={e => setVersion(e.target.value)} placeholder="1.4.0" className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 placeholder-surface-600" /></label>
 
             <div>
-              <div className="text-surface-500 mb-1.5">Interactions <span className="text-surface-600">(requests with a contract)</span></div>
+              <div className="text-surface-500 mb-1.5">{t('Interactions')} <span className="text-surface-600">{t('(requests with a contract)')}</span></div>
               {withContract.length === 0 ? (
-                <p className="text-surface-500 px-1 py-3">No requests here have a contract yet. Add expected status/schema on a request's Contract tab first.</p>
+                <p className="text-surface-500 px-1 py-3">{t("No requests here have a contract yet. Add expected status/schema on a request's Contract tab first.")}</p>
               ) : (
                 <div className="rounded-lg border border-surface-800 max-h-56 overflow-y-auto">
                   {withContract.map(r => (
@@ -126,14 +128,14 @@ export function PushContractModal({ requests, defaultConsumer, onClose }: {
           </>
         ) : (
           <>
-            <p className="text-surface-500">Publishes a pinned OpenAPI spec as the provider contract. Consumer pacts are then verified against it without running the provider.</p>
+            <p className="text-surface-500">{t('Publishes a pinned OpenAPI spec as the provider contract. Consumer pacts are then verified against it without running the provider.')}</p>
             <div className="grid grid-cols-2 gap-3">
-              <label className="flex flex-col gap-1"><span className="text-surface-500">Provider (pacticipant)</span>
+              <label className="flex flex-col gap-1"><span className="text-surface-500">{t('Provider (pacticipant)')}</span>
                 <input value={pacticipant} onChange={e => setPacticipant(e.target.value)} placeholder="orders-api" className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 placeholder-surface-600" /></label>
-              <label className="flex flex-col gap-1"><span className="text-surface-500">Version</span>
+              <label className="flex flex-col gap-1"><span className="text-surface-500">{t('Version')}</span>
                 <input value={version} onChange={e => setVersion(e.target.value)} placeholder="2.1.0" className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 placeholder-surface-600" /></label>
             </div>
-            <label className="flex flex-col gap-1"><span className="text-surface-500">Spec snapshot</span>
+            <label className="flex flex-col gap-1"><span className="text-surface-500">{t('Spec snapshot')}</span>
               <select value={snapshotPath} onChange={e => setSnapshotPath(e.target.value)} className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500">
                 {snapshotEntries.map(([path, snap]) => <option key={path} value={path}>{snap.name ?? path}</option>)}
               </select></label>
@@ -153,15 +155,15 @@ export function PushContractModal({ requests, defaultConsumer, onClose }: {
             <span className={`text-[11px] flex-1 ${status.state === 'ok' ? 'text-green-400' : status.state === 'warn' ? 'text-amber-400' : 'text-red-400'}`}>
               {status.state === 'ok' ? '✓' : status.state === 'warn' ? '⚠' : '✗'} {status.msg}
             </span>
-            <button onClick={() => openCloudMatrix()} className="px-3 py-1.5 bg-surface-800 hover:bg-surface-700 rounded text-xs">View matrix ↗</button>
-            <button onClick={onClose} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-xs font-medium">Done</button>
+            <button onClick={() => openCloudMatrix()} className="px-3 py-1.5 bg-surface-800 hover:bg-surface-700 rounded text-xs">{t('View matrix ↗')}</button>
+            <button onClick={onClose} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-xs font-medium">{t('Done')}</button>
           </>
         ) : (
           <>
             <button onClick={push} disabled={!canPush || status.state === 'pushing'} className="ml-auto px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 rounded text-xs font-medium">
-              {status.state === 'pushing' ? 'Publishing…' : 'Publish'}
+              {status.state === 'pushing' ? t('Publishing…') : t('Publish')}
             </button>
-            <button onClick={onClose} className="px-4 py-1.5 bg-surface-800 hover:bg-surface-700 rounded text-xs">Cancel</button>
+            <button onClick={onClose} className="px-4 py-1.5 bg-surface-800 hover:bg-surface-700 rounded text-xs">{t('Cancel')}</button>
           </>
         )}
       </div>

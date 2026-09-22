@@ -12,6 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getMethodColor } from '../../../../shared/colors';
 import { cloudEnabled } from '../../lib/cloud-push';
 import { PushToCloudModal } from './PushToCloudModal';
+import { useT } from '../../i18n';
 import {
   mockBodyCompletionExtension,
   mockScriptCompletionExtension,
@@ -36,6 +37,7 @@ function RouteRow({
   onDuplicate: () => void
   initialEditing?: boolean
 }) {
+  const t = useT();
   const [editing,      setEditing]      = useState(initialEditing);
   const [draft,        setDraft]        = useState(route);
   const [scriptOpen,   setScriptOpen]   = useState(!!(route.script?.trim()));
@@ -67,7 +69,7 @@ function RouteRow({
           <span className="text-surface-600 text-xs truncate max-w-[200px]">{draft.description}</span>
         )}
         {draft.script?.trim() && (
-          <span className="text-[10px] text-purple-400/70 shrink-0">⚡ script</span>
+          <span className="text-[10px] text-purple-400/70 shrink-0">⚡ {t('script')}</span>
         )}
         <span className={`text-xs font-mono w-10 text-right shrink-0 ${
           draft.statusCode < 300 ? 'text-emerald-400' :
@@ -80,12 +82,12 @@ function RouteRow({
           onClick={() => { setDraft(route); setEditing(true); }}
           className="opacity-0 group-hover:opacity-100 text-xs text-surface-600 hover:text-surface-200 transition-opacity px-1"
         >
-          Edit
+          {t('Edit')}
         </button>
         <button
           onClick={onDuplicate}
           className="opacity-0 group-hover:opacity-100 text-xs text-surface-600 hover:text-blue-400 transition-opacity"
-          title="Duplicate route"
+          title={t('Duplicate route')}
         >
           ⧉
         </button>
@@ -129,11 +131,11 @@ function RouteRow({
         <input
           value={draft.description ?? ''}
           onChange={e => setDraft(d => ({ ...d, description: e.target.value }))}
-          placeholder="Description (optional)"
+          placeholder={t('Description (optional)')}
           className="flex-1 bg-surface-800 border border-surface-700 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 placeholder-surface-700"
         />
         <div className="flex items-center gap-2">
-          <label className="text-xs text-surface-400 shrink-0">Delay ms</label>
+          <label className="text-xs text-surface-400 shrink-0">{t('Delay ms')}</label>
           <input
             type="number"
             value={draft.delay ?? ''}
@@ -147,14 +149,14 @@ function RouteRow({
       {/* Response body */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <label className="text-[11px] text-surface-400 uppercase tracking-wider">Response body</label>
+          <label className="text-[11px] text-surface-400 uppercase tracking-wider">{t('Response body')}</label>
           <span className="text-[10px] text-surface-600">
-            Use <code className="text-surface-400">{'{{faker.person.firstName()}}'}</code>
+            {t('Use')} <code className="text-surface-400">{'{{faker.person.firstName()}}'}</code>
             {pathParamNames.map(p => (
               <span key={p}>, <code className="text-blue-400/80">{`{{request.params.${p}}}`}</code></span>
             ))}
             {pathParamNames.length === 0 && (
-              <span>, <code className="text-surface-400">{'{{request.params.id}}'}</code> <span className="text-surface-700">(add :id to path)</span></span>
+              <span>, <code className="text-surface-400">{'{{request.params.id}}'}</code> <span className="text-surface-700">{t('(add :id to path)')}</span></span>
             )}
             , <code className="text-surface-400">{'{{request.query.search}}'}</code>
           </span>
@@ -173,7 +175,7 @@ function RouteRow({
 
       {/* Response headers */}
       <div>
-        <p className="text-[11px] text-surface-400 uppercase tracking-wider mb-2">Response headers</p>
+        <p className="text-[11px] text-surface-400 uppercase tracking-wider mb-2">{t('Response headers')}</p>
         {Object.entries(draft.headers).map(([k, v]) => (
           <div key={k} className="flex gap-2 mb-2">
             <input
@@ -182,13 +184,13 @@ function RouteRow({
                 const h = { ...draft.headers }; delete h[k]; h[e.target.value] = v;
                 setDraft(d => ({ ...d, headers: h }));
               }}
-              placeholder="Header-Name"
+              placeholder={t('Header-Name')}
               className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:border-blue-500 placeholder-surface-700"
             />
             <input
               value={v}
               onChange={e => setDraft(d => ({ ...d, headers: { ...d.headers, [k]: e.target.value } }))}
-              placeholder="value"
+              placeholder={t('value')}
               className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:border-blue-500 placeholder-surface-700"
             />
             <button
@@ -200,7 +202,7 @@ function RouteRow({
         <button
           onClick={() => setDraft(d => ({ ...d, headers: { ...d.headers, '': '' } }))}
           className="text-xs text-blue-400 hover:text-blue-300"
-        >+ Add header</button>
+        >{t('+ Add header')}</button>
       </div>
 
       {/* Pre-response script */}
@@ -210,18 +212,17 @@ function RouteRow({
           className="flex items-center gap-1.5 text-[11px] text-surface-400 uppercase tracking-wider hover:text-white transition-colors"
         >
           <span>{scriptOpen ? '▾' : '▸'}</span>
-          <span>Pre-response script</span>
-          {draft.script?.trim() && <span className="text-purple-400 normal-case font-normal tracking-normal ml-1">⚡ active</span>}
+          <span>{t('Pre-response script')}</span>
+          {draft.script?.trim() && <span className="text-purple-400 normal-case font-normal tracking-normal ml-1">⚡ {t('active')}</span>}
         </button>
 
         {scriptOpen && (
           <div className="mt-2 flex flex-col gap-1.5">
             <p className="text-[10px] text-surface-600">
-              Runs before the response is sent.
-              Mutate <code className="text-surface-400">response.statusCode</code>,{' '}
+              {t('Runs before the response is sent. Mutate')} <code className="text-surface-400">response.statusCode</code>,{' '}
               <code className="text-surface-400">response.body</code>,{' '}
               <code className="text-surface-400">response.headers</code>.
-              Access <code className="text-surface-400">request.params</code>,{' '}
+              {' '}{t('Access')} <code className="text-surface-400">request.params</code>,{' '}
               <code className="text-surface-400">request.query</code>,{' '}
               <code className="text-surface-400">request.body</code>,{' '}
               <code className="text-surface-400">faker</code>, <code className="text-surface-400">dayjs</code>.
@@ -246,16 +247,16 @@ function RouteRow({
           onClick={() => { onSave(draft); setEditing(false); }}
           className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition-colors"
         >
-          Save route
+          {t('Save route')}
         </button>
         <button
           onClick={() => setEditing(false)}
           className="px-4 py-1.5 bg-surface-800 hover:bg-surface-700 rounded text-sm transition-colors"
         >
-          Cancel
+          {t('Cancel')}
         </button>
         <button onClick={onDelete} className="ml-auto px-4 py-1.5 text-red-400 hover:text-red-300 text-sm">
-          Delete route
+          {t('Delete route')}
         </button>
       </div>
     </div>
@@ -264,14 +265,15 @@ function RouteRow({
 
 // ─── Request log ──────────────────────────────────────────────────────────────
 
-function timeAgo(ts: number): string {
+function timeAgo(ts: number, t: ReturnType<typeof useT>): string {
   const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 60)   return `${s}s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  return `${Math.floor(s / 3600)}h ago`;
+  if (s < 60)   return t(':v ago', { v: `${s}s` });
+  if (s < 3600) return t(':v ago', { v: `${Math.floor(s / 60)}m` });
+  return t(':v ago', { v: `${Math.floor(s / 3600)}h` });
 }
 
 function HitRow({ hit, matched }: { hit: MockHit; matched: MockRoute | undefined | null }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const unmatched = !hit.matchedRouteId;
 
@@ -300,7 +302,7 @@ function HitRow({ hit, matched }: { hit: MockHit; matched: MockRoute | undefined
         </span>
         <span className="w-32 shrink-0 truncate text-surface-600 text-xs font-sans" title={matched?.description ?? matched?.path ?? ''}>
           {unmatched
-            ? <span className="text-red-400">no match</span>
+            ? <span className="text-red-400">{t('no match')}</span>
             : (matched?.description || matched?.path || '-')}
         </span>
         <span className={`w-12 text-right shrink-0 text-xs ${
@@ -309,7 +311,7 @@ function HitRow({ hit, matched }: { hit: MockHit; matched: MockRoute | undefined
         }`}>{hit.status}</span>
         <span className="w-14 text-right shrink-0 text-surface-600 text-xs">{hit.durationMs}ms</span>
         <span className="w-20 text-right shrink-0 text-surface-400 text-xs">
-          {timeAgo(hit.timestamp)}
+          {timeAgo(hit.timestamp, t)}
         </span>
       </button>
 
@@ -319,7 +321,7 @@ function HitRow({ hit, matched }: { hit: MockHit; matched: MockRoute | undefined
           {/* Response headers */}
           {hit.responseHeaders && Object.keys(hit.responseHeaders).length > 0 && (
             <div className="mt-2">
-              <p className="text-[10px] uppercase tracking-wider text-surface-600 mb-1">Response headers</p>
+              <p className="text-[10px] uppercase tracking-wider text-surface-600 mb-1">{t('Response headers')}</p>
               <div className="font-mono text-xs space-y-0.5">
                 {Object.entries(hit.responseHeaders).map(([k, v]) => (
                   <div key={k} className="flex gap-2">
@@ -332,10 +334,10 @@ function HitRow({ hit, matched }: { hit: MockHit; matched: MockRoute | undefined
           )}
           {/* Response body */}
           <div className="mt-2">
-            <p className="text-[10px] uppercase tracking-wider text-surface-600 mb-1">Response body</p>
+            <p className="text-[10px] uppercase tracking-wider text-surface-600 mb-1">{t('Response body')}</p>
             {prettyBody
               ? <pre className="font-mono text-xs text-surface-300 bg-surface-950 rounded p-2 overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap break-all">{prettyBody}</pre>
-              : <span className="text-xs text-surface-600 italic">empty</span>
+              : <span className="text-xs text-surface-600 italic">{t('empty')}</span>
             }
           </div>
         </div>
@@ -345,6 +347,7 @@ function HitRow({ hit, matched }: { hit: MockHit; matched: MockRoute | undefined
 }
 
 function RequestLog({ serverId, routes, running }: { serverId: string; routes: MockRoute[]; running: boolean }) {
+  const t         = useT();
   const hits      = useStore(s => s.mockLogs[serverId]) ?? [];
   const clearLogs = useStore(s => s.clearMockLogs);
   const routeMap  = useMemo(() => new Map((routes ?? []).map(r => [r.id, r])), [routes]);
@@ -353,14 +356,14 @@ function RequestLog({ serverId, routes, running }: { serverId: string; routes: M
     <div className="flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between px-4 py-2 border-b border-surface-800 flex-shrink-0">
         <span className="text-xs text-surface-600 font-semibold uppercase tracking-wider">
-          Requests {hits.length > 0 && <span className="text-surface-400 normal-case font-normal tracking-normal">({hits.length})</span>}
+          {t('Requests')} {hits.length > 0 && <span className="text-surface-400 normal-case font-normal tracking-normal">({hits.length})</span>}
         </span>
         {hits.length > 0 && (
           <button
             onClick={() => clearLogs(serverId)}
             className="text-xs text-surface-400 hover:text-red-400 transition-colors"
           >
-            Clear
+            {t('Clear')}
           </button>
         )}
       </div>
@@ -369,13 +372,13 @@ function RequestLog({ serverId, routes, running }: { serverId: string; routes: M
         <div className="flex-1 flex items-center justify-center">
           {!running ? (
             <div className="text-center">
-              <p className="text-sm text-surface-400">Server is not running.</p>
-              <p className="text-xs text-surface-600 mt-1">Start the server to begin capturing requests.</p>
+              <p className="text-sm text-surface-400">{t('Server is not running.')}</p>
+              <p className="text-xs text-surface-600 mt-1">{t('Start the server to begin capturing requests.')}</p>
             </div>
           ) : (
             <div className="text-center">
-              <p className="text-sm text-surface-400">No requests yet.</p>
-              <p className="text-xs text-surface-600 mt-1">Waiting for incoming requests…</p>
+              <p className="text-sm text-surface-400">{t('No requests yet.')}</p>
+              <p className="text-xs text-surface-600 mt-1">{t('Waiting for incoming requests…')}</p>
             </div>
           )}
         </div>
@@ -384,12 +387,12 @@ function RequestLog({ serverId, routes, running }: { serverId: string; routes: M
           {/* Column headers */}
           <div className="flex items-center gap-3 px-4 py-1.5 border-b border-surface-800 text-[10px] uppercase tracking-wider text-surface-400 sticky top-0 bg-surface-950">
             <span className="w-3 shrink-0" />
-            <span className="w-16 shrink-0">Method</span>
-            <span className="flex-1">Path</span>
-            <span className="w-32 shrink-0">Matched route</span>
-            <span className="w-12 text-right shrink-0">Status</span>
-            <span className="w-14 text-right shrink-0">Duration</span>
-            <span className="w-20 text-right shrink-0">Time</span>
+            <span className="w-16 shrink-0">{t('Method')}</span>
+            <span className="flex-1">{t('Path')}</span>
+            <span className="w-32 shrink-0">{t('Matched route')}</span>
+            <span className="w-12 text-right shrink-0">{t('Status')}</span>
+            <span className="w-14 text-right shrink-0">{t('Duration')}</span>
+            <span className="w-20 text-right shrink-0">{t('Time')}</span>
           </div>
 
           {hits.map(hit => (
@@ -408,6 +411,7 @@ function RequestLog({ serverId, routes, running }: { serverId: string; routes: M
 // ─── MockDetailPanel ──────────────────────────────────────────────────────────
 
 export function MockDetailPanel({ mockId }: { mockId: string }) {
+  const t          = useT();
   const entry      = useStore(s => s.mocks[mockId]);
   const updateMock = useStore(s => s.updateMock);
   const deleteMock = useStore(s => s.deleteMock);
@@ -492,14 +496,14 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
               onKeyDown={e => { if (e.key === 'Enter') saveMeta(); if (e.key === 'Escape') setEditMeta(false); }}
               className="w-20 bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:border-blue-500"
             />
-            <button onClick={saveMeta} className="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded text-sm transition-colors">Save</button>
-            <button onClick={() => setEditMeta(false)} className="px-3 py-1 bg-surface-800 hover:bg-surface-700 rounded text-sm transition-colors">Cancel</button>
+            <button onClick={saveMeta} className="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded text-sm transition-colors">{t('Save')}</button>
+            <button onClick={() => setEditMeta(false)} className="px-3 py-1 bg-surface-800 hover:bg-surface-700 rounded text-sm transition-colors">{t('Cancel')}</button>
           </div>
         ) : (
           <button
             onClick={() => { setNameDraft(mock.name); setPortDraft(String(mock.port)); setEditMeta(true); }}
             className="flex items-center gap-2 hover:text-blue-400 transition-colors group"
-            title="Click to edit name and port"
+            title={t('Click to edit name and port')}
           >
             <span className="text-sm font-semibold">{mock.name}</span>
             <span className="text-surface-600 text-sm font-mono">:{mock.port}</span>
@@ -527,9 +531,9 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
             <button
               onClick={() => setShowPush(true)}
               className="px-3 py-1.5 rounded text-sm font-medium bg-surface-800 hover:bg-surface-700 text-surface-300 border border-surface-700"
-              title="Push this mock to API Spector Cloud (choose routes)"
+              title={t('Push this mock to API Spector Cloud (choose routes)')}
             >
-              ☁ Push to cloud
+              ☁ {t('Push to cloud')}
             </button>
           )}
           <div className="relative group/cli flex items-center">
@@ -541,12 +545,12 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
                   : 'bg-surface-800 hover:bg-surface-700 text-surface-300 border border-surface-700'
               }`}
             >
-              {running ? '● Running' : '▶ Start'}
+              {running ? `● ${t('Running')}` : `▶ ${t('Start')}`}
             </button>
             {!running && (
               <div className="pointer-events-none absolute bottom-full right-0 mb-2 hidden group-hover/cli:block z-50">
                 <div className="bg-[#1e1b2e] border border-white/10 rounded px-2.5 py-1.5 shadow-xl text-[11px] text-surface-300 whitespace-nowrap">
-                  <span className="text-surface-500 mr-1">or run from CLI:</span>
+                  <span className="text-surface-500 mr-1">{t('or run from CLI:')}</span>
                   <code className="text-blue-300">npx api-spector mock --workspace &lt;path&gt;</code>
                 </div>
               </div>
@@ -559,9 +563,9 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
               setActive(null);
             }}
             className="px-2 py-1.5 text-sm text-surface-600 hover:text-red-400 transition-colors"
-            title="Delete server"
+            title={t('Delete server')}
           >
-            Delete
+            {t('Delete')}
           </button>
         </div>
       </div>
@@ -578,7 +582,7 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
                 : 'border-transparent text-surface-400 hover:text-white'
             }`}
           >
-            {tab}
+            {t(tab)}
             {tab === 'routes' && routes.length > 0 && (
               <span className="ml-1.5 bg-surface-700 text-surface-300 rounded px-1.5 py-0.5 text-[10px]">
                 {routes.length}
@@ -595,12 +599,12 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
             <div className="flex-1 overflow-y-auto">
               {routes.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full gap-3">
-                  <p className="text-surface-400 text-sm">No routes defined.</p>
+                  <p className="text-surface-400 text-sm">{t('No routes defined.')}</p>
                   <button
                     onClick={addRoute}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition-colors"
                   >
-                    + Add first route
+                    {t('+ Add first route')}
                   </button>
                 </div>
               ) : (
@@ -630,7 +634,7 @@ export function MockDetailPanel({ mockId }: { mockId: string }) {
                   onClick={addRoute}
                   className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
                 >
-                  + Add route
+                  {t('+ Add route')}
                 </button>
               </div>
             )}

@@ -8,6 +8,7 @@ import { useStore } from '../../store';
 import { envRelPath } from '../../../../shared/naming-utils';
 import { parseCurl } from '../../../../shared/curl-import';
 import { Modal } from './Modal';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
@@ -57,6 +58,7 @@ function listEndpoints(col: Collection): EndpointEntry[] {
 }
 
 export function ImportModal({ onImport, onClose }: Props) {
+  const t = useT();
   const collections                 = useStore(s => s.collections);
   const environments                = useStore(s => s.environments);
   const setActiveCollection         = useStore(s => s.setActiveCollection);
@@ -112,7 +114,7 @@ export function ImportModal({ onImport, onClose }: Props) {
     const state = useStore.getState();
     const activeEnvId = state.activeEnvironmentId;
     setEnvTarget(activeEnvId && state.environments[activeEnvId] ? activeEnvId : '__new__');
-    setNewEnvName(`${col.name} env`);
+    setNewEnvName(t(':name env', { name: col.name }));
   }
 
   async function runFileImport(opt: ImportOption) {
@@ -165,7 +167,7 @@ export function ImportModal({ onImport, onClose }: Props) {
       const col: Collection = {
         version: '1.0',
         id: uuidv4(),
-        name: parsed.name || 'Imported request',
+        name: parsed.name || t('Imported request'),
         description: '',
         rootFolder: { id: uuidv4(), name: 'root', description: '', folders: [], requestIds: [reqId] },
         requests: {
@@ -213,14 +215,14 @@ export function ImportModal({ onImport, onClose }: Props) {
     if (!previewCol) return;
     const picked = endpoints.filter(e => chosenIds.has(e.request.id));
     if (!picked.length) {
-      setError('Pick at least one endpoint');
+      setError(t('Pick at least one endpoint'));
       return;
     }
     const trimmedVarName = varName.trim();
     const trimmedBaseUrl = baseUrl.trim();
     const useVariable    = Boolean(trimmedVarName && trimmedBaseUrl);
     if (trimmedBaseUrl && !trimmedVarName) {
-      setError('Variable name is required when extracting base URL');
+      setError(t('Variable name is required when extracting base URL'));
       return;
     }
     setLoading(true);
@@ -262,7 +264,7 @@ export function ImportModal({ onImport, onClose }: Props) {
         // Merge selected endpoints into the target existing collection,
         // preserving the folder/tag structure from the spec.
         const targetCol = collections[target]?.data;
-        if (!targetCol) throw new Error('Target collection not found');
+        if (!targetCol) throw new Error(t('Target collection not found'));
         const prunedRoot = pruneFolder(previewCol.rootFolder, previewCol, chosenIds, {} as Record<string, ApiRequest>);
         const prunedRequests = collectRequestsByFolder(prunedRoot, previewCol);
         mergeIntoCollection(target, prunedRoot, prunedRequests);
@@ -291,7 +293,7 @@ export function ImportModal({ onImport, onClose }: Props) {
   async function persistBaseUrlVariable(name: string, value: string) {
     const state = useStore.getState();
     if (envTarget === '__new__') {
-      const desiredName = newEnvName.trim() || 'New Environment';
+      const desiredName = newEnvName.trim() || t('New Environment');
       const existingNames = Object.values(state.environments).map(e => e.data.name);
       const finalName = uniqueEnvName(desiredName, existingNames);
       const envId = uuidv4();
@@ -317,7 +319,7 @@ export function ImportModal({ onImport, onClose }: Props) {
       if (ws) await electron.saveWorkspace(ws);
     } else {
       const entry = state.environments[envTarget];
-      if (!entry) throw new Error('Target environment not found');
+      if (!entry) throw new Error(t('Target environment not found'));
       const updated: Environment = { ...entry.data };
       const idx = updated.variables.findIndex(v => v.key === name);
       if (idx >= 0) {
@@ -346,7 +348,7 @@ export function ImportModal({ onImport, onClose }: Props) {
       >
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-surface-100">
-              Import - {previewCol.name}
+              {t('Import - :name', { name: previewCol.name })}
             </h2>
             <button
               onClick={onClose}
@@ -358,13 +360,13 @@ export function ImportModal({ onImport, onClose }: Props) {
 
           {/* Destination */}
           <div className="flex flex-col gap-2 border border-surface-800 rounded-lg p-3">
-            <p className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">Destination</p>
+            <p className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">{t('Destination')}</p>
             <select
               value={target}
               onChange={e => setTarget(e.target.value)}
               className="text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500"
             >
-              <option value="__new__">Create new collection…</option>
+              <option value="__new__">{t('Create new collection…')}</option>
               {Object.values(collections).map(c => (
                 <option key={c.data.id} value={c.data.id}>{c.data.name}</option>
               ))}
@@ -373,7 +375,7 @@ export function ImportModal({ onImport, onClose }: Props) {
               <input
                 value={newColName}
                 onChange={e => setNewColName(e.target.value)}
-                placeholder="Collection name"
+                placeholder={t('Collection name')}
                 className="text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500"
               />
             )}
@@ -381,7 +383,7 @@ export function ImportModal({ onImport, onClose }: Props) {
 
           {/* Base URL → variable */}
           <div className="flex flex-col gap-2 border border-surface-800 rounded-lg p-3">
-            <p className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">Base URL → variable</p>
+            <p className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">{t('Base URL → variable')}</p>
             <div className="flex gap-2">
               <input
                 value={baseUrl}
@@ -398,7 +400,7 @@ export function ImportModal({ onImport, onClose }: Props) {
               />
             </div>
             <p className="text-[10px] text-surface-500">
-              Leave the URL field empty to keep absolute URLs in each request.
+              {t('Leave the URL field empty to keep absolute URLs in each request.')}
             </p>
             {baseUrl.trim() && varName.trim() && (
               <>
@@ -407,7 +409,7 @@ export function ImportModal({ onImport, onClose }: Props) {
                   onChange={e => setEnvTarget(e.target.value)}
                   className="text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500"
                 >
-                  <option value="__new__">Create new environment…</option>
+                  <option value="__new__">{t('Create new environment…')}</option>
                   {Object.values(environments).map(e => (
                     <option key={e.data.id} value={e.data.id}>{e.data.name}</option>
                   ))}
@@ -416,7 +418,7 @@ export function ImportModal({ onImport, onClose }: Props) {
                   <input
                     value={newEnvName}
                     onChange={e => setNewEnvName(e.target.value)}
-                    placeholder="Environment name"
+                    placeholder={t('Environment name')}
                     className="text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500"
                   />
                 )}
@@ -427,11 +429,11 @@ export function ImportModal({ onImport, onClose }: Props) {
           {/* Endpoint picker */}
           <div className="flex items-center justify-between">
             <p className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">
-              Endpoints ({chosenIds.size} / {endpoints.length})
+              {t('Endpoints (:chosen / :total)', { chosen: chosenIds.size, total: endpoints.length })}
             </p>
             <div className="flex gap-2">
-              <button onClick={selectAll}  className="text-[10px] text-blue-400 hover:text-blue-300">Select all</button>
-              <button onClick={selectNone} className="text-[10px] text-blue-400 hover:text-blue-300">Select none</button>
+              <button onClick={selectAll}  className="text-[10px] text-blue-400 hover:text-blue-300">{t('Select all')}</button>
+              <button onClick={selectNone} className="text-[10px] text-blue-400 hover:text-blue-300">{t('Select none')}</button>
             </div>
           </div>
 
@@ -480,7 +482,7 @@ export function ImportModal({ onImport, onClose }: Props) {
               );
             })}
             {!grouped.length && (
-              <p className="text-[11px] text-surface-500 p-3">No endpoints found in spec.</p>
+              <p className="text-[11px] text-surface-500 p-3">{t('No endpoints found in spec.')}</p>
             )}
           </div>
 
@@ -491,21 +493,21 @@ export function ImportModal({ onImport, onClose }: Props) {
               onClick={() => { setPreviewCol(null); setError(null); }}
               className="px-3 py-1.5 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
             >
-              Back
+              {t('Back')}
             </button>
             <div className="flex gap-2">
               <button
                 onClick={onClose}
                 className="px-3 py-1.5 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
               >
-                Cancel
+                {t('Cancel')}
               </button>
               <button
                 disabled={loading || chosenIds.size === 0 || (target === '__new__' && !newColName.trim())}
                 onClick={confirmImport}
                 className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors"
               >
-                {loading ? 'Importing…' : 'Import'}
+                {loading ? t('Importing…') : t('Import')}
               </button>
             </div>
           </div>
@@ -521,7 +523,7 @@ export function ImportModal({ onImport, onClose }: Props) {
     >
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-surface-100">Import Collection</h2>
+          <h2 className="text-sm font-semibold text-surface-100">{t('Import Collection')}</h2>
           <button
             onClick={onClose}
             className="text-surface-500 hover:text-surface-300 text-lg leading-none"
@@ -543,7 +545,7 @@ export function ImportModal({ onImport, onClose }: Props) {
               }`}
             >
               <div className="text-xs font-semibold">{opt.label}</div>
-              <div className="text-[10px] text-surface-500 mt-0.5">{opt.description}</div>
+              <div className="text-[10px] text-surface-500 mt-0.5">{t(opt.description)}</div>
             </button>
           ))}
         </div>
@@ -551,7 +553,7 @@ export function ImportModal({ onImport, onClose }: Props) {
         {/* OpenAPI URL input (shown only when OpenAPI selected) */}
         {selected === 'openapi' && (
           <div className="flex flex-col gap-2">
-            <p className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">Or import from URL</p>
+            <p className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">{t('Or import from URL')}</p>
             <div className="flex gap-2">
               <input
                 ref={urlInputRef}
@@ -566,7 +568,7 @@ export function ImportModal({ onImport, onClose }: Props) {
                 disabled={!url.trim() || loading}
                 className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors whitespace-nowrap"
               >
-                {loading ? 'Fetching…' : 'From URL'}
+                {loading ? t('Fetching…') : t('From URL')}
               </button>
             </div>
           </div>
@@ -575,7 +577,7 @@ export function ImportModal({ onImport, onClose }: Props) {
         {/* cURL command input (shown only when cURL selected) */}
         {selected === 'curl' && (
           <div className="flex flex-col gap-2">
-            <p className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">Paste a curl command</p>
+            <p className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">{t('Paste a curl command')}</p>
             <textarea
               value={curlText}
               onChange={e => { setCurlText(e.target.value); setError(null); }}
@@ -595,7 +597,7 @@ export function ImportModal({ onImport, onClose }: Props) {
             onClick={onClose}
             className="px-3 py-1.5 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
           >
-            Cancel
+            {t('Cancel')}
           </button>
           {selected === 'curl' ? (
             <button
@@ -603,7 +605,7 @@ export function ImportModal({ onImport, onClose }: Props) {
               onClick={importCurl}
               className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors"
             >
-              Parse
+              {t('Parse')}
             </button>
           ) : (
             <button
@@ -614,7 +616,7 @@ export function ImportModal({ onImport, onClose }: Props) {
               }}
               className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors"
             >
-              {loading ? 'Importing…' : 'Choose File'}
+              {loading ? t('Importing…') : t('Choose File')}
             </button>
           )}
         </div>

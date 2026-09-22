@@ -7,6 +7,7 @@ import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
 import { Modal } from '../common/Modal';
 import { FuzzResultsPanel } from '../ContractPanel/FuzzResultsPanel';
 import type { ApiRequest, FuzzReport } from '../../../../shared/types';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
@@ -19,6 +20,7 @@ const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
  * call the same engine; here the request list is just [request].
  */
 export function FuzzModal({ request, onClose }: { request: ApiRequest; onClose: () => void }) {
+  const t = useT();
   const environments        = useStore(s => s.environments);
   const activeEnvironmentId = useStore(s => s.activeEnvironmentId);
   const activeCollectionId  = useStore(s => s.activeCollectionId);
@@ -72,7 +74,7 @@ export function FuzzModal({ request, onClose }: { request: ApiRequest; onClose: 
   return (
     <Modal
       onClose={onClose}
-      title={`Fuzz: ${request.name}`}
+      title={t('Fuzz: :name', { name: request.name })}
       subtitle={`${request.method} ${request.url}`}
       panelClassName="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl w-[720px] flex flex-col max-h-[85vh]"
     >
@@ -80,7 +82,7 @@ export function FuzzModal({ request, onClose }: { request: ApiRequest; onClose: 
         {/* Options */}
         <div className="flex items-end gap-3 px-4 py-3 border-b border-surface-800 flex-shrink-0 flex-wrap">
           <label className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Cases</span>
+            <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Cases')}</span>
             <input
               type="number" min={1} value={cases}
               onChange={e => setCases(Math.max(1, Number(e.target.value)))}
@@ -88,7 +90,7 @@ export function FuzzModal({ request, onClose }: { request: ApiRequest; onClose: 
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Seed</span>
+            <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Seed')}</span>
             <input
               type="number" value={seed}
               onChange={e => setSeed(Number(e.target.value))}
@@ -96,13 +98,13 @@ export function FuzzModal({ request, onClose }: { request: ApiRequest; onClose: 
             />
           </label>
           <label className="flex flex-col gap-1 flex-1 min-w-[180px]">
-            <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">Spec (optional)</span>
+            <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Spec (optional)')}</span>
             <select
               value={snapshotRelPath}
               onChange={e => setSnapshotRelPath(e.target.value)}
               className="bg-surface-800 border border-surface-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
             >
-              <option value="">Request body (no spec)</option>
+              <option value="">{t('Request body (no spec)')}</option>
               {snapshotList.map(({ relPath, snapshot }) => (
                 <option key={relPath} value={relPath}>{snapshot.name}</option>
               ))}
@@ -110,20 +112,20 @@ export function FuzzModal({ request, onClose }: { request: ApiRequest; onClose: 
           </label>
           <label className="flex items-center gap-1.5 text-[11px] text-surface-400 select-none">
             <input type="checkbox" checked={trace} onChange={e => setTrace(e.target.checked)} />
-            Record all cases
+            {t('Record all cases')}
           </label>
           <button
             onClick={run}
             disabled={running || !request.url}
             className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-surface-800 disabled:text-surface-400 rounded text-sm font-medium transition-colors"
           >
-            {running ? 'Fuzzing...' : 'Run fuzz'}
+            {running ? t('Fuzzing...') : t('Run fuzz')}
           </button>
         </div>
 
         {isWrite && (
           <p className="text-[11px] text-amber-400 px-4 py-2 border-b border-surface-800 flex-shrink-0">
-            {request.method} sends malformed writes. Point this request at a staging environment or a mock, not production.
+            {t(':method sends malformed writes. Point this request at a staging environment or a mock, not production.', { method: request.method })}
           </p>
         )}
         {error && (
@@ -138,8 +140,8 @@ export function FuzzModal({ request, onClose }: { request: ApiRequest; onClose: 
               <div className="flex-1 flex items-center justify-center text-center p-8">
                 <p className="text-xs text-surface-500">
                   {running
-                    ? 'Sending malformed inputs...'
-                    : 'Generates malformed variants of this request body and flags responses that crash (5xx) or accept invalid input. Pick a pinned spec for richer inputs, or fuzz the request body as-is.'}
+                    ? t('Sending malformed inputs...')
+                    : t('Generates malformed variants of this request body and flags responses that crash (5xx) or accept invalid input. Pick a pinned spec for richer inputs, or fuzz the request body as-is.')}
                 </p>
               </div>
             )}

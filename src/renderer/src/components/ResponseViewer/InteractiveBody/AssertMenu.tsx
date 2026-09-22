@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { useState, useEffect, useRef } from 'react';
+import { useT } from '../../../i18n';
 import type { PopoverState } from './types';
 import { getAtPath, jsonPathLabel } from './utils/jsonPath';
 import {
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export function AssertMenu({ state, onClose, onConfirm }: Props) {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const [jpOpen, setJpOpen] = useState(false);
   const [filterKey, setFilterKey] = useState('');
@@ -54,10 +56,10 @@ export function AssertMenu({ state, onClose, onConfirm }: Props) {
       : String(value);
     title = jsonPathLabel(path);
     options = [
-      { label: `equals ${preview}`,                            snippet: makeJsonSnippet(path, value, 'equals')   },
-      { label: 'exists (not null/undefined)',                  snippet: makeJsonSnippet(path, value, 'exists')   },
-      { label: `is ${value === null ? 'null' : typeof value}`, snippet: makeJsonSnippet(path, value, 'type')     },
-      ...(isStr ? [{ label: `contains ${preview}`,             snippet: makeJsonSnippet(path, value, 'contains') }] : []),
+      { label: t('equals :preview', { preview }),                            snippet: makeJsonSnippet(path, value, 'equals')   },
+      { label: t('exists (not null/undefined)'),                  snippet: makeJsonSnippet(path, value, 'exists')   },
+      { label: t('is :type', { type: value === null ? 'null' : typeof value }), snippet: makeJsonSnippet(path, value, 'type')     },
+      ...(isStr ? [{ label: t('contains :preview', { preview }),             snippet: makeJsonSnippet(path, value, 'contains') }] : []),
     ];
 
     // JSONPath filter: only when value is inside an array
@@ -87,9 +89,9 @@ export function AssertMenu({ state, onClose, onConfirm }: Props) {
     const preview = `"${value.length > 22 ? value.slice(0, 22) + '…' : value}"`;
     title = selector;
     options = [
-      { label: `equals ${preview}`,   snippet: makeXmlSnippet(selector, value, 'equals')   },
-      { label: 'exists',              snippet: makeXmlSnippet(selector, value, 'exists')   },
-      { label: `contains ${preview}`, snippet: makeXmlSnippet(selector, value, 'contains') },
+      { label: t('equals :preview', { preview }),   snippet: makeXmlSnippet(selector, value, 'equals')   },
+      { label: t('exists'),              snippet: makeXmlSnippet(selector, value, 'exists')   },
+      { label: t('contains :preview', { preview }), snippet: makeXmlSnippet(selector, value, 'contains') },
     ];
   }
 
@@ -123,12 +125,12 @@ export function AssertMenu({ state, onClose, onConfirm }: Props) {
             className="w-full text-left text-xs text-blue-400 hover:text-blue-300 hover:bg-surface-800 rounded px-2 py-1.5 transition-colors flex items-center gap-1"
           >
             <span>{jpOpen ? '▾' : '▸'}</span>
-            <span>JSONPath assert (with filter)</span>
+            <span>{t('JSONPath assert (with filter)')}</span>
           </button>
           {jpOpen && state.type === 'json' && (
             <div className="mt-1 px-2 flex flex-col gap-1.5">
               <div className="flex items-center gap-1">
-                <span className="text-[10px] text-surface-400 w-16 shrink-0">filter by</span>
+                <span className="text-[10px] text-surface-400 w-16 shrink-0">{t('filter by')}</span>
                 <select
                   value={filterKey}
                   onChange={e => {
@@ -146,7 +148,7 @@ export function AssertMenu({ state, onClose, onConfirm }: Props) {
                 </select>
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-[10px] text-surface-400 w-16 shrink-0">equals</span>
+                <span className="text-[10px] text-surface-400 w-16 shrink-0">{t('equals')}</span>
                 <input
                   value={filterVal}
                   onChange={e => setFilterVal(e.target.value)}
@@ -159,21 +161,21 @@ export function AssertMenu({ state, onClose, onConfirm }: Props) {
                   onClick={() => { onConfirm(makeJsonPathSnippet(state.path, state.value, filterKey, filterVal)); onClose(); }}
                   className="text-xs px-2 py-1 bg-blue-700 hover:bg-blue-600 disabled:opacity-40 rounded transition-colors"
                 >
-                  Assert
+                  {t('Assert')}
                 </button>
                 <button
                   disabled={!filterKey || !filterVal}
                   onClick={() => { onConfirm(makeJsonPathExtractSnippet(state.path, filterKey, filterVal, 'variables')); onClose(); }}
                   className="text-xs px-2 py-1 bg-surface-700 hover:bg-surface-600 disabled:opacity-40 rounded transition-colors"
                 >
-                  → variable
+                  {t('→ variable')}
                 </button>
                 <button
                   disabled={!filterKey || !filterVal}
                   onClick={() => { onConfirm(makeJsonPathExtractSnippet(state.path, filterKey, filterVal, 'environment')); onClose(); }}
                   className="text-xs px-2 py-1 bg-surface-700 hover:bg-surface-600 disabled:opacity-40 rounded transition-colors"
                 >
-                  → env
+                  {t('→ env')}
                 </button>
               </div>
             </div>
@@ -183,20 +185,20 @@ export function AssertMenu({ state, onClose, onConfirm }: Props) {
 
       {/* ── Extract section ── */}
       <div className="mt-1 border-t border-surface-800 pt-1">
-        <div className="text-[10px] text-surface-500 uppercase tracking-wider px-2 py-1">Extract</div>
+        <div className="text-[10px] text-surface-500 uppercase tracking-wider px-2 py-1">{t('Extract')}</div>
         {state.type === 'json' ? (
           <>
             <button
               onClick={() => { onConfirm(makeJsonExtractSnippet(state.path, 'variables')); onClose(); }}
               className="w-full text-left text-xs text-surface-300 hover:text-white hover:bg-surface-800 rounded px-2 py-1.5 transition-colors"
             >
-              Save to variable
+              {t('Save to variable')}
             </button>
             <button
               onClick={() => { onConfirm(makeJsonExtractSnippet(state.path, 'environment')); onClose(); }}
               className="w-full text-left text-xs text-surface-300 hover:text-white hover:bg-surface-800 rounded px-2 py-1.5 transition-colors"
             >
-              Save to environment
+              {t('Save to environment')}
             </button>
           </>
         ) : (
@@ -205,13 +207,13 @@ export function AssertMenu({ state, onClose, onConfirm }: Props) {
               onClick={() => { onConfirm(makeXmlExtractSnippet(state.selector, 'variables')); onClose(); }}
               className="w-full text-left text-xs text-surface-300 hover:text-white hover:bg-surface-800 rounded px-2 py-1.5 transition-colors"
             >
-              Save to variable
+              {t('Save to variable')}
             </button>
             <button
               onClick={() => { onConfirm(makeXmlExtractSnippet(state.selector, 'environment')); onClose(); }}
               className="w-full text-left text-xs text-surface-300 hover:text-white hover:bg-surface-800 rounded px-2 py-1.5 transition-colors"
             >
-              Save to environment
+              {t('Save to environment')}
             </button>
           </>
         )}

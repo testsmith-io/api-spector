@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  API Spector — animated end slide.
+  Closing slide, same visual language as presentation-animated.svg:
+  floating ghost with eye-roll, but with "Thank you!" headline and the
+  docs URL as the secondary line. SMIL-driven so it self-animates wherever
+  it's rendered live (browsers, Figma, in-app SVG views).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <radialGradient id="body" cx="35%" cy="22%" r="70%">
+      <stop offset="0%"   stop-color="#5497c8"/>
+      <stop offset="55%"  stop-color="#205d96"/>
+      <stop offset="100%" stop-color="#123a60"/>
+    </radialGradient>
+
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="white" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0.0"/>
+    </linearGradient>
+
+    <clipPath id="ghostClip">
+      <path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z"/>
+    </clipPath>
+
+    <filter id="ghostGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="0" stdDeviation="80" flood-color="#6aa3c8" flood-opacity="0.7"/>
+    </filter>
+  </defs>
+
+  <rect width="1920" height="1080" fill="#1e1b2e"/>
+
+  <g filter="url(#ghostGlow)">
+    <animateTransform
+      attributeName="transform"
+      type="translate"
+      dur="2.4s"
+      repeatCount="indefinite"
+      calcMode="spline"
+      keyTimes="0; 0.5; 1"
+      keySplines=".42 0 .58 1; .42 0 .58 1"
+      values="688 139;
+              688 99;
+              688 139"/>
+    <g transform="scale(1.06)">
+    <path d="M 130,225 C 130,95 382,95 382,225 L 382,390 Q 340,435 298,390 Q 256,435 214,390 Q 172,435 130,390 Z" fill="url(#body)"/>
+    <ellipse cx="198" cy="262" rx="29" ry="33" fill="white"/>
+    <ellipse cx="314" cy="262" rx="29" ry="33" fill="white"/>
+
+    <ellipse cx="204" cy="268" rx="16" ry="20" fill="#0b1624">
+      <animateTransform
+        attributeName="transform"
+        type="translate"
+        dur="5s"
+        repeatCount="indefinite"
+        keyTimes="0; 0.18; 0.23; 0.28; 0.33; 0.38; 0.43; 0.48; 0.53; 0.58; 0.63; 1"
+        values="0 0;
+                0 0;
+                -7 -5;
+                0 -8;
+                7 -5;
+                9 0;
+                7 5;
+                0 7;
+                -7 5;
+                -9 0;
+                0 0;
+                0 0"/>
+    </ellipse>
+
+    <ellipse cx="320" cy="268" rx="16" ry="20" fill="#0b1624">
+      <animateTransform
+        attributeName="transform"
+        type="translate"
+        dur="5s"
+        begin="0.04s"
+        repeatCount="indefinite"
+        keyTimes="0; 0.18; 0.23; 0.28; 0.33; 0.38; 0.43; 0.48; 0.53; 0.58; 0.63; 1"
+        values="0 0;
+                0 0;
+                -7 -5;
+                0 -8;
+                7 -5;
+                9 0;
+                7 5;
+                0 7;
+                -7 5;
+                -9 0;
+                0 0;
+                0 0"/>
+    </ellipse>
+
+    <ellipse cx="194" cy="254" rx="6" ry="7" fill="white" opacity="0.65"/>
+    <ellipse cx="310" cy="254" rx="6" ry="7" fill="white" opacity="0.65"/>
+    <ellipse cx="256" cy="100" rx="200" ry="180" fill="url(#gloss)" clip-path="url(#ghostClip)"/>
+    </g>
+  </g>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+     text-anchor="middle">
+    <text x="960" y="760" font-size="140" letter-spacing="12">
+      <tspan fill="#e4e3ea" font-weight="300">Thank</tspan>
+      <tspan fill="#6aa3c8" font-weight="600"> you!</tspan>
+    </text>
+  </g>
+
+  <a href="https://testsmith-io.github.io/api-spector/#/" target="_blank">
+    <text x="960" y="850"
+          text-anchor="middle"
+          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+          font-size="32"
+          font-weight="300"
+          letter-spacing="4"
+          fill="#8a87a0">
+      testsmith-io.github.io/api-spector
+    </text>
+  </a>
+
+</svg>

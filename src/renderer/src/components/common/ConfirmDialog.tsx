@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { Modal } from './Modal';
+import { useT } from '../../i18n';
 
 // ─── Confirm dialog ───────────────────────────────────────────────────────────
 
@@ -10,6 +11,7 @@ export function ConfirmDialog ( { message, onConfirm, onCancel }: {
   onConfirm: () => void
   onCancel: () => void
 } ) {
+  const t = useT();
   return (
     <Modal
       onClose={onCancel}
@@ -22,13 +24,13 @@ export function ConfirmDialog ( { message, onConfirm, onCancel }: {
           onClick={onCancel}
           className="px-3 py-1.5 text-xs text-surface-400 hover:text-white transition-colors"
         >
-          Cancel
+          {t('Cancel')}
         </button>
         <button
           onClick={onConfirm}
           className="px-3 py-1.5 text-xs bg-red-700 hover:bg-red-600 rounded transition-colors"
         >
-          Delete
+          {t('Delete')}
         </button>
       </div>
     </Modal>

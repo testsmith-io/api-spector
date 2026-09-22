@@ -6,10 +6,12 @@ import { useStore } from '../../store';
 import { useActiveEnvironment } from '../../hooks/useActiveEnvironment';
 import { EnvironmentEditor } from './EnvironmentEditor';
 import { MasterKeyModal } from './MasterKeyModal';
+import { useT } from '../../i18n';
 
 const { electron } = window;
 
 export function EnvironmentBar({ inline = false }: { inline?: boolean }) {
+  const t = useT();
   const environments = useStore(s => s.environments);
   const activeEnvironmentId = useStore(s => s.activeEnvironmentId);
   const setActiveEnvironment = useStore(s => s.setActiveEnvironment);
@@ -55,11 +57,11 @@ export function EnvironmentBar({ inline = false }: { inline?: boolean }) {
         className="bg-surface-800 border border-surface-700 rounded px-2 py-0.5 text-xs focus:outline-none focus:border-blue-500 max-w-[140px]"
         style={{ color: 'var(--text-primary)' }}
       >
-        <option value="">No env</option>
+        <option value="">{t('No env')}</option>
         {envList.map(({ data: env }) => (
           <option key={env.id} value={env.id}>
             {defaultEnvName && env.name.toLowerCase() === defaultEnvName.toLowerCase()
-              ? `${env.name} (default)`
+              ? t(':name (default)', { name: env.name })
               : env.name}
           </option>
         ))}
@@ -67,7 +69,7 @@ export function EnvironmentBar({ inline = false }: { inline?: boolean }) {
 
       {activeEnv && (
         <span className="text-surface-400 text-xs">
-          {varCount} var{varCount !== 1 ? 's' : ''}
+          {t(':count var|:count vars', { count: varCount })}
         </span>
       )}
 
@@ -75,7 +77,7 @@ export function EnvironmentBar({ inline = false }: { inline?: boolean }) {
         onClick={() => setShowEditor(true)}
         className="text-blue-400 hover:text-blue-300 transition-colors text-xs"
       >
-        {activeEnv ? 'Edit' : 'Manage'}
+        {activeEnv ? t('Edit') : t('Manage')}
       </button>
 
       {showEditor && <EnvironmentEditor onClose={() => setShowEditor(false)} />}
@@ -86,7 +88,7 @@ export function EnvironmentBar({ inline = false }: { inline?: boolean }) {
 
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 border-b border-surface-800 bg-surface-950 flex-shrink-0">
-      <span className="text-surface-400 font-medium text-xs">Env:</span>
+      <span className="text-surface-400 font-medium text-xs">{t('Env:')}</span>
       {controls}
     </div>
   );
