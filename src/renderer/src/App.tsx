@@ -9,6 +9,7 @@ import { useWorkspaceLoader } from './hooks/useWorkspaceLoader';
 import { CollectionTree } from './components/CollectionTree/CollectionTree';
 import { RequestBuilder } from './components/RequestBuilder/RequestBuilder';
 import { ResponseViewer } from './components/ResponseViewer/ResponseViewer';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { GeneratorPanel } from './components/GeneratorPanel/GeneratorPanel';
 import { HistoryPanel } from './components/History/HistoryPanel';
 import { WelcomeScreen } from './components/common/WelcomeScreen';
@@ -27,6 +28,7 @@ import { GitDiffPane } from './components/GitPanel/GitDiffPane';
 import { GitPanel } from './components/GitPanel/GitPanel';
 import { CommandPalette } from './components/common/CommandPalette';
 import { DocsGeneratorModal } from './components/common/DocsGeneratorModal';
+import { UpdateModal } from './components/common/UpdateModal';
 import { useT } from './i18n';
 
 const { electron } = window;
@@ -386,6 +388,7 @@ export default function App () {
       <CoverageModal />
       <CompareModal />
       <CommandPalette />
+      <UpdateModal />
       {docsModalOpen && <DocsGeneratorModal onClose={() => setDocsModalOpen( false )} />}
       {/* macOS drag region with centered title — hidden on Windows (native title bar used instead) */}
       {window.electron.platform !== 'win32' && (
@@ -663,7 +666,18 @@ export default function App () {
                 {/* Right pane: response viewer */}
                 {responseOpen && (
                   <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-                    <ResponseViewer />
+                    <ErrorBoundary
+                      resetKey={activeTabId}
+                      fallback={(error, reset) => (
+                        <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+                          <div className="text-sm font-medium text-red-400">{t('The response view hit an error')}</div>
+                          <div className="text-xs text-surface-500 max-w-md whitespace-pre-wrap break-words font-mono">{error.message}</div>
+                          <button onClick={reset} className="px-3 py-1 text-xs rounded bg-surface-700 hover:bg-surface-600 transition-colors">{t('Dismiss')}</button>
+                        </div>
+                      )}
+                    >
+                      <ResponseViewer />
+                    </ErrorBoundary>
                   </div>
                 )}
               </div>

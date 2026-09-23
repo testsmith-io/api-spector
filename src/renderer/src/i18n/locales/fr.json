@@ -1009,5 +1009,13 @@
   "Token:": "Token :",
   "Loading editor…": "Chargement de l'éditeur…",
   "No request body.": "Aucun corps de requête.",
-  "field": "champ"
+  "field": "champ",
+  "The response view hit an error": "La vue de réponse a rencontré une erreur",
+  "Dismiss": "Ignorer",
+  "Update available": "Mise à jour disponible",
+  "API Spector :latest is available. You have :current.": "API Spector :latest est disponible. Vous avez la :current.",
+  "Update with": "Mettre à jour avec",
+  "Copied": "Copié",
+  "Skip this version": "Ignorer cette version",
+  "Later": "Plus tard"
 }
