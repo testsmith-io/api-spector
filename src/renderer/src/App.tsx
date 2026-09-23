@@ -28,7 +28,7 @@ import { GitDiffPane } from './components/GitPanel/GitDiffPane';
 import { GitPanel } from './components/GitPanel/GitPanel';
 import { CommandPalette } from './components/common/CommandPalette';
 import { DocsGeneratorModal } from './components/common/DocsGeneratorModal';
-import { UpdateModal } from './components/common/UpdateModal';
+import { UpdateToast } from './components/common/UpdateToast';
 import { ProductTour } from './components/common/ProductTour';
 import { useT } from './i18n';
 
@@ -83,6 +83,9 @@ function IconGit () {
     </svg>
   );
 }
+
+// How long the welcome screen stays before the last workspace auto-loads.
+const WELCOME_SCREEN_DELAY_MS = 1500;
 
 function ActivityBarBtn ( {
   active,
@@ -257,11 +260,16 @@ export default function App () {
     };
   }, [] );
 
-  // Auto-load last opened workspace on startup
+  // Auto-load last opened workspace on startup, but after a short beat so the
+  // welcome screen (recents + update banner) is actually visible first instead
+  // of flashing by.
   useEffect( () => {
-    electron.getLastWorkspace().then( ( result: { workspace: unknown; workspacePath: string } | null ) => {
-      if ( result ) applyWorkspace( result.workspace, result.workspacePath );
-    } );
+    const id = setTimeout( () => {
+      electron.getLastWorkspace().then( ( result: { workspace: unknown; workspacePath: string } | null ) => {
+        if ( result ) applyWorkspace( result.workspace, result.workspacePath );
+      } );
+    }, WELCOME_SCREEN_DELAY_MS );
+    return () => clearTimeout( id );
   }, [applyWorkspace] );
 
   // "Open in API Spector" deep link (spector://open-from-git?url=…) from the web
@@ -391,7 +399,7 @@ export default function App () {
       <CoverageModal />
       <CompareModal />
       <CommandPalette />
-      <UpdateModal />
+      <UpdateToast />
       <ProductTour />
       {docsModalOpen && <DocsGeneratorModal onClose={() => setDocsModalOpen( false )} />}
       {/* macOS drag region with centered title — hidden on Windows (native title bar used instead) */}
