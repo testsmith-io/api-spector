@@ -137,6 +137,17 @@ body {
 /* Orange — errors */
 :root.light .text-orange-400 { color: #c2410c !important; }  /* orange-700 */
 :root.light .text-orange-500 { color: #9a3412 !important; }  /* orange-800 */
+
+/* Info callouts (Schema/Contract tab headers) use a dark-palette tint + light   */
+/* text that is unreadable in light mode. Remap to a light tint + dark text.     */
+:root.light .bg-amber-950\/20    { background-color: #fef3c7 !important; }  /* amber-100 */
+:root.light .border-amber-700\/40 { border-color: #fcd34d !important; }    /* amber-300 */
+:root.light .text-amber-200\/90  { color: #92400e !important; }            /* amber-800 */
+:root.light .text-amber-300      { color: #b45309 !important; }            /* amber-700 */
+:root.light .bg-blue-950\/30     { background-color: #dbeafe !important; } /* blue-100  */
+:root.light .border-blue-700\/50 { border-color: #93c5fd !important; }     /* blue-300  */
+:root.light .text-blue-200\/90   { color: #1e3a8a !important; }            /* blue-900  */
+:root.light .text-blue-300       { color: #1d4ed8 !important; }            /* blue-700  */
 /* Inputs & textareas need dark placeholder text in light mode */
 :root.light input::placeholder,
 :root.light textarea::placeholder {

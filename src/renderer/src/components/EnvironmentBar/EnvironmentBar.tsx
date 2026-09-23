@@ -74,6 +74,7 @@ export function EnvironmentBar({ inline = false }: { inline?: boolean }) {
       )}
 
       <button
+        data-tour="environment-bar"
         onClick={() => setShowEditor(true)}
         className="text-blue-400 hover:text-blue-300 transition-colors text-xs"
       >

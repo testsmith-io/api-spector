@@ -9,6 +9,7 @@ import Ajv from 'ajv';
 import type { ApiRequest } from '../../../../shared/types';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
+import { renderMarkup } from '../common/RichText';
 
 const ajv = new Ajv({ allErrors: true, strict: false });
 
@@ -90,8 +91,8 @@ export function SchemaTab({ request, onChange }: Props) {
     <div className="flex flex-col gap-3">
       {/* What this tab is — and how it differs from Contract. */}
       <div className="rounded-lg border border-amber-700/40 bg-amber-950/20 px-3 py-2 text-[11px] leading-relaxed text-amber-200/90">
-        <span className="font-semibold text-amber-300">{t('Schema — a local scratch check.')}</span>{' '}
-        {t('Validate this request\'s last response against a JSON Schema, right here. It is')} <strong>{t('not saved to the contract and not published')}</strong> {t('— a dev-time sanity check only. To define what the provider')} <em>{t('must')}</em> {t('return (which drives contract testing), use the')} <strong>{t('Contract')}</strong> {t('tab.')}
+        <span className="font-semibold text-amber-300">{t('Schema: a local scratch check.')}</span>{' '}
+        {renderMarkup(t("Validate this request's last response against a JSON Schema, right here. It is **not saved to the contract and not published**. A dev-time sanity check only. To define what the provider *must* return (which drives contract testing), use the **Contract** tab."))}
       </div>
 
       <div className="flex items-center justify-between">

@@ -440,10 +440,14 @@ async function cmdFuzz ( args: Record<string, string | boolean> ): Promise<void>
   }
 
   const includeWrites = Boolean( args['include-writes'] );
-  console.log( `  Fuzzing ${allRequests.length} request(s)${specUrl || specPath ? ' against the spec' : ' from request bodies'}...` );
+  const levelArg = typeof args['level'] === 'string' ? args['level'].toLowerCase() : 'standard';
+  const level = ( [ 'basic', 'standard', 'aggressive' ].includes( levelArg ) ? levelArg : 'standard' ) as 'basic' | 'standard' | 'aggressive';
+  console.log( `  Fuzzing ${allRequests.length} request(s)${specUrl || specPath ? ' against the spec' : ' from request bodies'} at the ${level} level...` );
+  if ( level === 'aggressive' ) console.log( '  Aggressive: includes injection probes (SQL/NoSQL/…) and header tampering. Only run against systems you own.' );
   if ( !includeWrites ) console.log( '  Write methods (POST/PUT/PATCH/DELETE) are skipped. Add --include-writes to fuzz them (sends malformed writes; target staging or a mock).' );
 
   const report = await runFuzz( {
+    level,
     requests: allRequests,
     envVars,
     collectionVars,
@@ -842,7 +846,7 @@ async function main (): Promise<void> {
   api-spector contract record-deployment --workspace <path> --pacticipant <name> --app-version <ver> --env <name>
   api-spector contract environments  --workspace <path>
   api-spector contract webhooks      --workspace <path> [--test]
-  api-spector contract fuzz          --workspace <path> --provider-base-url <url> [--snapshot <id> | --spec-url <url>] [--cases <n>] [--seed <n>] [--include-writes] [--trace] [--html <path>]
+  api-spector contract fuzz          --workspace <path> --provider-base-url <url> [--snapshot <id> | --spec-url <url>] [--level basic|standard|aggressive] [--cases <n>] [--seed <n>] [--include-writes] [--trace] [--html <path>]
   api-spector contract pact-import   --file <pact.json> [--out <collection.json>]
   api-spector contract pact-export   --workspace <path> --out <pact.json> [--consumer <name> --provider <name> --collection <name>]
 

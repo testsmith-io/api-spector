@@ -23,7 +23,8 @@ import { loadSpec, findOperation, resolveSchema } from './provider-verifier';
 import { rebaseUrl } from './provider-live-verifier';
 import {
   buildBaseline, mutate, inferSchema, makeRng, mutateQueryParams,
-  type JsonSchema, type QueryParamSchema,
+  duplicateKeyBody, mutateHeaders,
+  type JsonSchema, type QueryParamSchema, type FuzzLevel,
 } from './fuzz-gen';
 
 /** Deterministic shuffle + take, so a seed reproduces the same sampled cases. */
@@ -53,6 +54,10 @@ export interface FuzzOptions {
   requestBaseUrl?: string
   casesPerOperation?: number
   seed?: number
+  /** Fuzzing intensity: 'basic' (structural), 'standard' (+ boundary/naughty/
+   *  duplicate-key), 'aggressive' (+ injection probes + header tampering).
+   *  Default 'standard'. */
+  level?: FuzzLevel
   /** Fuzz POST/PUT/PATCH/DELETE. Off by default: those send malformed writes. */
   includeWrites?: boolean
   /** Flag any response whose status the spec does not document. Noisy; opt-in. */
@@ -172,6 +177,7 @@ export async function runFuzz(opts: FuzzOptions): Promise<FuzzRunResult> {
     : null;
   const seed = opts.seed ?? 1;
   const casesPerOp = opts.casesPerOperation ?? 40;
+  const level: FuzzLevel = opts.level ?? 'standard';
   const vars = mergeVars(opts.envVars, opts.collectionVars ?? {}, {}, {}, await buildDynamicVars());
 
   const dispatcher: ProxyAgent | Agent | undefined = await buildDispatcher(undefined, undefined);
@@ -230,15 +236,34 @@ export async function runFuzz(opts: FuzzOptions): Promise<FuzzRunResult> {
 
     // One applied case = one single-fault mutation, of either the body or the
     // query string. The other half stays at its valid baseline.
-    interface Applied { mutation: FuzzFinding['mutation']; bodyJson?: string; params: KeyValuePair[]; bodyValue?: unknown; isBody: boolean }
+    interface Applied { mutation: FuzzFinding['mutation']; bodyJson?: string; params: KeyValuePair[]; bodyValue?: unknown; isBody: boolean; headers?: KeyValuePair[] }
     const applied: Applied[] = [];
     if (hasBody) {
-      for (const c of mutate(baselineBody, bodySchema, 'body')) {
+      for (const c of mutate(baselineBody, bodySchema, 'body', level)) {
         applied.push({ mutation: c.mutation, bodyJson: JSON.stringify(c.value), bodyValue: c.value, params: baselineParams, isBody: true });
       }
+      // Duplicate a top-level JSON key (raw body — JSON.stringify can't express
+      // it). Body stays otherwise valid, so only crashing behaviour is a finding.
+      // Standard and up.
+      if (level !== 'basic') {
+        const dupRaw = duplicateKeyBody(baselineBody);
+        if (dupRaw) {
+          applied.push({
+            mutation: { target: 'body', kind: 'duplicate-key', description: 'send the same JSON key twice' },
+            bodyJson: dupRaw, bodyValue: baselineBody, params: baselineParams, isBody: true,
+          });
+        }
+      }
     }
-    for (const c of mutateQueryParams(baselineParams, specCtx?.queryParams ?? [], 'query')) {
+    for (const c of mutateQueryParams(baselineParams, specCtx?.queryParams ?? [], 'query', level)) {
       applied.push({ mutation: c.mutation, bodyJson: baselineBodyJson, params: c.params, isBody: false });
+    }
+    // Header tampering (Content-Type etc.): body + query stay at valid baseline.
+    // Aggressive only.
+    if (level === 'aggressive') {
+      for (const hc of mutateHeaders(req.headers ?? [], 'header')) {
+        applied.push({ mutation: hc.mutation, bodyJson: baselineBodyJson, params: baselineParams, isBody: false, headers: hc.headers });
+      }
     }
 
     const cases = sampleApplied(applied, casesPerOp, makeRng(seed + 1));
@@ -255,6 +280,7 @@ export async function runFuzz(opts: FuzzOptions): Promise<FuzzRunResult> {
       const fuzzReq: ApiRequest = {
         ...req,
         params: c.params,
+        ...(c.headers ? { headers: c.headers } : {}),
         body: c.bodyJson !== undefined ? { mode: 'json', json: c.bodyJson } : req.body,
       };
       const resolvedUrl = rebaseUrl(buildUrl(fuzzReq.url, fuzzReq.params, vars), opts.providerBaseUrl);

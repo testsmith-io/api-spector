@@ -29,6 +29,7 @@ import { GitPanel } from './components/GitPanel/GitPanel';
 import { CommandPalette } from './components/common/CommandPalette';
 import { DocsGeneratorModal } from './components/common/DocsGeneratorModal';
 import { UpdateModal } from './components/common/UpdateModal';
+import { ProductTour } from './components/common/ProductTour';
 import { useT } from './i18n';
 
 const { electron } = window;
@@ -89,15 +90,17 @@ function ActivityBarBtn ( {
   title,
   badge,
   children,
+  dataTour,
 }: {
   active: boolean
   onClick: () => void
   title: string
   badge?: number
   children: React.ReactNode
+  dataTour?: string
 } ) {
   return (
-    <div className="relative group/ab">
+    <div className="relative group/ab" data-tour={dataTour}>
       <button
         onClick={onClick}
         className={`relative w-10 h-10 flex items-center justify-center rounded transition-colors ${active
@@ -389,6 +392,7 @@ export default function App () {
       <CompareModal />
       <CommandPalette />
       <UpdateModal />
+      <ProductTour />
       {docsModalOpen && <DocsGeneratorModal onClose={() => setDocsModalOpen( false )} />}
       {/* macOS drag region with centered title — hidden on Windows (native title bar used instead) */}
       {window.electron.platform !== 'win32' && (
@@ -427,6 +431,7 @@ export default function App () {
               onClick={() => selectPanel( 'history' )}
               title={t( 'History' )}
               badge={historyCount}
+              dataTour="history"
             >
               <IconHistory />
             </ActivityBarBtn>
@@ -434,6 +439,7 @@ export default function App () {
               active={sidebarOpen && sidebarTab === 'mocks'}
               onClick={() => selectPanel( 'mocks' )}
               title={t( 'Mock servers' )}
+              dataTour="mocks"
             >
               <IconMock />
             </ActivityBarBtn>
@@ -441,6 +447,7 @@ export default function App () {
               active={sidebarOpen && sidebarTab === 'contracts'}
               onClick={() => selectPanel( 'contracts' )}
               title={t( 'Contract testing' )}
+              dataTour="contracts"
             >
               <IconContract />
             </ActivityBarBtn>
@@ -448,6 +455,7 @@ export default function App () {
               active={sidebarOpen && sidebarTab === 'git'}
               onClick={() => selectPanel( 'git' )}
               title={t( 'Git' )}
+              dataTour="git"
             >
               <IconGit />
             </ActivityBarBtn>
@@ -456,7 +464,7 @@ export default function App () {
           {/* Side panel */}
           {sidebarOpen ? (
             <>
-              <aside style={{ width: sidebarWidth }} className="flex-shrink-0 flex flex-col overflow-hidden">
+              <aside data-tour="collections-panel" style={{ width: sidebarWidth }} className="flex-shrink-0 flex flex-col overflow-hidden">
                 <div className="px-3 py-2 flex items-center justify-between border-b border-surface-800 flex-shrink-0">
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-600">
                     {sidebarTab === 'collections' ? t( 'Collections' ) : sidebarTab === 'history' ? t( 'History' ) : sidebarTab === 'mocks' ? t( 'Mocks' ) : sidebarTab === 'git' ? t( 'Git' ) : t( 'Contracts' )}
@@ -469,6 +477,7 @@ export default function App () {
                     )}
                     {sidebarTab === 'collections' && (
                       <button
+                        data-tour="new-collection"
                         onClick={() => addCollection( 'New Collection' )}
                         title={t( 'New collection' )}
                         className="text-surface-600 hover:text-surface-300 transition-colors text-sm leading-none px-0.5"

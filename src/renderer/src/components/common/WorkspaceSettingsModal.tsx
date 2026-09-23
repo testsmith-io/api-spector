@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { useStore } from '../../store';
 import { Modal } from './Modal';
 import { LOCALES, useLocale, useT, type Locale } from '../../i18n';
+import { START_TOUR_EVENT } from './ProductTour';
 
 const { electron } = window;
 
@@ -276,6 +277,21 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
                   </span>
                 </span>
               </label>
+
+              <div className="flex items-start justify-between gap-3 mt-2">
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-surface-200">{t('Product tour')}</span>
+                  <span className="text-surface-600 text-[11px]">
+                    {t('Replay the guided walkthrough of collections, environments and requests.')}
+                  </span>
+                </span>
+                <button
+                  onClick={() => { onClose(); window.dispatchEvent(new CustomEvent(START_TOUR_EVENT)); }}
+                  className="flex-shrink-0 px-3 py-1.5 rounded border border-surface-700 text-surface-200 hover:bg-surface-800 transition-colors"
+                >
+                  {t('Restart tour')}
+                </button>
+              </div>
             </>
           )}
 
