@@ -11,6 +11,7 @@ release/
 build/frames/
 build/*.icns
 build/*.ico
+!build/icon.ico
 
 # OS
 .DS_Store
