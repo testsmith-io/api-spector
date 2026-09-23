@@ -5,6 +5,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { I18nProvider, detectLocale } from './i18n';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import './index.css';
 
 // Set <html lang> before first paint so it matches the chosen UI language.
@@ -26,7 +27,9 @@ if (savedZoom) window.electron.setZoomFactor(parseFloat(savedZoom));
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <I18nProvider>
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </I18nProvider>
   </React.StrictMode>
 );

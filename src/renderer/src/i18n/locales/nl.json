@@ -1009,5 +1009,13 @@
   "Token:": "Token:",
   "Loading editor…": "Editor laden…",
   "No request body.": "Geen verzoekbody.",
-  "field": "veld"
+  "field": "veld",
+  "The response view hit an error": "De responsweergave liep tegen een fout aan",
+  "Dismiss": "Sluiten",
+  "Update available": "Update beschikbaar",
+  "API Spector :latest is available. You have :current.": "API Spector :latest is beschikbaar. Je hebt :current.",
+  "Update with": "Bijwerken met",
+  "Copied": "Gekopieerd",
+  "Skip this version": "Deze versie overslaan",
+  "Later": "Later"
 }
