@@ -8,6 +8,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import type { ApiRequest, ContractExpectation } from '../../../../shared/types';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
+import { renderMarkup } from '../common/RichText';
 
 const { electron } = window;
 
@@ -61,7 +62,7 @@ export function ContractTab({ request, onChange }: Props) {
       {/* What this tab is, and how it differs from Schema. */}
       <div className="rounded-lg border border-blue-700/50 bg-blue-950/30 px-3 py-2 text-[11px] leading-relaxed text-blue-200/90">
         <span className="font-semibold text-blue-300">{t('Contract.')}</span>{' '}
-        {t('What this request')} <em>{t('expects')}</em> {t('from the provider: status, headers, and body shape (a JSON Schema). It is checked against the response in the')} <strong>{t('Contract')}</strong> {t('panel and is the consumer side of contract testing (consumer & bi-directional verify), feeding the')} <span className="font-mono">deploy-check</span> {t('gate. For a quick body check that runs on every send, use the')} <strong>{t('Schema')}</strong> {t('tab.')}
+        {renderMarkup(t("What this request *expects* from the provider: status, headers, and body shape (a JSON Schema). It is checked against the response in the **Contract** panel and is the consumer side of contract testing (consumer and bi-directional verify), feeding the `deploy-check` gate. For a quick body check that runs on every send, use the **Schema** tab."))}
       </div>
 
       {/* Status indicator */}

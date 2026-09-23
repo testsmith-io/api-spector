@@ -23,7 +23,7 @@ export function UpdateModal() {
   useEffect(() => {
     let cancelled = false;
     electron.checkForUpdate()
-      .then(u => {
+      .then((u: UpdateInfo | null) => {
         if (cancelled || !u?.updateAvailable) return;
         let skipped = '';
         try { skipped = localStorage.getItem(DISMISS_KEY) ?? ''; } catch { /* storage disabled */ }
