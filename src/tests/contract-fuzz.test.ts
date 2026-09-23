@@ -4,7 +4,8 @@
 import { describe, it, expect } from 'vitest';
 import Ajv from 'ajv';
 import {
-  makeRng, buildBaseline, mutate, inferSchema, sampleCases, type JsonSchema,
+  makeRng, buildBaseline, mutate, inferSchema, sampleCases,
+  duplicateKeyBody, mutateHeaders, type JsonSchema,
 } from '../main/contract/fuzz-gen';
 
 const ajv = new Ajv({ allErrors: true, strict: false });
@@ -84,6 +85,32 @@ describe('mutate', () => {
 
   it('generates an unexpected-field mutation when additionalProperties is false', () => {
     expect(cases.some(c => c.mutation.kind === 'unexpected-field')).toBe(true);
+  });
+
+  it('generates an extra-property mutation on a permissive (no additionalProperties) schema', () => {
+    const permissive: JsonSchema = { type: 'object', required: ['a'], properties: { a: { type: 'string' } } };
+    const cs = mutate(buildBaseline(permissive, makeRng(1)), permissive, 'body');
+    expect(cs.some(c => c.mutation.kind === 'extra-property')).toBe(true);
+    expect(cs.some(c => c.mutation.kind === 'unexpected-field')).toBe(false);
+  });
+
+  it('standard level: naughty + adversarial strings, but no injection probes', () => {
+    expect(cases.some(c => c.mutation.kind.startsWith('naughty:'))).toBe(true);
+    expect(cases.some(c => c.mutation.kind.startsWith('adversarial:'))).toBe(true);
+    expect(cases.some(c => c.mutation.kind.startsWith('injection:'))).toBe(false);
+  });
+
+  it('aggressive level adds injection probes on string fields', () => {
+    const agg = mutate(baseline, productSchema, 'body', 'aggressive');
+    expect(agg.some(c => c.mutation.kind.startsWith('injection:sql') && c.mutation.target.startsWith('body.'))).toBe(true);
+    expect(agg.some(c => c.mutation.kind.startsWith('injection:nosql'))).toBe(true);
+  });
+
+  it('basic level drops adversarial/naughty/injection but keeps structural faults', () => {
+    const basic = mutate(baseline, productSchema, 'body', 'basic');
+    expect(basic.some(c => /^(injection:|naughty:|adversarial:)/.test(c.mutation.kind))).toBe(false);
+    expect(basic.some(c => c.mutation.kind === 'missing-required')).toBe(true);
+    expect(basic.some(c => c.mutation.kind.startsWith('type:'))).toBe(true);
   });
 
   it('generates a format violation for the email field', () => {
@@ -238,10 +265,16 @@ describe('mutateQueryParams', () => {
     expect(below.params.find(p => p.key === 'limit')!.value).toBe('0');
   });
 
-  it('injects adversarial values (sql, xss, traversal) per param', () => {
-    const cases = mutateQueryParams(base, schemas);
-    const kinds = cases.map(c => c.mutation.kind);
-    expect(kinds).toEqual(expect.arrayContaining(['adversarial:sql', 'adversarial:xss', 'adversarial:traversal']));
+  it('injects boundary probes at standard, and sql/xss/traversal only at aggressive', () => {
+    const standard = mutateQueryParams(base, schemas).map(c => c.mutation.kind);
+    expect(standard).toEqual(expect.arrayContaining(['adversarial:empty', 'adversarial:very-long']));
+    expect(standard).not.toContain('adversarial:sql');
+
+    const aggressive = mutateQueryParams(base, schemas, 'query', 'aggressive').map(c => c.mutation.kind);
+    expect(aggressive).toEqual(expect.arrayContaining(['adversarial:sql', 'adversarial:xss', 'adversarial:traversal']));
+
+    const basic = mutateQueryParams(base, schemas, 'query', 'basic').map(c => c.mutation.kind);
+    expect(basic.some(k => k.startsWith('adversarial:'))).toBe(false);
   });
 
   it('adds an unexpected extra param', () => {
@@ -255,5 +288,38 @@ describe('mutateQueryParams', () => {
     expect(cases.length).toBeGreaterThan(0);
     expect(cases.every(c => c.mutation.kind !== 'missing-required')).toBe(true);
     expect(cases.some(c => c.mutation.kind.startsWith('adversarial:'))).toBe(true);
+  });
+});
+
+describe('duplicateKeyBody', () => {
+  it('crafts raw JSON with a top-level key repeated', () => {
+    const raw = duplicateKeyBody({ a: 1, b: 'x' });
+    expect(raw).not.toBeNull();
+    // "a" appears twice in the raw text; still parseable (last value wins).
+    expect((raw!.match(/"a":/g) ?? []).length).toBe(2);
+    expect(() => JSON.parse(raw!)).not.toThrow();
+  });
+  it('returns null for non-object or empty bodies', () => {
+    expect(duplicateKeyBody([])).toBeNull();
+    expect(duplicateKeyBody({})).toBeNull();
+    expect(duplicateKeyBody('x')).toBeNull();
+    expect(duplicateKeyBody(null)).toBeNull();
+  });
+});
+
+describe('mutateHeaders', () => {
+  const cases = mutateHeaders([{ key: 'Authorization', value: 'Bearer x', enabled: true }], 'header');
+  it('tampers Content-Type (incl. multipart/mixed) and preserves other headers', () => {
+    const mm = cases.find(c => c.mutation.kind === 'header:content-type:multipart-mixed');
+    expect(mm).toBeTruthy();
+    expect(mm!.headers.some(h => h.key === 'Content-Type' && h.value === 'multipart/mixed')).toBe(true);
+    // The original Authorization header is carried through.
+    expect(mm!.headers.some(h => h.key === 'Authorization')).toBe(true);
+  });
+  it('never leaves two Content-Type entries', () => {
+    for (const c of cases) {
+      const cts = c.headers.filter(h => h.key.toLowerCase() === 'content-type');
+      expect(cts.length).toBeLessThanOrEqual(1);
+    }
   });
 });

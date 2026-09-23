@@ -28,6 +28,7 @@ export function FuzzModal({ request, onClose }: { request: ApiRequest; onClose: 
   const snapshots           = useStore(s => s.contractSnapshots);
   const activeSnapshotRelPath = useStore(s => s.activeContractSnapshotRelPath);
 
+  const [level, setLevel]       = useState<'basic' | 'standard' | 'aggressive'>('standard');
   const [cases, setCases]       = useState(40);
   const [seed, setSeed]         = useState(1);
   const [trace, setTrace]       = useState(true);
@@ -58,6 +59,7 @@ export function FuzzModal({ request, onClose }: { request: ApiRequest; onClose: 
         collectionVars,
         specSnapshotRelPath: snapshotRelPath || undefined,
         // No providerBaseUrl: the request is fuzzed against its own URL.
+        level,
         casesPerOperation: cases,
         seed,
         trace,
@@ -81,6 +83,19 @@ export function FuzzModal({ request, onClose }: { request: ApiRequest; onClose: 
       <div className="flex flex-col min-h-0 flex-1">
         {/* Options */}
         <div className="flex items-end gap-3 px-4 py-3 border-b border-surface-800 flex-shrink-0 flex-wrap">
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Level')}</span>
+            <select
+              value={level}
+              onChange={e => setLevel(e.target.value as 'basic' | 'standard' | 'aggressive')}
+              title={t('Basic: structural faults. Standard: + boundary and naughty strings. Aggressive: + injection probes and header tampering.')}
+              className="bg-surface-800 border border-surface-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
+            >
+              <option value="basic">{t('Basic')}</option>
+              <option value="standard">{t('Standard')}</option>
+              <option value="aggressive">{t('Aggressive')}</option>
+            </select>
+          </label>
           <label className="flex flex-col gap-1">
             <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Cases')}</span>
             <input

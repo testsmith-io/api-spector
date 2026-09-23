@@ -343,6 +343,7 @@ const api = {
     specSnapshotRelPath?: string
     providerBaseUrl?: string
     requestBaseUrl?: string
+    level?: 'basic' | 'standard' | 'aggressive'
     casesPerOperation?: number
     seed?: number
     includeWrites?: boolean
