@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type {
   ApiRequest,
   AuthConfig,
+  ChildRef,
   Collection,
   DataSet,
   Folder,
@@ -22,6 +23,7 @@ import {
   findFolderContaining,
   findFolderParent,
   findFolderPath,
+  orderedChildren,
   reIdFolderTree,
   removeFolderById,
   removeFromFolder,
@@ -100,6 +102,9 @@ export interface CollectionsSliceActions {
   duplicateRequest: (collectionId: string, id: string) => void
   moveRequest: (srcCollectionId: string, requestId: string, destCollectionId: string, destFolderId: string, destIndex?: number) => void
   moveFolder: (collectionId: string, folderId: string, destParentFolderId: string, destIndex?: number) => void
+  /** Move a request or sub-folder to a unified position among a folder's
+   *  children (interleaving requests and folders). Same-collection only. */
+  reorderChild: (collectionId: string, ref: ChildRef, destParentFolderId: string, destIndex: number) => void
 
   // Request examples (Postman/Bruno-style saved request/response snapshots)
   addExample: (requestId: string, snapshot: { name?: string; request?: Partial<ApiRequest>; response?: ResponsePayload | null }) => string | null
@@ -624,6 +629,36 @@ export const createCollectionsSlice: StateCreator<
     } else {
       destParent.folders.push(folder);
     }
+    s.collections[collectionId].dirty = true;
+  }),
+
+  reorderChild: (collectionId, ref, destParentFolderId, destIndex) => set(s => {
+    const col = s.collections[collectionId]?.data;
+    if (!col) return;
+    const destParent = findFolder(col.rootFolder, destParentFolderId);
+    if (!destParent) return;
+
+    if (ref.type === 'request') {
+      if (!col.requests[ref.id]) return;
+      removeFromFolder(col.rootFolder, ref.id);
+      if (!destParent.requestIds.includes(ref.id)) destParent.requestIds.push(ref.id);
+    } else {
+      const moving = findFolder(col.rootFolder, ref.id);
+      if (!moving) return;
+      // Can't drop a folder into itself or one of its own descendants.
+      if (ref.id === destParentFolderId || findFolder(moving, destParentFolderId)) return;
+      const srcParent = findFolderParent(col.rootFolder, ref.id) ?? col.rootFolder;
+      const srcIdx    = srcParent.folders.findIndex(f => f.id === ref.id);
+      if (srcIdx >= 0) srcParent.folders.splice(srcIdx, 1);
+      if (!destParent.folders.some(f => f.id === ref.id)) destParent.folders.push(moving);
+    }
+
+    // Rebuild the destination's child order with the moved item at destIndex.
+    const others = orderedChildren(destParent).filter(c => !(c.type === ref.type && c.id === ref.id));
+    const idx = Math.max(0, Math.min(destIndex, others.length));
+    others.splice(idx, 0, { type: ref.type, id: ref.id });
+    destParent.childOrder = others;
+
     s.collections[collectionId].dirty = true;
   }),
 

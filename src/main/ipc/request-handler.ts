@@ -13,7 +13,7 @@ import type {
   TestResult,
   StreamEvent,
 } from '../../shared/types';
-import { interpolate, buildUrl, buildEnvVars, mergeVars, buildDynamicVars } from '../interpolation';
+import { interpolate, buildUrl, buildEnvVars, mergeVars, buildDynamicVars, resolveDataRow } from '../interpolation';
 import { runScript } from '../script-runner';
 import { getGlobals, patchGlobals, persistGlobals } from '../globals-store';
 import { buildProxyUri } from '../proxy-utils';
@@ -161,6 +161,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
       piiMaskPatterns = [],
       streamId,
       forceStream,
+      dataRow,
     } = payload;
     applyRequestDefaults(req);
 
@@ -208,6 +209,12 @@ export function registerRequestHandler(ipc: IpcMain): void {
 
     // Dynamic built-in vars ($uuid, $randomEmail, etc.) — generated once per send
     const dynamicVars = await buildDynamicVars();
+
+    // A chosen data-table row (running one request against a specific row) is
+    // injected as local vars, resolving any {{vars}} / faker in its cells first.
+    if (dataRow && Object.keys(dataRow).length > 0) {
+      localVars = resolveDataRow(dataRow, mergeVars(envVars, collectionVars, mergedGlobals, {}, dynamicVars));
+    }
 
     // Merge for pre-script
     let vars = mergeVars(envVars, collectionVars, mergedGlobals, localVars, dynamicVars);

@@ -27,7 +27,7 @@ import type {
   StreamClose,
 } from '../shared/types';
 import { detectStreamKind, readStream } from './stream/parse';
-import { interpolate, buildUrl, mergeVars, buildDynamicVars } from './interpolation';
+import { interpolate, buildUrl, mergeVars, buildDynamicVars, resolveDataRow } from './interpolation';
 import { hasSecretScheme, resolveExternalSecret } from './secrets';
 import { runScript } from './script-runner';
 import { patchGlobals, persistGlobals } from './globals-store';
@@ -655,6 +655,16 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
   // Dynamic built-in vars ($uuid, $timestamp, $randomInt, etc.) — generated
   // fresh for each request so each gets unique values.
   const dynamicVars = await buildDynamicVars();
+
+  // Data-driven rows (a collection- or folder-level DataSet) arrive as
+  // localVars. Resolve {{...}} references and faker/dynamic expressions inside
+  // each cell value so a data table can use {{baseUrl}}, {{$randomEmail}},
+  // {{faker.person.firstName()}}, etc. Resolved against the surrounding scopes
+  // and freshly-generated dynamic vars, so faker yields a new value per row.
+  if (localVars && Object.keys(localVars).length > 0) {
+    localVars = resolveDataRow(localVars, mergeVars(envVars, collectionVars, globals, {}, dynamicVars));
+  }
+
   let vars = mergeVars(envVars, collectionVars, globals, localVars, dynamicVars);
   let updatedEnvVars = { ...envVars };
   let updatedCollectionVars = { ...collectionVars };

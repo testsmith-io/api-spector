@@ -36,7 +36,10 @@ export type Locale = keyof typeof LOCALES;
 
 const STORAGE_KEY = 'locale';
 
-/** Persisted choice → browser language → English, restricted to shipped locales. */
+/** Explicitly-chosen locale if the user picked one; English otherwise.
+ *  English is the default so the app is predictable on first run regardless of
+ *  the OS language — users switch via Settings → Appearance → Language, and the
+ *  choice persists in localStorage. */
 export function detectLocale(): Locale {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -44,8 +47,7 @@ export function detectLocale(): Locale {
   } catch {
     /* private mode / disabled storage */
   }
-  const nav = (typeof navigator !== 'undefined' ? navigator.language : 'en').slice(0, 2);
-  return (nav in CATALOGS ? nav : 'en') as Locale;
+  return 'en';
 }
 
 export type TVars = Record<string, string | number>;

@@ -3,6 +3,7 @@
 
 import React, { useRef } from 'react';
 import type { DataSet } from '../../../../shared/types';
+import { VarInput } from './VarInput';
 import { useT } from '../../i18n';
 
 // ─── CSV helpers ──────────────────────────────────────────────────────────────
@@ -102,6 +103,12 @@ export function DataSetEditor({ ds, onChange, exportName, scopeLabel = 'collecti
         <code className="text-surface-500">{'{{variable}}'}</code>{' '}
         {t('placeholders.')}
       </p>
+      <p className="text-surface-600 text-[11px]">
+        {t('Cell values can also use variables and faker, e.g.')}{' '}
+        <code className="text-surface-500">{'{{baseUrl}}'}</code>,{' '}
+        <code className="text-surface-500">{'{{$randomEmail}}'}</code>{' '}{t('or')}{' '}
+        <code className="text-surface-500">{'{{faker.person.firstName()}}'}</code>.
+      </p>
 
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -157,10 +164,11 @@ export function DataSetEditor({ ds, onChange, exportName, scopeLabel = 'collecti
                   <td className="px-2 py-1 text-surface-600">{ri + 1}</td>
                   {ds.columns.map((_, ci) => (
                     <td key={ci} className="px-1 py-1">
-                      <input
+                      <VarInput
                         value={row[ci] ?? ''}
-                        onChange={e => setCell(ri, ci, e.target.value)}
-                        className="w-full bg-surface-800 border border-transparent rounded px-1.5 py-0.5 font-mono focus:outline-none focus:border-blue-500 hover:border-surface-600"
+                        onChange={v => setCell(ri, ci, v)}
+                        wrapperClassName="w-full"
+                        className="bg-surface-800 border border-transparent rounded px-1.5 py-0.5 font-mono focus:outline-none focus:border-blue-500 hover:border-surface-600"
                       />
                     </td>
                   ))}

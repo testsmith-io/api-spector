@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, it, expect } from 'vitest';
-import { interpolate, buildUrl, mergeVars } from '../main/interpolation';
+import { interpolate, buildUrl, mergeVars, buildDynamicVars, resolveDataRow } from '../main/interpolation';
 import type { KeyValuePair } from '../shared/types';
 
 // ─── interpolate ─────────────────────────────────────────────────────────────
@@ -168,5 +168,36 @@ describe('mergeVars', () => {
   it('handles empty scopes', () => {
     const result = mergeVars({}, {}, {});
     expect(result).toEqual({});
+  });
+});
+
+// ─── resolveDataRow (variables + faker in collection/folder data tables) ──────
+
+describe('resolveDataRow', () => {
+  it('resolves {{variable}} references in cell values', async () => {
+    await buildDynamicVars(); // primes the expression context
+    const scope = mergeVars({}, { baseUrl: 'https://api.example.com' }, {}, {}, {});
+    const out = resolveDataRow({ url: '{{baseUrl}}/users', name: 'literal' }, scope);
+    expect(out.url).toBe('https://api.example.com/users');
+    expect(out.name).toBe('literal');
+  });
+
+  it('resolves built-in dynamic vars and faker expressions in cells', async () => {
+    const dyn = await buildDynamicVars();
+    const scope = mergeVars({}, {}, {}, {}, dyn);
+    const out = resolveDataRow(
+      { email: '{{$randomEmail}}', first: '{{faker.person.firstName()}}' },
+      scope,
+    );
+    expect(out.email).toContain('@');
+    expect(out.email).not.toContain('{{');
+    expect(out.first.length).toBeGreaterThan(0);
+    expect(out.first).not.toContain('{{');
+  });
+
+  it('leaves unknown tokens untouched', async () => {
+    await buildDynamicVars();
+    const out = resolveDataRow({ x: '{{nope}}' }, mergeVars({}, {}, {}, {}, {}));
+    expect(out.x).toBe('{{nope}}');
   });
 });

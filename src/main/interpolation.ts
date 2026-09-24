@@ -66,6 +66,17 @@ export function interpolate(str: string, vars: Record<string, string>): string {
   });
 }
 
+/** Resolve {{...}} references and faker/dynamic expressions inside data-row
+ *  (DataSet) cell values, so a collection- or folder-level data table can use
+ *  {{baseUrl}}, {{$randomEmail}}, {{faker.person.firstName()}}, etc. Each value
+ *  is interpolated against `scope` (the surrounding variable scopes plus the
+ *  freshly-generated dynamic vars, so faker yields a new value per row). */
+export function resolveDataRow(row: Record<string, string>, scope: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(row).map(([k, v]) => [k, typeof v === 'string' ? interpolate(v, scope) : v]),
+  );
+}
+
 /** Build a URL with resolved query params appended. */
 export function buildUrl(
   baseUrl: string,

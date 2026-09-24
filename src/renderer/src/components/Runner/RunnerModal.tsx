@@ -6,7 +6,7 @@ import { useStore } from '../../store';
 import type { RunRequestResult, RunSummary, RunnerItem } from '../../../../shared/types';
 import { findFolder } from '../../store';
 import { buildJsonReport, buildJUnitReport, buildHtmlReport } from '../../../../shared/report';
-import { collectAllTags, buildRunPlan, resolveInheritedAuthAndHeaders, authIsConfigured } from '../../../../shared/request-collection';
+import { collectAllTags, buildRunPlan, expandRunPlanWithData, expandFolderDataSets, resolveInheritedAuthAndHeaders, authIsConfigured } from '../../../../shared/request-collection';
 import { buildCliArgs, generateGitHub, generateAzure, generateGitLab } from '../../../../shared/ci-generators';
 import { getMethodColor } from '../../../../shared/colors';
 import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
@@ -62,6 +62,98 @@ function StatusDot({ status }: { status: RunRequestResult['status'] }) {
   return <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${colors[status] ?? 'bg-surface-700'}`} />;
 }
 
+// ─── Per-request detail (same data the exported report carries) ───────────────
+
+/** True when a result has anything worth expanding to show. */
+function hasDetail(r: RunRequestResult): boolean {
+  return !!(
+    r.testResults?.length || r.consoleOutput?.length ||
+    r.preScriptError || r.postScriptError || r.sentRequest || r.receivedResponse ||
+    (r.error && !r.error.startsWith('Skipped'))
+  );
+}
+
+function DetailSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[9px] uppercase tracking-wider text-surface-600 font-semibold">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function KVRows({ rows }: { rows: [string, string][] }) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-0.5">
+      {rows.map(([k, v]) => (
+        <div key={k} className="flex gap-2 font-mono text-[10px]">
+          <span className="text-surface-500 shrink-0">{k}:</span>
+          <span className="text-surface-300 break-all">{v}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const PRE_CLS = 'text-[10px] font-mono text-surface-300 bg-surface-900 border border-surface-800 rounded px-2 py-1.5 overflow-x-auto whitespace-pre-wrap break-words max-h-56 overflow-y-auto';
+
+function ResultDetail({ r }: { r: RunRequestResult }) {
+  const t = useT();
+  return (
+    <div className="flex flex-col gap-3 text-xs">
+      {r.testResults && r.testResults.length > 0 && (
+        <DetailSection label={t('Tests')}>
+          {r.testResults.map((tr, i) => (
+            <div key={i} className="flex items-baseline gap-2">
+              <span className={tr.passed ? 'text-emerald-400' : 'text-red-400'}>{tr.passed ? '✓' : '✗'}</span>
+              <span className="text-surface-300">{tr.name}</span>
+              {tr.error && <span className="text-red-400 font-mono text-[10px] break-all">{tr.error}</span>}
+            </div>
+          ))}
+        </DetailSection>
+      )}
+
+      {(r.preScriptError || r.postScriptError) && (
+        <DetailSection label={t('Script errors')}>
+          {r.preScriptError && <p className="text-[10px] text-red-300 font-mono break-all">{t('Pre-script:')} {r.preScriptError}</p>}
+          {r.postScriptError && <p className="text-[10px] text-red-300 font-mono break-all">{t('Post-script:')} {r.postScriptError}</p>}
+        </DetailSection>
+      )}
+
+      {r.error && !r.error.startsWith('Skipped') && (
+        <DetailSection label={t('Error')}>
+          <p className="text-[10px] text-red-300 font-mono break-all">{r.error}</p>
+        </DetailSection>
+      )}
+
+      {r.consoleOutput && r.consoleOutput.length > 0 && (
+        <DetailSection label={t('Console')}>
+          <pre className={PRE_CLS}>{r.consoleOutput.join('\n')}</pre>
+        </DetailSection>
+      )}
+
+      <DetailSection label={t('Request')}>
+        <p className="font-mono text-[10px] text-surface-300 break-all">{r.method} {r.resolvedUrl}</p>
+        {r.sentRequest && <KVRows rows={Object.entries(r.sentRequest.headers ?? {})} />}
+        {r.sentRequest?.body && <pre className={PRE_CLS}>{r.sentRequest.body}</pre>}
+      </DetailSection>
+
+      {r.receivedResponse && (
+        <DetailSection label={t('Response')}>
+          <p className="font-mono text-[10px]">
+            <span className={r.receivedResponse.status < 400 ? 'text-emerald-400' : 'text-red-400'}>
+              {r.receivedResponse.status} {r.receivedResponse.statusText}
+            </span>
+          </p>
+          <KVRows rows={Object.entries(r.receivedResponse.headers ?? {})} />
+          {r.receivedResponse.body && <pre className={PRE_CLS}>{r.receivedResponse.body}</pre>}
+        </DetailSection>
+      )}
+    </div>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function RunnerModal() {
@@ -85,6 +177,14 @@ export function RunnerModal() {
   const [copiedKey,     setCopiedKey]     = useState<string | null>(null);
   const [exportFormat,  setExportFormat]  = useState<'json' | 'junit' | 'html'>('json');
   const [requestDelay,  setRequestDelay]  = useState<number>(0);
+  const [expandedRows,  setExpandedRows]  = useState<Set<number>>(new Set());
+
+  const toggleRow = (idx: number) =>
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      return next;
+    });
 
   const { collectionId, folderId } = runnerModal;
   const colEntry   = collectionId ? collections[collectionId] : null;
@@ -113,6 +213,7 @@ export function RunnerModal() {
     setFilterTags(initFilterTagsRef.current);
     setSelectedEnvId(initEnvIdRef.current ?? '');
     setSummary(null);
+    setExpandedRows(new Set());
     progressIdxRef.current = 0;
   }, [runnerModal.open]);
 
@@ -128,21 +229,13 @@ export function RunnerModal() {
     const baseItems = collectionId ? collectRequests(collectionId, folderId, filterTags) : [];
     if (baseItems.length === 0) return;
 
-    // Expand with data rows if defined
-    let items: RunnerItem[];
-    if (ds.rows.length > 0) {
-      items = ds.rows.flatMap((row, ri) => {
-        const dataRow: Record<string, string> = {};
-        ds.columns.forEach((col, ci) => { dataRow[col] = row[ci] ?? ''; });
-        return baseItems.map(item => ({
-          ...item,
-          dataRow,
-          iterationLabel: `${ri + 1}/${ds.rows.length}`,
-        }));
-      });
-    } else {
-      items = baseItems;
-    }
+    // Data-table expansion:
+    //  - Collection run: each folder's own data table iterates its requests.
+    //  - Then the whole-scope table (the folder's for a folder run, else the
+    //    collection's) repeats the plan once per row. No rows → a single pass.
+    let items: RunnerItem[] = baseItems;
+    if (!folderId && colEntry) items = expandFolderDataSets(items, colEntry.data);
+    items = expandRunPlanWithData(items, ds);
 
     // Merge inherited auth/headers from collection/folder into each request
     // so the runner sees the effective auth, not just request-level overrides.
@@ -165,6 +258,7 @@ export function RunnerModal() {
 
     const env = resolveEnvironmentById(environments, selectedEnvId || null);
 
+    setExpandedRows(new Set());
     setRunnerResults(items.map(item => ({
       requestId:      item.request.id,
       name:           item.request.name,
@@ -354,10 +448,14 @@ export function RunnerModal() {
                         </tr>
                       )}
                   <tr
-                    className={`border-b border-surface-800/50 hover:bg-surface-800/30 ${r.isHook ? 'opacity-80' : ''}`}
+                    onClick={() => hasDetail(r) && toggleRow(idx)}
+                    className={`border-b border-surface-800/50 hover:bg-surface-800/30 ${r.isHook ? 'opacity-80' : ''} ${hasDetail(r) ? 'cursor-pointer' : ''}`}
                   >
                     <td className="px-4 py-2 w-6">
-                      <StatusDot status={r.status} />
+                      <div className="flex items-center gap-1">
+                        <span className="w-2 text-surface-600 text-[9px]">{hasDetail(r) ? (expandedRows.has(idx) ? '▾' : '▸') : ''}</span>
+                        <StatusDot status={r.status} />
+                      </div>
                     </td>
                     <td className="py-2 pr-2 w-20">
                       {r.isHook && r.hookType ? (
@@ -405,6 +503,13 @@ export function RunnerModal() {
                       )}
                     </td>
                   </tr>
+                  {expandedRows.has(idx) && hasDetail(r) && (
+                    <tr className="border-b border-surface-800/50 bg-surface-950/40">
+                      <td colSpan={6} className="px-6 py-3">
+                        <ResultDetail r={r} />
+                      </td>
+                    </tr>
+                  )}
                     </Fragment>
                   );
                 })}

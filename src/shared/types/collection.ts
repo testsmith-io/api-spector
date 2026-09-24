@@ -73,12 +73,23 @@ export interface ApiRequest {
   examples?: RequestExample[]
 }
 
+/** One child of a folder in display / execution order — either a request or a
+ *  sub-folder. Lets requests and folders be freely interleaved. */
+export interface ChildRef {
+  type: 'request' | 'folder'
+  id: string
+}
+
 export interface Folder {
   id: string
   name: string
   description?: string
   folders: Folder[]
   requestIds: string[]
+  /** Unified order of this folder's children (requests + sub-folders). When
+   *  absent or partial, missing items fall in after it (requests, then folders).
+   *  Drives both the tree and the run order. */
+  childOrder?: ChildRef[]
   tags?: string[]
   auth?: AuthConfig
   headers?: KeyValuePair[]

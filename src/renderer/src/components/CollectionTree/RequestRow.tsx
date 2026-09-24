@@ -55,7 +55,6 @@ export interface RequestRowProps {
   reqId: string
   collectionId: string
   folderId: string
-  reqIndex: number
   name: string
   url: string
   method: string
@@ -84,7 +83,7 @@ export interface RequestRowProps {
 }
 
 export function RequestRow({
-  reqId, collectionId, folderId, reqIndex, name, url, method, protocol, authType, hookType, disabled, tags, isActive, indent, autoRename = false,
+  reqId, collectionId, name, url, method, protocol, authType, hookType, disabled, tags, isActive, indent, autoRename = false,
   examples = [], activeExampleId,
   onSelect, onRename, onDelete, onDuplicate, onUpdateTags, onSetHookType, onToggleDisabled,
   onAddExample, onOpenExample, onRenameExample, onDeleteExample, onDuplicateExample,
@@ -94,7 +93,6 @@ export function RequestRow({
   const [examplesOpen, setExamplesOpen] = useState(true);
   const [addingTag, setAddingTag] = useState(false);
   const [showSchemaSync, setShowSchemaSync] = useState(false);
-  const [dropPos, setDropPos] = useState<'before' | 'after' | null>(null);
   const dragCtx = useContext(DragCtx);
   const sel = useContext(SelectionCtx);
   const selected = sel.isSelected(collectionId, reqId);
@@ -125,24 +123,8 @@ export function RequestRow({
     onClick: () => onSetHookType(hookType === ht ? undefined : ht),
   }));
 
-  function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
-    if (!dragCtx.dragging || dragCtx.dragging.type !== 'request' || dragCtx.dragging.requestId === reqId) return;
-    e.preventDefault();
-    const rect = e.currentTarget.getBoundingClientRect();
-    setDropPos(e.clientY < rect.top + rect.height / 2 ? 'before' : 'after');
-  }
-
-  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
-    e.preventDefault();
-    e.stopPropagation();
-    const insertIndex = dropPos === 'before' ? reqIndex : reqIndex + 1;
-    dragCtx.onDropRequest(collectionId, folderId, insertIndex);
-    setDropPos(null);
-  }
-
   return (
     <div className="relative">
-      {dropPos === 'before' && <div className="absolute top-0 inset-x-0 h-0.5 bg-blue-500 z-10 pointer-events-none" />}
       <div
         draggable
         className={`group flex items-start gap-1.5 py-1 pr-1 rounded-sm cursor-pointer transition-colors ${
@@ -155,10 +137,7 @@ export function RequestRow({
         onClick={handleRowClick}
         onDoubleClick={() => setRenaming(true)}
         onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; dragCtx.setDragging({ type: 'request', requestId: reqId, collectionId }); }}
-        onDragEnd={() => { dragCtx.setDragging(null); setDropPos(null); }}
-        onDragOver={handleDragOver}
-        onDragLeave={() => setDropPos(null)}
-        onDrop={handleDrop}
+        onDragEnd={() => { dragCtx.setDragging(null); }}
       >
         {/* Multi-select checkbox — hidden until row hover, always shown once a
             selection is in progress so every row can be toggled without the
@@ -265,7 +244,6 @@ export function RequestRow({
           ]} />
         </div>
         {toast && <div className="fixed bottom-4 right-4 z-[100] w-96"><Toast toast={toast} /></div>}
-        {dropPos === 'after' && <div className="absolute bottom-0 inset-x-0 h-0.5 bg-blue-500 z-10 pointer-events-none" />}
       </div>
       {examplesOpen && examples.map(ex => (
         <ExampleRow
