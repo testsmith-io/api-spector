@@ -27,7 +27,7 @@ export const DYNAMIC_VAR_NAMES: string[] = [
   '$randomHexColor',
 ];
 
-const DYNAMIC_VAR_INFO: Record<string, string> = {
+export const DYNAMIC_VAR_INFO: Record<string, string> = {
   $uuid:            'Random UUID v4 - generated fresh each send',
   $timestamp:       'Current Unix timestamp in milliseconds',
   $isoTimestamp:    'Current date/time as ISO 8601 string',
@@ -178,7 +178,7 @@ function chaiChainCompletion(textBefore: string, pos: number): CompletionResult 
 
 // ─── faker ───────────────────────────────────────────────────────────────────
 
-const FAKER_NAMESPACES: Completion[] = [
+export const FAKER_NAMESPACES: Completion[] = [
   { label: 'string',   type: 'property', info: 'String generators' },
   { label: 'number',   type: 'property', info: 'Number generators' },
   { label: 'person',   type: 'property', info: 'Names, titles, etc.' },
@@ -195,7 +195,7 @@ const FAKER_NAMESPACES: Completion[] = [
   { label: 'helpers',  type: 'property', info: 'Utility helpers (slugify, arrayElement, …)' },
 ];
 
-const FAKER_SUB: Record<string, Completion[]> = {
+export const FAKER_SUB: Record<string, Completion[]> = {
   string: [
     { label: 'uuid',         type: 'function', detail: '()',         info: 'Random UUID v4' },
     { label: 'alphanumeric', type: 'function', detail: '(length)',   info: 'Random alphanumeric string' },

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, it, expect } from 'vitest';
-import { buildRunPlan, collectTagged } from '../shared/request-collection';
-import type { Collection, ApiRequest } from '../shared/types';
+import { buildRunPlan, collectTagged, expandRunPlanWithData, expandFolderDataSets } from '../shared/request-collection';
+import type { Collection, ApiRequest, RunnerItem, DataSet, Folder } from '../shared/types';
 
 function req(id: string, name: string, extra: Partial<ApiRequest> = {}): ApiRequest {
   return {
@@ -256,5 +256,74 @@ describe('buildRunPlan scopePath', () => {
     const plan = buildRunPlan(col, 'f-users', []);
     const main = plan.find(p => p.request.id === 'r-main');
     expect(main?.scopePath).toEqual([]);
+  });
+});
+
+describe('expandRunPlanWithData (folder/collection data tables)', () => {
+  const items = [
+    { request: req('a', 'A') },
+    { request: req('b', 'B') },
+  ] as unknown as RunnerItem[];
+
+  it('runs the plan once per data row (N rows × M requests)', () => {
+    const ds: DataSet = { columns: ['email', 'name'], rows: [['a@x.io', 'Al'], ['b@x.io', 'Bo'], ['c@x.io', 'Cy']] };
+    const out = expandRunPlanWithData(items, ds);
+    expect(out).toHaveLength(6); // 3 rows × 2 requests
+    expect(out.filter(i => i.iterationLabel === '1/3')).toHaveLength(2);
+    expect(out[0].dataRow).toEqual({ email: 'a@x.io', name: 'Al' });
+    expect(out[2].dataRow).toEqual({ email: 'b@x.io', name: 'Bo' });
+  });
+
+  it('returns the plan unchanged when there are no rows', () => {
+    expect(expandRunPlanWithData(items, { columns: ['x'], rows: [] })).toBe(items);
+    expect(expandRunPlanWithData(items, undefined)).toBe(items);
+  });
+
+  it('fills missing cells with empty strings and ignores blank column names', () => {
+    const ds: DataSet = { columns: ['a', '', 'b'], rows: [['1']] };
+    const out = expandRunPlanWithData(items, ds);
+    expect(out[0].dataRow).toEqual({ a: '1', b: '' });
+  });
+});
+
+describe('expandFolderDataSets (folder data tables in a collection run)', () => {
+  const sub: Folder = { id: 'f1', name: 'F', folders: [], requestIds: [], dataSet: { columns: ['id'], rows: [['1'], ['2']] } };
+  const root: Folder = { id: 'root', name: 'root', folders: [sub], requestIds: [] };
+  const col = { version: '1.0', id: 'c', name: 'C', rootFolder: root, requests: {} } as unknown as Collection;
+  const rows = [
+    { request: req('a', 'A'), collectionVars: {}, scopeId: 'f1', scopeAncestors: ['root'] },
+    { request: req('b', 'B'), collectionVars: {}, scopeId: 'root', scopeAncestors: [] },
+    { request: req('h', 'H'), collectionVars: {}, scopeId: 'f1', scopeAncestors: ['root'], isHook: true, hookType: 'before' },
+  ] as unknown as RunnerItem[];
+
+  it("repeats a folder's requests once per its rows, others once", () => {
+    const out = expandFolderDataSets(rows, col);
+    expect(out).toHaveLength(4); // a×2 + b×1 + hook×1
+    const a = out.filter(i => i.request.id === 'a');
+    expect(a).toHaveLength(2);
+    expect(a[0].dataRow).toEqual({ id: '1' });
+    expect(a[1].dataRow).toEqual({ id: '2' });
+    expect(out.filter(i => i.request.id === 'b')).toHaveLength(1); // root: no folder table
+    expect(out.filter(i => i.request.id === 'h')).toHaveLength(1); // hooks not multiplied
+  });
+});
+
+describe('buildRunPlan honours childOrder (interleaved requests + folders)', () => {
+  it('runs children in the folder\'s explicit order', () => {
+    const col = makeNestedCollection();
+    // Put a folder before the root-level request, and reorder the folders.
+    col.rootFolder.childOrder = [
+      { type: 'folder', id: 'f-orders' },
+      { type: 'request', id: 'r-root' },
+      { type: 'folder', id: 'f-users' },
+    ];
+    const ids = buildRunPlan(col, null, []).filter(i => !i.isHook).map(i => i.request.id);
+    expect(ids).toEqual(['r-orders', 'r-root', 'r-users', 'r-adm']);
+  });
+
+  it('falls back to requests-then-folders when childOrder is absent', () => {
+    const col = makeNestedCollection();
+    const ids = buildRunPlan(col, null, []).filter(i => !i.isHook).map(i => i.request.id);
+    expect(ids).toEqual(['r-root', 'r-users', 'r-adm', 'r-orders']);
   });
 });

@@ -3,7 +3,8 @@
 
 import React, { useState, useRef, useEffect, useContext, createContext } from 'react';
 import { useStore } from '../../store';
-import type { Folder, Collection, ApiRequest } from '../../../../shared/types';
+import type { Folder, Collection, ApiRequest, ChildRef } from '../../../../shared/types';
+import { orderedChildren } from '../../../../shared/folder-tree';
 import { FolderSettingsModal } from './FolderSettingsModal';
 import { CollectionSettingsModal } from './CollectionSettingsModal';
 import { SchemaSyncModal } from './SchemaSyncModal';
@@ -31,7 +32,35 @@ export const DragCtx = createContext<{
   setDragging: ( d: DragState | null ) => void
   onDropRequest: ( destCollectionId: string, destFolderId: string, destIndex?: number ) => void
   onDropFolder: ( destCollectionId: string, destParentFolderId: string, destIndex?: number ) => void
-}>( { dragging: null, setDragging: () => { }, onDropRequest: () => { }, onDropFolder: () => { } } );
+  /** Drop the dragged item at a unified position among a folder's children. */
+  onReorderChild: ( destCollectionId: string, destParentFolderId: string, destIndex: number ) => void
+}>( { dragging: null, setDragging: () => { }, onDropRequest: () => { }, onDropFolder: () => { }, onReorderChild: () => { } } );
+
+// ─── Drop line (unified child ordering) ─────────────────────────────────────────
+// A thin target between rows (and at the very top, under the collection name)
+// that drops the dragged item at a specific position among a folder's children.
+
+function DropLine ( { collectionId, parentFolderId, index, indent }: {
+  collectionId: string
+  parentFolderId: string
+  index: number
+  indent: number
+} ) {
+  const dragCtx = useContext( DragCtx );
+  const [over, setOver] = useState( false );
+  if ( !dragCtx.dragging ) return null;
+  return (
+    <div
+      style={{ paddingLeft: indent }}
+      className="relative h-2 -my-1 z-20"
+      onDragOver={e => { e.preventDefault(); e.stopPropagation(); setOver( true ); }}
+      onDragLeave={() => setOver( false )}
+      onDrop={e => { e.preventDefault(); e.stopPropagation(); setOver( false ); dragCtx.onReorderChild( collectionId, parentFolderId, index ); }}
+    >
+      {over && <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 h-0.5 bg-blue-500 rounded pointer-events-none" />}
+    </div>
+  );
+}
 
 // ─── Multi-select context ─────────────────────────────────────────────────────
 // Selection lives at the tree root and is read by RequestRow through context so
@@ -169,6 +198,7 @@ export function CollectionTree () {
 
   const moveRequest = useStore( s => s.moveRequest );
   const moveFolder = useStore( s => s.moveFolder );
+  const reorderChild = useStore( s => s.reorderChild );
 
   const colList = Object.values( collections );
   const [query, setQuery] = useState( '' );
@@ -213,8 +243,23 @@ export function CollectionTree () {
     setDragging( null );
   }
 
+  // Drop the dragged item at a unified position among destParent's children.
+  // Same-collection only; cross-collection drags fall back to appending/nesting.
+  function onReorderChild ( destCollectionId: string, destParentFolderId: string, destIndex: number ) {
+    if ( !dragging ) return;
+    if ( dragging.collectionId === destCollectionId ) {
+      const ref = dragging.type === 'folder'
+        ? { type: 'folder' as const, id: dragging.folderId }
+        : { type: 'request' as const, id: dragging.requestId };
+      reorderChild( destCollectionId, ref, destParentFolderId, destIndex );
+    } else if ( dragging.type === 'request' ) {
+      moveRequest( dragging.collectionId, dragging.requestId, destCollectionId, destParentFolderId );
+    }
+    setDragging( null );
+  }
+
   return (
-    <DragCtx.Provider value={{ dragging, setDragging, onDropRequest, onDropFolder }}>
+    <DragCtx.Provider value={{ dragging, setDragging, onDropRequest, onDropFolder, onReorderChild }}>
      <SelectionCtx.Provider value={selectionCtx}>
       <div className="flex flex-col flex-1 min-h-0 select-none">
         {pendingConfirm && (
@@ -509,7 +554,7 @@ function CollectionNode ( {
 // ─── Folder row ───────────────────────────────────────────────────────────────
 
 function FolderRow ( {
-  folder, collectionId, parentFolderId, folderIndex, depth,
+  folder, collectionId, depth,
   expandCtrl,
   onAddRequest, onAddFolder,
   onRename, onDelete, onDuplicate,
@@ -519,7 +564,6 @@ function FolderRow ( {
   folder: Folder
   collectionId: string
   parentFolderId: string
-  folderIndex: number
   depth: number
   expandCtrl: ExpandCtrl
   onAddRequest: () => void
@@ -545,7 +589,9 @@ function FolderRow ( {
   const [showPushContract, setShowPushContract] = useState( false );
   const [addingTag, setAddingTag] = useState( false );
   const folderCollection = useStore( s => s.collections[collectionId]?.data );
-  const [dropPos, setDropPos] = useState<'before' | 'inside' | 'after' | null>( null );
+  // Dropping onto the folder body nests the dragged item inside it; positioning
+  // between siblings is handled by the DropLine elements around each row.
+  const [dropInside, setDropInside] = useState( false );
   const dragCtx = useContext( DragCtx );
   const tags = folder.tags ?? [];
   const indent = depth * 12 + 8;
@@ -553,55 +599,34 @@ function FolderRow ( {
 
   function handleFolderDragOver ( e: React.DragEvent<HTMLDivElement> ) {
     if ( !dragCtx.dragging ) return;
-    // Don't allow dropping a folder onto itself
+    // Don't allow dropping a folder onto itself.
     if ( dragCtx.dragging.type === 'folder' && dragCtx.dragging.folderId === folder.id ) return;
     e.preventDefault();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const zone = y / rect.height;
-    if ( dragCtx.dragging.type === 'folder' ) {
-      // Folders can be reordered (before/after) or nested (inside)
-      if ( zone < 0.25 ) setDropPos( 'before' );
-      else if ( zone > 0.75 ) setDropPos( 'after' );
-      else setDropPos( 'inside' );
-    } else {
-      // Requests always drop inside the folder
-      setDropPos( 'inside' );
-    }
+    setDropInside( true );
   }
 
   function handleFolderDrop ( e: React.DragEvent<HTMLDivElement> ) {
     e.preventDefault();
     e.stopPropagation();
+    setDropInside( false );
     if ( !dragCtx.dragging ) return;
-    if ( dragCtx.dragging.type === 'folder' ) {
-      if ( dropPos === 'inside' ) {
-        dragCtx.onDropFolder( collectionId, folder.id );
-      } else {
-        const insertIndex = dropPos === 'before' ? folderIndex : folderIndex + 1;
-        dragCtx.onDropFolder( collectionId, parentFolderId, insertIndex );
-      }
-    } else {
-      dragCtx.onDropRequest( collectionId, folder.id );
-    }
-    setDropPos( null );
+    if ( dragCtx.dragging.type === 'folder' ) dragCtx.onDropFolder( collectionId, folder.id );
+    else dragCtx.onDropRequest( collectionId, folder.id );
   }
 
   return (
     <div className="relative">
-      {dropPos === 'before' && <div className="absolute top-0 inset-x-0 h-0.5 bg-blue-500 z-10 pointer-events-none" />}
       <div
         draggable
-        className={`group flex items-start gap-1 py-1 hover:bg-surface-800 transition-colors cursor-pointer text-surface-400 ${dropPos === 'inside' ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
+        className={`group flex items-start gap-1 py-1 hover:bg-surface-800 transition-colors cursor-pointer text-surface-400 ${dropInside ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
         style={{ paddingLeft: indent }}
         onClick={() => setExpanded( e => !e )}
         onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.stopPropagation(); dragCtx.setDragging( { type: 'folder', folderId: folder.id, collectionId } ); }}
-        onDragEnd={() => { dragCtx.setDragging( null ); setDropPos( null ); }}
+        onDragEnd={() => { dragCtx.setDragging( null ); setDropInside( false ); }}
         onDragOver={handleFolderDragOver}
-        onDragLeave={() => setDropPos( null )}
+        onDragLeave={() => setDropInside( false )}
         onDrop={handleFolderDrop}
       >
-        {dropPos === 'after' && <div className="absolute bottom-0 inset-x-0 h-0.5 bg-blue-500 z-10 pointer-events-none" />}
         <span className="text-[10px] w-3 text-center shrink-0 mt-0.5">{expanded ? '▾' : '▸'}</span>
         <FolderIcon className={`shrink-0 mt-0.5 ${hasInheritedConfig ? 'text-blue-500' : 'text-amber-600'}`} />
 
@@ -714,15 +739,20 @@ function FolderContents ( {
   const deleteExample    = useStore( s => s.deleteExample );
   const duplicateExample = useStore( s => s.duplicateExample );
 
-  return (
-    <>
-      {folder.folders.map( ( sub, subIndex ) => (
+  const dropIndent = ( depth + 1 ) * 12 + 8;
+
+  // Requests and sub-folders are rendered in one unified, drag-orderable list
+  // (folder.childOrder). A drop line sits before every child and after the last,
+  // so an item can be placed at any position — including above the first folder.
+  const renderChild = ( child: ChildRef ) => {
+    if ( child.type === 'folder' ) {
+      const sub = folder.folders.find( f => f.id === child.id );
+      if ( !sub ) return null;
+      return (
         <FolderRow
-          key={sub.id}
           folder={sub}
           collectionId={collectionId}
           parentFolderId={folder.id}
-          folderIndex={subIndex}
           depth={depth + 1}
           expandCtrl={expandCtrl}
           onAddRequest={() => onAddRequest( sub.id )}
@@ -757,46 +787,54 @@ function FolderContents ( {
             onRunFolder={onRunFolder}
           />
         </FolderRow>
-      ) )}
+      );
+    }
+    const req = requests[child.id];
+    if ( !req ) return null;
+    return (
+      <RequestRow
+        reqId={req.id}
+        collectionId={collectionId}
+        folderId={folder.id}
+        name={req.name}
+        url={req.url}
+        method={req.method}
+        protocol={req.protocol}
+        authType={req.auth.type}
+        hookType={req.hookType}
+        disabled={req.disabled}
+        tags={req.meta?.tags ?? []}
+        isActive={req.id === activeRequestId}
+        autoRename={req.id === newRequestId}
+        indent={( depth + 1 ) * 12 + 8}
+        examples={req.examples?.map( e => ( { id: e.id, name: e.name } ) )}
+        activeExampleId={req.id === activeRequestId ? activeExampleId : null}
+        onSelect={() => onSelectRequest( req.id )}
+        onRename={name => onRenameRequest( req.id, name )}
+        onDelete={() => onDeleteRequest( req.id )}
+        onDuplicate={() => onDuplicateRequest( req.id )}
+        onUpdateTags={tags => onUpdateRequestTags( req.id, tags )}
+        onSetHookType={ht => onSetRequestHookType( req.id, ht )}
+        onToggleDisabled={() => onToggleRequestDisabled( req.id )}
+        onAddExample={() => { const exId = addExampleFromRequest( req.id ); if ( exId ) openExample( req.id, collectionId, exId ); }}
+        onOpenExample={exId => openExample( req.id, collectionId, exId )}
+        onRenameExample={( exId, name ) => renameExample( req.id, exId, name )}
+        onDeleteExample={exId => deleteExample( req.id, exId )}
+        onDuplicateExample={exId => duplicateExample( req.id, exId )}
+      />
+    );
+  };
 
-      {folder.requestIds.map( ( reqId, reqIndex ) => {
-        const req = requests[reqId];
-        if ( !req ) return null;
-        return (
-          <RequestRow
-            key={req.id}
-            reqId={req.id}
-            collectionId={collectionId}
-            folderId={folder.id}
-            reqIndex={reqIndex}
-            name={req.name}
-            url={req.url}
-            method={req.method}
-            protocol={req.protocol}
-            authType={req.auth.type}
-            hookType={req.hookType}
-            disabled={req.disabled}
-            tags={req.meta?.tags ?? []}
-            isActive={req.id === activeRequestId}
-            autoRename={req.id === newRequestId}
-            indent={( depth + 1 ) * 12 + 8}
-            examples={req.examples?.map( e => ( { id: e.id, name: e.name } ) )}
-            activeExampleId={req.id === activeRequestId ? activeExampleId : null}
-            onSelect={() => onSelectRequest( req.id )}
-            onRename={name => onRenameRequest( req.id, name )}
-            onDelete={() => onDeleteRequest( req.id )}
-            onDuplicate={() => onDuplicateRequest( req.id )}
-            onUpdateTags={tags => onUpdateRequestTags( req.id, tags )}
-            onSetHookType={ht => onSetRequestHookType( req.id, ht )}
-            onToggleDisabled={() => onToggleRequestDisabled( req.id )}
-            onAddExample={() => { const exId = addExampleFromRequest( req.id ); if ( exId ) openExample( req.id, collectionId, exId ); }}
-            onOpenExample={exId => openExample( req.id, collectionId, exId )}
-            onRenameExample={( exId, name ) => renameExample( req.id, exId, name )}
-            onDeleteExample={exId => deleteExample( req.id, exId )}
-            onDuplicateExample={exId => duplicateExample( req.id, exId )}
-          />
-        );
-      } )}
+  const children = orderedChildren( folder );
+  return (
+    <>
+      <DropLine collectionId={collectionId} parentFolderId={folder.id} index={0} indent={dropIndent} />
+      {children.map( ( child, k ) => (
+        <React.Fragment key={child.type + ':' + child.id}>
+          {renderChild( child )}
+          <DropLine collectionId={collectionId} parentFolderId={folder.id} index={k + 1} indent={dropIndent} />
+        </React.Fragment>
+      ) )}
     </>
   );
 }

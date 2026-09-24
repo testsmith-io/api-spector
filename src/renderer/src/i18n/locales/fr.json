@@ -1036,5 +1036,18 @@
   "Replay the guided walkthrough of collections, environments and requests.": "Rejouez la visite guidée des collections, environnements et requests.",
   "Schema: a local scratch check.": "Schema : une vérification locale de travail.",
   "Validate this request's last response against a JSON Schema, right here. It is **not saved to the contract and not published**. A dev-time sanity check only. To define what the provider *must* return (which drives contract testing), use the **Contract** tab.": "Validez la dernière réponse de ce request directement ici par rapport à un JSON Schema. Elle n'est **pas enregistrée dans le contract ni publiée**. Juste une vérification de bon sens en développement. Pour définir ce que le provider *doit* renvoyer (ce qui pilote les tests de contract), utilisez l'onglet **Contract**.",
-  "What this request *expects* from the provider: status, headers, and body shape (a JSON Schema). It is checked against the response in the **Contract** panel and is the consumer side of contract testing (consumer and bi-directional verify), feeding the `deploy-check` gate. For a quick body check that runs on every send, use the **Schema** tab.": "Ce que ce request *attend* du provider : statut, en-têtes et forme du body (un JSON Schema). C'est vérifié par rapport à la réponse dans le panneau **Contract** et c'est le côté consommateur des tests de contract (vérification consommateur et bidirectionnelle), qui alimente la gate `deploy-check`. Pour une vérification rapide du body à chaque envoi, utilisez l'onglet **Schema**."
+  "What this request *expects* from the provider: status, headers, and body shape (a JSON Schema). It is checked against the response in the **Contract** panel and is the consumer side of contract testing (consumer and bi-directional verify), feeding the `deploy-check` gate. For a quick body check that runs on every send, use the **Schema** tab.": "Ce que ce request *attend* du provider : statut, en-têtes et forme du body (un JSON Schema). C'est vérifié par rapport à la réponse dans le panneau **Contract** et c'est le côté consommateur des tests de contract (vérification consommateur et bidirectionnelle), qui alimente la gate `deploy-check`. Pour une vérification rapide du body à chaque envoi, utilisez l'onglet **Schema**.",
+  "More": "Plus",
+  "Response sections": "Sections de réponse",
+  "More response sections": "Autres sections de réponse",
+  "More actions": "Autres actions",
+  "Body view mode": "Mode d’affichage du body",
+  "Cell values can also use variables and faker, e.g.": "Les valeurs de cellule peuvent aussi utiliser des variables et faker, p. ex.",
+  "or": "ou",
+  "Script errors": "Erreurs de script",
+  "Pre-script:": "Pré-script :",
+  "Post-script:": "Post-script :",
+  "No data row": "Aucune ligne de données",
+  "Row :n": "Ligne :n",
+  "Run this request with the variables from one data table row": "Exécuter ce request avec les variables d'une ligne de la table de données"
 }

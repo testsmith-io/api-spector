@@ -22,6 +22,8 @@ import { prettyJson, prettyXml } from './utils/formatters';
 import { appendSnippetToScript } from '../RequestBuilder/scriptAppend';
 import { useToast } from '../common/Toast';
 import { ContextMenu } from '../common/ContextMenu';
+import { OverflowMenu } from '../common/OverflowMenu';
+import { DotsHorizontalIcon } from '../common/icons';
 import { Modal } from '../common/Modal';
 import { validateHttpSemantics } from '../../../../shared/http-semantics';
 import { useT } from '../../i18n';
@@ -116,6 +118,22 @@ function HistoryTabRow({ entry, onLoad, onResend }: { entry: HistoryEntry; onLoa
 }
 
 type RespTab = 'body' | 'headers' | 'tests' | 'console' | 'request' | 'history' | 'http' | 'error'
+
+// Progressive disclosure driven by the PANEL width (a container query on the
+// toolbar), not the viewport — the response panel is independently resizable.
+// Primary tabs stay inline; the rest fold into "More" as the panel narrows.
+// `@min-[520px]` = medium+, `@min-[720px]` = large. The active tab is always
+// forced inline (and dropped from the menu) so it never hides.
+const TAB_INLINE_VIS: Record<RespTab, string> = {
+  error: 'flex', request: 'flex', body: 'flex', headers: 'flex',
+  tests: 'hidden @min-[520px]:flex', console: 'hidden @min-[520px]:flex',
+  history: 'hidden @min-[720px]:flex', http: 'hidden @min-[720px]:flex',
+};
+const TAB_MENU_VIS: Record<RespTab, string> = {
+  error: 'hidden', request: 'hidden', body: 'hidden', headers: 'hidden',
+  tests: 'flex @min-[520px]:hidden', console: 'flex @min-[520px]:hidden',
+  history: 'flex @min-[720px]:hidden', http: 'flex @min-[720px]:hidden',
+};
 
 export function ResponseViewer() {
   const t = useT();
@@ -310,6 +328,58 @@ export function ResponseViewer() {
     </div>
   );
 
+  // One response tab, rendered either inline in the bar or as a row inside the
+  // "More" menu; container-query classes pick which, and the active tab is
+  // always forced inline (and removed from the menu) so it can never hide.
+  function renderTabButton(def: typeof tabList[number], variant: 'inline' | 'menu') {
+    const active = tab === def.id;
+    const badge = def.badge !== undefined ? (
+      <span className={`text-[10px] px-1 rounded ${
+        def.error ? 'bg-red-800 text-red-200'
+        : def.id === 'tests' && passedCount < totalCount ? 'bg-red-800 text-red-200'
+        : 'bg-surface-700 text-white'
+      }`}>{def.badge}</span>
+    ) : null;
+    if (variant === 'menu') {
+      return (
+        <button
+          key={def.id}
+          role="menuitem"
+          tabIndex={-1}
+          onClick={() => setTab(def.id)}
+          className={`${active ? 'hidden' : TAB_MENU_VIS[def.id]} w-full items-center justify-between gap-3 px-3 py-1.5 text-xs ${active ? '' : 'text-surface-300 hover:bg-surface-800 hover:text-white'}`}
+        >
+          <span>{def.label}</span>
+          {badge}
+        </button>
+      );
+    }
+    return (
+      <button
+        key={def.id}
+        role="tab"
+        aria-selected={active}
+        onClick={() => setTab(def.id)}
+        className={`${active ? 'flex' : TAB_INLINE_VIS[def.id]} px-3 py-1 text-xs rounded transition-colors items-center gap-1 ${active ? 'bg-surface-800 text-white' : 'text-surface-400 hover:text-white'}`}
+      >
+        {def.label}
+        {badge}
+      </button>
+    );
+  }
+
+  // Left/Right arrow navigation across the visible tabs (WAI-ARIA tablist).
+  function onTablistKey(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    const btns = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')).filter(el => el.offsetParent !== null);
+    const idx = btns.indexOf(document.activeElement as HTMLElement);
+    e.preventDefault();
+    if (e.key === 'ArrowRight') btns[(idx + 1) % btns.length]?.focus();
+    else if (e.key === 'ArrowLeft') btns[(idx - 1 + btns.length) % btns.length]?.focus();
+    else if (e.key === 'Home') btns[0]?.focus();
+    else btns[btns.length - 1]?.focus();
+  }
+
   return (
     <div className="h-full flex flex-col">
       {/* Hook results */}
@@ -317,122 +387,163 @@ export function ResponseViewer() {
         <HookResultsPanel results={hookResults} />
       )}
 
-      {/* Status bar */}
-      <div className="flex items-center gap-4 px-4 py-1.5 border-b border-surface-800 flex-shrink-0 overflow-x-auto">
-        <span className={`text-sm font-bold shrink-0 ${getStatusColor(response.status)}`}>
-          {response.status} {response.statusText}
-        </span>
-        <span className="text-xs text-surface-400 shrink-0">{response.durationMs}ms</span>
-        <span className="text-xs text-surface-400 shrink-0">{(response.bodySize / 1024).toFixed(1)} KB</span>
+      {/* Response toolbar. A container query on this wrapper makes the controls
+          respond to the PANEL width (it is independently resizable), so the bar
+          never scrolls horizontally: tabs and actions fold into overflow menus
+          as it narrows. Row 1 = metadata + tabs; row 2 = view label + actions. */}
+      <div className="@container flex-shrink-0 border-b border-surface-800">
+        {/* Row 1: response metadata + tabs (+ "More" overflow) */}
+        <div className="flex items-center gap-3 px-4 py-1.5 min-w-0">
+          <div className="flex items-center gap-3 shrink-0">
+            <span className={`text-sm font-bold ${getStatusColor(response.status)}`}>
+              {response.status}<span className="hidden @min-[440px]:inline"> {response.statusText}</span>
+            </span>
+            <span className="text-xs text-surface-400">{response.durationMs}ms</span>
+            <span className="text-xs text-surface-400">{(response.bodySize / 1024).toFixed(1)} KB</span>
+          </div>
 
-        <div className="flex gap-0 ml-2 shrink-0">
-          {tabList.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`px-3 py-1 text-xs rounded transition-colors flex items-center gap-1 ${tab === t.id ? 'bg-surface-800 text-white' : 'text-surface-400 hover:text-white'
-                }`}
+          <div role="tablist" aria-label={t('Response sections')} onKeyDown={onTablistKey} className="flex items-center gap-0 min-w-0 ml-1">
+            {tabList.map(def => renderTabButton(def, 'inline'))}
+            <OverflowMenu
+              wrapperClassName="flex @min-[720px]:hidden"
+              buttonClassName="px-2 py-1 text-xs rounded text-surface-400 hover:text-white hover:bg-surface-800 flex items-center gap-1"
+              button={<>{t('More')} <span aria-hidden="true">▾</span></>}
+              ariaLabel={t('More response sections')}
+              align="left"
             >
-              {t.label}
-              {t.badge !== undefined && (
-                <span className={`text-[10px] px-1 rounded ${
-                  t.error ? 'bg-red-800 text-red-200'
-                  : t.id === 'tests' && passedCount < totalCount ? 'bg-red-800 text-red-200'
-                  : 'bg-surface-700 text-white'
-                }`}>
-                  {t.badge}
-                </span>
-              )}
-            </button>
-          ))}
+              {tabList.map(def => renderTabButton(def, 'menu'))}
+            </OverflowMenu>
+          </div>
         </div>
 
+        {/* Row 2: current view label + body/view actions (+ "…" overflow) */}
+        {!response.error && (
+          <div className="flex items-center gap-2 px-4 py-1 border-t border-surface-800/60 min-w-0">
+            <span className="text-[11px] uppercase tracking-wider text-surface-500 font-medium truncate">
+              {tabList.find(x => x.id === tab)?.label ?? t('Body')}
+            </span>
+            {assertToast.toast && (
+              <span className="text-[10px] text-emerald-400 font-medium px-1 shrink-0">{assertToast.toast.msg}</span>
+            )}
+            {contractToast.toast && (
+              <span className="text-[10px] text-blue-400 font-medium px-1 shrink-0">{contractToast.toast.msg}</span>
+            )}
 
-        {!response.error && <div className="ml-auto flex items-center gap-1 shrink-0">
-          {/* Toasts */}
-          {assertToast.toast && (
-            <span className="text-[10px] text-emerald-400 font-medium px-1">{assertToast.toast.msg}</span>
-          )}
-          {contractToast.toast && (
-            <span className="text-[10px] text-blue-400 font-medium px-1">{contractToast.toast.msg}</span>
-          )}
+            <div className="ml-auto flex items-center gap-1 shrink-0">
+              {/* Tree / Raw / Table — a segmented view-mode control (body tab) */}
+              {tab === 'body' && supportsTree && !response.streamed && (
+                <div role="group" aria-label={t('Body view mode')} className="flex rounded overflow-hidden border border-surface-800 mr-1">
+                  <button
+                    onClick={() => setBodyView('tree')}
+                    aria-pressed={bodyView === 'tree'}
+                    className={`px-2 py-0.5 text-[10px] transition-colors ${bodyView === 'tree' ? 'bg-surface-700 text-white' : 'text-surface-600 hover:text-white'}`}
+                    title={t('Interactive tree view - click values to add assertions')}
+                  >
+                    {t('Tree')}
+                  </button>
+                  <button
+                    onClick={() => setBodyView('raw')}
+                    aria-pressed={bodyView === 'raw'}
+                    className={`px-2 py-0.5 text-[10px] transition-colors ${bodyView === 'raw' ? 'bg-surface-700 text-white' : 'text-surface-600 hover:text-white'}`}
+                    title={t('Raw body view')}
+                  >
+                    {t('Raw')}
+                  </button>
+                  {showTable && (
+                    <button
+                      onClick={() => setBodyView('table')}
+                      aria-pressed={bodyView === 'table'}
+                      className={`px-2 py-0.5 text-[10px] transition-colors ${bodyView === 'table' ? 'bg-surface-700 text-white' : 'text-surface-600 hover:text-white'}`}
+                      title={t('Show an array in the response as a sortable table')}
+                    >
+                      {t('Table')}
+                    </button>
+                  )}
+                </div>
+              )}
 
-          {/* Tree / Raw toggle — only for body tab with JSON or XML (not streams) */}
-          {tab === 'body' && supportsTree && !response.streamed && (
-            <div className="flex rounded overflow-hidden border border-surface-800 mr-1">
+              {/* Pin — always visible */}
               <button
-                onClick={() => setBodyView('tree')}
-                className={`px-2 py-0.5 text-[10px] transition-colors ${bodyView === 'tree' ? 'bg-surface-700 text-white' : 'text-surface-600 hover:text-white'}`}
-                title={t('Interactive tree view - click values to add assertions')}
+                onClick={() => setPinned(response)}
+                aria-pressed={pinnedResponse === response}
+                title={t('Pin this response to compare against later responses')}
+                className={`px-2 py-0.5 text-[10px] rounded transition-colors shrink-0 ${pinnedResponse === response ? 'bg-blue-700 text-white' : 'bg-surface-800 hover:bg-surface-700'}`}
               >
-                {t('Tree')}
+                {t('Pin')}
               </button>
-              <button
-                onClick={() => setBodyView('raw')}
-                className={`px-2 py-0.5 text-[10px] transition-colors ${bodyView === 'raw' ? 'bg-surface-700 text-white' : 'text-surface-600 hover:text-white'}`}
-                title={t('Raw body view')}
-              >
-                {t('Raw')}
-              </button>
-              {showTable && (
+
+              {/* Diff / Contract / Mock — inline while there is room; they are
+                  few and small, so they only fold into "…" on a genuinely narrow
+                  panel. */}
+              {pinnedResponse && (
                 <button
-                  onClick={() => setBodyView('table')}
-                  className={`px-2 py-0.5 text-[10px] transition-colors ${bodyView === 'table' ? 'bg-surface-700 text-white' : 'text-surface-600 hover:text-white'}`}
-                  title={t('Show an array in the response as a sortable table')}
+                  onClick={() => setDiffMode(d => !d)}
+                  aria-pressed={diffMode}
+                  title={t('Toggle diff view against pinned response')}
+                  className={`hidden @min-[350px]:flex px-2 py-0.5 text-[10px] rounded transition-colors ${diffMode ? 'bg-amber-700 text-white' : 'bg-surface-800 hover:bg-surface-700'}`}
                 >
-                  {t('Table')}
+                  {t('Diff')}
                 </button>
               )}
+              <button
+                onClick={saveAsContract}
+                className="hidden @min-[350px]:flex px-2 py-0.5 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors"
+                title={t('Capture this response as a contract expectation')}
+              >
+                ↓ {t('Contract')}
+              </button>
+              <button
+                onClick={() => setShowMockModal(true)}
+                className="hidden @min-[350px]:flex px-2 py-0.5 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors"
+                title={t('Save this response as a mock route')}
+              >
+                ↓ {t('Mock')}
+              </button>
+
+              {/* "…" overflow — only appears below the width where Diff/Contract/
+                  Mock stop fitting; hidden entirely (no empty button) above it. */}
+              <OverflowMenu
+                wrapperClassName="flex @min-[350px]:hidden"
+                buttonClassName="px-1.5 py-1 text-[10px] rounded bg-surface-800 hover:bg-surface-700 text-surface-300 flex items-center"
+                button={<DotsHorizontalIcon />}
+                ariaLabel={t('More actions')}
+              >
+                {pinnedResponse && (
+                  <button
+                    role="menuitem"
+                    tabIndex={-1}
+                    onClick={() => setDiffMode(d => !d)}
+                    className="flex @min-[350px]:hidden w-full items-center gap-2 px-3 py-1.5 text-xs text-surface-300 hover:bg-surface-800 hover:text-white"
+                  >
+                    {t('Diff')}
+                  </button>
+                )}
+                <button
+                  role="menuitem"
+                  tabIndex={-1}
+                  onClick={saveAsContract}
+                  className="flex @min-[350px]:hidden w-full items-center gap-2 px-3 py-1.5 text-xs text-surface-300 hover:bg-surface-800 hover:text-white"
+                >
+                  ↓ {t('Contract')}
+                </button>
+                <button
+                  role="menuitem"
+                  tabIndex={-1}
+                  onClick={() => setShowMockModal(true)}
+                  className="flex @min-[350px]:hidden w-full items-center gap-2 px-3 py-1.5 text-xs text-surface-300 hover:bg-surface-800 hover:text-white"
+                >
+                  ↓ {t('Mock')}
+                </button>
+              </OverflowMenu>
             </div>
-          )}
-
-          {/* Pin button */}
-          <button
-            onClick={() => setPinned(response)}
-            title={t('Pin this response to compare against later responses')}
-            className={`px-2 py-0.5 text-[10px] rounded transition-colors ${pinnedResponse === response
-              ? 'bg-blue-700 text-white'
-              : 'bg-surface-800 hover:bg-surface-700'
-              }`}
-          >
-            {t('Pin')}
-          </button>
-
-          {/* Diff toggle — only when a pinned response exists */}
-          {pinnedResponse && (
-            <button
-              onClick={() => setDiffMode(d => !d)}
-              title={t('Toggle diff view against pinned response')}
-              className={`px-2 py-0.5 text-[10px] rounded transition-colors ${diffMode
-                ? 'bg-amber-700 text-white'
-                : 'bg-surface-800 hover:bg-surface-700'
-                }`}
-            >
-              {t('Diff')}
-            </button>
-          )}
-
-          <button
-            onClick={saveAsContract}
-            className="px-2 py-0.5 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors"
-            title={t('Capture this response as a contract expectation')}
-          >
-            ↓ {t('Contract')}
-          </button>
-          <button
-            onClick={() => setShowMockModal(true)}
-            className="px-2 py-0.5 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors"
-            title={t('Save this response as a mock route')}
-          >
-            ↓ {t('Mock')}
-          </button>
-        </div>}
+          </div>
+        )}
       </div>
 
       {showMockModal && <SaveAsMockModal onClose={() => setShowMockModal(false)} />}
 
       {/* Content — flex-col so each panel can fill remaining height cleanly */}
-      <div className="flex-1 min-h-0 flex flex-col overflow-y-auto">
+      <div role="tabpanel" aria-label={tabList.find(x => x.id === tab)?.label} className="flex-1 min-h-0 flex flex-col overflow-y-auto">
         {response.error ? (
           tab === 'request' ? (
             <RequestPanel sentRequest={sentRequest} />

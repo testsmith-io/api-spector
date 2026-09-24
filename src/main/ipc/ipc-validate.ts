@@ -96,6 +96,7 @@ interface SendRequestShape {
   proxy?: unknown
   tls?: unknown
   piiMaskPatterns?: string[]
+  dataRow?: Record<string, string>
 }
 
 export const validateSendRequestPayload: (data: unknown) => asserts data is SendRequestShape = compile<SendRequestShape>({
@@ -104,6 +105,7 @@ export const validateSendRequestPayload: (data: unknown) => asserts data is Send
     request:        apiRequestSchema,
     collectionVars: stringMap,
     globals:        stringMap,
+    dataRow:        stringMap,
     piiMaskPatterns: { type: 'array', items: { type: 'string' } },
     // `environment`, `proxy`, `tls` are accepted as anything — they're
     // covered by the IPC handler's own type-narrow + defaults.

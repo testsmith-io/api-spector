@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { useStore } from '../store';
 import { useActiveEnvironment } from './useActiveEnvironment';
 import { DYNAMIC_VAR_NAMES } from '../components/RequestBuilder/atCompletions';
+import type { Folder } from '../../../shared/types';
 
 // Regex to extract keys from sp.*.set("key", ...) calls in scripts
 const SCRIPT_SET_RE = /\bsp\.(?:variables|collectionVariables|environment|globals)\.set\(\s*["']([^"']+)["']/g;
@@ -41,6 +42,14 @@ export function useVarNames(): string[] {
       const col = collections[activeCollectionId]?.data;
       if (col) {
         Object.keys(col.collectionVariables ?? {}).forEach(k => names.add(k));
+        // Data-table columns become {{variable}} placeholders per row, so offer
+        // them too — the collection's, and every folder's.
+        (col.dataSet?.columns ?? []).forEach(c => { if (c) names.add(c); });
+        const addFolderCols = (f: Folder): void => {
+          (f.dataSet?.columns ?? []).forEach(c => { if (c) names.add(c); });
+          f.folders.forEach(addFolderCols);
+        };
+        addFolderCols(col.rootFolder);
         // Scan every request's pre/post scripts for .set("key", ...) calls
         for (const req of Object.values(col.requests)) {
           extractScriptVarNames(req.preRequestScript).forEach(k => names.add(k));

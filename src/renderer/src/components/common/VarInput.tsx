@@ -1,10 +1,43 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { useVarNames } from '../../hooks/useVarNames';
 import { useVarValues } from '../../hooks/useVarValues';
+import { FAKER_NAMESPACES, FAKER_SUB } from '../RequestBuilder/atCompletions';
+
+// Staged {{…}} completion, matching the request-body / URL editors: a variable
+// name, a $dynamic var, or an expression drilled faker → namespace → method
+// (and dayjs starters). Each item carries the exact text to splice in place of
+// the token being typed; `close` items finish with `}}`, the rest keep the
+// dropdown open so completion continues (e.g. faker. → person. → firstName()).
+type CompletionType = 'variable' | 'function' | 'property'
+
+interface Suggestion {
+  label: string
+  insert: string
+  type: CompletionType   // drives the CodeMirror-style completion icon
+  close?: boolean        // append }} — a terminal completion
+  detail?: string
+  boost?: number         // higher sorts first (matches the body editor)
+}
+
+const DAYJS_OPTIONS: { label: string; insert: string }[] = [
+  { label: "dayjs().format('YYYY-MM-DD')",         insert: "dayjs().format('YYYY-MM-DD')" },
+  { label: 'dayjs().toISOString()',                insert: 'dayjs().toISOString()' },
+  { label: 'dayjs().valueOf()',                    insert: 'dayjs().valueOf()' },
+  { label: "dayjs().subtract(1,'day').format(…)",  insert: "dayjs().subtract(1,'day').format('YYYY-MM-DD')" },
+  { label: "dayjs().add(1,'day').format(…)",       insert: "dayjs().add(1,'day').format('YYYY-MM-DD')" },
+];
+
+// Mirrors CodeMirror's completion icons (@codemirror/autocomplete) so the
+// dropdown reads the same as the request-body editor.
+const ICON: Record<CompletionType, { glyph: string; cls: string }> = {
+  variable: { glyph: '𝑥', cls: 'text-emerald-400' },
+  function: { glyph: 'ƒ', cls: 'text-violet-400' },
+  property: { glyph: '◆', cls: 'text-blue-400' },
+};
 import { useT } from '../../i18n';
 
 // ─── Parse {{varname}} tokens ─────────────────────────────────────────────────
@@ -32,31 +65,29 @@ function PortalDropdown({
   onPick,
 }: {
   pos: DropdownPos
-  items: string[]
+  items: Suggestion[]
   activeIndex: number
   mode: 'var' | 'static'
-  onPick: (s: string) => void
+  onPick: (s: Suggestion) => void
 }) {
   return ReactDOM.createPortal(
     <ul
-      style={{ position: 'fixed', top: pos.top, left: pos.left, minWidth: pos.minWidth, zIndex: 9999 }}
-      className="max-h-52 overflow-y-auto bg-surface-800 border border-surface-600 rounded shadow-xl text-xs"
+      style={{ position: 'fixed', top: pos.top, left: pos.left, minWidth: Math.max(pos.minWidth, 220), zIndex: 9999 }}
+      className="max-h-56 overflow-y-auto bg-surface-800 border border-surface-600 rounded shadow-xl text-xs py-0.5"
     >
       {items.map((s, i) => (
-        <li key={s}>
+        <li key={s.label + i}>
           <button
             onMouseDown={e => { e.preventDefault(); onPick(s); }}
-            className={`w-full text-left px-3 py-1.5 font-mono transition-colors ${
+            className={`w-full text-left px-2 py-1 font-mono transition-colors flex items-center gap-1.5 ${
               i === activeIndex ? 'bg-blue-600 text-white' : 'hover:bg-surface-700'
             }`}
           >
-            {mode === 'var' ? (
-              <>
-                <span className="text-surface-500">{'{{'}</span>
-                <span>{s}</span>
-                <span className="text-surface-500">{'}}'}</span>
-              </>
-            ) : s}
+            {mode === 'var'
+              ? <span className={`w-3 shrink-0 text-center ${i === activeIndex ? 'text-white/80' : ICON[s.type].cls}`}>{ICON[s.type].glyph}</span>
+              : null}
+            <span className="truncate">{s.label}</span>
+            {s.detail && <span className={`ml-auto pl-2 shrink-0 italic ${i === activeIndex ? 'text-white/70' : 'text-surface-500'}`}>{s.detail}</span>}
           </button>
         </li>
       ))}
@@ -88,11 +119,13 @@ export function VarInput({ value, onChange, className, wrapperClassName, staticS
   const varValues = useVarValues();
   const inputRef  = useRef<HTMLInputElement>(null);
 
-  const [suggestions,    setSuggestions]    = useState<string[]>([]);
+  const [suggestions,    setSuggestions]    = useState<Suggestion[]>([]);
   const [suggestionMode, setSuggestionMode] = useState<SuggestionMode>('var');
   const [activeIndex,    setActiveIndex]    = useState(-1);
   const [dropPos,        setDropPos]        = useState<DropdownPos | null>(null);
   const [showPreview,    setShowPreview]    = useState(false);
+  // Length of the token currently being replaced (the completion's `from`).
+  const partialLen = useRef(0);
 
   // Recalculate portal position whenever suggestions appear or window resizes
   useEffect(() => {
@@ -105,34 +138,82 @@ export function VarInput({ value, onChange, className, wrapperClassName, staticS
 
   // ── Autocomplete ───────────────────────────────────────────────────────────
 
-  function detectQuery(val: string, cursor: number) {
-    const before   = val.slice(0, cursor);
-    const varMatch = /\{\{(\w*)$/.exec(before);
+  function show(items: Suggestion[], from: number) {
+    partialLen.current = from;
+    setSuggestions(items);
+    setSuggestionMode('var');
+    setActiveIndex(-1);
+  }
 
-    if (varMatch) {
-      const q        = varMatch[1].toLowerCase();
-      const filtered = varNames.filter(n => n.toLowerCase().includes(q));
-      setSuggestions(filtered);
-      setSuggestionMode('var');
-      setActiveIndex(-1);
-    } else if (staticSuggestions) {
-      const q        = val.toLowerCase();
-      const filtered = q
+  function detectQuery(val: string, cursor: number) {
+    const before = val.slice(0, cursor);
+
+    // Prefix matches sort before mid-string ones, then higher boost — the same
+    // ordering CodeMirror applies in the body editor.
+    const sortByMatch = (items: Suggestion[], q: string) =>
+      items.map((it, i) => ({ it, i }))
+        .sort((a, b) => {
+          const ap = a.it.label.toLowerCase().startsWith(q) ? 0 : 1;
+          const bp = b.it.label.toLowerCase().startsWith(q) ? 0 : 1;
+          return ap - bp || (b.it.boost ?? 0) - (a.it.boost ?? 0) || a.i - b.i;
+        })
+        .map(x => x.it);
+
+    // {{faker.<namespace>.<method> — drill into a namespace's generators.
+    let m = /\{\{faker\.(\w+)\.(\w*)$/.exec(before);
+    if (m) {
+      const q = m[2].toLowerCase();
+      const subs = (FAKER_SUB[m[1]] ?? []).filter(c => c.label.toLowerCase().includes(q));
+      show(sortByMatch(subs.map(c => ({ label: c.label, type: 'function', detail: (c.detail as string) ?? '()', insert: `${c.label}()`, close: true })), q), m[2].length);
+      return;
+    }
+    // {{faker.<namespace> — list namespaces (person, internet, …).
+    m = /\{\{faker\.(\w*)$/.exec(before);
+    if (m) {
+      const q = m[1].toLowerCase();
+      const items: Suggestion[] = FAKER_NAMESPACES.filter(c => c.label.toLowerCase().includes(q))
+        .map(c => ({ label: c.label, type: 'property', insert: `${c.label}.` }));
+      show(sortByMatch(items, q), m[1].length);
+      return;
+    }
+    // {{dayjs… — date/time expression options.
+    m = /\{\{(dayjs\b[^}]*)$/.exec(before);
+    if (m) {
+      const q = m[1].toLowerCase();
+      show(DAYJS_OPTIONS.filter(o => o.label.toLowerCase().includes(q))
+        .map(o => ({ label: o.label, type: 'function', insert: o.insert, close: true })), m[1].length);
+      return;
+    }
+    // {{name / {{$dynamic / faker|dayjs expression starters.
+    m = /\{\{(\$?\w*)$/.exec(before);
+    if (m) {
+      const q = m[1].toLowerCase();
+      const vars: Suggestion[] = varNames
+        .filter(n => n.toLowerCase().includes(q))
+        .map(n => ({ label: n, insert: n, type: 'variable', close: true, boost: n.startsWith('$') ? 1 : 0 }));
+      const starters: Suggestion[] = [
+        { label: 'faker', insert: 'faker.', type: 'property' as const },
+        { label: 'dayjs', insert: 'dayjs().', type: 'function' as const },
+      ].filter(s => s.label.includes(q));
+      show([...sortByMatch(vars, q), ...starters], m[1].length);
+      return;
+    }
+
+    if (staticSuggestions) {
+      const q = val.toLowerCase();
+      const filtered = (q
         ? staticSuggestions
             .filter(s => s.toLowerCase().includes(q))
-            .sort((a, b) => {
-              const aP = a.toLowerCase().startsWith(q) ? 0 : 1;
-              const bP = b.toLowerCase().startsWith(q) ? 0 : 1;
-              return aP - bP;
-            })
+            .sort((a, b) => (a.toLowerCase().startsWith(q) ? 0 : 1) - (b.toLowerCase().startsWith(q) ? 0 : 1))
             .slice(0, 20)
-        : staticSuggestions.slice(0, 20);
-      setSuggestions(filtered);
+        : staticSuggestions.slice(0, 20));
+      partialLen.current = 0;
+      setSuggestions(filtered.map(s => ({ label: s, insert: s, type: 'variable' as const })));
       setSuggestionMode('static');
       setActiveIndex(-1);
-    } else {
-      setSuggestions([]);
+      return;
     }
+    setSuggestions([]);
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -164,27 +245,35 @@ export function VarInput({ value, onChange, className, wrapperClassName, staticS
     }
   }
 
-  const apply = useCallback((suggestion: string) => {
+  function apply(item: Suggestion) {
     if (suggestionMode === 'static') {
-      onChange(suggestion);
+      onChange(item.insert);
       setSuggestions([]);
       return;
     }
 
-    // var mode: splice {{name}} at cursor position
     const el     = inputRef.current;
     const cursor = el?.selectionStart ?? value.length;
     const before = value.slice(0, cursor);
     const after  = value.slice(cursor);
-    const match  = /\{\{(\w*)$/.exec(before);
-    if (!match) return;
-
-    const newVal    = before.slice(0, match.index) + `{{${suggestion}}}` + after;
-    const newCursor = match.index + suggestion.length + 4;
+    const start  = cursor - partialLen.current;                 // replace the token being typed
+    const insert = item.insert + (item.close ? '}}' : '');
+    const newVal    = before.slice(0, start) + insert + after;
+    const newCursor = start + insert.length;
     onChange(newVal);
-    setSuggestions([]);
-    requestAnimationFrame(() => el?.setSelectionRange(newCursor, newCursor));
-  }, [suggestionMode, value, onChange]);
+
+    if (item.close) {
+      setSuggestions([]);
+      requestAnimationFrame(() => el?.setSelectionRange(newCursor, newCursor));
+    } else {
+      // Non-terminal (faker. / namespace. / dayjs().) — keep completing.
+      requestAnimationFrame(() => {
+        el?.focus();
+        el?.setSelectionRange(newCursor, newCursor);
+        detectQuery(newVal, newCursor);
+      });
+    }
+  }
 
   function handleBlur(e: React.FocusEvent<HTMLInputElement>) {
     setTimeout(() => setSuggestions([]), 150);

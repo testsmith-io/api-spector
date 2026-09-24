@@ -1,7 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import type { Folder, Collection, ApiRequest, RunnerItem, AuthConfig, KeyValuePair } from './types';
+import type { Folder, Collection, ApiRequest, RunnerItem, AuthConfig, KeyValuePair, DataSet } from './types';
+import { findFolder, orderedChildren } from './folder-tree';
 
 export type CollectedRequest = {
   request: ApiRequest
@@ -94,37 +95,44 @@ function buildFolderPlan(
     result.push(makeHook(req, collectionVars, 'beforeAll', scopeId, ancestorIds, scopePath));
   }
 
-  // 2. Regular requests in this folder (applying tag filter)
-  for (const req of regularReqs) {
-    const tags = req.meta?.tags ?? [];
-    if (filterTags.length > 0 && !filterTags.some(t => tags.includes(t))) continue;
+  // 2 + 3. Regular requests and sub-folders, interleaved in the folder's own
+  // order (childOrder). Hook requests are excluded here — they are emitted as
+  // beforeAll/afterAll or as before/after wrappers around each regular request.
+  const regularById = new Map(regularReqs.map(r => [r.id, r] as const));
+  const subById     = new Map(folder.folders.map(f => [f.id, f] as const));
+  for (const child of orderedChildren(folder)) {
+    if (child.type === 'request') {
+      const req = regularById.get(child.id);
+      if (!req) continue;
+      const tags = req.meta?.tags ?? [];
+      if (filterTags.length > 0 && !filterTags.some(t => tags.includes(t))) continue;
 
-    // before hooks: outer → inner
-    for (const w of allWrappers) {
-      for (const hookReq of w.before) {
-        result.push(makeHook(hookReq, collectionVars, 'before', w.scopeId, w.ancestors, w.scopePath, req.id));
+      // before hooks: outer → inner
+      for (const w of allWrappers) {
+        for (const hookReq of w.before) {
+          result.push(makeHook(hookReq, collectionVars, 'before', w.scopeId, w.ancestors, w.scopePath, req.id));
+        }
       }
-    }
-    // main request
-    result.push({ request: req, collectionVars, scopeId, scopeAncestors: ancestorIds, scopePath });
-    // after hooks: inner → outer
-    for (const w of [...allWrappers].reverse()) {
-      for (const hookReq of w.after) {
-        result.push(makeHook(hookReq, collectionVars, 'after', w.scopeId, w.ancestors, w.scopePath, req.id));
+      // main request
+      result.push({ request: req, collectionVars, scopeId, scopeAncestors: ancestorIds, scopePath });
+      // after hooks: inner → outer
+      for (const w of [...allWrappers].reverse()) {
+        for (const hookReq of w.after) {
+          result.push(makeHook(hookReq, collectionVars, 'after', w.scopeId, w.ancestors, w.scopePath, req.id));
+        }
       }
+    } else {
+      const sub = subById.get(child.id);
+      if (!sub) continue;
+      const folderTags = sub.tags ?? [];
+      const effectiveFilter = filterTags.length === 0
+        ? filterTags
+        : folderTags.some(t => filterTags.includes(t)) ? [] : filterTags;
+      result.push(...buildFolderPlan(
+        sub, requests, collectionVars, effectiveFilter,
+        sub.id, [...ancestorIds, scopeId], scopePath, allWrappers, false,
+      ));
     }
-  }
-
-  // 3. Subfolders
-  for (const sub of folder.folders) {
-    const folderTags = sub.tags ?? [];
-    const effectiveFilter = filterTags.length === 0
-      ? filterTags
-      : folderTags.some(t => filterTags.includes(t)) ? [] : filterTags;
-    result.push(...buildFolderPlan(
-      sub, requests, collectionVars, effectiveFilter,
-      sub.id, [...ancestorIds, scopeId], scopePath, allWrappers, false,
-    ));
   }
 
   // 4. afterAll hooks for this scope (always runs)
@@ -408,4 +416,52 @@ export function buildRunPlan(
   }
 
   return result;
+}
+
+/**
+ * Data-driven expansion: repeat a run plan once per DataSet row, tagging each
+ * copy with the row's values (`dataRow`, injected as local vars at send-time)
+ * and a `1/N` iteration label. Used for both collection- and folder-scoped runs
+ * — pass the folder's DataSet for a folder run, the collection's otherwise.
+ * With no rows the plan is returned unchanged (a single pass).
+ */
+export function expandRunPlanWithData(items: RunnerItem[], ds: DataSet | undefined): RunnerItem[] {
+  if (!ds || ds.rows.length === 0) return items;
+  return ds.rows.flatMap((row, ri) => {
+    const rowVars: Record<string, string> = {};
+    ds.columns.forEach((col, ci) => { if (col) rowVars[col] = row[ci] ?? ''; });
+    // Merge onto any existing dataRow (e.g. from folder-level expansion) so both
+    // sets of variables are available; this row's values win on key conflicts.
+    return items.map(item => ({ ...item, dataRow: { ...item.dataRow, ...rowVars }, iterationLabel: `${ri + 1}/${ds.rows.length}` }));
+  });
+}
+
+/** The nearest data table for a run item: walk from its own folder outward and
+ *  return the first ancestor folder that has rows. Collection-level data is not
+ *  considered here (it is applied separately by expandRunPlanWithData). */
+function nearestFolderDataSet(item: RunnerItem, collection: Collection): DataSet | undefined {
+  const chain = [item.scopeId, ...(item.scopeAncestors ?? [])].filter(Boolean) as string[];
+  for (const id of chain) {
+    const f = findFolder(collection.rootFolder, id);
+    if (f?.dataSet && f.dataSet.rows.length > 0) return f.dataSet;
+  }
+  return undefined;
+}
+
+/** Collection-run expansion: each non-hook request is repeated once per row of
+ *  its nearest folder-level data table (requests inherit an ancestor folder's
+ *  table). Hooks and requests not under any folder table pass through unchanged.
+ *  Collection-level data is layered on afterwards via expandRunPlanWithData. */
+export function expandFolderDataSets(items: RunnerItem[], collection: Collection): RunnerItem[] {
+  const out: RunnerItem[] = [];
+  for (const item of items) {
+    const ds = item.isHook ? undefined : nearestFolderDataSet(item, collection);
+    if (!ds) { out.push(item); continue; }
+    ds.rows.forEach((row, ri) => {
+      const rowVars: Record<string, string> = {};
+      ds.columns.forEach((col, ci) => { if (col) rowVars[col] = row[ci] ?? ''; });
+      out.push({ ...item, dataRow: { ...item.dataRow, ...rowVars }, iterationLabel: `${ri + 1}/${ds.rows.length}` });
+    });
+  }
+  return out;
 }

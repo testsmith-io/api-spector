@@ -30,6 +30,10 @@ export interface SendRequestPayload {
   environment: Environment | null
   collectionVars: Record<string, string>
   globals: Record<string, string>
+  /** A single data-table row to inject as local variables for this send, so an
+   *  individual request can be run against one specific row. Values may contain
+   *  {{vars}} / faker expressions; they are resolved at send-time. */
+  dataRow?: Record<string, string>
   proxy?: {
     url: string
     auth?: { username: string; password: string }

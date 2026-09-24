@@ -6,7 +6,29 @@
 // renderer and the main process.
 
 import { v4 as uuidv4 } from 'uuid';
-import type { Folder } from './types';
+import type { Folder, ChildRef } from './types';
+
+/** Effective, de-duplicated child order for a folder: honour `childOrder` for
+ *  items that still exist, then append anything missing (requests first, then
+ *  sub-folders). Stale entries in `childOrder` are ignored. This is the single
+ *  source of truth for both tree rendering and run order. */
+export function orderedChildren(folder: Folder): ChildRef[] {
+  const reqSet    = new Set(folder.requestIds);
+  const folderSet = new Set(folder.folders.map(f => f.id));
+  const seen      = new Set<string>();
+  const out: ChildRef[] = [];
+  for (const ref of folder.childOrder ?? []) {
+    const key = `${ref.type}:${ref.id}`;
+    if (seen.has(key)) continue;
+    if ((ref.type === 'request' && reqSet.has(ref.id)) || (ref.type === 'folder' && folderSet.has(ref.id))) {
+      out.push({ type: ref.type, id: ref.id });
+      seen.add(key);
+    }
+  }
+  for (const id of folder.requestIds) if (!seen.has(`request:${id}`)) out.push({ type: 'request', id });
+  for (const f of folder.folders)    if (!seen.has(`folder:${f.id}`)) out.push({ type: 'folder', id: f.id });
+  return out;
+}
 
 export function findFolder(root: Folder, id: string): Folder | null {
   if (root.id === id) return root;

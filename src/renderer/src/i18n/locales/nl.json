@@ -1036,5 +1036,18 @@
   "Replay the guided walkthrough of collections, environments and requests.": "Speel de rondleiding door collecties, omgevingen en requests opnieuw af.",
   "Schema: a local scratch check.": "Schema: een lokale kladcontrole.",
   "Validate this request's last response against a JSON Schema, right here. It is **not saved to the contract and not published**. A dev-time sanity check only. To define what the provider *must* return (which drives contract testing), use the **Contract** tab.": "Valideer de laatste respons van dit request hier direct tegen een JSON Schema. Het wordt **niet opgeslagen in het contract en niet gepubliceerd**. Alleen een sanity check tijdens ontwikkeling. Om te definiëren wat de provider *moet* retourneren (wat contracttesten aanstuurt), gebruik je het **Contract** tabblad.",
-  "What this request *expects* from the provider: status, headers, and body shape (a JSON Schema). It is checked against the response in the **Contract** panel and is the consumer side of contract testing (consumer and bi-directional verify), feeding the `deploy-check` gate. For a quick body check that runs on every send, use the **Schema** tab.": "Wat dit request *verwacht* van de provider: status, headers en body-vorm (een JSON Schema). Het wordt gecontroleerd tegen de respons in het **Contract** paneel en is de consumerzijde van contracttesten (consumer- en bidirectionele verificatie), wat de `deploy-check` gate voedt. Gebruik voor een snelle body-controle bij elke verzending het **Schema** tabblad."
+  "What this request *expects* from the provider: status, headers, and body shape (a JSON Schema). It is checked against the response in the **Contract** panel and is the consumer side of contract testing (consumer and bi-directional verify), feeding the `deploy-check` gate. For a quick body check that runs on every send, use the **Schema** tab.": "Wat dit request *verwacht* van de provider: status, headers en body-vorm (een JSON Schema). Het wordt gecontroleerd tegen de respons in het **Contract** paneel en is de consumerzijde van contracttesten (consumer- en bidirectionele verificatie), wat de `deploy-check` gate voedt. Gebruik voor een snelle body-controle bij elke verzending het **Schema** tabblad.",
+  "More": "Meer",
+  "Response sections": "Responssecties",
+  "More response sections": "Meer responssecties",
+  "More actions": "Meer acties",
+  "Body view mode": "Body-weergavemodus",
+  "Cell values can also use variables and faker, e.g.": "Celwaarden kunnen ook variabelen en faker gebruiken, bijv.",
+  "or": "of",
+  "Script errors": "Scriptfouten",
+  "Pre-script:": "Pre-script:",
+  "Post-script:": "Post-script:",
+  "No data row": "Geen datarij",
+  "Row :n": "Rij :n",
+  "Run this request with the variables from one data table row": "Voer dit request uit met de variabelen van één datatabelrij"
 }

@@ -1,10 +1,11 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../../store';
 import type { ApiRequest, HttpMethod, KeyValuePair, RunRequestResult } from '../../../../shared/types';
 import { getHooksForRequest, authIsConfigured } from '../../../../shared/request-collection';
+import { findFolderContaining } from '../../../../shared/folder-tree';
 import { extractQueryParams } from '../../../../shared/url-params';
 import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
 import { ParamsTab } from './ParamsTab';
@@ -104,6 +105,28 @@ export function RequestBuilder({ request }: Props) {
       localStorage.setItem('runHooks', String(next));
       return next;
     });
+  }
+
+  // Data table applicable to this request (its folder's wins, else the
+  // collection's) so a single send can be run against one specific row.
+  const applicableDataSet = useMemo(() => {
+    const col = activeCollectionId ? collections[activeCollectionId]?.data : null;
+    if (!col) return null;
+    const folder = findFolderContaining(col.rootFolder, request.id);
+    if (folder?.dataSet && folder.dataSet.rows.length > 0) return folder.dataSet;
+    if (col.dataSet && col.dataSet.rows.length > 0) return col.dataSet;
+    return null;
+  }, [activeCollectionId, collections, request.id]);
+
+  const [dataRowIdx, setDataRowIdx] = useState(-1);
+
+  function selectedDataRow(): Record<string, string> | undefined {
+    if (!applicableDataSet || dataRowIdx < 0) return undefined;
+    const row = applicableDataSet.rows[dataRowIdx];
+    if (!row) return undefined;
+    const dr: Record<string, string> = {};
+    applicableDataSet.columns.forEach((c, ci) => { if (c) dr[c] = row[ci] ?? ''; });
+    return dr;
   }
 
   // When the tab is on an example, edits update the example's overrides rather
@@ -255,6 +278,7 @@ export function RequestBuilder({ request }: Props) {
           collectionVars: { ...collectionVars, ...freshSessionVars },
           globals: liveGlobals,
           streamId,
+          ...(selectedDataRow() ? { dataRow: selectedDataRow() } : {}),
         });
       } finally {
         finishLiveStream(streamId);
@@ -381,7 +405,9 @@ export function RequestBuilder({ request }: Props) {
       </div>
 
       {/* URL bar */}
-      <div className="flex items-center gap-2 px-4 py-2 flex-shrink-0">
+      <div className="flex flex-col gap-2 px-4 py-2 flex-shrink-0">
+        {/* Row 1: protocol toggle + method */}
+        <div className="flex items-center gap-2">
         {/* Protocol toggle */}
         <div className="flex bg-surface-800 border border-surface-700 rounded overflow-hidden text-xs font-bold flex-shrink-0">
           <button
@@ -474,7 +500,10 @@ export function RequestBuilder({ request }: Props) {
             gRPC
           </span>
         )}
+        </div>
 
+        {/* Row 2: endpoint + hooks + Send */}
+        <div className="flex items-center gap-2">
         <VarInput
           value={request.url}
           onChange={url => update({ url })}
@@ -492,6 +521,24 @@ export function RequestBuilder({ request }: Props) {
               : 'bg-surface-800 border-surface-700'
           }`}
         />
+
+        {/* Data-row picker — run this request against one specific data table row */}
+        {!isWs && !isGrpc && applicableDataSet && (
+          <select
+            value={dataRowIdx}
+            onChange={e => setDataRowIdx(Number(e.target.value))}
+            title={t('Run this request with the variables from one data table row')}
+            className="bg-surface-800 border border-surface-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500 max-w-[150px]"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            <option value={-1}>{t('No data row')}</option>
+            {applicableDataSet.rows.map((row, ri) => (
+              <option key={ri} value={ri}>
+                {t('Row :n', { n: ri + 1 })}{row[0] ? ` · ${row[0]}` : ''}
+              </option>
+            ))}
+          </select>
+        )}
 
         {/* Hooks toggle + Send button (HTTP only) */}
         {!isWs && !isGrpc && (
@@ -517,6 +564,7 @@ export function RequestBuilder({ request }: Props) {
             </button>
           </>
         )}
+        </div>
       </div>
 
       {showFuzz && <FuzzModal request={request} onClose={() => setShowFuzz(false)} />}
