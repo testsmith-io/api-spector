@@ -1049,5 +1049,6 @@
   "Post-script:": "Pós-script:",
   "No data row": "Sem linha de dados",
   "Row :n": "Linha :n",
-  "Run this request with the variables from one data table row": "Executa este request com as variáveis de uma linha da tabela de dados"
+  "Run this request with the variables from one data table row": "Executa este request com as variáveis de uma linha da tabela de dados",
+  "Disabled": "Desativada"
 }

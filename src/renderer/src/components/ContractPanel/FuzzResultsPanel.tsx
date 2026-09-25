@@ -156,7 +156,7 @@ function TraceRow({ trace, onCopy }: { trace: FuzzCaseTrace; onCopy: (t: string)
         onClick={() => setOpen(v => !v)}
         className="w-full flex items-center gap-3 px-3 py-1.5 text-left hover:bg-surface-800/60 transition-colors font-mono text-[11px]"
       >
-        <span className="shrink-0 text-surface-600 w-3">{open ? '▾' : '▸'}</span>
+        <span className="shrink-0 text-surface-600 w-3 text-[22px] leading-none">{open ? '▾' : '▸'}</span>
         <span className={`shrink-0 font-bold w-9 ${statusTone(trace.status, trace.finding)}`}>
           {trace.status || t('ERR')}
         </span>

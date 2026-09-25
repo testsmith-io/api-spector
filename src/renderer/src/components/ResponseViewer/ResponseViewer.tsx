@@ -77,7 +77,7 @@ function HistoryTabRow({ entry, onLoad, onResend }: { entry: HistoryEntry; onLoa
   return (
     <div className="border-b border-surface-800">
       <div className="flex items-center gap-3 px-4 py-2 hover:bg-surface-800/40">
-        <button onClick={() => setOpen(o => !o)} className="text-surface-600 text-xs w-3 shrink-0">{open ? '▾' : '▸'}</button>
+        <button onClick={() => setOpen(o => !o)} className="text-surface-600 text-[22px] leading-none w-3 shrink-0">{open ? '▾' : '▸'}</button>
         <span className={`text-[10px] font-bold font-mono shrink-0 w-10 ${getMethodColor(entry.request.method)}`}>{entry.request.method}</span>
         <span className={`text-xs font-bold font-mono shrink-0 w-8 ${getStatusColor(entry.response.status)}`}>{entry.response.status || 'ERR'}</span>
         <span className="text-xs text-surface-400 shrink-0">{entry.response.durationMs}ms</span>
@@ -407,7 +407,7 @@ export function ResponseViewer() {
             <OverflowMenu
               wrapperClassName="flex @min-[720px]:hidden"
               buttonClassName="px-2 py-1 text-xs rounded text-surface-400 hover:text-white hover:bg-surface-800 flex items-center gap-1"
-              button={<>{t('More')} <span aria-hidden="true">▾</span></>}
+              button={<>{t('More')} <span aria-hidden="true" className="text-[22px] leading-none">▾</span></>}
               ariaLabel={t('More response sections')}
               align="left"
             >

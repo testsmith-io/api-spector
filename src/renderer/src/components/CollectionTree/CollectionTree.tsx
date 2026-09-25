@@ -190,6 +190,7 @@ export function CollectionTree () {
   const deleteRequest = useStore( s => s.deleteRequest );
   const duplicateRequest = useStore( s => s.duplicateRequest );
   const duplicateCollection = useStore( s => s.duplicateCollection );
+  const toggleCollectionDisabled = useStore( s => s.toggleCollectionDisabled );
   const duplicateFolder = useStore( s => s.duplicateFolder );
   const updateFolderTags = useStore( s => s.updateFolderTags );
   const updateRequestTags = useStore( s => s.updateRequestTags );
@@ -334,6 +335,7 @@ export function CollectionTree () {
               onRenameCollection={name => renameCollection( col.id, name )}
               onDeleteCollection={() => confirmThen( t( 'Delete collection ":name"?', { name: col.name } ), () => deleteCollection( col.id ) )}
               onDuplicateCollection={() => duplicateCollection( col.id )}
+              onToggleCollectionDisabled={() => toggleCollectionDisabled( col.id )}
               onRenameFolder={( folderId, name ) => renameFolder( col.id, folderId, name )}
               onDeleteFolder={folderId => confirmThen( t( 'Delete this folder and all its requests?' ), () => deleteFolder( col.id, folderId ) )}
               onDuplicateFolder={folderId => duplicateFolder( col.id, folderId )}
@@ -412,7 +414,7 @@ function CollectionNode ( {
   newRequestId,
   onSelectCollection, onSelectRequest,
   onAddRequest, onAddFolder,
-  onRenameCollection, onDeleteCollection, onDuplicateCollection,
+  onRenameCollection, onDeleteCollection, onDuplicateCollection, onToggleCollectionDisabled,
   onRenameFolder, onDeleteFolder, onDuplicateFolder,
   onRenameRequest, onDeleteRequest, onDuplicateRequest,
   onUpdateFolderTags, onUpdateRequestTags, onSetRequestHookType, onToggleRequestDisabled,
@@ -430,6 +432,7 @@ function CollectionNode ( {
   onRenameCollection: ( name: string ) => void
   onDeleteCollection: () => void
   onDuplicateCollection: () => void
+  onToggleCollectionDisabled: () => void
   onRenameFolder: ( folderId: string, name: string ) => void
   onDeleteFolder: ( folderId: string ) => void
   onDuplicateFolder: ( folderId: string ) => void
@@ -459,8 +462,8 @@ function CollectionNode ( {
   return (
     <div>
       <div
-        className={`group flex items-start gap-1 px-2 py-1.5 cursor-pointer hover:bg-surface-800 transition-colors ${isActive ? 'text-[var(--text-primary)]' : 'text-surface-400'
-          } ${dropOver ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
+        className={`group flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-surface-800 transition-colors ${isActive ? 'text-[var(--text-primary)]' : 'text-surface-400'
+          } ${col.disabled ? 'opacity-50' : ''} ${dropOver ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
         onClick={() => { onSelectCollection(); setExpanded( e => !e ); }}
         onDragOver={dragCtx.dragging ? e => { e.preventDefault(); setDropOver( true ); } : undefined}
         onDragLeave={() => setDropOver( false )}
@@ -470,7 +473,7 @@ function CollectionNode ( {
           else dragCtx.onDropRequest( col.id, col.rootFolder.id );
         }}
       >
-        <span className="text-[10px] w-3 text-center shrink-0 mt-0.5">{expanded ? '▾' : '▸'}</span>
+        <span className="text-[22px] leading-none w-4 h-4 shrink-0 flex items-center justify-center">{expanded ? '▾' : '▸'}</span>
 
         <div className="flex-1 min-w-0">
           {renaming ? (
@@ -483,7 +486,10 @@ function CollectionNode ( {
                 ? t( '":name" already exists', { name: v } ) : null}
             />
           ) : (
-            <span className="text-xs font-semibold truncate block">{col.name}</span>
+            <span className="text-xs font-semibold truncate block">
+              {col.name}
+              {col.disabled && <span className="ml-1.5 text-[9px] uppercase tracking-wider text-surface-500 border border-surface-700 rounded px-1 py-px">{t( 'Disabled' )}</span>}
+            </span>
           )}
         </div>
 
@@ -501,6 +507,7 @@ function CollectionNode ( {
             { type: 'item', label: t( 'Settings' ), icon: <GearIcon />, onClick: () => setShowSettings( true ) },
             { type: 'item', label: t( 'Sync schemas' ), icon: <SyncIcon />, onClick: () => setShowSchemaSync( true ) },
             ...( cloudEnabled() ? [{ type: 'item' as const, label: t( 'Push contract to cloud' ), icon: <SyncIcon />, onClick: () => setShowPushContract( true ) }] : [] ),
+            { type: 'item', label: col.disabled ? t( 'Enable' ) : t( 'Disable' ), onClick: onToggleCollectionDisabled },
             { type: 'item', label: t( 'Rename' ), icon: <PencilIcon />, onClick: () => setRenaming( true ) },
             { type: 'item', label: t( 'Duplicate' ), icon: <CopyIcon />, onClick: onDuplicateCollection },
             { type: 'separator' },
@@ -618,7 +625,7 @@ function FolderRow ( {
     <div className="relative">
       <div
         draggable
-        className={`group flex items-start gap-1 py-1 hover:bg-surface-800 transition-colors cursor-pointer text-surface-400 ${dropInside ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
+        className={`group flex items-center gap-1 py-1 hover:bg-surface-800 transition-colors cursor-pointer text-surface-400 ${dropInside ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
         style={{ paddingLeft: indent }}
         onClick={() => setExpanded( e => !e )}
         onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.stopPropagation(); dragCtx.setDragging( { type: 'folder', folderId: folder.id, collectionId } ); }}
@@ -627,8 +634,8 @@ function FolderRow ( {
         onDragLeave={() => setDropInside( false )}
         onDrop={handleFolderDrop}
       >
-        <span className="text-[10px] w-3 text-center shrink-0 mt-0.5">{expanded ? '▾' : '▸'}</span>
-        <FolderIcon className={`shrink-0 mt-0.5 ${hasInheritedConfig ? 'text-blue-500' : 'text-amber-600'}`} />
+        <span className="text-[22px] leading-none w-4 h-4 shrink-0 flex items-center justify-center">{expanded ? '▾' : '▸'}</span>
+        <FolderIcon className={`shrink-0 ${hasInheritedConfig ? 'text-blue-500' : 'text-amber-600'}`} />
 
         <div className="flex-1 min-w-0">
           {renaming ? (

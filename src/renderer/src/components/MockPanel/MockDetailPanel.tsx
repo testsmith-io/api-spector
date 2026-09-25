@@ -211,7 +211,7 @@ function RouteRow({
           onClick={() => setScriptOpen(o => !o)}
           className="flex items-center gap-1.5 text-[11px] text-surface-400 uppercase tracking-wider hover:text-white transition-colors"
         >
-          <span>{scriptOpen ? '▾' : '▸'}</span>
+          <span className="text-[22px] leading-none">{scriptOpen ? '▾' : '▸'}</span>
           <span>{t('Pre-response script')}</span>
           {draft.script?.trim() && <span className="text-purple-400 normal-case font-normal tracking-normal ml-1">⚡ {t('active')}</span>}
         </button>
@@ -293,7 +293,7 @@ function HitRow({ hit, matched }: { hit: MockHit; matched: MockRoute | undefined
           unmatched ? '' : 'hover:bg-surface-800/20'
         } transition-colors`}
       >
-        <span className="text-surface-600 text-[10px] w-3 shrink-0">{open ? '▾' : '▸'}</span>
+        <span className="text-surface-600 text-[22px] leading-none w-3 shrink-0">{open ? '▾' : '▸'}</span>
         <span className={`font-bold w-16 shrink-0 text-xs ${getMethodColor(hit.method)}`}>
           {hit.method}
         </span>

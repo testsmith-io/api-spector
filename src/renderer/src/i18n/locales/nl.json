@@ -1049,5 +1049,6 @@
   "Post-script:": "Post-script:",
   "No data row": "Geen datarij",
   "Row :n": "Rij :n",
-  "Run this request with the variables from one data table row": "Voer dit request uit met de variabelen van één datatabelrij"
+  "Run this request with the variables from one data table row": "Voer dit request uit met de variabelen van één datatabelrij",
+  "Disabled": "Uitgeschakeld"
 }

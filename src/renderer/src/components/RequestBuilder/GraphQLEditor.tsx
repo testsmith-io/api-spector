@@ -66,7 +66,7 @@ function FieldNode({
         {hasChildren ? (
           <button
             onClick={() => setExpanded(v => !v)}
-            className="text-surface-600 hover:text-surface-300 w-3 text-[10px] leading-none flex-shrink-0"
+            className="text-surface-600 hover:text-surface-300 w-3 text-[22px] leading-none flex-shrink-0"
           >
             {expanded ? '▾' : '▸'}
           </button>
@@ -146,7 +146,7 @@ function RootTypeSection({
         onClick={() => setExpanded(v => !v)}
         className="w-full flex items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-surface-500 hover:text-surface-300 transition-colors"
       >
-        <span className="text-[9px]">{expanded ? '▾' : '▸'}</span>
+        <span className="text-[22px] leading-none">{expanded ? '▾' : '▸'}</span>
         {label}
         <span className="text-surface-400 normal-case tracking-normal font-normal ml-auto">{t(':count field|:count fields', { count: fields.length })}</span>
       </button>
@@ -478,7 +478,7 @@ export function GraphQLEditor({ request, onChange }: Props) {
                 onClick={() => setShowVars(v => !v)}
                 className="text-[10px] text-surface-600 hover:text-surface-300 uppercase tracking-wider font-medium flex items-center gap-1"
               >
-                <span>{showVars ? '▾' : '▸'}</span> {t('Variables')}
+                <span className="text-[22px] leading-none">{showVars ? '▾' : '▸'}</span> {t('Variables')}
                 {gql.variables?.trim() && <span className="text-blue-400 ml-1">●</span>}
               </button>
               {showVars && gql.variables?.trim() && (
