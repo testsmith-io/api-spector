@@ -17,7 +17,7 @@ import { ConfirmDialog } from '../common/ConfirmDialog';
 import { DotsBtn } from '../common/ContextMenu';
 import {
   PlayIcon, PlusIcon, FolderIcon, TagIcon, PencilIcon, TrashIcon, TableIcon,
-  CopyIcon, KeyIcon, ExpandAllIcon, CollapseAllIcon, SyncIcon, GearIcon,
+  CopyIcon, KeyIcon, ExpandAllIcon, CollapseAllIcon, SyncIcon, GearIcon, BanIcon,
 } from '../common/icons';
 import { useT } from '../../i18n';
 
@@ -507,7 +507,7 @@ function CollectionNode ( {
             { type: 'item', label: t( 'Settings' ), icon: <GearIcon />, onClick: () => setShowSettings( true ) },
             { type: 'item', label: t( 'Sync schemas' ), icon: <SyncIcon />, onClick: () => setShowSchemaSync( true ) },
             ...( cloudEnabled() ? [{ type: 'item' as const, label: t( 'Push contract to cloud' ), icon: <SyncIcon />, onClick: () => setShowPushContract( true ) }] : [] ),
-            { type: 'item', label: col.disabled ? t( 'Enable' ) : t( 'Disable' ), onClick: onToggleCollectionDisabled },
+            { type: 'item', label: col.disabled ? t( 'Enable' ) : t( 'Disable' ), icon: <BanIcon />, onClick: onToggleCollectionDisabled },
             { type: 'item', label: t( 'Rename' ), icon: <PencilIcon />, onClick: () => setRenaming( true ) },
             { type: 'item', label: t( 'Duplicate' ), icon: <CopyIcon />, onClick: onDuplicateCollection },
             { type: 'separator' },
