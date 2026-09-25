@@ -199,7 +199,23 @@ async function main() {
 
   for (const col of collections) {
     if (colName && col.name.toLowerCase() !== colName.toLowerCase()) continue;
-    if (col.disabled) continue;  // excluded from workspace/CI runs
+    if (col.disabled) {
+      // Excluded from the run, but recorded (per collection) so it is visible
+      // both in the console and in the exported report rather than vanishing.
+      console.log(color(`  ┌ ${col.name}  (disabled)`, C.gray));
+      allResults.push({
+        requestId:   col.id,
+        name:        col.name,
+        method:      '',
+        resolvedUrl: '',
+        status:      'skipped',
+        error:       'Collection disabled',
+        scopePath:   [],
+      });
+      summary.total++;
+      summary.skipped++;
+      continue;
+    }
 
     // Use the same plan builder the in-app runner uses, so before/beforeAll
     // hooks (e.g. a "fetch token" request) actually execute and propagate

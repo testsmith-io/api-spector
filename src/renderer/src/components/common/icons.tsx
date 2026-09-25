@@ -52,6 +52,15 @@ export function TrashIcon () {
     </svg>
   );
 }
+
+export function BanIcon () {
+  return (
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9" />
+      <path strokeLinecap="round" d="M5.64 5.64l12.72 12.72" />
+    </svg>
+  );
+}
 export function TableIcon () {
   return (
     <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
