@@ -453,7 +453,7 @@ export function RunnerModal() {
                   >
                     <td className="px-4 py-2 w-6">
                       <div className="flex items-center gap-1">
-                        <span className="w-2 text-surface-600 text-[9px]">{hasDetail(r) ? (expandedRows.has(idx) ? '▾' : '▸') : ''}</span>
+                        <span className="w-3 text-surface-600 text-[22px] leading-none">{hasDetail(r) ? (expandedRows.has(idx) ? '▾' : '▸') : ''}</span>
                         <StatusDot status={r.status} />
                       </div>
                     </td>

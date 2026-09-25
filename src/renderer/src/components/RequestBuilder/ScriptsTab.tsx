@@ -111,7 +111,7 @@ export function ScriptsTab({ request, onChange }: Props) {
             onClick={() => setSnippetsOpen(false)}
             className="flex items-center gap-1 text-[10px] font-semibold text-surface-400 uppercase tracking-wider mb-2 hover:text-white transition-colors w-full"
           >
-            <span>▾</span>
+            <span className="text-[22px] leading-none">▾</span>
             <span>{t('Quick inserts')}</span>
           </button>
         ) : (
@@ -132,7 +132,7 @@ export function ScriptsTab({ request, onChange }: Props) {
               className="w-full text-left text-xs font-medium text-surface-400 hover:text-white flex items-center justify-between py-0.5"
             >
               <span>{t(group.group)}</span>
-              <span className="text-[10px]">{expandedGroup === group.group ? '▾' : '▸'}</span>
+              <span className="text-[22px] leading-none">{expandedGroup === group.group ? '▾' : '▸'}</span>
             </button>
             {expandedGroup === group.group && (
               <div className="flex flex-col gap-0.5 mt-0.5">

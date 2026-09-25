@@ -45,7 +45,7 @@ export function XmlNode({ element, depth, onLeaf }: Props) {
         onClick={() => setExpanded(v => !v)}
         className="flex items-center gap-1.5 py-0.5 pl-1 rounded hover:bg-surface-800/40 w-full text-left"
       >
-        <span className="text-surface-600 text-[10px] w-3 shrink-0 text-center">
+        <span className="text-surface-600 text-[22px] leading-none w-3 shrink-0 text-center">
           {expanded ? '▾' : '▸'}
         </span>
         <span className="text-blue-300 font-mono text-xs">&lt;{tag}&gt;</span>

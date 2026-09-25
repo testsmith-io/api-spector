@@ -1049,5 +1049,6 @@
   "Post-script:": "Post-script:",
   "No data row": "No data row",
   "Row :n": "Row :n",
-  "Run this request with the variables from one data table row": "Run this request with the variables from one data table row"
+  "Run this request with the variables from one data table row": "Run this request with the variables from one data table row",
+  "Disabled": "Disabled"
 }

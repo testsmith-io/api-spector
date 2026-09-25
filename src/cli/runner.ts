@@ -40,7 +40,7 @@ import {
   maskPii,
 } from '../main/request-exec';
 import { buildJsonReport, buildJUnitReport, buildHtmlReport } from '../shared/report';
-import { buildRunPlan, resolveInheritedAuthAndHeaders, authIsConfigured } from '../shared/request-collection';
+import { buildRunPlan, expandFolderDataSets, expandRunPlanWithData, resolveInheritedAuthAndHeaders, authIsConfigured } from '../shared/request-collection';
 import { selectEnvironment } from '../shared/environments';
 import {
   C, color, parseArgs,
@@ -199,13 +199,14 @@ async function main() {
 
   for (const col of collections) {
     if (colName && col.name.toLowerCase() !== colName.toLowerCase()) continue;
+    if (col.disabled) continue;  // excluded from workspace/CI runs
 
     // Use the same plan builder the in-app runner uses, so before/beforeAll
     // hooks (e.g. a "fetch token" request) actually execute and propagate
     // their extracted variables to subsequent requests. `collectTagged`
     // silently dropped hooks, which is why CLI runs of an authed request
     // came back 401 even though the UI runner worked.
-    const items = buildRunPlan(col, null, filterTags);
+    let items = buildRunPlan(col, null, filterTags);
     if (items.length === 0) continue;
 
     if (!firstColName) firstColName = col.name;
@@ -234,6 +235,14 @@ async function main() {
         req.headers = [...inheritedHeaders, ...req.headers];
       }
     }
+
+    // Data-driven expansion — identical to the in-app runner so CLI/CI runs
+    // (and the report) match the tree: each folder's data table iterates its
+    // requests, then the collection's data table repeats the whole plan.
+    // Done after the auth/header merge so each request is merged once, not
+    // once per iteration.
+    items = expandFolderDataSets(items, col);
+    items = expandRunPlanWithData(items, col.dataSet);
 
     let bailed = false;
     let lastPrintedScope: string | null = null;
@@ -268,6 +277,7 @@ async function main() {
           hookType,
           scopeId,
           scopePath:  item.scopePath,
+          iterationLabel: item.iterationLabel,
         };
       } else {
         const out = await executeRunnerRequest({
@@ -275,7 +285,7 @@ async function main() {
           collectionVars: { ...item.collectionVars, ...runCollectionVars },
           envVars: runEnvVars,
           globals: runGlobals,
-          localVars: { ...runLocalVars },
+          localVars: { ...runLocalVars, ...(item.dataRow ?? {}) },
           dispatcher,
           piiMaskPatterns: piiPatterns,
           tls: effectiveTls,
@@ -291,6 +301,7 @@ async function main() {
         result.hookType  = hookType;
         result.scopeId   = scopeId;
         result.scopePath = item.scopePath;
+        result.iterationLabel = item.iterationLabel;
 
         skipTracker.recordResult(item, result.status);
       }

@@ -385,7 +385,7 @@ function BasicCredentialsFields({
         onClick={() => setKeychainOpen(o => !o)}
         className="text-[10px] text-surface-500 hover:text-surface-300 text-left transition-colors w-fit"
       >
-        {keychainOpen ? '▾' : '▸'} {t('Store password in OS keychain instead')}
+        <span className="text-[22px] leading-none">{keychainOpen ? '▾' : '▸'}</span> {t('Store password in OS keychain instead')}
       </button>
 
       {keychainOpen && (
@@ -463,7 +463,7 @@ function BearerPanel({
         onClick={() => setKeychainOpen(o => !o)}
         className="text-[10px] text-surface-500 hover:text-surface-300 text-left transition-colors w-fit"
       >
-        {keychainOpen ? '▾' : '▸'} {t('Store in OS keychain instead')}
+        <span className="text-[22px] leading-none">{keychainOpen ? '▾' : '▸'}</span> {t('Store in OS keychain instead')}
       </button>
 
       {keychainOpen && (

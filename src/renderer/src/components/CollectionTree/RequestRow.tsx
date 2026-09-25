@@ -155,7 +155,7 @@ export function RequestRow({
         {examples.length > 0 ? (
           <button
             onClick={e => { e.stopPropagation(); setExamplesOpen(o => !o); }}
-            className="shrink-0 w-3 text-surface-500 hover:text-white leading-none"
+            className="shrink-0 w-4 h-4 mt-0.5 inline-flex items-center justify-center text-surface-500 hover:text-white leading-none text-[22px]"
             title={examplesOpen ? t('Hide examples') : t('Show :count example(s)', { count: examples.length })}
           >{examplesOpen ? '▾' : '▸'}</button>
         ) : (

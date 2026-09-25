@@ -34,7 +34,7 @@ export function HookResultsPanel({ results }: { results: RunRequestResult[] }) {
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center gap-2 px-4 py-1.5 text-xs hover:bg-surface-800/30 transition-colors"
       >
-        <span className="text-surface-400">{open ? '▾' : '▸'}</span>
+        <span className="text-surface-400 text-[22px] leading-none">{open ? '▾' : '▸'}</span>
         <span className="font-medium text-surface-400">{t('Hooks')}</span>
         <span className="text-surface-500">{t(':count ran', { count: results.length })}</span>
         {failed > 0 && (
@@ -73,7 +73,7 @@ export function HookResultsPanel({ results }: { results: RunRequestResult[] }) {
                   {r.durationMs !== undefined && (
                     <span className="text-surface-500 shrink-0">{r.durationMs}ms</span>
                   )}
-                  {hasDetail && <span className="text-surface-500 shrink-0">{isExpanded ? '▾' : '▸'}</span>}
+                  {hasDetail && <span className="text-surface-500 shrink-0 text-[22px] leading-none">{isExpanded ? '▾' : '▸'}</span>}
                 </div>
 
                 {isExpanded && (

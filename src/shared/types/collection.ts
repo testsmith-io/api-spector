@@ -116,6 +116,8 @@ export interface Collection {
   description?: string
   rootFolder: Folder
   requests: Record<string, ApiRequest>
+  /** When true, the whole collection is excluded from workspace/CI runs. */
+  disabled?: boolean
   collectionVariables?: Record<string, string>
   /** Data-driven dataset: each row runs the full collection once with those variables injected. */
   dataSet?: DataSet

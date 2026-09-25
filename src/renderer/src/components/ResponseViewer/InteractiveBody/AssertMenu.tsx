@@ -124,7 +124,7 @@ export function AssertMenu({ state, onClose, onConfirm }: Props) {
             onClick={() => setJpOpen(o => !o)}
             className="w-full text-left text-xs text-blue-400 hover:text-blue-300 hover:bg-surface-800 rounded px-2 py-1.5 transition-colors flex items-center gap-1"
           >
-            <span>{jpOpen ? '▾' : '▸'}</span>
+            <span className="text-[22px] leading-none">{jpOpen ? '▾' : '▸'}</span>
             <span>{t('JSONPath assert (with filter)')}</span>
           </button>
           {jpOpen && state.type === 'json' && (

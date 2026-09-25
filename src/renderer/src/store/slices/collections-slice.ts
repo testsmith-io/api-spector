@@ -75,6 +75,8 @@ export interface CollectionsSliceActions {
   addCollectionObject: (data: Collection) => string
   renameCollection: (id: string, name: string) => void
   deleteCollection: (id: string) => void
+  /** Toggle whether a collection is excluded from workspace/CI runs. */
+  toggleCollectionDisabled: (id: string) => void
 
   duplicateCollection: (id: string) => void
 
@@ -210,6 +212,13 @@ export const createCollectionsSlice: StateCreator<
     if (s.workspace && oldRelPath !== newRelPath) {
       s.workspace.collections = s.workspace.collections.map(p => p === oldRelPath ? newRelPath : p);
     }
+  }),
+
+  toggleCollectionDisabled: (id) => set(s => {
+    const entry = s.collections[id];
+    if (!entry) return;
+    entry.data.disabled = !entry.data.disabled;
+    entry.dirty = true;
   }),
 
   duplicateCollection: (id) => set(s => {
