@@ -8,7 +8,7 @@ import { json } from '@codemirror/lang-json';
 import { xml } from '@codemirror/lang-xml';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { getStatusColor, getMethodColor } from '../../../../shared/colors';
-import type { HistoryEntry } from '../../../../shared/types';
+import type { HistoryEntry, DesignInteraction, KeyValuePair } from '../../../../shared/types';
 import { InteractiveBody } from './InteractiveBody';
 import { ResponseTable, bodyHasArray } from './ResponseTable';
 import { StreamView } from './StreamView';
@@ -144,6 +144,7 @@ export function ResponseViewer() {
   const setPinned = useStore(s => s.setPinnedResponse);
   const updateRequest = useStore(s => s.updateRequest);
   const setTabRequestTab = useStore(s => s.setTabRequestTab);
+  const openContractDesigner = useStore(s => s.openContractDesigner);
   const setTabScriptTab = useStore(s => s.setTabScriptTab);
   const isSending = activeTab?.isSending ?? false;
   const liveStream = useStore(s => s.liveStream);
@@ -228,6 +229,36 @@ export function ResponseViewer() {
     updateRequest(requestId, { schema });
     setTabRequestTab(activeTabId, 'schema');
     schemaToast.show(t('✓ Schema saved'), true);
+  }
+
+  // Seed a new design-first contract interaction from this request/response and
+  // open the Contract Designer (replaces the old response-capture-to-contract).
+  function sendToDesigner() {
+    if (!response) return;
+    const rawUrl = sentRequest?.url ?? '';
+    let path = rawUrl.split('?')[0];
+    let query: KeyValuePair[] = [];
+    try {
+      const u = new URL(rawUrl);
+      path = u.pathname;
+      query = [...u.searchParams.entries()].map(([key, value]) => ({ key, value, enabled: true }));
+    } catch { /* relative or templated URL — keep the path as-is */ }
+    const contentType = response.headers['content-type'];
+    const seed: Partial<DesignInteraction> = {
+      description: sentRequest ? `${sentRequest.method} ${path}` : path,
+      request: {
+        method: sentRequest?.method ?? 'GET',
+        path: path || '/',
+        query: query.length ? query : undefined,
+        headers: [],
+      },
+      response: {
+        status: response.status,
+        headers: contentType ? [{ key: 'Content-Type', value: contentType, enabled: true }] : [],
+        body: response.body || undefined,
+      },
+    };
+    openContractDesigner(seed);
   }
 
   function handleAssert(snippet: string) {
@@ -516,9 +547,16 @@ export function ResponseViewer() {
               >
                 ↓ {t('Mock')}
               </button>
+              <button
+                onClick={sendToDesigner}
+                className="hidden @min-[350px]:flex px-2 py-0.5 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors"
+                title={t('Seed a design-first contract from this request and response, then open the Contract Designer')}
+              >
+                → {t('Designer')}
+              </button>
 
-              {/* "…" overflow — only appears below the width where Diff/Contract/
-                  Mock stop fitting; hidden entirely (no empty button) above it. */}
+              {/* "…" overflow — only appears below the width where the actions
+                  stop fitting; hidden entirely (no empty button) above it. */}
               <OverflowMenu
                 wrapperClassName="flex @min-[350px]:hidden"
                 buttonClassName="px-1.5 py-1 text-[10px] rounded bg-surface-800 hover:bg-surface-700 text-surface-300 flex items-center"
@@ -550,6 +588,14 @@ export function ResponseViewer() {
                   className="flex @min-[350px]:hidden w-full items-center gap-2 px-3 py-1.5 text-xs text-surface-300 hover:bg-surface-800 hover:text-white"
                 >
                   ↓ {t('Mock')}
+                </button>
+                <button
+                  role="menuitem"
+                  tabIndex={-1}
+                  onClick={sendToDesigner}
+                  className="flex @min-[350px]:hidden w-full items-center gap-2 px-3 py-1.5 text-xs text-surface-300 hover:bg-surface-800 hover:text-white"
+                >
+                  → {t('Designer')}
                 </button>
               </OverflowMenu>
             </div>

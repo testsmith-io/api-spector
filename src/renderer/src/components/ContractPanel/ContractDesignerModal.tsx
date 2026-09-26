@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../../store';
 import { Modal } from '../common/Modal';
 import { useToast, Toast } from '../common/Toast';
@@ -61,7 +61,7 @@ function KVRows({ label, rows, onChange, keyPlaceholder = 'name', valuePlacehold
   );
 }
 
-export function ContractDesignerModal({ onClose }: { onClose: () => void }) {
+export function ContractDesignerModal({ seed, onClose }: { seed?: Partial<DesignInteraction>; onClose: () => void }) {
   const workspace     = useStore(s => s.workspace);
   const workspacePath = useStore(s => s.workspacePath);
   const setWorkspace  = useStore(s => s.setWorkspace);
@@ -77,6 +77,26 @@ export function ContractDesignerModal({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
 
   const selected = contracts.find(c => c.id === selectedId) ?? null;
+
+  // Opened from "Send to contract designer": create a new contract prefilled
+  // with one interaction built from the request/response. Runs once.
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (!seed || seededRef.current || !workspace) return;
+    seededRef.current = true;
+    const base = newInteraction();
+    const interaction: DesignInteraction = {
+      ...base,
+      ...seed,
+      id: uid(),
+      request:  { ...base.request,  ...(seed.request  ?? {}) },
+      response: { ...base.response, ...(seed.response ?? {}) },
+    };
+    const contract: ConsumerContract = { ...newContract(), interactions: [interaction] };
+    setSelectedId(contract.id);
+    persist([...contracts, contract]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Persist the whole list through the normal workspace-save path (writes the
   // .spector file as-is, so designContracts travel with the workspace).

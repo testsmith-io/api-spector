@@ -52,8 +52,8 @@ export function ProductTour() {
     },
     {
       target: 'contracts',
-      title: t('5. Contract testing and fuzzing'),
-      body: t('Validate responses against an OpenAPI contract, or fuzz your API to surface crashes and spec violations.'),
+      title: t('5. Contract testing'),
+      body: t('Design consumer-driven contracts and verify them against your provider or its OpenAPI spec. To fuzz an endpoint, use the fuzz button next to Send.'),
     },
     {
       target: 'mocks',
