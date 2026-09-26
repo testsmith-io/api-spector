@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, it, expect } from 'vitest';
-import { buildRunPlan, collectTagged, expandRunPlanWithData, expandFolderDataSets } from '../shared/request-collection';
+import { buildRunPlan, collectTagged, expandRunPlanWithData, expandFolderDataSets, parseDataRow } from '../shared/request-collection';
 import type { Collection, ApiRequest, RunnerItem, DataSet, Folder } from '../shared/types';
 
 function req(id: string, name: string, extra: Partial<ApiRequest> = {}): ApiRequest {
@@ -325,5 +325,106 @@ describe('buildRunPlan honours childOrder (interleaved requests + folders)', () 
     const col = makeNestedCollection();
     const ids = buildRunPlan(col, null, []).filter(i => !i.isHook).map(i => i.request.id);
     expect(ids).toEqual(['r-root', 'r-users', 'r-adm', 'r-orders']);
+  });
+
+  it('runs a series of same-type hooks in childOrder, not requestIds order', () => {
+    const col: Collection = {
+      version: '1.0',
+      id: 'col-h',
+      name: 'Hooks',
+      rootFolder: {
+        id: 'root', name: 'root', description: '', folders: [],
+        // requestIds insertion order is h1, h2; childOrder swaps them.
+        requestIds: ['h1', 'h2', 'r1'],
+        childOrder: [
+          { type: 'request', id: 'h2' },
+          { type: 'request', id: 'h1' },
+          { type: 'request', id: 'r1' },
+        ],
+      },
+      requests: {
+        h1: req('h1', 'setup one', { hookType: 'beforeAll' }),
+        h2: req('h2', 'setup two', { hookType: 'beforeAll' }),
+        r1: req('r1', 'main'),
+      },
+    };
+    const seq = buildRunPlan(col, null, []).map(p => p.request.id);
+    // beforeAll hooks fire in the visible (childOrder) order: h2 before h1.
+    expect(seq).toEqual(['h2', 'h1', 'r1']);
+  });
+
+  it('runs an entire folder as a hook (folder.hookType) in the parent scope', () => {
+    const col: Collection = {
+      version: '1.0',
+      id: 'col-fh',
+      name: 'FolderHooks',
+      rootFolder: {
+        id: 'root', name: 'root', description: '',
+        requestIds: ['m1'],
+        folders: [
+          { id: 'f-setup',    name: 'Setup',    description: '', folders: [], requestIds: ['s1', 's2'], hookType: 'beforeAll' },
+          { id: 'f-teardown', name: 'Teardown', description: '', folders: [], requestIds: ['t1'],        hookType: 'afterAll'  },
+        ],
+        childOrder: [
+          { type: 'folder',  id: 'f-setup' },
+          { type: 'request', id: 'm1' },
+          { type: 'folder',  id: 'f-teardown' },
+        ],
+      },
+      requests: {
+        s1: req('s1', 'setup one'),
+        s2: req('s2', 'setup two'),
+        m1: req('m1', 'main'),
+        t1: req('t1', 'teardown'),
+      },
+    };
+    const plan = buildRunPlan(col, null, []);
+    // Setup folder's requests run first (as beforeAll), then main, then teardown.
+    expect(plan.map(p => p.request.id)).toEqual(['s1', 's2', 'm1', 't1']);
+    // Folder-hook bodies are marked as hooks of the parent scope.
+    const byId = Object.fromEntries(plan.map(p => [p.request.id, p]));
+    expect(byId.s1.isHook).toBe(true);
+    expect(byId.s1.hookType).toBe('beforeAll');
+    expect(byId.t1.hookType).toBe('afterAll');
+    expect(byId.m1.isHook).toBeFalsy();
+  });
+});
+
+describe('parseDataRow (access-control matrix columns)', () => {
+  it('turns normal columns into variables', () => {
+    const p = parseDataRow(['token', 'userId'], ['abc', '42']);
+    expect(p.dataRow).toEqual({ token: 'abc', userId: '42' });
+    expect(p.expectStatus).toBeUndefined();
+    expect(p.owaspTag).toBeUndefined();
+  });
+
+  it('reads the reserved expectStatus + owasp columns (not as variables)', () => {
+    const p = parseDataRow(['token', 'expectStatus', 'owasp'], ['{{admin_token}}', '403, 404', 'bola']);
+    expect(p.dataRow).toEqual({ token: '{{admin_token}}' });   // reserved cols excluded
+    expect(p.expectStatus).toEqual([403, 404]);
+    expect(p.owaspTag).toBe('BOLA');
+  });
+
+  it('ignores a blank expectStatus and blank column names', () => {
+    const p = parseDataRow(['a', '', 'expect_status'], ['1', 'x', '']);
+    expect(p.dataRow).toEqual({ a: '1' });
+    expect(p.expectStatus).toBeUndefined();
+  });
+});
+
+describe('expandRunPlanWithData carries expected-status assertions', () => {
+  const items = [{ request: req('a', 'A') }] as unknown as RunnerItem[];
+
+  it('attaches expectStatus/owaspTag from reserved columns to each run item', () => {
+    const ds: DataSet = {
+      columns: ['token', 'expectStatus', 'owasp'],
+      rows: [['{{admin}}', '200', 'FUNC-AUTH'], ['{{customer}}', '403', 'FUNC-AUTH']],
+    };
+    const out = expandRunPlanWithData(items, ds);
+    expect(out).toHaveLength(2);
+    expect(out[0].dataRow).toEqual({ token: '{{admin}}' });
+    expect(out[0].expectStatus).toEqual([200]);
+    expect(out[0].owaspTag).toBe('FUNC-AUTH');
+    expect(out[1].expectStatus).toEqual([403]);
   });
 });

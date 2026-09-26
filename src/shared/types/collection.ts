@@ -86,6 +86,13 @@ export interface Folder {
   description?: string
   folders: Folder[]
   requestIds: string[]
+  /** When set, the entire folder runs as a lifecycle hook within its PARENT
+   *  scope (like {@link ApiRequest.hookType}, but the whole folder is the hook
+   *  body): its requests run as a group in the before/after position and it is
+   *  not run inline in normal sequence. */
+  hookType?: 'beforeAll' | 'before' | 'after' | 'afterAll'
+  /** When true, the folder and its subtree are excluded from runs. */
+  disabled?: boolean
   /** Unified order of this folder's children (requests + sub-folders). When
    *  absent or partial, missing items fall in after it (requests, then folders).
    *  Drives both the tree and the run order. */

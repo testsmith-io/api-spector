@@ -1,22 +1,18 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
-import Ajv from 'ajv';
 import type { ApiRequest } from '../../../../shared/types';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
 import { renderMarkup } from '../common/RichText';
+import { validateBodyAgainstSchema, type SchemaValidation } from '../../lib/schema-validate';
+import { SchemaSyncModal } from '../CollectionTree/SchemaSyncModal';
 
-const ajv = new Ajv({ allErrors: true, strict: false });
-
-interface ValidationResult {
-  valid: boolean
-  errors: { instancePath: string; message?: string }[]
-}
+const { electron } = window;
 
 interface Props {
   request: ApiRequest
@@ -27,100 +23,68 @@ export function SchemaTab({ request, onChange }: Props) {
   const t = useT();
   const activeTab      = useStore(s => s.tabs.find(tab => tab.id === s.activeTabId));
   const lastResponse   = activeTab?.lastResponse ?? null;
-  const [result, setResult] = useState<ValidationResult | null>(null);
-  const [error, setError]   = useState<string | null>(null);
+  const collectionId   = useStore(s =>
+    Object.values(s.collections).find(c => c.data.requests[request.id])?.data.id ?? null);
+  const [result, setResult] = useState<SchemaValidation | null>(null);
+  const [inferring, setInferring] = useState(false);
+  const [showSync, setShowSync] = useState(false);
 
   const schemaValue = request.schema ?? '';
-  const contractSchema = request.contract?.bodySchema ?? '';
-  const canDerive = Boolean(contractSchema.trim());
 
   function setSchema(val: string) {
     onChange({ schema: val });
   }
 
-  function deriveFromContract() {
-    if (!canDerive) return;
-    setSchema(contractSchema);
-  }
+  // Auto-validate: whenever a response arrives (or the schema changes) and both
+  // are present, re-check silently so opening this tab after a send already
+  // shows the current pass / fail without clicking Validate.
+  useEffect(() => {
+    if (!schemaValue.trim() || !lastResponse) { setResult(null); return; }
+    setResult(validateBodyAgainstSchema(schemaValue, lastResponse.body));
+  }, [schemaValue, lastResponse]);
 
-  function validate() {
-    setError(null);
-    setResult(null);
-
-    if (!schemaValue.trim()) {
-      setError(t('No schema defined. Enter a JSON Schema above.'));
-      return;
-    }
-    if (!lastResponse) {
-      setError(t('No response yet. Send the request first, then validate.'));
-      return;
-    }
-
-    let schema: unknown;
+  async function createFromResponse() {
+    if (!lastResponse?.body) return;
+    setInferring(true);
     try {
-      schema = JSON.parse(schemaValue);
-    } catch {
-      setError(t('Schema is not valid JSON. Fix the syntax and try again.'));
-      return;
-    }
-
-    let data: unknown;
-    try {
-      data = JSON.parse(lastResponse.body);
-    } catch {
-      setError(t('Response body is not valid JSON and cannot be validated against a schema.'));
-      return;
-    }
-
-    try {
-      const validate = ajv.compile(schema as object);
-      const valid = validate(data);
-      setResult({
-        valid: !!valid,
-        errors: (validate.errors ?? []).map(e => ({
-          instancePath: e.instancePath,
-          message: e.message,
-        })),
-      });
-    } catch (e: unknown) {
-      setError(t('Schema compile error: :message', { message: e instanceof Error ? e.message : String(e) }));
+      const schema = await electron.inferContractSchema(lastResponse.body);
+      if (schema) setSchema(schema);
+    } finally {
+      setInferring(false);
     }
   }
 
   return (
     <div className="flex flex-col gap-3">
-      {/* What this tab is — and how it differs from Contract. */}
-      <div className="rounded-lg border border-amber-700/40 bg-amber-950/20 px-3 py-2 text-[11px] leading-relaxed text-amber-200/90">
-        <span className="font-semibold text-amber-300">{t('Schema: a local scratch check.')}</span>{' '}
-        {renderMarkup(t("Validate this request's last response against a JSON Schema, right here. It is **not saved to the contract and not published**. A dev-time sanity check only. To define what the provider *must* return (which drives contract testing), use the **Contract** tab."))}
+      {/* What this tab is. */}
+      <div className="rounded-lg border border-blue-700/40 bg-blue-950/20 px-3 py-2 text-[11px] leading-relaxed text-blue-200/90">
+        <span className="font-semibold text-blue-300">{t('Response schema.')}</span>{' '}
+        {renderMarkup(t("Validate this request's response body against a JSON Schema. The schema comes from your **OpenAPI spec** or is **created from a response**, and is checked automatically after every send. For cross-team contract verification, use the **Contract** panel."))}
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <span className="text-[10px] text-surface-600 uppercase tracking-wider font-medium">
           {t('JSON Schema (draft-07+)')}
         </span>
         <div className="flex items-center gap-2">
           <button
-            onClick={deriveFromContract}
-            disabled={!canDerive}
-            title={canDerive
-              ? t("Copy the body schema from this request's contract")
-              : t('No contract body schema defined yet')}
+            onClick={() => setShowSync(true)}
+            disabled={!collectionId}
+            title={t('Match this request against your OpenAPI spec and pull in its response schema')}
             className="px-3 py-1 text-xs bg-surface-800 hover:bg-surface-700 disabled:bg-surface-900 disabled:text-surface-600 rounded transition-colors font-medium"
           >
-            {t('Derive from contract')}
+            {t('Sync from OpenAPI')}
           </button>
           <button
-            onClick={validate}
-            className="px-3 py-1 text-xs bg-blue-700 hover:bg-blue-600 rounded transition-colors font-medium"
+            onClick={createFromResponse}
+            disabled={!lastResponse?.body || inferring}
+            title={lastResponse?.body ? t('Infer a schema from the last response body') : t('Send the request first')}
+            className="px-3 py-1 text-xs bg-surface-800 hover:bg-surface-700 disabled:bg-surface-900 disabled:text-surface-600 rounded transition-colors font-medium"
           >
-            {t('Validate')}
+            {inferring ? t('Creating…') : t('Create from response')}
           </button>
         </div>
       </div>
-      <p className="text-[10px] text-surface-600">
-        {t('Standalone — edits here don\'t touch the contract. Use “Derive from contract” to start from it.')}
-      </p>
 
       {/* Schema editor */}
       <div className="border border-surface-700 rounded overflow-hidden">
@@ -147,33 +111,43 @@ export function SchemaTab({ request, onChange }: Props) {
         />
       </div>
 
-      {/* Validation results */}
-      {error && (
-        <div className="text-xs text-red-400 bg-red-950/50 border border-red-800 rounded px-3 py-2">
-          {error}
+      {/* Validation status */}
+      {!schemaValue.trim() ? (
+        <p className="text-[11px] text-surface-600">
+          {t('No schema yet. Sync one from your OpenAPI spec or create one from a response.')}
+        </p>
+      ) : !lastResponse ? (
+        <p className="text-[11px] text-surface-600">
+          {t('Schema saved. Send the request and the response will be validated automatically.')}
+        </p>
+      ) : result?.status === 'error' ? (
+        <div className="text-xs text-amber-400 bg-amber-950/40 border border-amber-800 rounded px-3 py-2">
+          {t(result.message)}
         </div>
-      )}
+      ) : result?.status === 'valid' ? (
+        <div className="rounded border border-emerald-700 bg-emerald-900/20 px-3 py-2 text-xs">
+          <span className="text-emerald-400 font-semibold">{t('Valid: response matches the schema.')}</span>
+        </div>
+      ) : result?.status === 'invalid' ? (
+        <div className="rounded border border-red-700 bg-red-900/20 px-3 py-2 text-xs">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-red-400 font-semibold">{t('Invalid: :count error|Invalid: :count errors', { count: result.errors.length })}</span>
+            {result.errors.map((e, i) => (
+              <div key={i} className="flex gap-2 text-red-300">
+                <span className="text-red-500 font-mono shrink-0">{e.instancePath || '/'}</span>
+                <span>{e.message}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
-      {result && (
-        <div className={`rounded border px-3 py-2 text-xs ${
-          result.valid
-            ? 'bg-emerald-900/20 border-emerald-700'
-            : 'bg-red-900/20 border-red-700'
-        }`}>
-          {result.valid ? (
-            <span className="text-emerald-400 font-semibold">{t('Valid: response matches the schema.')}</span>
-          ) : (
-            <div className="flex flex-col gap-1.5">
-              <span className="text-red-400 font-semibold">{t('Invalid: :count error|Invalid: :count errors', { count: result.errors.length })}</span>
-              {result.errors.map((e, i) => (
-                <div key={i} className="flex gap-2 text-red-300">
-                  <span className="text-red-500 font-mono shrink-0">{e.instancePath || '/'}</span>
-                  <span>{e.message}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      {showSync && collectionId && (
+        <SchemaSyncModal
+          collectionId={collectionId}
+          scope={{ type: 'request', requestId: request.id }}
+          onClose={() => setShowSync(false)}
+        />
       )}
     </div>
   );

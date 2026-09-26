@@ -540,6 +540,10 @@ export interface RunnerExecOptions {
   tls?: TlsConfig
   /** Optional observer for pre/post script output (the CLI prints it live). */
   onScriptOutput?: (phase: 'pre' | 'post', consoleOutput: string[], error?: string) => void
+  /** From a data-table row: assert the response status is one of these. */
+  expectStatus?: number[]
+  /** OWASP tag for the expected-status assertion (feeds SARIF). */
+  owaspTag?: string
 }
 
 export interface RunnerExecResult {
@@ -706,6 +710,18 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
       patchGlobals(r.updatedGlobals);
       await persistGlobals();
       onScriptOutput?.('post', r.consoleOutput, r.error);
+    }
+
+    // Data-table access-control assertion: when a row carries `expectStatus`,
+    // assert the response code matches (tagged with its OWASP category for SARIF).
+    if (opts.expectStatus && opts.expectStatus.length > 0) {
+      const tag = opts.owaspTag ? `[${opts.owaspTag}] ` : '';
+      const passed = opts.expectStatus.includes(exchange.status);
+      testResults = [...testResults, {
+        name: `${tag}expected status ${opts.expectStatus.join(' or ')}`,
+        passed,
+        error: passed ? undefined : `got ${exchange.status} ${exchange.statusText}`,
+      }];
     }
 
     const status = deriveRunStatus(postScriptError, testResults, exchange.status);

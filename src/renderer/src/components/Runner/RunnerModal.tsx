@@ -5,7 +5,7 @@ import { Fragment, useEffect, useRef, useState, useCallback } from 'react';
 import { useStore } from '../../store';
 import type { RunRequestResult, RunSummary, RunnerItem } from '../../../../shared/types';
 import { findFolder } from '../../store';
-import { buildJsonReport, buildJUnitReport, buildHtmlReport } from '../../../../shared/report';
+import { buildJsonReport, buildJUnitReport, buildHtmlReport, buildSarifReport } from '../../../../shared/report';
 import { collectAllTags, buildRunPlan, expandRunPlanWithData, expandFolderDataSets, resolveInheritedAuthAndHeaders, authIsConfigured } from '../../../../shared/request-collection';
 import { buildCliArgs, generateGitHub, generateAzure, generateGitLab } from '../../../../shared/ci-generators';
 import { getMethodColor } from '../../../../shared/colors';
@@ -175,7 +175,7 @@ export function RunnerModal() {
   const [filterTags,    setFilterTags]    = useState<string[]>(runnerModal.filterTags);
   const [summary,       setSummary]       = useState<RunSummary | null>(null);
   const [copiedKey,     setCopiedKey]     = useState<string | null>(null);
-  const [exportFormat,  setExportFormat]  = useState<'json' | 'junit' | 'html'>('json');
+  const [exportFormat,  setExportFormat]  = useState<'json' | 'junit' | 'html' | 'sarif'>('json');
   const [requestDelay,  setRequestDelay]  = useState<number>(0);
   const [expandedRows,  setExpandedRows]  = useState<Set<number>>(new Set());
 
@@ -230,9 +230,10 @@ export function RunnerModal() {
     if (baseItems.length === 0) return;
 
     // Data-table expansion:
-    //  - Collection run: each folder's own data table iterates its requests.
-    //  - Then the whole-scope table (the folder's for a folder run, else the
-    //    collection's) repeats the plan once per row. No rows → a single pass.
+    //  - Collection run: each folder's own data table iterates its requests, then
+    //  - the whole-scope table repeats the plan once per row. No rows → single pass.
+    //  A data table can also carry `expectStatus`/`owasp` columns to act as an
+    //  access-control matrix (run as different personas, assert allow/deny).
     let items: RunnerItem[] = baseItems;
     if (!folderId && colEntry) items = expandFolderDataSets(items, colEntry.data);
     items = expandRunPlanWithData(items, ds);
@@ -534,13 +535,14 @@ export function RunnerModal() {
             <div className="ml-auto flex items-center gap-1.5">
               <select
                 value={exportFormat}
-                onChange={e => setExportFormat(e.target.value as 'json' | 'junit' | 'html')}
+                onChange={e => setExportFormat(e.target.value as 'json' | 'junit' | 'html' | 'sarif')}
                 className="bg-surface-800 border border-surface-700 rounded px-1.5 py-0.5 text-[11px] focus:outline-none focus:border-blue-500"
                 style={{ color: 'var(--text-primary)' }}
               >
                 <option value="json">JSON</option>
                 <option value="junit">JUnit XML</option>
                 <option value="html">HTML</option>
+                <option value="sarif">SARIF (security)</option>
               </select>
               <button
                 onClick={() => {
@@ -551,8 +553,9 @@ export function RunnerModal() {
                   };
                   const content = exportFormat === 'junit' ? buildJUnitReport(runnerResults, summary, meta)
                     : exportFormat === 'html'  ? buildHtmlReport(runnerResults, summary, meta)
+                    : exportFormat === 'sarif' ? buildSarifReport(runnerResults, summary, meta)
                     : buildJsonReport(runnerResults, summary, meta);
-                  const ext = exportFormat === 'junit' ? 'xml' : exportFormat === 'html' ? 'html' : 'json';
+                  const ext = exportFormat === 'junit' ? 'xml' : exportFormat === 'html' ? 'html' : exportFormat === 'sarif' ? 'sarif' : 'json';
                   electron.saveResults(content, `spector-results.${ext}`);
                 }}
                 className="px-2.5 py-0.5 bg-surface-800 hover:bg-surface-700 rounded transition-colors text-[11px] whitespace-nowrap"

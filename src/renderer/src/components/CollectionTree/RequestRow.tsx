@@ -8,7 +8,7 @@ import { SchemaSyncModal } from './SchemaSyncModal';
 import { DragCtx, SelectionCtx, TagChips } from './CollectionTree';
 import { InlineEdit } from '../common/InlineEdit';
 import { type MenuItem, DotsBtn } from '../common/ContextMenu';
-import { PencilIcon, CopyIcon, TagIcon, SyncIcon, TrashIcon } from '../common/icons';
+import { PencilIcon, CopyIcon, TagIcon, SyncIcon, TrashIcon, ShieldIcon, BanIcon } from '../common/icons';
 import { useStore } from '../../store';
 import { useToast, Toast } from '../common/Toast';
 import { pushRequestAsMonitor, cloudEnabled } from '../../lib/cloud-push';
@@ -26,14 +26,14 @@ function requestPath(url: string): string {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const HOOK_LABELS: Record<NonNullable<ApiRequest['hookType']>, string> = {
+export const HOOK_LABELS: Record<NonNullable<ApiRequest['hookType']>, string> = {
   beforeAll: 'Before All',
-  before:    'Before',
-  after:     'After',
+  before:    'Before Each',
+  after:     'After Each',
   afterAll:  'After All',
 };
 
-const HOOK_COLORS: Record<NonNullable<ApiRequest['hookType']>, string> = {
+export const HOOK_COLORS: Record<NonNullable<ApiRequest['hookType']>, string> = {
   beforeAll: 'bg-violet-700 text-white',
   before:    'bg-violet-600 text-white',
   after:     'bg-cyan-700 text-white',
@@ -97,6 +97,7 @@ export function RequestRow({
   const sel = useContext(SelectionCtx);
   const selected = sel.isSelected(collectionId, reqId);
   const { toast, show } = useToast();
+  const addSecurityTests = useStore(s => s.addSecurityTests);
 
   // Cmd/Ctrl+click toggles this request into the multi-selection instead of
   // opening it; a plain click clears any selection and opens as before.
@@ -227,15 +228,23 @@ export function RequestRow({
 
         <div className="shrink-0">
           <DotsBtn items={[
+            ...(onAddExample ? [
+              { type: 'item' as const, label: t('Add Example'), icon: <CopyIcon />, onClick: () => { onAddExample(); setExamplesOpen(true); } },
+              { type: 'separator' as const },
+            ] : []),
             { type: 'item', label: t('Rename'),     icon: <PencilIcon />, onClick: () => setRenaming(true) },
             { type: 'item', label: t('Duplicate'),  icon: <CopyIcon />,   onClick: onDuplicate },
-            ...(onAddExample ? [{ type: 'item' as const, label: t('Add Example'), icon: <CopyIcon />, onClick: () => { onAddExample(); setExamplesOpen(true); } }] : []),
             { type: 'item', label: t('Add tag'),    icon: <TagIcon />,    onClick: () => setAddingTag(true) },
+            { type: 'separator' },
             { type: 'item', label: t('Sync schema'),icon: <SyncIcon />,   onClick: () => setShowSchemaSync(true) },
-            { type: 'item', label: disabled ? t('Enable') : t('Disable'),    onClick: onToggleDisabled },
+            { type: 'item', label: t('Generate security tests'), icon: <ShieldIcon />, onClick: () => {
+              const n = addSecurityTests(collectionId, reqId);
+              show(n > 0 ? t('Added :count OWASP security tests', { count: n }) : t('No security tests generated for this request'), n > 0);
+            } },
             ...(cloudEnabled()
               ? [{ type: 'item' as const, label: t('Push as monitor to cloud'), icon: <SyncIcon />, onClick: pushMonitor }]
               : []),
+            { type: 'item', label: disabled ? t('Enable') : t('Disable'), icon: <BanIcon />, onClick: onToggleDisabled },
             { type: 'separator' },
             { type: 'header', label: t('Hook type') },
             ...hookMenuItems,

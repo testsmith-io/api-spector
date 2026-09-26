@@ -26,6 +26,7 @@ import { OverflowMenu } from '../common/OverflowMenu';
 import { DotsHorizontalIcon } from '../common/icons';
 import { Modal } from '../common/Modal';
 import { validateHttpSemantics } from '../../../../shared/http-semantics';
+import { validateBodyAgainstSchema } from '../../lib/schema-validate';
 import { useT } from '../../i18n';
 
 const { electron } = window;
@@ -205,26 +206,28 @@ export function ResponseViewer() {
   const [showMockModal, setShowMockModal] = useState(false);
   const [bodyView, setBodyView] = useState<'tree' | 'raw' | 'table'>('raw');
   const assertToast = useToast(2500);
-  const contractToast = useToast(2500);
+  const schemaToast = useToast(2500);
 
-  async function saveAsContract() {
+  // The request behind this response, so we can read/write its stored schema.
+  const currentRequest = useStore(s => requestId
+    ? Object.values(s.collections).find(c => c.data.requests[requestId])?.data.requests[requestId] ?? null
+    : null);
+
+  // Auto-check: if a schema is stored and we have a JSON response, validate it
+  // so the response header shows a pass / fail badge on every send.
+  const schemaCheck = currentRequest?.schema?.trim() && response && !response.error
+    ? validateBodyAgainstSchema(currentRequest.schema, response.body)
+    : null;
+
+  async function saveAsSchema() {
     if (!response || !requestId || !activeTabId) return;
     const schema: string | null = response.body
       ? await electron.inferContractSchema(response.body)
       : null;
-    const contentType = response.headers['content-type'];
-    const headers: { key: string; value: string; required: boolean }[] = contentType
-      ? [{ key: 'content-type', value: contentType, required: true }]
-      : [];
-    updateRequest(requestId, {
-      contract: {
-        statusCode: response.status,
-        headers,
-        bodySchema: schema ?? '',
-      },
-    });
-    setTabRequestTab(activeTabId, 'contract');
-    contractToast.show(t('✓ Contract saved'), true);
+    if (!schema) return;
+    updateRequest(requestId, { schema });
+    setTabRequestTab(activeTabId, 'schema');
+    schemaToast.show(t('✓ Schema saved'), true);
   }
 
   function handleAssert(snippet: string) {
@@ -425,8 +428,22 @@ export function ResponseViewer() {
             {assertToast.toast && (
               <span className="text-[10px] text-emerald-400 font-medium px-1 shrink-0">{assertToast.toast.msg}</span>
             )}
-            {contractToast.toast && (
-              <span className="text-[10px] text-blue-400 font-medium px-1 shrink-0">{contractToast.toast.msg}</span>
+            {schemaToast.toast && (
+              <span className="text-[10px] text-blue-400 font-medium px-1 shrink-0">{schemaToast.toast.msg}</span>
+            )}
+            {schemaCheck && schemaCheck.status !== 'error' && (
+              <span
+                title={schemaCheck.status === 'valid'
+                  ? t('Response matches the saved schema')
+                  : t('Response does not match the saved schema (:count issue|Response does not match the saved schema (:count issues', { count: schemaCheck.status === 'invalid' ? schemaCheck.errors.length : 0 }) + ')'}
+                className={`text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 ${
+                  schemaCheck.status === 'valid'
+                    ? 'text-emerald-300 bg-emerald-900/30'
+                    : 'text-red-300 bg-red-900/30'
+                }`}
+              >
+                {schemaCheck.status === 'valid' ? t('Schema ✓') : t('Schema ✗')}
+              </span>
             )}
 
             <div className="ml-auto flex items-center gap-1 shrink-0">
@@ -486,11 +503,11 @@ export function ResponseViewer() {
                 </button>
               )}
               <button
-                onClick={saveAsContract}
+                onClick={saveAsSchema}
                 className="hidden @min-[350px]:flex px-2 py-0.5 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors"
-                title={t('Capture this response as a contract expectation')}
+                title={t('Save a JSON Schema from this response; it is checked automatically on every send')}
               >
-                ↓ {t('Contract')}
+                ↓ {t('Schema')}
               </button>
               <button
                 onClick={() => setShowMockModal(true)}
@@ -521,10 +538,10 @@ export function ResponseViewer() {
                 <button
                   role="menuitem"
                   tabIndex={-1}
-                  onClick={saveAsContract}
+                  onClick={saveAsSchema}
                   className="flex @min-[350px]:hidden w-full items-center gap-2 px-3 py-1.5 text-xs text-surface-300 hover:bg-surface-800 hover:text-white"
                 >
-                  ↓ {t('Contract')}
+                  ↓ {t('Schema')}
                 </button>
                 <button
                   role="menuitem"

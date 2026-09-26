@@ -109,6 +109,9 @@ export function DataSetEditor({ ds, onChange, exportName, scopeLabel = 'collecti
         <code className="text-surface-500">{'{{$randomEmail}}'}</code>{' '}{t('or')}{' '}
         <code className="text-surface-500">{'{{faker.person.firstName()}}'}</code>.
       </p>
+      <p className="text-surface-600 text-[11px]">
+        {t('Special columns :status and :owasp turn a data table into an access-control matrix: :status asserts the response code (e.g. 403) and :owasp tags the finding (e.g. BOLA).', { status: 'expectStatus', owasp: 'owasp' })}
+      </p>
 
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap">

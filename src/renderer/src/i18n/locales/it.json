@@ -1050,5 +1050,9 @@
   "No data row": "Nessuna riga di dati",
   "Row :n": "Riga :n",
   "Run this request with the variables from one data table row": "Esegui questo request con le variabili di una riga della tabella dati",
-  "Disabled": "Disattivata"
+  "Disabled": "Disattivata",
+  "Generate security tests": "Genera test di sicurezza",
+  "Added :count OWASP security tests": ":count test di sicurezza OWASP aggiunti",
+  "No security tests generated for this request": "Nessun test di sicurezza generato per questo request",
+  "Special columns :status and :owasp turn a data table into an access-control matrix: :status asserts the response code (e.g. 403) and :owasp tags the finding (e.g. BOLA).": "Le colonne speciali :status e :owasp trasformano una tabella dati in una matrice di controllo degli accessi: :status verifica il codice di risposta (ad es. 403) e :owasp etichetta il risultato (ad es. BOLA)."
 }
