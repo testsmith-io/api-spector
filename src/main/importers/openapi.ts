@@ -311,6 +311,11 @@ function buildCollection(spec: any): Collection {
 
   const requests: Record<string, ApiRequest> = {};
   const foldersByTag: Record<string, Folder> = {};
+  // Top-level tag descriptions become folder docs.
+  const tagDescriptions: Record<string, string> = {};
+  for (const tg of (spec.tags ?? []) as { name?: string; description?: string }[]) {
+    if (tg?.name && tg.description) tagDescriptions[tg.name] = tg.description;
+  }
 
   for (const [pathStr, pathItem] of Object.entries<any>(spec.paths ?? {})) {
     const resolved = resolve(spec, pathItem);
@@ -350,7 +355,7 @@ function buildCollection(spec: any): Collection {
         params,
         auth: buildAuth(security, securitySchemes),
         body,
-        description: operation.description ?? '',
+        description: operation.description || operation.summary || '',
         meta: { tags },
         ...(responseSchema ? { schema: responseSchema } : {}),
         ...(examples ? { examples } : {}),
@@ -358,7 +363,7 @@ function buildCollection(spec: any): Collection {
       requests[req.id] = req;
 
       if (!foldersByTag[tag]) {
-        foldersByTag[tag] = { id: uuidv4(), name: tag, description: '', folders: [], requestIds: [] };
+        foldersByTag[tag] = { id: uuidv4(), name: tag, description: tagDescriptions[tag] ?? '', folders: [], requestIds: [] };
       }
       foldersByTag[tag].requestIds.push(req.id);
     }

@@ -16,3 +16,4 @@ export * from './types/mock';
 export * from './types/recorder';
 export * from './types/git';
 export * from './types/soap-wsdl';
+export * from './types/ai';

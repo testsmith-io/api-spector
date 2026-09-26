@@ -21,6 +21,7 @@ import { existsSync, readFileSync } from 'fs';
 import { registerFileHandlers } from './ipc/file-handler';
 import { registerRequestHandler } from './ipc/request-handler';
 import { registerSecretHandlers, initSecretStore } from './ipc/secret-handler';
+import { registerAiHandlers } from './ipc/ai-handler';
 import { registerImportHandlers } from './ipc/import-handler';
 import { registerGenerateHandlers } from './ipc/generate-handler';
 import { registerRunnerHandler } from './ipc/runner-handler';
@@ -254,6 +255,7 @@ app.whenReady().then(async () => {
   registerFileHandlers(ipcMain);
   registerRequestHandler(ipcMain);
   registerSecretHandlers(ipcMain);
+  registerAiHandlers(ipcMain);
   registerImportHandlers(ipcMain);
   registerGenerateHandlers(ipcMain);
   registerRunnerHandler(ipcMain);

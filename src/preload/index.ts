@@ -24,6 +24,7 @@ import type {
   GrpcServiceInfo,
   StreamEvent,
   ConsumerContract,
+  GenerateDocsInput,
   ApiRequest,
   ContractRunPayload,
   ContractReport,
@@ -96,6 +97,15 @@ const api = {
   /** Save a named secret to the OS keychain (safeStorage). */
   setSecret: (ref: string, value: string): Promise<void> =>
     ipcRenderer.invoke(IPC.secret.set, ref, value),
+  /** Whether a secret exists (never returns the value itself). */
+  hasSecret: (ref: string): Promise<{ has: boolean }> =>
+    ipcRenderer.invoke(IPC.secret.has, ref),
+  /** Remove a secret from the OS keychain. */
+  deleteSecret: (ref: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.secret.delete, ref),
+  /** Optional: generate markdown docs for an item via the configured LLM. */
+  generateDocs: (input: GenerateDocsInput): Promise<string> =>
+    ipcRenderer.invoke(IPC.ai.generateDocs, input),
 
   // ─── Globals ──────────────────────────────────────────────────────────────
   getGlobals: (): Promise<Record<string, string>> =>

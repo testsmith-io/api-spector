@@ -137,7 +137,8 @@ export function parseBruFile(content: string, fileName: string): ApiRequest {
     params,
     auth,
     body,
-    description:       '',
+    // Bruno keeps request documentation in a `docs { ... }` block (markdown).
+    description:       extractBlock(content, 'docs')?.trim() ?? '',
     preRequestScript:  extractBlock(content, 'script:pre-request')  ? translateScript(extractBlock(content, 'script:pre-request')!.trim(),  'bruno') || undefined : undefined,
     postRequestScript: extractBlock(content, 'script:post-response') ? translateScript(extractBlock(content, 'script:post-response')!.trim(), 'bruno') || undefined : undefined,
     meta:        { seq: meta['seq'] !== undefined ? Number(meta['seq']) : 0 },

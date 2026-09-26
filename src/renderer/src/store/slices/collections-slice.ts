@@ -146,6 +146,7 @@ export interface CollectionsSliceActions {
   // Collection TLS
   updateCollectionTls: (id: string, tls: TlsSettings | undefined) => void
   updateCollectionAuthAndHeaders: (id: string, auth: AuthConfig, headers: KeyValuePair[]) => void
+  updateCollectionDescription: (id: string, description: string) => void
 }
 
 export type CollectionsSlice = CollectionsSliceState & CollectionsSliceActions
@@ -352,6 +353,12 @@ export const createCollectionsSlice: StateCreator<
   updateCollectionTls: (id, tls) => set(s => {
     if (!s.collections[id]) return;
     s.collections[id].data.tls = tls;
+    s.collections[id].dirty = true;
+  }),
+
+  updateCollectionDescription: (id, description) => set(s => {
+    if (!s.collections[id]) return;
+    s.collections[id].data.description = description;
     s.collections[id].dirty = true;
   }),
 

@@ -8,9 +8,11 @@ import { KVTable } from '../RequestBuilder/KVTable';
 import { Modal } from '../common/Modal';
 import { AuthEditor, type AuthEditorPatch } from '../common/AuthEditor';
 import { DataSetEditor } from '../common/DataSetEditor';
+import { DocsEditor } from '../common/DocsEditor';
+import { useAiAvailable, generateDocs, folderDocsContext } from '../../lib/ai';
 import { useT } from '../../i18n';
 
-type ModalTab = 'auth' | 'headers' | 'variables' | 'data'
+type ModalTab = 'auth' | 'headers' | 'variables' | 'data' | 'docs'
 
 interface Props {
   collectionId: string
@@ -29,6 +31,9 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
     Object.entries(folder.variables ?? {}).map(([key, value]) => ({ key, value, enabled: true })),
   );
   const [dataSet, setDataSet]     = useState<DataSet>(folder.dataSet ?? { columns: [], rows: [] });
+  const [docs, setDocs]           = useState<string>(folder.description ?? '');
+  const requests = useStore(s => s.collections[collectionId]?.data.requests ?? {});
+  const aiAvailable = useAiAvailable();
 
   function patchAuth(patch: AuthEditorPatch) {
     setAuth(prev => ({ ...prev, ...patch } as AuthConfig));
@@ -40,7 +45,7 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
     );
     const cleanData: DataSet | undefined =
       dataSet.columns.length > 0 ? dataSet : undefined;
-    updateFolder(collectionId, folder.id, { auth, headers, variables, dataSet: cleanData });
+    updateFolder(collectionId, folder.id, { auth, headers, variables, dataSet: cleanData, description: docs });
     onClose();
   }
 
@@ -61,7 +66,7 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
 
         {/* Tabs */}
         <div className="flex border-b border-surface-800 px-4 shrink-0">
-          {(['auth', 'headers', 'variables', 'data'] as ModalTab[]).map(tab => (
+          {(['auth', 'headers', 'variables', 'data', 'docs'] as ModalTab[]).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -113,6 +118,14 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
           )}
           {activeTab === 'data' && (
             <DataSetEditor ds={dataSet} onChange={setDataSet} exportName={folder.name} scopeLabel="folder" />
+          )}
+          {activeTab === 'docs' && (
+            <DocsEditor
+              value={docs}
+              onChange={setDocs}
+              aiAvailable={aiAvailable}
+              onGenerate={() => generateDocs({ level: 'folder', name: folder.name, existing: docs, context: folderDocsContext(folder, requests) })}
+            />
           )}
         </div>
 

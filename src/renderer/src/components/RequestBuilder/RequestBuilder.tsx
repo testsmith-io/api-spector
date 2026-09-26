@@ -15,6 +15,7 @@ import { BodyTab } from './BodyTab';
 import { AuthTab } from './AuthTab';
 import { ScriptsTab } from './ScriptsTab';
 import { SchemaTab } from './SchemaTab';
+import { DocsTab } from './DocsTab';
 import { StreamTab } from './StreamTab';
 import { WebSocketPanel } from '../WebSocket/WebSocketPanel';
 import { GrpcPanel } from '../Grpc/GrpcPanel';
@@ -365,6 +366,7 @@ export function RequestBuilder({ request }: Props) {
       ...(!isExample ? [
         { id: 'scripts', label: 'Scripts', count: (hasPreScript ? 1 : 0) + (hasPostScript ? 1 : 0) },
         { id: 'schema',   label: 'Schema',   count: request.schema?.trim() ? 1 : 0 },
+        { id: 'docs',     label: 'Docs',     count: request.description?.trim() ? 1 : 0 },
         { id: 'stream',   label: 'Stream',   count: (request.stream?.idleMs !== undefined || request.stream?.maxMs !== undefined) ? 1 : 0 },
       ] : []),
     ] : []),
@@ -613,7 +615,7 @@ export function RequestBuilder({ request }: Props) {
               const raw = activeTab === 'contract' ? 'schema' : activeTab;
               // On an example, Scripts/Schema are hidden; if the stored tab was
               // one of them, fall back to Body so nothing renders blank.
-              const shown = isExample && (raw === 'scripts' || raw === 'schema' || raw === 'stream')
+              const shown = isExample && (raw === 'scripts' || raw === 'schema' || raw === 'docs' || raw === 'stream')
                 ? 'body' : raw;
               return <>
                 {shown === 'params'  && <ParamsTab  request={request} onChange={update} />}
@@ -622,6 +624,7 @@ export function RequestBuilder({ request }: Props) {
                 {shown === 'auth'    && <AuthTab    request={request} onChange={update} />}
                 {!isExample && shown === 'scripts' && <ScriptsTab request={request} onChange={update} />}
                 {!isExample && shown === 'schema'   && <SchemaTab   request={request} onChange={update} />}
+                {!isExample && shown === 'docs'     && <DocsTab     request={request} onChange={update} />}
                 {!isExample && shown === 'stream'   && <StreamTab   request={request} onChange={update} />}
               </>;
             })()}

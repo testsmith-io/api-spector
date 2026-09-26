@@ -6,13 +6,15 @@ import { useStore } from '../../store';
 import { Modal } from './Modal';
 import { LOCALES, useLocale, useT, type Locale } from '../../i18n';
 import { START_TOUR_EVENT } from './ProductTour';
+import { AI_OPENAI_TOKEN_REF } from '../../../../shared/types';
+import { getAiConfig, setAiConfig, invalidateAiAvailable } from '../../lib/ai';
 
 const { electron } = window;
 
 const DEFAULT_PII_PATTERNS = ['authorization', 'password', 'token', 'secret', 'api-key', 'x-api-key'];
 const ZOOM_STEPS = [0.75, 0.90, 1.0, 1.10, 1.25, 1.50];
 
-type SettingsTab = 'general' | 'appearance' | 'proxy' | 'tls' | 'privacy' | 'cloud' | 'secrets'
+type SettingsTab = 'general' | 'appearance' | 'proxy' | 'tls' | 'privacy' | 'cloud' | 'ai' | 'secrets'
 
 export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
   const workspace = useStore(s => s.workspace);
@@ -64,6 +66,25 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
     } catch (e) {
       setCloudTest({ status: 'err', msg: (e as Error).message });
     }
+  }
+
+  // AI state. The API key lives ONLY in the OS keychain (never in the workspace
+  // file); the model choice lives in localStorage (per-machine). Nothing here is
+  // written to the .spector file, so no AI config reaches version control.
+  const [aiModel, setAiModel] = useState(getAiConfig().model);
+  const [aiKey, setAiKey]     = useState('');
+  const [aiKeySet, setAiKeySet] = useState(false);
+  React.useEffect(() => {
+    let live = true;
+    electron.hasSecret(AI_OPENAI_TOKEN_REF).then(r => { if (live) setAiKeySet(r.has); }).catch(() => { /* none */ });
+    return () => { live = false; };
+  }, []);
+
+  async function removeAiKey() {
+    await electron.deleteSecret(AI_OPENAI_TOKEN_REF);
+    setAiKey('');
+    setAiKeySet(false);
+    invalidateAiAvailable();
   }
 
   // Secrets state — external secret-manager connection config (non-secret only;
@@ -152,6 +173,11 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
     }
     if (cloudToken.trim()) await electron.setSecret('cloud:token', cloudToken.trim());
 
+    // AI: key to the keychain, model to localStorage — nothing into `settings`,
+    // so the workspace file (and version control) never sees any AI config.
+    if (aiKey.trim()) { await electron.setSecret(AI_OPENAI_TOKEN_REF, aiKey.trim()); invalidateAiAvailable(); }
+    setAiConfig({ model: aiModel.trim() || 'gpt-4o-mini' });
+
     if (defaultEnvironment) settings.defaultEnvironment = defaultEnvironment;
     else delete settings.defaultEnvironment;
 
@@ -214,6 +240,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
     { id: 'privacy',    label: t('Privacy') },
     { id: 'secrets',    label: t('Secrets') },
     { id: 'cloud',      label: t('Cloud') },
+    { id: 'ai',         label: t('AI') },
   ];
 
   return (
@@ -506,6 +533,38 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
                 />
                 <span>{t('Reject unauthorized / self-signed certificates')}</span>
               </label>
+            </>
+          )}
+
+          {activeTab === 'ai' && (
+            <>
+              <p className="text-surface-600 text-[11px] leading-relaxed">
+                {t('Optional. Configure an OpenAI key to generate documentation from the Docs tab of a request, folder, or collection. The key is stored only in your OS keychain and never written to the workspace file or version control.')}
+              </p>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('OpenAI API key')}</label>
+                <input
+                  type="password"
+                  value={aiKey}
+                  onChange={e => setAiKey(e.target.value)}
+                  placeholder={aiKeySet ? t('•••••••• (stored in keychain — type to replace)') : 'sk-...'}
+                  autoComplete="off"
+                  className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
+                />
+                {aiKeySet && (
+                  <button onClick={removeAiKey} className="self-start text-[11px] text-red-400 hover:text-red-300 mt-0.5">{t('Remove key')}</button>
+                )}
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Model')}</label>
+                <input
+                  value={aiModel}
+                  onChange={e => setAiModel(e.target.value)}
+                  placeholder="gpt-4o-mini"
+                  className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono placeholder-surface-600"
+                />
+                <p className="text-[10px] text-surface-600">{t('Any OpenAI chat model id (e.g. gpt-4o-mini, gpt-4o). Stored per-machine, not in the workspace.')}</p>
+              </div>
             </>
           )}
 

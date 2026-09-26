@@ -7,9 +7,11 @@ import { useStore } from '../../store';
 import { KVTable } from '../RequestBuilder/KVTable';
 import { Modal } from '../common/Modal';
 import { AuthEditor, type AuthEditorPatch } from '../common/AuthEditor';
+import { DocsEditor } from '../common/DocsEditor';
+import { useAiAvailable, generateDocs, collectionDocsContext } from '../../lib/ai';
 import { useT } from '../../i18n';
 
-type ModalTab = 'auth' | 'headers' | 'tls'
+type ModalTab = 'auth' | 'headers' | 'tls' | 'docs'
 
 interface Props {
   collection: Collection
@@ -20,8 +22,11 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
   const t = useT();
   const updateCollectionTls             = useStore(s => s.updateCollectionTls);
   const updateCollectionAuthAndHeaders  = useStore(s => s.updateCollectionAuthAndHeaders);
+  const updateCollectionDescription     = useStore(s => s.updateCollectionDescription);
+  const aiAvailable = useAiAvailable();
 
   const [activeTab, setActiveTab] = useState<ModalTab>('auth');
+  const [docs, setDocs]           = useState<string>(collection.description ?? '');
 
   // Auth & headers
   const [auth, setAuth]       = useState<AuthConfig>(collection.auth ?? { type: 'none' });
@@ -40,6 +45,7 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
 
   function save() {
     updateCollectionAuthAndHeaders(collection.id, auth, headers);
+    updateCollectionDescription(collection.id, docs);
 
     const hasAny = caCertPath.trim() || clientCertPath.trim() || clientKeyPath.trim();
     updateCollectionTls(collection.id, hasAny ? {
@@ -69,7 +75,7 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
 
         {/* Tabs */}
         <div className="flex border-b border-surface-800 px-4 shrink-0">
-          {(['auth', 'headers', 'tls'] as ModalTab[]).map(tab => (
+          {(['auth', 'headers', 'tls', 'docs'] as ModalTab[]).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -148,6 +154,14 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
                 <span>{t('Reject unauthorized / self-signed certificates')}</span>
               </label>
             </div>
+          )}
+          {activeTab === 'docs' && (
+            <DocsEditor
+              value={docs}
+              onChange={setDocs}
+              aiAvailable={aiAvailable}
+              onGenerate={() => generateDocs({ level: 'collection', name: collection.name, existing: docs, context: collectionDocsContext(collection) })}
+            />
           )}
         </div>
 

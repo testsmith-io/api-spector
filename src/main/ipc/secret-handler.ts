@@ -84,6 +84,20 @@ export function registerSecretHandlers(ipc: IpcMain): void {
     secretStore[ref] = ss.encryptString(value).toString('base64');
     await persistSecretStore();
   });
+
+  /** Whether a secret is available (keychain store or env fallback) — never
+   *  returns the value itself, so the renderer can gate UI without holding it. */
+  handleIpc(ipc, IPC.secret.has, async (_e, ref: string) => {
+    return { has: (await getSecret(ref)) != null };
+  });
+
+  /** Remove a secret from the OS-encrypted store. */
+  handleIpc(ipc, IPC.secret.delete, async (_e, ref: string) => {
+    if (ref in secretStore) {
+      delete secretStore[ref];
+      await persistSecretStore();
+    }
+  });
 }
 
 // ─── Decrypt utility (used internally by interpolation.ts) ───────────────────

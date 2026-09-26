@@ -28,7 +28,7 @@ export interface AppTab {
   lastSentRequest: SentRequest | null
   lastHookResults: RunRequestResult[] | null
   isSending: boolean
-  requestTab: 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'schema' | 'contract' | 'stream'
+  requestTab: 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'schema' | 'contract' | 'stream' | 'docs'
 }
 
 export function makeTab(requestId: string, collectionId: string, opts: { protocol?: ApiRequest['protocol']; exampleId?: string | null } = {}): AppTab {

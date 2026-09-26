@@ -58,6 +58,13 @@ export const IPC = {
     checkMasterKey: 'secret:checkMasterKey',
     setMasterKey:   'secret:setMasterKey',
     set:            'secret:set',
+    has:            'secret:has',
+    delete:         'secret:delete',
+  },
+
+  // ─── AI (optional; key lives only in the OS keychain) ────────────────────────
+  ai: {
+    generateDocs: 'ai:generateDocs',
   },
 
   // ─── Global variables ──────────────────────────────────────────────────────
