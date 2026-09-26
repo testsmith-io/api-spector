@@ -107,6 +107,10 @@ export interface Folder {
    *  those variables injected. Used when running the folder; takes priority
    *  over the collection dataset for folder runs. */
   dataSet?: DataSet
+  /** On-disk pointer to the folder's data table, stored as a separate CSV under
+   *  `data/`. Written in place of an inline `dataSet` when persisted, and
+   *  resolved back into `dataSet` on load — so in memory only `dataSet` is used. */
+  dataSetRef?: string
 }
 
 export interface TlsSettings {
@@ -128,6 +132,10 @@ export interface Collection {
   collectionVariables?: Record<string, string>
   /** Data-driven dataset: each row runs the full collection once with those variables injected. */
   dataSet?: DataSet
+  /** On-disk pointer to the collection's data table (a separate CSV under
+   *  `data/`). Written in place of an inline `dataSet` and resolved back on
+   *  load — in memory only `dataSet` is used. */
+  dataSetRef?: string
   /** TLS overrides applied to every request in this collection (takes priority over workspace TLS). */
   tls?: TlsSettings
   /** Auth inherited by all requests in this collection (can be overridden at folder or request level). */

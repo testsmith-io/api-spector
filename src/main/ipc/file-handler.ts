@@ -10,6 +10,7 @@ import { join, dirname, resolve, basename, sep } from 'path';
 import { randomUUID } from 'crypto';
 import JSZip from 'jszip';
 import type { Collection, Environment, Workspace } from '../../shared/types';
+import { externalizeDataSets, inlineDataSets } from '../data-files';
 import { loadGlobals, getGlobals, setGlobals, persistGlobals } from '../globals-store';
 import { setSecretsConfig } from '../secrets';
 
@@ -342,15 +343,19 @@ export function registerFileHandlers(ipc: IpcMain): void {
 
   handleIpc(ipc, IPC.file.loadCollection, async (_e, relPath: string) => {
     if (!workspaceDir) throw new Error('No workspace open');
-    const raw = await readFile(resolve(workspaceDir, relPath), 'utf8');
-    return JSON.parse(raw) as Collection;
+    const fullPath = resolve(workspaceDir, relPath);
+    const raw = await readFile(fullPath, 'utf8');
+    // Resolve any externalized data tables (data/*.csv) back into `dataSet`.
+    return inlineDataSets(JSON.parse(raw) as Collection, dirname(fullPath));
   });
 
   handleIpc(ipc, IPC.file.saveCollection, async (_e, relPath: string, col: Collection) => {
     if (!workspaceDir) throw new Error('No workspace open');
     const fullPath = resolve(workspaceDir, relPath);
     await mkdir(dirname(fullPath), { recursive: true });
-    await atomicWrite(fullPath, JSON.stringify(col, null, 2));
+    // Data tables are written to separate CSVs under data/, not inline.
+    const toWrite = await externalizeDataSets(col, dirname(fullPath));
+    await atomicWrite(fullPath, JSON.stringify(toWrite, null, 2));
   });
 
   handleIpc(ipc, IPC.file.loadEnvironment, async (_e, relPath: string) => {
