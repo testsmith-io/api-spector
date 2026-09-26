@@ -204,6 +204,7 @@ export const IPC = {
     branches:       'git:branches',
     checkout:       'git:checkout',
     deleteBranch:   'git:deleteBranch',
+    fetch:          'git:fetch',
     pull:           'git:pull',
     push:           'git:push',
     remotes:        'git:remotes',
@@ -214,6 +215,8 @@ export const IPC = {
     resolveOurs:    'git:resolveOurs',
     resolveTheirs:  'git:resolveTheirs',
     markResolved:   'git:markResolved',
+    readConflict:   'git:readConflict',
+    writeResolved:  'git:writeResolved',
   },
 
   // ─── Recorder ──────────────────────────────────────────────────────────────

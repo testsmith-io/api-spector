@@ -6,6 +6,7 @@ import { useStore } from '../../store';
 import type { GitStatus, GitCommit, GitBranch, GitRemote, GitFile, CiPlatform } from '../../../../shared/types';
 import { Toast, useToast } from '../common/Toast';
 import { detectPlatform, generateCiContent, ciFilePath, secretManagerOf, requestSecretManagers, type SecretManagerKind } from '../../lib/ci-templates';
+import { ConflictEditor } from './ConflictEditor';
 import { useT } from '../../i18n';
 
 const { electron } = window;
@@ -59,7 +60,20 @@ function ChangesTab({ status, onRefresh }: { status: GitStatus; onRefresh: () =>
   const [error,      setError]      = useState<string | null>(null);
   const [pushing,    setPushing]    = useState(false);
   const [pulling,    setPulling]    = useState(false);
+  const [fetching,   setFetching]   = useState(false);
+  const [conflictFile, setConflictFile] = useState<string | null>(null);
+  const [pullRebase, setPullRebase] = useState(() => {
+    try { return localStorage.getItem('apiSpector.git.pullRebase') === '1'; } catch { return false; }
+  });
   const { toast, show: showToast }  = useToast();
+
+  function toggleRebase() {
+    setPullRebase(v => {
+      const next = !v;
+      try { localStorage.setItem('apiSpector.git.pullRebase', next ? '1' : '0'); } catch { /* private mode */ }
+      return next;
+    });
+  }
 
   async function showDiff(file: GitFile, staged: boolean) {
     setDiffFile(file.path);
@@ -97,13 +111,28 @@ function ChangesTab({ status, onRefresh }: { status: GitStatus; onRefresh: () =>
     } catch (e) { setError(String(e)); }
   }
 
+  async function fetch() {
+    setFetching(true);
+    try {
+      await electron.gitFetch();
+      showToast(t('Fetched from remote'), true);
+      onRefresh();
+    } catch (e) { showToast(String(e), false); }
+    finally { setFetching(false); }
+  }
+
   async function pull() {
     setPulling(true);
     try {
-      await electron.gitPull();
-      showToast(t('Pull successful'), true);
+      await electron.gitPull(pullRebase);
+      showToast(pullRebase ? t('Pulled (rebased)') : t('Pull successful'), true);
       onRefresh();
-    } catch (e) { showToast(String(e), false); }
+    } catch (e) {
+      const msg = String(e);
+      // A pull that stops on conflicts leaves them in the working tree.
+      showToast(/conflict/i.test(msg) ? t('Pull stopped on conflicts - resolve them below') : msg, false);
+      onRefresh();
+    }
     finally { setPulling(false); }
   }
 
@@ -113,7 +142,13 @@ function ChangesTab({ status, onRefresh }: { status: GitStatus; onRefresh: () =>
       await electron.gitPush(!status.remote);
       showToast(t('Push successful'), true);
       onRefresh();
-    } catch (e) { showToast(String(e), false); }
+    } catch (e) {
+      const msg = String(e);
+      // Remote moved ahead: guide the user to pull first instead of a raw error.
+      showToast(/non-fast-forward|rejected|fetch first/i.test(msg)
+        ? t('Push rejected - the remote has new commits. Pull first, then push.')
+        : msg, false);
+    }
     finally { setPushing(false); }
   }
 
@@ -137,6 +172,22 @@ function ChangesTab({ status, onRefresh }: { status: GitStatus; onRefresh: () =>
       {/* Branch + sync bar */}
       <div className="px-3 py-2 border-b border-surface-800 flex items-center gap-2 flex-shrink-0">
         <span className="text-[11px] font-mono text-blue-300 truncate flex-1">⎇ {status.branch || t('no branch')}</span>
+        <button
+          onClick={toggleRebase}
+          aria-pressed={pullRebase}
+          title={pullRebase ? t('Pull uses rebase (click for merge)') : t('Pull uses merge (click for rebase)')}
+          className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${pullRebase ? 'text-blue-300 bg-blue-900/30' : 'text-surface-500 hover:text-surface-300'}`}
+        >
+          {t('rebase')}
+        </button>
+        <button
+          onClick={fetch}
+          disabled={fetching}
+          title={t('Fetch from remote (update ahead/behind, no merge)')}
+          className="text-xs px-1.5 py-0.5 rounded text-surface-400 hover:text-white transition-colors disabled:opacity-40"
+        >
+          {fetching ? '…' : '⟳'}
+        </button>
         <button
           onClick={pull}
           disabled={pulling}
@@ -188,6 +239,14 @@ function ChangesTab({ status, onRefresh }: { status: GitStatus; onRefresh: () =>
       )}
 
       <Toast toast={toast} />
+
+      {conflictFile && (
+        <ConflictEditor
+          path={conflictFile}
+          onClose={() => setConflictFile(null)}
+          onResolved={onRefresh}
+        />
+      )}
 
       <div className="flex-1 min-h-0 overflow-y-auto">
         {/* Staged */}
@@ -267,6 +326,11 @@ function ChangesTab({ status, onRefresh }: { status: GitStatus; onRefresh: () =>
                 <span className="font-mono text-[11px] font-bold w-4 shrink-0 text-red-400">!</span>
                 <span className="flex-1 truncate text-red-300">{path}</span>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                  <button
+                    onClick={e => { e.stopPropagation(); setConflictFile(path); }}
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-surface-300 hover:bg-surface-600 transition-colors"
+                    title={t('Open the conflict editor')}
+                  >{t('Edit')}</button>
                   <button
                     onClick={e => { e.stopPropagation(); resolveConflict(path, 'ours'); }}
                     className="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-surface-300 hover:bg-emerald-900/50 hover:text-emerald-300 transition-colors"

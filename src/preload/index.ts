@@ -404,8 +404,10 @@ const api = {
     ipcRenderer.invoke(IPC.git.checkout, branch, create),
   gitDeleteBranch: (name: string, force = false): Promise<void> =>
     ipcRenderer.invoke(IPC.git.deleteBranch, name, force),
-  gitPull:       (): Promise<void> =>
-    ipcRenderer.invoke(IPC.git.pull),
+  gitFetch:      (): Promise<void> =>
+    ipcRenderer.invoke(IPC.git.fetch),
+  gitPull:       (rebase = false): Promise<void> =>
+    ipcRenderer.invoke(IPC.git.pull, rebase),
   gitPush:       (setUpstream: boolean): Promise<void> =>
     ipcRenderer.invoke(IPC.git.push, setUpstream),
   gitRemotes:      (): Promise<GitRemote[]> =>
@@ -424,6 +426,10 @@ const api = {
     ipcRenderer.invoke(IPC.git.resolveTheirs, filePath),
   gitMarkResolved:  (filePath: string): Promise<void> =>
     ipcRenderer.invoke(IPC.git.markResolved, filePath),
+  gitReadConflict:  (filePath: string): Promise<string> =>
+    ipcRenderer.invoke(IPC.git.readConflict, filePath),
+  gitWriteResolved: (filePath: string, content: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.git.writeResolved, filePath, content),
 
   // ─── Recorder ─────────────────────────────────────────────────────────────
   recordStart:    (config: RecorderConfig): Promise<void> =>
