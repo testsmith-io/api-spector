@@ -465,6 +465,9 @@ function CollectionNode ( {
   const [showSettings, setShowSettings] = useState( false );
   const [showSchemaSync, setShowSchemaSync] = useState( false );
   const [showPushContract, setShowPushContract] = useState( false );
+  // The collection panel is showing THIS collection (clicked, not just owning
+  // the active request) — highlight the row like a request/folder.
+  const panelActive = useStore( s => s.collectionPanelOpen && s.activeCollectionId === col.id );
   const [expandCtrl, setExpandCtrl] = useState<ExpandCtrl>( { value: true, seq: 0 } );
   const [dropOver, setDropOver] = useState( false );
   const dragCtx = useContext( DragCtx );
@@ -477,7 +480,7 @@ function CollectionNode ( {
   return (
     <div>
       <div
-        className={`group flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-surface-800 transition-colors ${isActive ? 'text-[var(--text-primary)]' : 'text-surface-400'
+        className={`group flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-surface-800 transition-colors ${panelActive ? 'bg-surface-800 text-[var(--text-primary)]' : isActive ? 'text-[var(--text-primary)]' : 'text-surface-400'
           } ${col.disabled ? 'opacity-50' : ''} ${dropOver ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
         onClick={() => { onSelectCollection(); setExpanded( e => !e ); }}
         onDragOver={dragCtx.dragging ? e => { e.preventDefault(); setDropOver( true ); } : undefined}
@@ -621,6 +624,8 @@ function FolderRow ( {
   const [addingTag, setAddingTag] = useState( false );
   const folderCollection = useStore( s => s.collections[collectionId]?.data );
   const setFolderHookType = useStore( s => s.setFolderHookType );
+  const openFolderPanel = useStore( s => s.openFolderPanel );
+  const isActive = useStore( s => s.folderPanel?.folderId === folder.id && s.folderPanel?.collectionId === collectionId );
   // "Hook type" submenu: run the whole folder as a lifecycle hook (or clear it).
   const hookMenuItems = ( ['beforeAll', 'before', 'after', 'afterAll'] as const ).map( ht => ( {
     type: 'item' as const,
@@ -656,9 +661,9 @@ function FolderRow ( {
     <div className="relative">
       <div
         draggable
-        className={`group flex items-center gap-1 py-1 hover:bg-surface-800 transition-colors cursor-pointer text-surface-400 ${folder.disabled ? 'opacity-40' : ''} ${dropInside ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
+        className={`group flex items-center gap-1 py-1 transition-colors cursor-pointer ${isActive ? 'bg-surface-800 text-[var(--text-primary)]' : 'text-surface-400 hover:bg-surface-800'} ${folder.disabled ? 'opacity-40' : ''} ${dropInside ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
         style={{ paddingLeft: indent }}
-        onClick={() => setExpanded( e => !e )}
+        onClick={() => { openFolderPanel( collectionId, folder.id ); setExpanded( e => !e ); }}
         onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.stopPropagation(); dragCtx.setDragging( { type: 'folder', folderId: folder.id, collectionId } ); }}
         onDragEnd={() => { dragCtx.setDragging( null ); setDropInside( false ); }}
         onDragOver={handleFolderDragOver}

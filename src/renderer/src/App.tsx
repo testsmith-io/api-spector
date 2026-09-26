@@ -18,6 +18,7 @@ import { RunnerModal } from './components/Runner/RunnerModal';
 import { CoverageModal } from './components/Coverage/CoverageModal';
 import { CompareModal } from './components/Compare/CompareModal';
 import { CollectionPanel } from './components/CollectionPanel/CollectionPanel';
+import { FolderPanel } from './components/CollectionPanel/FolderPanel';
 import { MockPanel } from './components/MockPanel/MockPanel';
 import { MockDetailPanel } from './components/MockPanel/MockDetailPanel';
 import { RecorderPanel } from './components/MockPanel/RecorderPanel';
@@ -206,6 +207,7 @@ export default function App () {
   const showGeneratorPanel = useStore( s => s.showGeneratorPanel );
   const sidebarTab = useStore( s => s.sidebarTab );
   const collectionPanelOpen = useStore( s => s.collectionPanelOpen );
+  const folderPanel = useStore( s => s.folderPanel );
   const setSidebarTab = useStore( s => s.setSidebarTab );
   const contractDesignerOpen = useStore( s => s.contractDesignerOpen );
   const contractDesignerSeed = useStore( s => s.contractDesignerSeed );
@@ -645,6 +647,10 @@ export default function App () {
             ) : sidebarTab === 'mocks' && activeMockId ? (
               <div className="flex-1 min-h-0">
                 <MockDetailPanel mockId={activeMockId} />
+              </div>
+            ) : folderPanel ? (
+              <div className="flex-1 min-h-0">
+                <FolderPanel />
               </div>
             ) : collectionPanelOpen ? (
               <div className="flex-1 min-h-0">

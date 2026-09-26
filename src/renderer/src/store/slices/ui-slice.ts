@@ -39,6 +39,9 @@ export interface UiSliceState {
    *  request tab is open. Cleared as soon as a request tab is (re)activated, so
    *  it behaves like "bring the collection to front" rather than a mode. */
   collectionPanelOpen: boolean
+  /** When set, the main pane shows the folder panel (docs/data/variables) for
+   *  this folder. Mutually exclusive with a request tab / the collection panel. */
+  folderPanel: { collectionId: string; folderId: string } | null
   coverageOpen: boolean
   compareOpen: boolean
 
@@ -63,6 +66,8 @@ export interface UiSliceActions {
   requestSend: () => void
   /** Show or hide the collection/folder data panel over an open request. */
   setCollectionPanelOpen: (open: boolean) => void
+  /** Bring the folder panel (docs/data/variables) to the front for a folder. */
+  openFolderPanel: (collectionId: string, folderId: string) => void
   setCoverageOpen: (open: boolean) => void
   setCoverageSpec: (spec: string) => void
   setCompareOpen: (open: boolean) => void
@@ -87,6 +92,7 @@ export const createUiSlice: StateCreator<
   quickInsertsOpen: true,
   sendSignal: 0,
   collectionPanelOpen: false,
+  folderPanel: null,
   coverageOpen: false,
   compareOpen: false,
 
@@ -137,7 +143,11 @@ export const createUiSlice: StateCreator<
 
   requestSend: () => set(s => { s.sendSignal += 1; }),
 
-  setCollectionPanelOpen: (open) => set(s => { s.collectionPanelOpen = open; }),
+  setCollectionPanelOpen: (open) => set(s => { s.collectionPanelOpen = open; if (open) s.folderPanel = null; }),
+  openFolderPanel: (collectionId, folderId) => set(s => {
+    s.folderPanel = { collectionId, folderId };
+    s.collectionPanelOpen = false;
+  }),
 
   setCoverageOpen: (open) => set(s => { s.coverageOpen = open; }),
 

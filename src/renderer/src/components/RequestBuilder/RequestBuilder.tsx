@@ -358,6 +358,8 @@ export function RequestBuilder({ request }: Props) {
   const isExample = !!activeAppTab?.exampleId;
   const tabs = [
     // SOAP collapses Params + Body into a single "SOAP" tab — the WSDL drives both.
+    // Docs leads so documentation is the first thing a reader sees.
+    ...(!isExample ? [{ id: 'docs', label: 'Docs', count: request.description?.trim() ? 1 : 0 }] : []),
     ...(!isSoap ? [{ id: 'params', label: 'Params', count: request.params.filter(p => p.enabled && p.key).length }] : []),
     { id: 'headers', label: 'Headers', count: request.headers.filter(h => h.enabled && h.key).length },
     ...(!isWs ? [
@@ -366,7 +368,6 @@ export function RequestBuilder({ request }: Props) {
       ...(!isExample ? [
         { id: 'scripts', label: 'Scripts', count: (hasPreScript ? 1 : 0) + (hasPostScript ? 1 : 0) },
         { id: 'schema',   label: 'Schema',   count: request.schema?.trim() ? 1 : 0 },
-        { id: 'docs',     label: 'Docs',     count: request.description?.trim() ? 1 : 0 },
         { id: 'stream',   label: 'Stream',   count: (request.stream?.idleMs !== undefined || request.stream?.maxMs !== undefined) ? 1 : 0 },
       ] : []),
     ] : []),

@@ -5,6 +5,8 @@ import { useState } from 'react';
 import { useStore } from '../../store';
 import type { DataSet } from '../../../../shared/types';
 import { DataSetEditor } from '../common/DataSetEditor';
+import { DocsEditor } from '../common/DocsEditor';
+import { useAiAvailable, generateDocs, collectionDocsContext } from '../../lib/ai';
 import { useT } from '../../i18n';
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -14,11 +16,13 @@ export function CollectionPanel() {
   const activeCollectionId        = useStore(s => s.activeCollectionId);
   const collections               = useStore(s => s.collections);
   const updateCollectionDataSet   = useStore(s => s.updateCollectionDataSet);
+  const updateCollectionDescription = useStore(s => s.updateCollectionDescription);
   const openRunner                = useStore(s => s.openRunner);
   const setCoverageOpen           = useStore(s => s.setCoverageOpen);
   const setCompareOpen            = useStore(s => s.setCompareOpen);
+  const aiAvailable               = useAiAvailable();
 
-  const [activeTab, setActiveTab] = useState<'data' | 'variables'>('data');
+  const [activeTab, setActiveTab] = useState<'documentation' | 'data' | 'variables'>('documentation');
 
   if (!activeCollectionId) {
     return (
@@ -80,8 +84,9 @@ export function CollectionPanel() {
       {/* Tabs */}
       <div className="flex border-b border-surface-800 px-6 flex-shrink-0">
         {([
-          { id: 'data',      label: 'Data',      badge: iterCount > 0 ? iterCount : 0 },
-          { id: 'variables', label: 'Variables',  badge: Object.keys(col.collectionVariables ?? {}).length },
+          { id: 'documentation', label: 'Documentation', badge: col.description?.trim() ? 1 : 0 },
+          { id: 'data',          label: 'Data',          badge: iterCount > 0 ? iterCount : 0 },
+          { id: 'variables',     label: 'Variables',     badge: Object.keys(col.collectionVariables ?? {}).length },
         ] as const).map(tab => (
           <button
             key={tab.id}
@@ -102,6 +107,15 @@ export function CollectionPanel() {
 
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto px-6 py-4">
+        {activeTab === 'documentation' && (
+          <DocsEditor
+            value={col.description ?? ''}
+            onChange={v => updateCollectionDescription(activeCollectionId!, v)}
+            aiAvailable={aiAvailable}
+            onGenerate={() => generateDocs({ level: 'collection', name: col.name, existing: col.description, context: collectionDocsContext(col) })}
+          />
+        )}
+
         {activeTab === 'data' && (
           <DataSetEditor ds={ds} onChange={setDs} exportName={col.name} scopeLabel="collection" />
         )}
