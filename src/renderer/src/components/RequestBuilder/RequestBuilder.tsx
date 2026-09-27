@@ -15,11 +15,12 @@ import { BodyTab } from './BodyTab';
 import { AuthTab } from './AuthTab';
 import { ScriptsTab } from './ScriptsTab';
 import { SchemaTab } from './SchemaTab';
-import { ContractTab } from './ContractTab';
+import { DocsTab } from './DocsTab';
 import { StreamTab } from './StreamTab';
 import { WebSocketPanel } from '../WebSocket/WebSocketPanel';
 import { GrpcPanel } from '../Grpc/GrpcPanel';
 import { FuzzModal } from './FuzzModal';
+import { STORAGE_KEYS } from '../../lib/storage-keys';
 import { useT } from '../../i18n';
 
 const { electron } = window;
@@ -56,12 +57,10 @@ function deriveHookStatus(r: {
   return tests.every(t => t.passed) ? 'passed' : 'failed';
 }
 
-// Tab tooltips. Schema vs Contract is the easily-confused pair: one is a local
-// throwaway check, the other is the published contract-testing expectation.
+// Tab tooltips.
 const TAB_HINTS: Record<string, string> = {
-  schema: 'Schema — a local, throwaway JSON-Schema check of the last response. Not saved to the contract, not published.',
-  contract: 'Contract — the published expectation (status, body shape, headers) that drives contract testing: consumer pact, bi-directional verify, can-i-deploy.',
-  stream: 'Stream — idle and total timeouts for streamed responses (SSE / NDJSON / chunked).',
+  schema: 'Schema: validate the response body against a JSON Schema, synced from your OpenAPI spec or created from a response. Checked automatically on every send.',
+  stream: 'Stream: idle and total timeouts for streamed responses (SSE / NDJSON / chunked).',
 };
 
 export function RequestBuilder({ request }: Props) {
@@ -97,12 +96,12 @@ export function RequestBuilder({ request }: Props) {
   const [editingName, setEditingName] = useState(false);
   const [showFuzz, setShowFuzz] = useState(false);
   const [customVerb, setCustomVerb] = useState(false);
-  const [runHooks, setRunHooks] = useState(() => localStorage.getItem('runHooks') !== 'false');
+  const [runHooks, setRunHooks] = useState(() => localStorage.getItem(STORAGE_KEYS.runHooks) !== 'false');
 
   function toggleRunHooks() {
     setRunHooks(prev => {
       const next = !prev;
-      localStorage.setItem('runHooks', String(next));
+      localStorage.setItem(STORAGE_KEYS.runHooks, String(next));
       return next;
     });
   }
@@ -360,6 +359,8 @@ export function RequestBuilder({ request }: Props) {
   const isExample = !!activeAppTab?.exampleId;
   const tabs = [
     // SOAP collapses Params + Body into a single "SOAP" tab — the WSDL drives both.
+    // Docs leads so documentation is the first thing a reader sees.
+    ...(!isExample ? [{ id: 'docs', label: 'Docs', count: request.description?.trim() ? 1 : 0 }] : []),
     ...(!isSoap ? [{ id: 'params', label: 'Params', count: request.params.filter(p => p.enabled && p.key).length }] : []),
     { id: 'headers', label: 'Headers', count: request.headers.filter(h => h.enabled && h.key).length },
     ...(!isWs ? [
@@ -368,7 +369,6 @@ export function RequestBuilder({ request }: Props) {
       ...(!isExample ? [
         { id: 'scripts', label: 'Scripts', count: (hasPreScript ? 1 : 0) + (hasPostScript ? 1 : 0) },
         { id: 'schema',   label: 'Schema',   count: request.schema?.trim() ? 1 : 0 },
-        { id: 'contract', label: 'Contract', count: (request.contract?.statusCode !== undefined || request.contract?.bodySchema?.trim() || request.contract?.headers?.some(h => h.key)) ? 1 : 0 },
         { id: 'stream',   label: 'Stream',   count: (request.stream?.idleMs !== undefined || request.stream?.maxMs !== undefined) ? 1 : 0 },
       ] : []),
     ] : []),
@@ -612,10 +612,13 @@ export function RequestBuilder({ request }: Props) {
           {/* Tab content */}
           <div className="px-4 py-3 flex-1 overflow-y-auto min-h-0">
             {(() => {
-              // On an example, Scripts/Schema/Contract are hidden; if the stored
-              // tab was one of them, fall back to Body so nothing renders blank.
-              const shown = isExample && (activeTab === 'scripts' || activeTab === 'schema' || activeTab === 'contract' || activeTab === 'stream')
-                ? 'body' : activeTab;
+              // The Contract tab was removed; a persisted 'contract' sub-tab
+              // falls back to Schema (its successor for response validation).
+              const raw = activeTab === 'contract' ? 'schema' : activeTab;
+              // On an example, Scripts/Schema are hidden; if the stored tab was
+              // one of them, fall back to Body so nothing renders blank.
+              const shown = isExample && (raw === 'scripts' || raw === 'schema' || raw === 'docs' || raw === 'stream')
+                ? 'body' : raw;
               return <>
                 {shown === 'params'  && <ParamsTab  request={request} onChange={update} />}
                 {shown === 'headers' && <HeadersTab request={request} onChange={update} />}
@@ -623,7 +626,7 @@ export function RequestBuilder({ request }: Props) {
                 {shown === 'auth'    && <AuthTab    request={request} onChange={update} />}
                 {!isExample && shown === 'scripts' && <ScriptsTab request={request} onChange={update} />}
                 {!isExample && shown === 'schema'   && <SchemaTab   request={request} onChange={update} />}
-                {!isExample && shown === 'contract' && <ContractTab request={request} onChange={update} />}
+                {!isExample && shown === 'docs'     && <DocsTab     request={request} onChange={update} />}
                 {!isExample && shown === 'stream'   && <StreamTab   request={request} onChange={update} />}
               </>;
             })()}

@@ -1,16 +1,18 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import React, { useState } from 'react';
-import type { Folder, AuthConfig, KeyValuePair, DataSet } from '../../../../shared/types';
+import { useState } from 'react';
+import type { Folder, AuthConfig, KeyValuePair } from '../../../../shared/types';
 import { useStore } from '../../store';
 import { KVTable } from '../RequestBuilder/KVTable';
 import { Modal } from '../common/Modal';
 import { AuthEditor, type AuthEditorPatch } from '../common/AuthEditor';
-import { DataSetEditor } from '../common/DataSetEditor';
 import { useT } from '../../i18n';
 
-type ModalTab = 'auth' | 'headers' | 'variables' | 'data'
+// Config only (auth + headers inherited by the folder's requests). Documentation,
+// data tables and variables live in the folder panel (click the folder), mirroring
+// how a collection splits its panel (content) from its settings modal (config).
+type ModalTab = 'auth' | 'headers'
 
 interface Props {
   collectionId: string
@@ -25,22 +27,13 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
   const [activeTab, setActiveTab] = useState<ModalTab>('auth');
   const [auth, setAuth]           = useState<AuthConfig>(folder.auth ?? { type: 'none' });
   const [headers, setHeaders]     = useState<KeyValuePair[]>(folder.headers ?? []);
-  const [varRows, setVarRows]     = useState<KeyValuePair[]>(
-    Object.entries(folder.variables ?? {}).map(([key, value]) => ({ key, value, enabled: true })),
-  );
-  const [dataSet, setDataSet]     = useState<DataSet>(folder.dataSet ?? { columns: [], rows: [] });
 
   function patchAuth(patch: AuthEditorPatch) {
     setAuth(prev => ({ ...prev, ...patch } as AuthConfig));
   }
 
   function save() {
-    const variables = Object.fromEntries(
-      varRows.filter(r => r.key.trim()).map(r => [r.key.trim(), r.value]),
-    );
-    const cleanData: DataSet | undefined =
-      dataSet.columns.length > 0 ? dataSet : undefined;
-    updateFolder(collectionId, folder.id, { auth, headers, variables, dataSet: cleanData });
+    updateFolder(collectionId, folder.id, { auth, headers });
     onClose();
   }
 
@@ -54,14 +47,14 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-surface-800 shrink-0">
           <div>
             <h2 className="text-sm font-semibold">{t('Folder settings')}</h2>
-            <p className="text-[10px] text-surface-600 mt-0.5">{t(':name - auth, headers and variables inherited by all requests in this folder', { name: folder.name })}</p>
+            <p className="text-[10px] text-surface-600 mt-0.5">{t(':name - auth and headers inherited by all requests in this folder', { name: folder.name })}</p>
           </div>
           <button onClick={onClose} className="text-surface-400 hover:text-white text-lg leading-none">×</button>
         </div>
 
         {/* Tabs */}
         <div className="flex border-b border-surface-800 px-4 shrink-0">
-          {(['auth', 'headers', 'variables', 'data'] as ModalTab[]).map(tab => (
+          {(['auth', 'headers'] as ModalTab[]).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -97,22 +90,6 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
               valuePlaceholder={t('value')}
               headerMode
             />
-          )}
-          {activeTab === 'variables' && (
-            <div className="flex flex-col gap-2">
-              <p className="text-[10px] text-surface-600">
-                {t('Variables scoped to this folder. They override collection variables and are overridden by an inner folder, the active environment, and script-set values. Reference them anywhere with :token.', { token: '{{name}}' })}
-              </p>
-              <KVTable
-                rows={varRows}
-                onChange={setVarRows}
-                keyPlaceholder="VARIABLE_NAME"
-                valuePlaceholder="value"
-              />
-            </div>
-          )}
-          {activeTab === 'data' && (
-            <DataSetEditor ds={dataSet} onChange={setDataSet} exportName={folder.name} scopeLabel="folder" />
           )}
         </div>
 

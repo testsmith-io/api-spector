@@ -74,6 +74,8 @@ export function registerRunnerHandler ( ipc: IpcMain ): void {
         piiMaskPatterns,
         proxy,
         tls,
+        expectStatus: item.expectStatus,
+        owaspTag: item.owaspTag,
       } );
 
       runEnvVars = updatedEnvVars;

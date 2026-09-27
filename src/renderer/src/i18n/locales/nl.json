@@ -1050,5 +1050,9 @@
   "No data row": "Geen datarij",
   "Row :n": "Rij :n",
   "Run this request with the variables from one data table row": "Voer dit request uit met de variabelen van één datatabelrij",
-  "Disabled": "Uitgeschakeld"
+  "Disabled": "Uitgeschakeld",
+  "Generate security tests": "Genereer securitytests",
+  "Added :count OWASP security tests": ":count OWASP-securitytests toegevoegd",
+  "No security tests generated for this request": "Geen securitytests gegenereerd voor dit request",
+  "Special columns :status and :owasp turn a data table into an access-control matrix: :status asserts the response code (e.g. 403) and :owasp tags the finding (e.g. BOLA).": "Speciale kolommen :status en :owasp maken van een datatabel een toegangscontrolematrix: :status controleert de responscode (bijv. 403) en :owasp labelt de bevinding (bijv. BOLA)."
 }

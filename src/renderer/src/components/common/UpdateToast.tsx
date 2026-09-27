@@ -3,6 +3,8 @@
 
 import { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
+import { STORAGE_KEYS } from '../../lib/storage-keys';
+import { useCopyFeedback } from '../../hooks/useCopyFeedback';
 
 // Unobtrusive "a newer release is on npm" corner toast, shown at startup on any
 // screen. Unlike the WelcomeScreen banner (which only shows while no workspace
@@ -12,14 +14,14 @@ import { useT } from '../../i18n';
 // ("Later") reappears next start.
 
 const { electron } = window;
-const DISMISS_KEY = 'apiSpectorUpdateSkipped';
+const DISMISS_KEY = STORAGE_KEYS.updateSkipped;
 
 interface UpdateInfo { current: string; latest: string; updateAvailable: boolean; command: string }
 
 export function UpdateToast() {
   const t = useT();
   const [info, setInfo] = useState<UpdateInfo | null>(null);
-  const [copied, setCopied] = useState(false);
+  const { copied, copy: doCopy } = useCopyFeedback(1500);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,11 +43,7 @@ export function UpdateToast() {
     try { localStorage.setItem(DISMISS_KEY, info.latest); } catch { /* storage disabled */ }
     setInfo(null);
   };
-  const copy = (): void => {
-    navigator.clipboard.writeText(info.command)
-      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); })
-      .catch(() => { /* clipboard blocked */ });
-  };
+  const copy = (): void => { void doCopy(info.command); };
 
   return (
     <div className="fixed bottom-4 right-4 z-[80] w-80 bg-surface-900 border border-surface-700 rounded-lg shadow-2xl overflow-hidden">

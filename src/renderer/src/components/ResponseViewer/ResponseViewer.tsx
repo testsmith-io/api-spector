@@ -1,14 +1,14 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../../store';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
 import { xml } from '@codemirror/lang-xml';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { getStatusColor, getMethodColor } from '../../../../shared/colors';
-import type { HistoryEntry } from '../../../../shared/types';
+import type { HistoryEntry, DesignInteraction, KeyValuePair } from '../../../../shared/types';
 import { InteractiveBody } from './InteractiveBody';
 import { ResponseTable, bodyHasArray } from './ResponseTable';
 import { StreamView } from './StreamView';
@@ -23,9 +23,11 @@ import { appendSnippetToScript } from '../RequestBuilder/scriptAppend';
 import { useToast } from '../common/Toast';
 import { ContextMenu } from '../common/ContextMenu';
 import { OverflowMenu } from '../common/OverflowMenu';
+import { labelCls } from '../../lib/ui-classes';
 import { DotsHorizontalIcon } from '../common/icons';
 import { Modal } from '../common/Modal';
 import { validateHttpSemantics } from '../../../../shared/http-semantics';
+import { validateBodyAgainstSchema } from '../../lib/schema-validate';
 import { useT } from '../../i18n';
 
 const { electron } = window;
@@ -143,6 +145,7 @@ export function ResponseViewer() {
   const setPinned = useStore(s => s.setPinnedResponse);
   const updateRequest = useStore(s => s.updateRequest);
   const setTabRequestTab = useStore(s => s.setTabRequestTab);
+  const openContractDesigner = useStore(s => s.openContractDesigner);
   const setTabScriptTab = useStore(s => s.setTabScriptTab);
   const isSending = activeTab?.isSending ?? false;
   const liveStream = useStore(s => s.liveStream);
@@ -161,10 +164,13 @@ export function ResponseViewer() {
   const [tab, setTab] = useState<RespTab>('body');
 
   // Past responses for THIS request (Bruno-style per-request history).
-  const requestHistory = requestId ? history.filter(e => e.request.id === requestId) : [];
+  const requestHistory = useMemo(
+    () => requestId ? history.filter(e => e.request.id === requestId) : [],
+    [history, requestId],
+  );
 
   // HTTP semantics: passive RFC conformance check on the current response.
-  const httpFindings = response && !response.error
+  const httpFindings = useMemo(() => response && !response.error
     ? validateHttpSemantics({
         method: sentRequest?.method ?? 'GET',
         status: response.status,
@@ -173,8 +179,26 @@ export function ResponseViewer() {
         body: response.body,
         bodySize: response.bodySize,
       }, { checkXml: xmlWellFormed })
-    : [];
+    : [], [response, sentRequest]);
   const httpErrors = httpFindings.filter(x => x.severity === 'error').length;
+
+  // Body parsing is expensive on large payloads and was re-run on every render
+  // (toast timers, resize, dialog keystrokes). Memoize it on the body itself so
+  // it parses once per response, not once per render.
+  const bodyMeta = useMemo(() => {
+    if (!response || response.error) return null;
+    const contentType = response.headers['content-type'] ?? '';
+    const isJson = contentType.includes('json');
+    const isXml = !isJson && (contentType.includes('xml') || contentType.includes('html'));
+    const supportsTree = isJson || isXml;
+    const showTable = supportsTree && !response.streamed && bodyHasArray(response.body, contentType);
+    const bodyParseError = response.body.trim().length > 0 && (
+      (isJson && (() => { try { JSON.parse(response.body); return false; } catch { return true; } })()) ||
+      (isXml && contentType.includes('xml') && !xmlWellFormed(response.body))
+    );
+    const displayBody = isJson ? prettyJson(response.body) : isXml ? prettyXml(response.body) : response.body;
+    return { contentType, isJson, isXml, supportsTree, showTable, bodyParseError, displayBody };
+  }, [response]);
 
   // Right-click a response header to create an environment variable from it.
   const [headerMenu, setHeaderMenu] = useState<{ x: number; y: number; key: string; value: string } | null>(null);
@@ -205,26 +229,58 @@ export function ResponseViewer() {
   const [showMockModal, setShowMockModal] = useState(false);
   const [bodyView, setBodyView] = useState<'tree' | 'raw' | 'table'>('raw');
   const assertToast = useToast(2500);
-  const contractToast = useToast(2500);
+  const schemaToast = useToast(2500);
 
-  async function saveAsContract() {
+  // The request behind this response, so we can read/write its stored schema.
+  const currentRequest = useStore(s => requestId
+    ? Object.values(s.collections).find(c => c.data.requests[requestId])?.data.requests[requestId] ?? null
+    : null);
+
+  // Auto-check: if a schema is stored and we have a JSON response, validate it
+  // so the response header shows a pass / fail badge on every send.
+  const schemaCheck = currentRequest?.schema?.trim() && response && !response.error
+    ? validateBodyAgainstSchema(currentRequest.schema, response.body)
+    : null;
+
+  async function saveAsSchema() {
     if (!response || !requestId || !activeTabId) return;
     const schema: string | null = response.body
       ? await electron.inferContractSchema(response.body)
       : null;
+    if (!schema) return;
+    updateRequest(requestId, { schema });
+    setTabRequestTab(activeTabId, 'schema');
+    schemaToast.show(t('✓ Schema saved'), true);
+  }
+
+  // Seed a new design-first contract interaction from this request/response and
+  // open the Contract Designer (replaces the old response-capture-to-contract).
+  function sendToDesigner() {
+    if (!response) return;
+    const rawUrl = sentRequest?.url ?? '';
+    let path = rawUrl.split('?')[0];
+    let query: KeyValuePair[] = [];
+    try {
+      const u = new URL(rawUrl);
+      path = u.pathname;
+      query = [...u.searchParams.entries()].map(([key, value]) => ({ key, value, enabled: true }));
+    } catch { /* relative or templated URL — keep the path as-is */ }
     const contentType = response.headers['content-type'];
-    const headers: { key: string; value: string; required: boolean }[] = contentType
-      ? [{ key: 'content-type', value: contentType, required: true }]
-      : [];
-    updateRequest(requestId, {
-      contract: {
-        statusCode: response.status,
-        headers,
-        bodySchema: schema ?? '',
+    const seed: Partial<DesignInteraction> = {
+      description: sentRequest ? `${sentRequest.method} ${path}` : path,
+      request: {
+        method: sentRequest?.method ?? 'GET',
+        path: path || '/',
+        query: query.length ? query : undefined,
+        headers: [],
       },
-    });
-    setTabRequestTab(activeTabId, 'contract');
-    contractToast.show(t('✓ Contract saved'), true);
+      response: {
+        status: response.status,
+        headers: contentType ? [{ key: 'Content-Type', value: contentType, enabled: true }] : [],
+        body: response.body || undefined,
+      },
+    };
+    openContractDesigner(seed);
   }
 
   function handleAssert(snippet: string) {
@@ -273,20 +329,10 @@ export function ResponseViewer() {
     );
   }
 
-  const contentType = response.headers['content-type'] ?? '';
-  const isJson = contentType.includes('json');
-  const isXml = !isJson && (contentType.includes('xml') || contentType.includes('html'));
-  const supportsTree = isJson || isXml;
-  const displayBody = isJson ? prettyJson(response.body) : isXml ? prettyXml(response.body) : response.body;
-  // Show the Table view only when the body actually has an array to tabulate.
-  // (A plain computation, not a hook: this sits after early returns above.)
-  const showTable = supportsTree && !response.streamed && bodyHasArray(response.body, contentType);
-
-  // Body parse error (for a red ! on the Body tab, regardless of tree/raw view).
-  const bodyParseError = response.body.trim().length > 0 && (
-    (isJson && (() => { try { JSON.parse(response.body); return false; } catch { return true; } })()) ||
-    (isXml && contentType.includes('xml') && !xmlWellFormed(response.body))
-  );
+  // Derived from the memoized body parse above (bodyMeta is non-null here since
+  // we've passed the !response / streaming early returns).
+  const { contentType, isJson, isXml, supportsTree, showTable, bodyParseError, displayBody } =
+    bodyMeta ?? { contentType: '', isJson: false, isXml: false, supportsTree: false, showTable: false, bodyParseError: false, displayBody: response.body };
 
   const passedCount = scriptResult?.testResults.filter(t => t.passed).length ?? 0;
   const totalCount = scriptResult?.testResults.length ?? 0;
@@ -425,8 +471,22 @@ export function ResponseViewer() {
             {assertToast.toast && (
               <span className="text-[10px] text-emerald-400 font-medium px-1 shrink-0">{assertToast.toast.msg}</span>
             )}
-            {contractToast.toast && (
-              <span className="text-[10px] text-blue-400 font-medium px-1 shrink-0">{contractToast.toast.msg}</span>
+            {schemaToast.toast && (
+              <span className="text-[10px] text-blue-400 font-medium px-1 shrink-0">{schemaToast.toast.msg}</span>
+            )}
+            {schemaCheck && schemaCheck.status !== 'error' && (
+              <span
+                title={schemaCheck.status === 'valid'
+                  ? t('Response matches the saved schema')
+                  : t('Response does not match the saved schema (:count issue|Response does not match the saved schema (:count issues', { count: schemaCheck.status === 'invalid' ? schemaCheck.errors.length : 0 }) + ')'}
+                className={`text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 ${
+                  schemaCheck.status === 'valid'
+                    ? 'text-emerald-300 bg-emerald-900/30'
+                    : 'text-red-300 bg-red-900/30'
+                }`}
+              >
+                {schemaCheck.status === 'valid' ? t('Schema ✓') : t('Schema ✗')}
+              </span>
             )}
 
             <div className="ml-auto flex items-center gap-1 shrink-0">
@@ -486,11 +546,11 @@ export function ResponseViewer() {
                 </button>
               )}
               <button
-                onClick={saveAsContract}
+                onClick={saveAsSchema}
                 className="hidden @min-[350px]:flex px-2 py-0.5 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors"
-                title={t('Capture this response as a contract expectation')}
+                title={t('Save a JSON Schema from this response; it is checked automatically on every send')}
               >
-                ↓ {t('Contract')}
+                ↓ {t('Schema')}
               </button>
               <button
                 onClick={() => setShowMockModal(true)}
@@ -499,9 +559,16 @@ export function ResponseViewer() {
               >
                 ↓ {t('Mock')}
               </button>
+              <button
+                onClick={sendToDesigner}
+                className="hidden @min-[350px]:flex px-2 py-0.5 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors"
+                title={t('Seed a design-first contract from this request and response, then open the Contract Designer')}
+              >
+                → {t('Designer')}
+              </button>
 
-              {/* "…" overflow — only appears below the width where Diff/Contract/
-                  Mock stop fitting; hidden entirely (no empty button) above it. */}
+              {/* "…" overflow — only appears below the width where the actions
+                  stop fitting; hidden entirely (no empty button) above it. */}
               <OverflowMenu
                 wrapperClassName="flex @min-[350px]:hidden"
                 buttonClassName="px-1.5 py-1 text-[10px] rounded bg-surface-800 hover:bg-surface-700 text-surface-300 flex items-center"
@@ -521,10 +588,10 @@ export function ResponseViewer() {
                 <button
                   role="menuitem"
                   tabIndex={-1}
-                  onClick={saveAsContract}
+                  onClick={saveAsSchema}
                   className="flex @min-[350px]:hidden w-full items-center gap-2 px-3 py-1.5 text-xs text-surface-300 hover:bg-surface-800 hover:text-white"
                 >
-                  ↓ {t('Contract')}
+                  ↓ {t('Schema')}
                 </button>
                 <button
                   role="menuitem"
@@ -533,6 +600,14 @@ export function ResponseViewer() {
                   className="flex @min-[350px]:hidden w-full items-center gap-2 px-3 py-1.5 text-xs text-surface-300 hover:bg-surface-800 hover:text-white"
                 >
                   ↓ {t('Mock')}
+                </button>
+                <button
+                  role="menuitem"
+                  tabIndex={-1}
+                  onClick={sendToDesigner}
+                  className="flex @min-[350px]:hidden w-full items-center gap-2 px-3 py-1.5 text-xs text-surface-300 hover:bg-surface-800 hover:text-white"
+                >
+                  → {t('Designer')}
                 </button>
               </OverflowMenu>
             </div>
@@ -669,7 +744,7 @@ export function ResponseViewer() {
         <Modal onClose={() => setVarDialog(null)} title={t('Create environment variable')} panelClassName="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl w-[420px]">
           <div className="flex flex-col gap-3 p-4">
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Variable name')}</span>
+              <span className={labelCls}>{t('Variable name')}</span>
               <input
                 autoFocus
                 value={varDialog.name}
@@ -678,7 +753,7 @@ export function ResponseViewer() {
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Value')}</span>
+              <span className={labelCls}>{t('Value')}</span>
               <input
                 value={varDialog.value}
                 onChange={e => setVarDialog(d => d && { ...d, value: e.target.value })}

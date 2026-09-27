@@ -3,15 +3,15 @@
 
 import { useState } from 'react';
 import type { FuzzReport, FuzzTargetResult, FuzzFinding, FuzzOracle, FuzzCaseTrace } from '../../../../shared/types';
-import { getMethodColor } from '../../../../shared/colors';
+import { getMethodColor, getStatusColor } from '../../../../shared/colors';
 import { Toast, useToast } from '../common/Toast';
 import { useT } from '../../i18n';
+import { labelCls } from '../../lib/ui-classes';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function statusColor(code: number): string {
-  const d = String(code)[0];
-  return d === '2' ? 'text-emerald-400' : d === '3' ? 'text-amber-400' : 'text-red-400';
+  return getStatusColor(code);
 }
 
 /** Per-oracle label, badge classes, and left border. Chosen to read in light and dark. */
@@ -140,9 +140,7 @@ function OperationCard({ result, onCopy }: { result: FuzzTargetResult; onCopy: (
 function statusTone(status: number, finding: boolean): string {
   if (finding) return 'text-red-400';
   if (status === 0) return 'text-surface-500';
-  if (status >= 200 && status < 300) return 'text-emerald-400';
-  if (status >= 400) return 'text-amber-400';
-  return 'text-surface-300';
+  return getStatusColor(status);
 }
 
 /** One case in the trace: a compact clickable summary that expands to the full
@@ -169,7 +167,7 @@ function TraceRow({ trace, onCopy }: { trace: FuzzCaseTrace; onCopy: (t: string)
           <p className="text-[11px] text-surface-400">{trace.mutation.description}</p>
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Request')}</span>
+              <span className={labelCls}>{t('Request')}</span>
               <button
                 onClick={() => onCopy(`${trace.request.method} ${trace.request.url}\n\n${trace.request.body ?? ''}`)}
                 className="text-[10px] text-surface-500 hover:text-surface-200 transition-colors"
@@ -183,7 +181,7 @@ function TraceRow({ trace, onCopy }: { trace: FuzzCaseTrace; onCopy: (t: string)
             )}
           </div>
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Response (:status)', { status: trace.status || t('no response') })}</span>
+            <span className={labelCls}>{t('Response (:status)', { status: trace.status || t('no response') })}</span>
             <pre className="text-[11px] font-mono text-surface-300 bg-surface-900 border border-surface-800 rounded px-2.5 py-2 overflow-x-auto whitespace-pre-wrap break-words">{trace.responseSample || t('(empty)')}</pre>
           </div>
         </div>

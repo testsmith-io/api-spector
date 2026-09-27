@@ -13,6 +13,12 @@ export interface RunnerItem {
   dataRow?: Record<string, string>
   /** Human-readable label, e.g. "2/5" when data-driven. */
   iterationLabel?: string
+  /** From a data-table row's reserved `expectStatus` column: the run asserts the
+   *  response code is one of these (turns a data table into an access matrix). */
+  expectStatus?: number[]
+  /** From a data-table row's reserved `owasp` column: tags the expected-status
+   *  assertion (e.g. BOLA) so it flows into the SARIF report. */
+  owaspTag?: string
   // ── Hook metadata ─────────────────────────────────────────────────────────
   isHook?: boolean
   hookType?: 'beforeAll' | 'before' | 'afterAll' | 'after'

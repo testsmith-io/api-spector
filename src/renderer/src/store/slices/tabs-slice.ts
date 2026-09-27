@@ -28,7 +28,7 @@ export interface AppTab {
   lastSentRequest: SentRequest | null
   lastHookResults: RunRequestResult[] | null
   isSending: boolean
-  requestTab: 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'schema' | 'contract' | 'stream'
+  requestTab: 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'schema' | 'contract' | 'stream' | 'docs'
 }
 
 export function makeTab(requestId: string, collectionId: string, opts: { protocol?: ApiRequest['protocol']; exampleId?: string | null } = {}): AppTab {
@@ -42,10 +42,9 @@ export function makeTab(requestId: string, collectionId: string, opts: { protoco
     lastSentRequest: null,
     lastHookResults: null,
     isSending: false,
-    // SOAP requests: 'params' isn't even shown for SOAP and 'body' renders the
-    // WSDL-driven SoapEditor — that's the primary surface, so jump there.
-    // HTTP/WebSocket: keep the existing 'params' default.
-    requestTab: opts.protocol === 'soap' ? 'body' : 'params',
+    // Documentation leads and opens active, so a request presents its docs
+    // first. Examples have no Docs tab and fall back to Body (see RequestBuilder).
+    requestTab: opts.exampleId ? 'body' : 'docs',
     // Default to the post-response tab — that's where the typical workflow
     // (assertions, extracting tokens, saving variables) lives.
     scriptTab: 'post',
@@ -115,6 +114,7 @@ export const createTabsSlice: StateCreator<
 
   openInTab: (requestId, collectionId) => set(s => {
     s.collectionPanelOpen = false; // activating a request supersedes the data panel
+    s.folderPanel = null;
     const existing = s.tabs.find(t => t.requestId === requestId && !t.exampleId);
     if (existing) {
       s.activeTabId = existing.id;
@@ -155,6 +155,7 @@ export const createTabsSlice: StateCreator<
   setActiveTabId: (id) => set(s => {
     s.activeTabId = id;
     s.collectionPanelOpen = false; // clicking a request tab supersedes the data panel
+    s.folderPanel = null;
     const tab = s.tabs.find(t => t.id === id);
     if (tab) s.activeCollectionId = tab.collectionId;
   }),

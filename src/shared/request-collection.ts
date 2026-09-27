@@ -35,6 +35,23 @@ type ScopeWrapper = {
   after: ApiRequest[]
 }
 
+/** All non-disabled requests in a folder subtree, in visible (childOrder)
+ *  order. Used to run an entire folder as a single hook body. Request-level
+ *  hook tags inside the folder are ignored — the folder's own hookType governs. */
+function flattenFolderRequests(folder: Folder, requests: Collection['requests']): ApiRequest[] {
+  const out: ApiRequest[] = [];
+  for (const child of orderedChildren(folder)) {
+    if (child.type === 'request') {
+      const r = requests[child.id];
+      if (r && !r.disabled) out.push(r);
+    } else {
+      const sub = folder.folders.find(f => f.id === child.id);
+      if (sub && !sub.disabled) out.push(...flattenFolderRequests(sub, requests));
+    }
+  }
+  return out;
+}
+
 function makeHook(
   req: ApiRequest,
   collectionVars: Record<string, string>,
@@ -77,14 +94,41 @@ function buildFolderPlan(
   // other scope, it's the parent path + this folder's name.
   const scopePath = isRoot ? [] : [...parentPath, folder.name];
 
-  // Split this folder's requests into hook requests and regular requests
-  // Filter out disabled requests — they're excluded from all runs.
-  const folderReqs = folder.requestIds.map(id => requests[id]).filter(r => r && !r.disabled) as ApiRequest[];
-  const beforeAllHooks = folderReqs.filter(r => r.hookType === 'beforeAll');
-  const beforeHooks    = folderReqs.filter(r => r.hookType === 'before');
-  const afterHooks     = folderReqs.filter(r => r.hookType === 'after');
-  const afterAllHooks  = folderReqs.filter(r => r.hookType === 'afterAll');
-  const regularReqs    = folderReqs.filter(r => !r.hookType);
+  // This folder's direct, non-disabled requests (for regular-request lookup).
+  const folderReqs = orderedChildren(folder)
+    .filter(c => c.type === 'request')
+    .map(c => requests[c.id])
+    .filter(r => r && !r.disabled) as ApiRequest[];
+
+  // Collect hook bodies in the folder's visible (drag) order so a series of
+  // same-type hooks runs top-to-bottom as shown. A hook is either a single
+  // request (request.hookType) or an entire sub-folder (folder.hookType) whose
+  // requests run as a group; folder-hooks are attributed to THIS parent scope
+  // and are not run inline. Disabled items are excluded from all runs.
+  const beforeAllHooks: ApiRequest[] = [];
+  const beforeHooks:    ApiRequest[] = [];
+  const afterHooks:     ApiRequest[] = [];
+  const afterAllHooks:  ApiRequest[] = [];
+  const hookFolderIds = new Set<string>();
+  const pushHook = (ht: ApiRequest['hookType'], reqs: ApiRequest[]) => {
+    if (ht === 'beforeAll')     beforeAllHooks.push(...reqs);
+    else if (ht === 'before')   beforeHooks.push(...reqs);
+    else if (ht === 'after')    afterHooks.push(...reqs);
+    else if (ht === 'afterAll') afterAllHooks.push(...reqs);
+  };
+  for (const child of orderedChildren(folder)) {
+    if (child.type === 'request') {
+      const r = requests[child.id];
+      if (r && !r.disabled && r.hookType) pushHook(r.hookType, [r]);
+    } else {
+      const sub = folder.folders.find(f => f.id === child.id);
+      if (sub && !sub.disabled && sub.hookType) {
+        hookFolderIds.add(sub.id);
+        pushHook(sub.hookType, flattenFolderRequests(sub, requests));
+      }
+    }
+  }
+  const regularReqs = folderReqs.filter(r => !r.hookType);
 
   // Build wrapper chain for this scope
   const myWrapper: ScopeWrapper = { scopeId, ancestors: ancestorIds, scopePath, before: beforeHooks, after: afterHooks };
@@ -123,7 +167,8 @@ function buildFolderPlan(
       }
     } else {
       const sub = subById.get(child.id);
-      if (!sub) continue;
+      if (!sub || sub.disabled) continue;   // disabled folders (and their subtree) are excluded
+      if (hookFolderIds.has(sub.id)) continue;   // hook folders run in the before/after position, not inline
       const folderTags = sub.tags ?? [];
       const effectiveFilter = filterTags.length === 0
         ? filterTags
@@ -428,12 +473,51 @@ export function buildRunPlan(
 export function expandRunPlanWithData(items: RunnerItem[], ds: DataSet | undefined): RunnerItem[] {
   if (!ds || ds.rows.length === 0) return items;
   return ds.rows.flatMap((row, ri) => {
-    const rowVars: Record<string, string> = {};
-    ds.columns.forEach((col, ci) => { if (col) rowVars[col] = row[ci] ?? ''; });
+    const parsed = parseDataRow(ds.columns, row);
     // Merge onto any existing dataRow (e.g. from folder-level expansion) so both
     // sets of variables are available; this row's values win on key conflicts.
-    return items.map(item => ({ ...item, dataRow: { ...item.dataRow, ...rowVars }, iterationLabel: `${ri + 1}/${ds.rows.length}` }));
+    return items.map(item => ({
+      ...item,
+      dataRow: { ...item.dataRow, ...parsed.dataRow },
+      iterationLabel: `${ri + 1}/${ds.rows.length}`,
+      ...(parsed.expectStatus ? { expectStatus: parsed.expectStatus } : {}),
+      ...(parsed.owaspTag ? { owaspTag: parsed.owaspTag } : {}),
+    }));
   });
+}
+
+// ─── Data-table row parsing ────────────────────────────────────────────────────
+// Most columns become variables. A few reserved column names turn a data table
+// into an access-control / OWASP matrix: `expectStatus` (or expect_status /
+// expectedStatus) makes the run assert the response code (a single 403 or a list
+// "403,404"), and `owasp` tags that assertion (e.g. BOLA) so it flows into SARIF.
+const RESERVED_STATUS = new Set(['expectstatus', 'expect_status', 'expectedstatus', 'expected_status']);
+const RESERVED_OWASP  = new Set(['owasp', 'owasp_tag', 'category']);
+
+export interface ParsedDataRow {
+  dataRow: Record<string, string>
+  expectStatus?: number[]
+  owaspTag?: string
+}
+
+export function parseDataRow(columns: string[], row: string[]): ParsedDataRow {
+  const dataRow: Record<string, string> = {};
+  let expectStatus: number[] | undefined;
+  let owaspTag: string | undefined;
+  columns.forEach((col, ci) => {
+    if (!col) return;
+    const key = col.toLowerCase();
+    const val = row[ci] ?? '';
+    if (RESERVED_STATUS.has(key)) {
+      const nums = val.split(/[\s,|]+/).map(x => parseInt(x, 10)).filter(n => Number.isFinite(n));
+      if (nums.length) expectStatus = nums;
+    } else if (RESERVED_OWASP.has(key)) {
+      if (val.trim()) owaspTag = val.trim().toUpperCase();
+    } else {
+      dataRow[col] = val;
+    }
+  });
+  return { dataRow, expectStatus, owaspTag };
 }
 
 /** The nearest data table for a run item: walk from its own folder outward and
@@ -458,9 +542,14 @@ export function expandFolderDataSets(items: RunnerItem[], collection: Collection
     const ds = item.isHook ? undefined : nearestFolderDataSet(item, collection);
     if (!ds) { out.push(item); continue; }
     ds.rows.forEach((row, ri) => {
-      const rowVars: Record<string, string> = {};
-      ds.columns.forEach((col, ci) => { if (col) rowVars[col] = row[ci] ?? ''; });
-      out.push({ ...item, dataRow: { ...item.dataRow, ...rowVars }, iterationLabel: `${ri + 1}/${ds.rows.length}` });
+      const parsed = parseDataRow(ds.columns, row);
+      out.push({
+        ...item,
+        dataRow: { ...item.dataRow, ...parsed.dataRow },
+        iterationLabel: `${ri + 1}/${ds.rows.length}`,
+        ...(parsed.expectStatus ? { expectStatus: parsed.expectStatus } : {}),
+        ...(parsed.owaspTag ? { owaspTag: parsed.owaspTag } : {}),
+      });
     });
   }
   return out;

@@ -5,7 +5,7 @@ import { type IpcMain } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
 import { simpleGit } from 'simple-git';
-import { writeFile, mkdir, stat } from 'fs/promises';
+import { writeFile, readFile, mkdir, stat } from 'fs/promises';
 import { join, dirname } from 'path';
 import type { GitStatus, GitCommit, GitBranch, GitRemote } from '../../shared/types';
 import { getWorkspaceDir, ensureGitignore } from './file-handler';
@@ -72,6 +72,22 @@ export function registerGitHandlers(ipc: IpcMain): void {
   });
 
   handleIpc(ipc, IPC.git.markResolved, async (_e, filePath: string) => {
+    await git().add([filePath]);
+  });
+
+  // Read a conflicted file's current content (with <<<<<<< / ======= / >>>>>>>
+  // markers) so the conflict editor can show and resolve it in place.
+  handleIpc(ipc, IPC.git.readConflict, async (_e, filePath: string): Promise<string> => {
+    const dir = getWorkspaceDir();
+    if (!dir) throw new Error('No workspace open');
+    return readFile(join(dir, filePath), 'utf8');
+  });
+
+  // Write the manually-resolved content back and stage it (marks it resolved).
+  handleIpc(ipc, IPC.git.writeResolved, async (_e, filePath: string, content: string) => {
+    const dir = getWorkspaceDir();
+    if (!dir) throw new Error('No workspace open');
+    await writeFile(join(dir, filePath), content, 'utf8');
     await git().add([filePath]);
   });
 
@@ -185,8 +201,14 @@ export function registerGitHandlers(ipc: IpcMain): void {
     await git().deleteLocalBranch(name, force);
   });
 
-  handleIpc(ipc, IPC.git.pull, async () => {
-    await git().pull();
+  handleIpc(ipc, IPC.git.fetch, async () => {
+    // Update remote-tracking refs (so ahead/behind is accurate) without merging.
+    await git().fetch(['--prune']);
+  });
+
+  handleIpc(ipc, IPC.git.pull, async (_e, rebase: boolean = false) => {
+    // Rebase keeps a linear history (no merge commit); plain pull merges.
+    await git().raw(['pull', ...(rebase ? ['--rebase'] : [])]);
   });
 
   handleIpc(ipc, IPC.git.push, async (_e, setUpstream: boolean) => {

@@ -9,6 +9,7 @@
 import type { StateCreator } from 'zustand';
 import type { ResponsePayload } from '../../../../shared/types';
 import type { FullState } from '../index';
+import { STORAGE_KEYS } from '../../lib/storage-keys';
 
 export interface UiSliceState {
   showGeneratorPanel: boolean
@@ -39,6 +40,9 @@ export interface UiSliceState {
    *  request tab is open. Cleared as soon as a request tab is (re)activated, so
    *  it behaves like "bring the collection to front" rather than a mode. */
   collectionPanelOpen: boolean
+  /** When set, the main pane shows the folder panel (docs/data/variables) for
+   *  this folder. Mutually exclusive with a request tab / the collection panel. */
+  folderPanel: { collectionId: string; folderId: string } | null
   coverageOpen: boolean
   compareOpen: boolean
 
@@ -63,6 +67,8 @@ export interface UiSliceActions {
   requestSend: () => void
   /** Show or hide the collection/folder data panel over an open request. */
   setCollectionPanelOpen: (open: boolean) => void
+  /** Bring the folder panel (docs/data/variables) to the front for a folder. */
+  openFolderPanel: (collectionId: string, folderId: string) => void
   setCoverageOpen: (open: boolean) => void
   setCoverageSpec: (spec: string) => void
   setCompareOpen: (open: boolean) => void
@@ -77,8 +83,8 @@ export const createUiSlice: StateCreator<
   UiSlice
 > = (set) => ({
   showGeneratorPanel: false,
-  theme: (localStorage.getItem('theme') as 'dark' | 'light' | 'system') ?? 'dark',
-  zoom: Number(localStorage.getItem('zoom') ?? '1.1'),
+  theme: (localStorage.getItem(STORAGE_KEYS.theme) as 'dark' | 'light' | 'system') ?? 'dark',
+  zoom: Number(localStorage.getItem(STORAGE_KEYS.zoom) ?? '1.1'),
   sidebarTab: 'collections' as UiSliceState['sidebarTab'],
   workspaceSettingsOpen: false,
   commandPaletteOpen: false,
@@ -87,6 +93,7 @@ export const createUiSlice: StateCreator<
   quickInsertsOpen: true,
   sendSignal: 0,
   collectionPanelOpen: false,
+  folderPanel: null,
   coverageOpen: false,
   compareOpen: false,
 
@@ -100,7 +107,7 @@ export const createUiSlice: StateCreator<
     s.theme = t;
     // Always mirror to localStorage so the welcome screen (no workspace open)
     // still remembers the most recent choice on next launch.
-    localStorage.setItem('theme', t);
+    localStorage.setItem(STORAGE_KEYS.theme, t);
     if (s.workspace) {
       if (!s.workspace.settings) s.workspace.settings = {};
       s.workspace.settings.theme = t;
@@ -115,7 +122,7 @@ export const createUiSlice: StateCreator<
 
   setZoom: (z) => set(s => {
     s.zoom = z;
-    localStorage.setItem('zoom', String(z));
+    localStorage.setItem(STORAGE_KEYS.zoom, String(z));
     if (s.workspace) {
       if (!s.workspace.settings) s.workspace.settings = {};
       s.workspace.settings.zoom = z;
@@ -137,7 +144,11 @@ export const createUiSlice: StateCreator<
 
   requestSend: () => set(s => { s.sendSignal += 1; }),
 
-  setCollectionPanelOpen: (open) => set(s => { s.collectionPanelOpen = open; }),
+  setCollectionPanelOpen: (open) => set(s => { s.collectionPanelOpen = open; if (open) s.folderPanel = null; }),
+  openFolderPanel: (collectionId, folderId) => set(s => {
+    s.folderPanel = { collectionId, folderId };
+    s.collectionPanelOpen = false;
+  }),
 
   setCoverageOpen: (open) => set(s => { s.coverageOpen = open; }),
 

@@ -5,6 +5,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { I18nProvider, detectLocale } from './i18n';
+import { STORAGE_KEYS } from './lib/storage-keys';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import './index.css';
 
@@ -12,7 +13,7 @@ import './index.css';
 document.documentElement.lang = detectLocale();
 
 // Apply persisted theme and zoom before first render to avoid flash
-const savedTheme = localStorage.getItem('theme') ?? 'dark';
+const savedTheme = localStorage.getItem(STORAGE_KEYS.theme) ?? 'dark';
 if (savedTheme === 'light') {
   document.documentElement.classList.add('light');
 } else if (savedTheme === 'system') {
@@ -21,7 +22,7 @@ if (savedTheme === 'light') {
   }
 }
 
-const savedZoom = localStorage.getItem('zoom');
+const savedZoom = localStorage.getItem(STORAGE_KEYS.zoom);
 if (savedZoom) window.electron.setZoomFactor(parseFloat(savedZoom));
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

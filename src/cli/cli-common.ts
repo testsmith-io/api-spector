@@ -16,6 +16,7 @@
 import { readFile, stat, readdir } from 'fs/promises';
 import { join, dirname, resolve } from 'path';
 import type { Workspace, Collection, Environment, MockServer } from '../shared/types';
+import { inlineDataSets } from '../main/data-files';
 
 // Design-first contract loading lives in main/contract so the app's IPC can share
 // it; re-exported here so the CLI's existing import site keeps working.
@@ -109,8 +110,8 @@ export async function loadCollections(
   const cols: Collection[] = [];
   for (const relPath of workspace.collections) {
     try {
-      const raw = await readFile(join(dir, relPath), 'utf8');
-      const col = JSON.parse(raw) as Collection;
+      const fullPath = join(dir, relPath);
+      const col = await inlineDataSets(JSON.parse(await readFile(fullPath, 'utf8')) as Collection, dirname(fullPath));
       if (!opts.filterName || col.name === opts.filterName) cols.push(col);
     } catch {
       opts.onError?.(relPath);

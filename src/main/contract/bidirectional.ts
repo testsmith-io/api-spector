@@ -134,7 +134,7 @@ function getProviderResponseSchema(
   statusCode:      number,
   requestBaseUrl?: string,
 ): Record<string, unknown> | null {
-  const url   = req.url.replace(/\{\{([^}]+)\}\}/g, (_, k: string) => envVars[k] ?? `{{${k}}}`);
+  const url   = interpolate(req.url, envVars);
   const match = findOperation(spec, req.method, url, requestBaseUrl);
   if (!match) return null;
 

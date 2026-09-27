@@ -29,6 +29,7 @@ import {
   removeFromFolder,
 } from '../../../../shared/folder-tree';
 import { makeTab, protocolFor } from './tabs-slice';
+import { generateSecurityTests } from '../../../../shared/security-tests';
 import type { FullState } from '../index';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -77,6 +78,10 @@ export interface CollectionsSliceActions {
   deleteCollection: (id: string) => void
   /** Toggle whether a collection is excluded from workspace/CI runs. */
   toggleCollectionDisabled: (id: string) => void
+  /** Toggle whether a folder (and its subtree) is excluded from runs. */
+  toggleFolderDisabled: (collectionId: string, folderId: string) => void
+  /** Set (or clear, with undefined) a folder-level lifecycle hook type. */
+  setFolderHookType: (collectionId: string, folderId: string, hookType: Folder['hookType']) => void
 
   duplicateCollection: (id: string) => void
 
@@ -102,6 +107,9 @@ export interface CollectionsSliceActions {
   renameRequest: (id: string, name: string) => void
   deleteRequest: (collectionId: string, id: string) => void
   duplicateRequest: (collectionId: string, id: string) => void
+  /** Generate OWASP security tests for a request into its folder. Returns the
+   *  number of tests added. Opt-in — only runs when the user invokes it. */
+  addSecurityTests: (collectionId: string, requestId: string) => number
   moveRequest: (srcCollectionId: string, requestId: string, destCollectionId: string, destFolderId: string, destIndex?: number) => void
   moveFolder: (collectionId: string, folderId: string, destParentFolderId: string, destIndex?: number) => void
   /** Move a request or sub-folder to a unified position among a folder's
@@ -138,6 +146,7 @@ export interface CollectionsSliceActions {
   // Collection TLS
   updateCollectionTls: (id: string, tls: TlsSettings | undefined) => void
   updateCollectionAuthAndHeaders: (id: string, auth: AuthConfig, headers: KeyValuePair[]) => void
+  updateCollectionDescription: (id: string, description: string) => void
 }
 
 export type CollectionsSlice = CollectionsSliceState & CollectionsSliceActions
@@ -219,6 +228,24 @@ export const createCollectionsSlice: StateCreator<
     if (!entry) return;
     entry.data.disabled = !entry.data.disabled;
     entry.dirty = true;
+  }),
+
+  toggleFolderDisabled: (collectionId, folderId) => set(s => {
+    const col = s.collections[collectionId]?.data;
+    if (!col) return;
+    const folder = findFolder(col.rootFolder, folderId);
+    if (!folder) return;
+    folder.disabled = !folder.disabled;
+    s.collections[collectionId].dirty = true;
+  }),
+
+  setFolderHookType: (collectionId, folderId, hookType) => set(s => {
+    const col = s.collections[collectionId]?.data;
+    if (!col) return;
+    const folder = findFolder(col.rootFolder, folderId);
+    if (!folder) return;
+    folder.hookType = hookType;
+    s.collections[collectionId].dirty = true;
   }),
 
   duplicateCollection: (id) => set(s => {
@@ -326,6 +353,12 @@ export const createCollectionsSlice: StateCreator<
   updateCollectionTls: (id, tls) => set(s => {
     if (!s.collections[id]) return;
     s.collections[id].data.tls = tls;
+    s.collections[id].dirty = true;
+  }),
+
+  updateCollectionDescription: (id, description) => set(s => {
+    if (!s.collections[id]) return;
+    s.collections[id].data.description = description;
     s.collections[id].dirty = true;
   }),
 
@@ -570,6 +603,25 @@ export const createCollectionsSlice: StateCreator<
     s.tabs.push(tab);
     s.activeTabId = tab.id;
   }),
+
+  addSecurityTests: (collectionId, requestId) => {
+    const col  = get().collections[collectionId]?.data;
+    const base = col?.requests[requestId];
+    if (!col || !base) return 0;
+    const tests = generateSecurityTests(base);
+    if (tests.length === 0) return 0;
+    set(s => {
+      const c = s.collections[collectionId]?.data;
+      if (!c) return;
+      const folder = findFolderContaining(c.rootFolder, requestId) ?? c.rootFolder;
+      for (const test of tests) {
+        c.requests[test.id] = test;
+        folder.requestIds.push(test.id);
+      }
+      s.collections[collectionId].dirty = true;
+    });
+    return tests.length;
+  },
 
   moveRequest: (srcCollectionId, requestId, destCollectionId, destFolderId, destIndex?) => set(s => {
     const srcCol  = s.collections[srcCollectionId]?.data;

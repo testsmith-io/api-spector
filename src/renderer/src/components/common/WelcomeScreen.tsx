@@ -146,17 +146,20 @@ export function WelcomeScreen() {
           <p className="text-[10px] uppercase tracking-wider font-semibold px-1" style={{ color: 'var(--text-muted)' }}>
             {t('Recent workspaces')}
           </p>
-          {recents.map(r => (
-            <button
-              key={r.path}
-              onClick={() => openRecent(r.path)}
-              title={r.path}
-              className="flex flex-col items-start px-2 py-1.5 rounded hover:bg-surface-800 transition-colors text-left group"
-            >
-              <span className="text-xs text-surface-200 group-hover:text-white truncate max-w-full">{r.name}</span>
-              <span className="text-[10px] text-surface-500 truncate max-w-full">{r.path}</span>
-            </button>
-          ))}
+          {/* Show ~5 at a glance; the rest scroll. */}
+          <div className="flex flex-col gap-1 max-h-56 overflow-y-auto pr-1">
+            {recents.map(r => (
+              <button
+                key={r.path}
+                onClick={() => openRecent(r.path)}
+                title={r.path}
+                className="flex flex-col items-start px-2 py-1.5 rounded hover:bg-surface-800 transition-colors text-left group shrink-0"
+              >
+                <span className="text-xs text-surface-200 group-hover:text-white truncate max-w-full">{r.name}</span>
+                <span className="text-[10px] text-surface-500 truncate max-w-full">{r.path}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

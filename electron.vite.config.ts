@@ -50,7 +50,17 @@ export default defineConfig( {
       rollupOptions: {
         input: {
           index: resolve( __dirname, 'src/renderer/index.html' )
-        }
+        },
+        output: {
+          // Split heavy, rarely-changing vendor code into its own chunks so the
+          // browser parses/caches them separately from app code (CodeMirror is
+          // the single largest renderer dependency; ajv is only used for schema
+          // validation).
+          manualChunks: {
+            codemirror: ['@uiw/react-codemirror', '@codemirror/state', '@codemirror/view', '@codemirror/commands', '@codemirror/lang-json', '@codemirror/lang-xml', '@codemirror/lang-javascript', '@codemirror/theme-one-dark'],
+            ajv: ['ajv'],
+          },
+        },
       }
     },
     plugins: [react()]

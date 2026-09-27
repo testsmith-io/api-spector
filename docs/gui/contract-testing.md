@@ -1,10 +1,12 @@
 # Contract Testing
 
-Contract testing verifies that a consumer (your API collection) and a provider (the real API) agree on a shared contract: the expected status codes, response headers, and response body shapes. API Spector supports five modes: **Consumer**, **Provider**, **Provider (live)**, **Bi-directional**, and **Fuzz**.
+Contract testing verifies that a consumer (your API collection) and a provider (the real API) agree on a shared contract: the expected status codes, response headers, and response body shapes. The Contracts panel has three tabs: **Consumer**, **Provider**, and **Bi-directional**.
 
 Think of it as **who owns the definition of "correct"**. For how these modes map to the industry terms (consumer-driven, provider-driven, and bi-directional contract testing) and how to choose between them, see **[Contract Testing Types](../reference/contract-testing-types.md)**.
 
-> **New in this release:** live provider verification with provider states, Pact-style flexible matchers, Pact file import/export, HTML reports, and a local `deploy-check` gate. The CLI side of all of this is covered in **[Contract Testing (CLI)](../cli/contract-testing.md)**.
+> **New in this release:** design-first consumer contracts (author them without an endpoint), live provider verification with provider states, Pact-style flexible matchers, Pact file import/export, HTML reports, and a local `deploy-check` gate. The CLI side of all of this is covered in **[Contract Testing (CLI)](../cli/contract-testing.md)**.
+
+> **Looking for fuzzing?** It is no longer a contract mode. To fuzz an endpoint, use the per-request **fuzz** button next to Send; for a whole-suite sweep in CI, see **[Contract Testing (CLI) -> Fuzzing](../cli/contract-testing.md#fuzzing)**.
 
 ---
 
@@ -12,18 +14,26 @@ Think of it as **who owns the definition of "correct"**. For how these modes map
 
 ### Consumer mode
 
-You define what you need. On each request you write down: "I expect a `200`, a `content-type: application/json` header, and a body that has `id` (integer) and `name` (string)." The tool sends each request live and checks whether the real API delivers exactly that.
-
-You do not need a spec file. You are the source of truth.
+You define what you need. In a consumer contract you write down: "when I `GET /brands/{id}`, I need a `200`, a `content-type: application/json` header, and a body that has `id` (integer) and `name` (string)." You author these contracts design-first (see [Authoring a contract](#authoring-a-contract)); you do not need a spec file, and you are the source of truth. Consumer mode sends each interaction and checks whether the API delivers exactly what the contract requires.
 
 **When to use:** Catching breaking changes after a deployment. Run it against two versions of the same API and see if anything you rely on has changed shape.
 
 **Workflow:**
-1. Send a request and click **⚡ Infer from response** in the Contract tab to capture the current response shape as a schema.
-2. Set the expected status code and any required headers.
-3. Open the Contracts panel, select **Consumer**, and click **Run**.
-4. Expand any failing row to see exactly which field or header violated your contract.
-5. Point your environment at a different API version and run again to compare.
+1. Author your consumer contracts with the Contract Designer (see [Authoring a contract](#authoring-a-contract)).
+2. Open the Contracts panel, select **Consumer**, and click **Run**.
+3. Expand any failing row to see exactly which field or header violated your contract.
+4. Point your environment at a different API version and run again to compare.
+
+#### Verifying against a running provider
+
+Consumer mode is also where you do real **Pact-style provider verification**: instead of trusting the request URLs alone, you replay your contracts against a really-running provider and assert that its live responses satisfy each one. It answers "does this build of the provider actually honour the consumer's expectations?" Two optional fields turn it on:
+
+1. **Provider base URL.** Enter an origin (e.g. `http://localhost:3000`) and every interaction is rebased onto it, keeping its path and query. This lets the same contracts verify any environment (local, staging, a PR preview) without editing them, and it is what supplies the host for host-less design-first contracts (a contract for `/brands` is sent to `http://localhost:3000/brands`).
+2. **State handler URL.** When your contracts declare provider states (Pact's `given(...)`), point the run at a state handler endpoint. Before each interaction the tool POSTs `{ state, action: "setup" }` to that URL; afterwards it POSTs `{ state, action: "teardown" }`. A `PROVIDER STATE FAILED` violation means a required state could not be seeded (handler missing, unreachable, or non-2xx), and the interaction is not replayed.
+
+**When to use:** Provider-side CI. The provider team runs this against a freshly built service to confirm it still satisfies every consumer contract before shipping.
+
+> **Tip:** The state handler is a small endpoint you add to your provider (often only in test builds) that puts the database/fixtures into the named state. It mirrors Pact's "state change URL" exactly, so an existing Pact provider-states endpoint works as-is.
 
 ---
 
@@ -46,46 +56,11 @@ You need the spec URL. You do not need to define any contract on your requests.
 
 ---
 
-### Provider (live) mode
-
-This is the real **Pact-style provider verification**. Instead of static analysis, it takes the contracts you defined on your requests and **replays them against a really-running provider**, asserting that the live responses satisfy each contract. It is the answer to "does this build of the provider actually honour the consumer's expectations?"
-
-Two things make it different from Consumer mode:
-
-1. **Provider base URL.** Every request is rebased onto the origin you supply (e.g. `http://localhost:3000`), keeping its path and query. This lets the same contracts verify any environment (local, staging, a PR preview) without editing request URLs.
-2. **Provider states.** Before each interaction, the tool can seed the provider into a known state (Pact's `given(...)`). You list the required states on the request's contract, and point the run at a **state handler URL**. Before each interaction the tool POSTs `{ state, action: "setup" }` to that URL; afterwards it POSTs `{ state, action: "teardown" }`.
-
-**When to use:** Provider-side CI. The provider team runs this against a freshly built service to confirm it still satisfies every consumer contract before shipping.
-
-**Workflow:**
-1. Define contracts on your requests (status, headers, body schema or matchers).
-2. (Optional) On each request's Contract tab, list the provider states it depends on.
-3. Open the Contracts panel, select **Live**, and enter the **Provider base URL**.
-4. (Optional) Enter a **State handler URL** if any contract declares provider states.
-5. Click **Run**. A `PROVIDER STATE FAILED` violation means a required state could not be seeded (handler missing, unreachable, or non-2xx).
-
-> **Tip:** The state handler is a small endpoint you add to your provider (often only in test builds) that puts the database/fixtures into the named state. It mirrors Pact's "state change URL" exactly, so an existing Pact provider-states endpoint works as-is.
-
----
-
-### Fuzz mode
-
-Fuzz mode generates malformed variants of your request bodies and query parameters (from a pinned spec or the request's own values), sends them to a provider base URL, and lists responses that crash (5xx) or accept invalid input. Set the provider base URL, optionally pick a spec or snapshot, choose how many cases per operation and a seed (runs are deterministic), and toggle "Include write methods" to fuzz POST/PUT/PATCH/DELETE. Each finding shows the single field it mutated and a request you can copy and replay. See [Fuzzing](../cli/contract-testing.md#fuzzing) for the full option reference.
-
-There are two ways to fuzz:
-
-- **Per request:** the **fuzz** button next to Send fuzzes just that one request, using its own URL, auth, and environment. This is the quick way to hammer an endpoint you are building. Pick a pinned spec in the dialog for richer inputs, or fuzz the request body as it stands. Because it targets the request's own URL, point the request at a staging environment or a mock before fuzzing write methods.
-- **Whole workspace:** Fuzz mode in the Contracts panel sweeps every request against a provider base URL and produces a report suitable for CI. This is the batch form of the same engine.
-
-Both share the seeded, single-fault engine, so a finding always names one mutated field and reproduces from its seed.
-
-Turn on **Record all cases** in either dialog to see every request the fuzzer sent, not just the findings: a table of each mutated body with its field, mutation, and HTTP status. It is on by default for a per-request run (you are inspecting one endpoint) and off for the workspace sweep (where it can be large).
-
 ### Bi-directional mode
 
 This combines both sides in a single run.
 
-**Step 1: Static schema compatibility check.** The response body schema you defined in the Contract tab is compared against the response schema documented in the provider's OpenAPI spec. If the contract uses body matchers instead of a schema, the matcher example is compiled to a type-level schema and compared the same way. Every field you *require* must exist in the provider schema with a compatible type. Extra provider fields are always allowed. No HTTP call needed for this step.
+**Step 1: Static schema compatibility check.** The response body schema in your consumer contract is compared against the response schema documented in the provider's OpenAPI spec. If the contract uses body matchers instead of a schema, the matcher example is compiled to a type-level schema and compared the same way. Every field you *require* must exist in the provider schema with a compatible type. Extra provider fields are always allowed. No HTTP call needed for this step.
 
 **Step 2: Live consumer verification.** The real request is sent and validated exactly as in Consumer mode.
 
@@ -94,7 +69,7 @@ Violations from both steps appear together in the results.
 **When to use:** You have both a response contract and a provider spec, and you want a single run that confirms the two sides agree on paper *and* the live API actually delivers.
 
 **Workflow:**
-1. Define a body schema on each relevant request via the Contract tab (use **⚡ Infer from response** as a starting point).
+1. Author a consumer contract with a response body schema or matchers for each relevant interaction (see [Authoring a contract](#authoring-a-contract)).
 2. Open the Contracts panel, select **Bi-dir**, and paste the spec URL.
 3. Click **Run**.
 4. `SCHEMA INCOMPATIBLE` violations mean the provider spec documents a different shape than what your contract expects. The schemas need to be reconciled.
@@ -111,8 +86,8 @@ You have two versions of the same API:
 | v3 | `https://api.practicesoftwaretesting.com/` | `https://api.practicesoftwaretesting.com/docs?api-docs.json` |
 | v4 | `https://api-v4.practicesoftwaretesting.com/` | `https://api-v4.practicesoftwaretesting.com/docs?api-docs.json` |
 
-**Step 1: Build your collection against v3.**
-Send requests and use **⚡ Infer from response** to capture expected response shapes as contracts.
+**Step 1: Author your consumer contracts against v3.**
+Send requests against v3, then use **Send to contract designer** on each one to seed a design interaction pre-filled from its response, and relax the expectations to just the shapes you rely on.
 
 **Step 2: Run Provider mode with the v4 spec.**
 This immediately shows which of your requests use paths or parameters that no longer exist in v4, without making a single HTTP call. Any `UNKNOWN PATH` result means that endpoint moved or was removed.
@@ -125,17 +100,25 @@ This gives the full picture: schema compatibility between your expectations and 
 
 ---
 
-## Defining a contract on a request
+## Authoring a contract
 
-Open any request in the collection and click the **Contract** tab.
+Consumer contracts are authored **design-first**, no endpoint required. Click **Design a contract (no endpoint needed)** at the top of the Contracts panel to open the **Contract Designer**.
+
+In the Designer you build a `ConsumerContract`: you describe the requests a consumer will make and the responses it needs. Requests use path templates (`/brands/{id}`, no host needed), and responses are matched **by type** by default, which is the CDCT best practice: you pin the *shape* you depend on, not the exact values. The Designer compiles what you author to a Pact v3 document (publishable to the cloud and verifiable by the provider) and to a mock, and these design contracts feed the verification modes directly.
+
+This is the way to author consumer contracts. (Legacy `request.contract` values in existing `.spector` files are still honoured when a run gathers interactions, but there is no longer a UI for authoring them on a request.)
+
+### Seeding from an existing request
+
+You do not have to start from a blank interaction. From any request (or from its response) choose **Send to contract designer** to pre-fill a new interaction with that request's method, path, and an inferred response shape. It is the quick way to turn something you just sent into a contract: send it, hand it to the Designer, then relax or adjust the expectations.
 
 ### Expected status code
 
-Enter the HTTP status code you expect (e.g. `200`, `201`, `404`). If the real response returns a different code, the test fails.
+Give each interaction the HTTP status code you expect (e.g. `200`, `201`, `404`). If the real response returns a different code, verification fails.
 
 ### Required response headers
 
-Add one or more headers the response must include.
+List one or more headers the response must include.
 
 | Column | Purpose |
 |--------|---------|
@@ -147,11 +130,7 @@ Header value comparison ignores parameters after `;`, so `application/json` matc
 
 ### Body schema
 
-Paste a JSON Schema (draft-07) the response body must satisfy.
-
-**⚡ Infer from response** generates a schema automatically from the last received response body. Use it as a starting point, then tighten types or remove optional fields as needed.
-
-**↓ Contract** in the response viewer captures status, `content-type`, and an inferred body schema all at once and jumps straight to the Contract tab.
+An interaction's response expectation can carry a JSON Schema (draft-07) the response body must satisfy. When you seed from an existing response, an inferred schema is filled in as a starting point; tighten types or remove optional fields as needed.
 
 ### Body matchers (Pact-style)
 
@@ -216,21 +195,21 @@ Click **Export HTML** in the results bar to save a **self-contained HTML report*
 
 | Type | Meaning | Modes |
 |------|---------|-------|
-| `STATUS MISMATCH` | Response status did not match expected | Consumer, Provider (live), Bi-dir |
-| `SCHEMA VIOLATION` | Response body failed JSON Schema / matcher validation | Consumer, Provider (live), Bi-dir |
-| `MISSING HEADER` | Required header absent or wrong value | Consumer, Provider (live), Bi-dir |
+| `STATUS MISMATCH` | Response status did not match expected | Consumer, Bi-dir |
+| `SCHEMA VIOLATION` | Response body failed JSON Schema / matcher validation | Consumer, Bi-dir |
+| `MISSING HEADER` | Required header absent or wrong value | Consumer, Bi-dir |
 | `REQUEST BODY INVALID` | Request body violates spec schema, or required query param missing | Provider, Bi-dir |
 | `UNKNOWN PATH` | No matching operation in spec for this method and URL | Provider, Bi-dir |
 | `SCHEMA INCOMPATIBLE` | Consumer's expected response schema conflicts with provider spec | Bi-dir |
-| `PROVIDER STATE FAILED` | A required provider state could not be seeded before replay | Provider (live) |
+| `PROVIDER STATE FAILED` | A required provider state could not be seeded before replay | Consumer (against a live provider) |
 
 ---
 
 ## Tips
 
-- **Start with Consumer mode** before you have a spec. It requires no setup beyond sending a request once.
+- **Start with Consumer mode** before you have a spec. Design a contract and run it; no spec file required.
 - **Provider mode needs no live server.** Run it in CI to detect spec drift before deployment.
-- **Provider (live) mode is for the provider's CI.** Point it at a freshly built service to prove it still satisfies every consumer contract before shipping.
+- **Consumer mode with a Provider base URL is for the provider's CI.** Point it at a freshly built service to prove it still satisfies every consumer contract before shipping, and add a State handler URL when your contracts declare provider states.
 - **Use matchers instead of exact bodies** when only the *shape* matters; they survive changing IDs, timestamps, and counts.
 - **Bi-dir without a body schema** skips the static compatibility check and runs only live verification.
 - **Environment variables** are substituted before validation in every mode, so `{{BASE_URL}}` in URLs and request bodies is resolved automatically.

@@ -5,11 +5,12 @@ import { Fragment, useEffect, useRef, useState, useCallback } from 'react';
 import { useStore } from '../../store';
 import type { RunRequestResult, RunSummary, RunnerItem } from '../../../../shared/types';
 import { findFolder } from '../../store';
-import { buildJsonReport, buildJUnitReport, buildHtmlReport } from '../../../../shared/report';
+import { buildJsonReport, buildJUnitReport, buildHtmlReport, buildSarifReport } from '../../../../shared/report';
 import { collectAllTags, buildRunPlan, expandRunPlanWithData, expandFolderDataSets, resolveInheritedAuthAndHeaders, authIsConfigured } from '../../../../shared/request-collection';
 import { buildCliArgs, generateGitHub, generateAzure, generateGitLab } from '../../../../shared/ci-generators';
-import { getMethodColor } from '../../../../shared/colors';
+import { getMethodColor, getStatusColor } from '../../../../shared/colors';
 import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
+import { useCopyFeedback } from '../../hooks/useCopyFeedback';
 import { EmptyState } from '../common/EmptyState';
 import { Modal } from '../common/Modal';
 import { useT } from '../../i18n';
@@ -142,7 +143,7 @@ function ResultDetail({ r }: { r: RunRequestResult }) {
       {r.receivedResponse && (
         <DetailSection label={t('Response')}>
           <p className="font-mono text-[10px]">
-            <span className={r.receivedResponse.status < 400 ? 'text-emerald-400' : 'text-red-400'}>
+            <span className={getStatusColor(r.receivedResponse.status)}>
               {r.receivedResponse.status} {r.receivedResponse.statusText}
             </span>
           </p>
@@ -174,8 +175,8 @@ export function RunnerModal() {
   const [selectedEnvId, setSelectedEnvId] = useState<string>(activeEnvId ?? '');
   const [filterTags,    setFilterTags]    = useState<string[]>(runnerModal.filterTags);
   const [summary,       setSummary]       = useState<RunSummary | null>(null);
-  const [copiedKey,     setCopiedKey]     = useState<string | null>(null);
-  const [exportFormat,  setExportFormat]  = useState<'json' | 'junit' | 'html'>('json');
+  const { copied: copiedKey, copy: copyCI } = useCopyFeedback<string>();
+  const [exportFormat,  setExportFormat]  = useState<'json' | 'junit' | 'html' | 'sarif'>('json');
   const [requestDelay,  setRequestDelay]  = useState<number>(0);
   const [expandedRows,  setExpandedRows]  = useState<Set<number>>(new Set());
 
@@ -230,9 +231,10 @@ export function RunnerModal() {
     if (baseItems.length === 0) return;
 
     // Data-table expansion:
-    //  - Collection run: each folder's own data table iterates its requests.
-    //  - Then the whole-scope table (the folder's for a folder run, else the
-    //    collection's) repeats the plan once per row. No rows → a single pass.
+    //  - Collection run: each folder's own data table iterates its requests, then
+    //  - the whole-scope table repeats the plan once per row. No rows → single pass.
+    //  A data table can also carry `expectStatus`/`owasp` columns to act as an
+    //  access-control matrix (run as different personas, assert allow/deny).
     let items: RunnerItem[] = baseItems;
     if (!folderId && colEntry) items = expandFolderDataSets(items, colEntry.data);
     items = expandRunPlanWithData(items, ds);
@@ -302,12 +304,6 @@ export function RunnerModal() {
   if (!runnerModal.open) return null;
 
   const envName = selectedEnvId ? environments[selectedEnvId]?.data.name ?? null : null;
-
-  function copyCI(key: string, content: string) {
-    navigator.clipboard.writeText(content);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
-  }
 
   return (
     <Modal
@@ -400,25 +396,25 @@ export function RunnerModal() {
             <div className="flex flex-wrap gap-1.5">
               <button
                 className="px-2 py-1 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors whitespace-nowrap"
-                onClick={() => copyCI('cli', buildCliArgs('./workspace.json', envName, filterTags))}
+                onClick={() => copyCI(buildCliArgs('./workspace.json', envName, filterTags), 'cli')}
               >
                 {copiedKey === 'cli' ? t('✓ Copied') : t('⊞ CLI command')}
               </button>
               <button
                 className="px-2 py-1 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors whitespace-nowrap"
-                onClick={() => copyCI('gh', generateGitHub(envName, filterTags))}
+                onClick={() => copyCI(generateGitHub(envName, filterTags), 'gh')}
               >
                 {copiedKey === 'gh' ? t('✓ Copied') : t('⊞ GitHub Actions')}
               </button>
               <button
                 className="px-2 py-1 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors whitespace-nowrap"
-                onClick={() => copyCI('az', generateAzure(envName, filterTags))}
+                onClick={() => copyCI(generateAzure(envName, filterTags), 'az')}
               >
                 {copiedKey === 'az' ? t('✓ Copied') : t('⊞ Azure Pipelines')}
               </button>
               <button
                 className="px-2 py-1 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors whitespace-nowrap"
-                onClick={() => copyCI('gl', generateGitLab(envName, filterTags))}
+                onClick={() => copyCI(generateGitLab(envName, filterTags), 'gl')}
               >
                 {copiedKey === 'gl' ? t('✓ Copied') : t('⊞ GitLab CI')}
               </button>
@@ -534,13 +530,14 @@ export function RunnerModal() {
             <div className="ml-auto flex items-center gap-1.5">
               <select
                 value={exportFormat}
-                onChange={e => setExportFormat(e.target.value as 'json' | 'junit' | 'html')}
+                onChange={e => setExportFormat(e.target.value as 'json' | 'junit' | 'html' | 'sarif')}
                 className="bg-surface-800 border border-surface-700 rounded px-1.5 py-0.5 text-[11px] focus:outline-none focus:border-blue-500"
                 style={{ color: 'var(--text-primary)' }}
               >
                 <option value="json">JSON</option>
                 <option value="junit">JUnit XML</option>
                 <option value="html">HTML</option>
+                <option value="sarif">SARIF (security)</option>
               </select>
               <button
                 onClick={() => {
@@ -551,8 +548,9 @@ export function RunnerModal() {
                   };
                   const content = exportFormat === 'junit' ? buildJUnitReport(runnerResults, summary, meta)
                     : exportFormat === 'html'  ? buildHtmlReport(runnerResults, summary, meta)
+                    : exportFormat === 'sarif' ? buildSarifReport(runnerResults, summary, meta)
                     : buildJsonReport(runnerResults, summary, meta);
-                  const ext = exportFormat === 'junit' ? 'xml' : exportFormat === 'html' ? 'html' : 'json';
+                  const ext = exportFormat === 'junit' ? 'xml' : exportFormat === 'html' ? 'html' : exportFormat === 'sarif' ? 'sarif' : 'json';
                   electron.saveResults(content, `spector-results.${ext}`);
                 }}
                 className="px-2.5 py-0.5 bg-surface-800 hover:bg-surface-700 rounded transition-colors text-[11px] whitespace-nowrap"

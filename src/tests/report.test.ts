@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, it, expect } from 'vitest';
-import { buildJsonReport, buildJUnitReport, buildHtmlReport } from '../shared/report';
+import { buildJsonReport, buildJUnitReport, buildHtmlReport, buildSarifReport, owaspRuleForName } from '../shared/report';
 import type { RunRequestResult, RunSummary } from '../shared/types';
 
 function makeResult(overrides: Partial<RunRequestResult> = {}): RunRequestResult {
@@ -302,5 +302,44 @@ describe('buildHtmlReport', () => {
   it('includes the toggle script for collapsible cards', () => {
     const html = buildHtmlReport([], summary, meta);
     expect(html).toContain('function toggle(');
+  });
+});
+
+// ─── OWASP classification + SARIF ────────────────────────────────────────────
+
+describe('owaspRuleForName', () => {
+  it('maps a known test-name prefix to its OWASP rule', () => {
+    expect(owaspRuleForName('[BOLA] cannot access other user')?.id).toBe('API1:2023');
+    expect(owaspRuleForName('[INJECTION] SQL in search')?.id).toBe('API10:2023');
+    expect(owaspRuleForName('[func-auth] admin endpoint')?.id).toBe('API5:2023'); // case-insensitive
+  });
+  it('returns null for untagged names', () => {
+    expect(owaspRuleForName('plain assertion')).toBeNull();
+    expect(owaspRuleForName('[UNKNOWN] whatever')).toBeNull();
+  });
+});
+
+describe('buildSarifReport', () => {
+  it('is valid SARIF 2.1.0 with one result per failing check', () => {
+    const results = [
+      makeResult({ name: '[BOLA] other user', status: 'failed', testResults: [
+        { name: '[BOLA] cannot access other user profile', passed: false, error: 'expected 403' },
+      ] }),
+      makeResult({ name: 'happy path', status: 'passed', testResults: [{ name: 'ok', passed: true }] }),
+    ];
+    const sarif = JSON.parse(buildSarifReport(results, summary, meta));
+    expect(sarif.version).toBe('2.1.0');
+    const run = sarif.runs[0];
+    expect(run.results).toHaveLength(1);                        // only the failure
+    expect(run.results[0].ruleId).toBe('API1:2023');           // OWASP-tagged
+    expect(run.results[0].level).toBe('error');
+    expect(run.tool.driver.rules.some((r: { id: string }) => r.id === 'API1:2023')).toBe(true);
+    expect(run.invocations[0].executionSuccessful).toBe(false);
+  });
+
+  it('produces no results when everything passes', () => {
+    const sarif = JSON.parse(buildSarifReport([makeResult()], summary, meta));
+    expect(sarif.runs[0].results).toHaveLength(0);
+    expect(sarif.runs[0].invocations[0].executionSuccessful).toBe(true);
   });
 });

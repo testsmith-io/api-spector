@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import type { RecordedEntry, RecordingSession } from '../../../../shared/types';
+import { getStatusColor } from '../../../../shared/colors';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
 
@@ -15,10 +16,8 @@ interface Props {
 }
 
 function statusColor(status: number): string {
-  if (status === 0)    return 'text-yellow-400';
-  if (status < 300)    return 'text-emerald-400';
-  if (status < 400)    return 'text-blue-400';
-  return 'text-red-400';
+  if (status === 0) return 'text-yellow-400';
+  return getStatusColor(status);
 }
 
 function methodColor(method: string): string {

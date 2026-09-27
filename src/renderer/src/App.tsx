@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import type { ApiRequest, FuzzReport } from '../../shared/types';
+import type { ApiRequest } from '../../shared/types';
 import { useStore } from './store';
 import { useAutoSave } from './hooks/useAutoSave';
 import { useWorkspaceLoader } from './hooks/useWorkspaceLoader';
@@ -18,12 +18,13 @@ import { RunnerModal } from './components/Runner/RunnerModal';
 import { CoverageModal } from './components/Coverage/CoverageModal';
 import { CompareModal } from './components/Compare/CompareModal';
 import { CollectionPanel } from './components/CollectionPanel/CollectionPanel';
+import { FolderPanel } from './components/CollectionPanel/FolderPanel';
 import { MockPanel } from './components/MockPanel/MockPanel';
 import { MockDetailPanel } from './components/MockPanel/MockDetailPanel';
 import { RecorderPanel } from './components/MockPanel/RecorderPanel';
 import { ContractPanel } from './components/ContractPanel/ContractPanel';
 import { ContractResultsPanel } from './components/ContractPanel/ContractResultsPanel';
-import { FuzzResultsPanel } from './components/ContractPanel/FuzzResultsPanel';
+import { ContractDesignerModal } from './components/ContractPanel/ContractDesignerModal';
 import { GitDiffPane } from './components/GitPanel/GitDiffPane';
 import { GitPanel } from './components/GitPanel/GitPanel';
 import { CommandPalette } from './components/common/CommandPalette';
@@ -206,7 +207,11 @@ export default function App () {
   const showGeneratorPanel = useStore( s => s.showGeneratorPanel );
   const sidebarTab = useStore( s => s.sidebarTab );
   const collectionPanelOpen = useStore( s => s.collectionPanelOpen );
+  const folderPanel = useStore( s => s.folderPanel );
   const setSidebarTab = useStore( s => s.setSidebarTab );
+  const contractDesignerOpen = useStore( s => s.contractDesignerOpen );
+  const contractDesignerSeed = useStore( s => s.contractDesignerSeed );
+  const closeContractDesigner = useStore( s => s.closeContractDesigner );
   const historyCount = useStore( s => s.history.length );
   const addCollection = useStore( s => s.addCollection );
   const addMockHit = useStore( s => s.addMockHit );
@@ -224,9 +229,6 @@ export default function App () {
   const addWsMessage = useStore( s => s.addWsMessage );
   const pushLiveStreamEvents = useStore( s => s.pushLiveStreamEvents );
 
-  // Fuzz report is lifted here (not in the contract store) so the parent can pick
-  // which results panel to render for the contracts sidebar tab.
-  const [fuzzReport, setFuzzReport] = useState<FuzzReport | null>( null );
   const [sidebarOpen, setSidebarOpen] = useState( true );
   const [responseOpen, setResponseOpen] = useState( false );
   const [docsModalOpen, setDocsModalOpen] = useState( false );
@@ -401,6 +403,7 @@ export default function App () {
       <CommandPalette />
       <UpdateToast />
       <ProductTour />
+      {contractDesignerOpen && <ContractDesignerModal seed={contractDesignerSeed ?? undefined} onClose={closeContractDesigner} />}
       {docsModalOpen && <DocsGeneratorModal onClose={() => setDocsModalOpen( false )} />}
       {/* macOS drag region with centered title — hidden on Windows (native title bar used instead) */}
       {window.electron.platform !== 'win32' && (
@@ -502,7 +505,7 @@ export default function App () {
                   sidebarTab === 'history' ? <HistoryPanel /> :
                     sidebarTab === 'mocks' ? <MockPanel /> :
                       sidebarTab === 'git' ? <GitPanel /> :
-                        <ContractPanel fuzzReport={fuzzReport} setFuzzReport={setFuzzReport} />}
+                        <ContractPanel />}
               </aside>
               {/* Sidebar resize handle */}
               <div
@@ -601,9 +604,7 @@ export default function App () {
               </div>
             ) : sidebarTab === 'contracts' ? (
               <div className="flex-1 min-h-0 flex flex-col">
-                {fuzzReport
-                  ? <FuzzResultsPanel report={fuzzReport} onClear={() => setFuzzReport( null )} />
-                  : <ContractResultsPanel />}
+                <ContractResultsPanel />
               </div>
             ) : sidebarTab === 'mocks' && recorderRunning ? (
               <div className="flex-1 min-h-0">
@@ -646,6 +647,10 @@ export default function App () {
             ) : sidebarTab === 'mocks' && activeMockId ? (
               <div className="flex-1 min-h-0">
                 <MockDetailPanel mockId={activeMockId} />
+              </div>
+            ) : folderPanel ? (
+              <div className="flex-1 min-h-0">
+                <FolderPanel />
               </div>
             ) : collectionPanelOpen ? (
               <div className="flex-1 min-h-0">

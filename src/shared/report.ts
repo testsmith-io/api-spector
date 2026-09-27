@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import type { RunRequestResult, RunSummary } from './types';
+import { escapeHtml } from './escape';
 
 export interface ReportMeta {
   workspace?: string
@@ -51,8 +52,7 @@ export function buildHtmlReport(
   summary: RunSummary,
   meta: ReportMeta = {},
 ): string {
-  const esc = (s: string) =>
-    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const esc = escapeHtml;
 
   function prettyJson(s: string): string {
     try { return esc(JSON.stringify(JSON.parse(s), null, 2)); } catch { return esc(s); }
@@ -332,11 +332,7 @@ export function buildJUnitReport(
   summary: RunSummary,
   meta: ReportMeta = {},
 ): string {
-  const esc = (s: string) =>
-    s.replace(/&/g, '&amp;')
-     .replace(/</g, '&lt;')
-     .replace(/>/g, '&gt;')
-     .replace(/"/g, '&quot;');
+  const esc = escapeHtml;
 
   const suiteName = esc(meta.collection ?? 'API Tests');
   const totalSec  = (summary.durationMs / 1000).toFixed(3);
@@ -393,4 +389,89 @@ export function buildJUnitReport(
   ];
 
   return lines.join('\n') + '\n';
+}
+
+// ─── OWASP API Top 10 (2023) classification + SARIF ───────────────────────────
+
+export interface OwaspRule { id: string; name: string; ref: string }
+
+/** Test-name prefix (e.g. "[BOLA]") → OWASP API Top 10 rule. Zero-config and
+ *  optional: names without a known prefix simply carry no OWASP tag. This is
+ *  the same tagging convention used by the security-testing guide/skill. */
+const OWASP_BY_TAG: Record<string, OwaspRule> = {
+  BOLA:          { id: 'API1:2023',  name: 'Broken Object Level Authorization',                 ref: 'https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/' },
+  AUTH:          { id: 'API2:2023',  name: 'Broken Authentication',                             ref: 'https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/' },
+  'MASS-ASSIGN': { id: 'API3:2023',  name: 'Broken Object Property Level Authorization',        ref: 'https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/' },
+  RESOURCE:      { id: 'API4:2023',  name: 'Unrestricted Resource Consumption',                 ref: 'https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/' },
+  'FUNC-AUTH':   { id: 'API5:2023',  name: 'Broken Function Level Authorization',               ref: 'https://owasp.org/API-Security/editions/2023/en/0xa5-broken-function-level-authorization/' },
+  'BIZ-FLOW':    { id: 'API6:2023',  name: 'Unrestricted Access to Sensitive Business Flows',   ref: 'https://owasp.org/API-Security/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/' },
+  SSRF:          { id: 'API7:2023',  name: 'Server Side Request Forgery',                       ref: 'https://owasp.org/API-Security/editions/2023/en/0xa7-server-side-request-forgery/' },
+  CONFIG:        { id: 'API8:2023',  name: 'Security Misconfiguration',                         ref: 'https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/' },
+  INVENTORY:     { id: 'API9:2023',  name: 'Improper Inventory Management',                     ref: 'https://owasp.org/API-Security/editions/2023/en/0xa9-improper-inventory-management/' },
+  INJECTION:     { id: 'API10:2023', name: 'Unsafe Consumption of APIs',                        ref: 'https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/' },
+};
+
+/** Resolve the OWASP rule from a `[TAG] …` name prefix, or null if untagged. */
+export function owaspRuleForName(name: string): OwaspRule | null {
+  const m = /^\s*\[([A-Za-z-]+)\]/.exec(name ?? '');
+  return m ? OWASP_BY_TAG[m[1].toUpperCase()] ?? null : null;
+}
+
+/** SARIF 2.1.0 report of failing checks, tagged with OWASP rules where the test
+ *  name carries a known prefix. Lets security findings flow into GitHub
+ *  code-scanning / the Security tab. Opt-in: only produced when SARIF is chosen. */
+export function buildSarifReport(
+  results: RunRequestResult[],
+  _summary: RunSummary,
+  meta: ReportMeta = {},
+): string {
+  const rules = new Map<string, { id: string; name: string; helpUri?: string }>();
+  const addRule = (id: string, name: string, helpUri?: string) => {
+    if (!rules.has(id)) rules.set(id, { id, name, ...(helpUri ? { helpUri } : {}) });
+  };
+
+  const sarifResults: unknown[] = [];
+  const emit = (rule: OwaspRule | null, fallbackId: string, fallbackName: string, r: RunRequestResult, message: string) => {
+    const id   = rule ? rule.id : fallbackId;
+    const name = rule ? rule.name : fallbackName;
+    addRule(id, name, rule?.ref);
+    sarifResults.push({
+      ruleId: id,
+      level:  'error',
+      message: { text: `${r.method} ${r.resolvedUrl}${r.iterationLabel ? ` #${r.iterationLabel}` : ''} — ${message}` },
+      locations: [{ physicalLocation: { artifactLocation: { uri: r.resolvedUrl || r.name } } }],
+    });
+  };
+
+  for (const r of results) {
+    if (r.status === 'error' && r.error) emit(owaspRuleForName(r.name), 'request-error', 'Request error', r, r.error);
+    if (r.preScriptError)  emit(null, 'pre-script-error',  'Pre-request script error',  r, r.preScriptError);
+    if (r.postScriptError) emit(null, 'post-script-error', 'Post-request script error', r, r.postScriptError);
+    for (const t of r.testResults ?? []) {
+      if (t.passed) continue;
+      const rule = owaspRuleForName(t.name) ?? owaspRuleForName(r.name);
+      emit(rule, 'assertion-failed', 'Assertion failed', r, `${t.name}${t.error ? `: ${t.error}` : ''}`);
+    }
+  }
+
+  return JSON.stringify({
+    version: '2.1.0',
+    $schema: 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json',
+    runs: [{
+      tool: {
+        driver: {
+          name: 'API Spector',
+          informationUri: 'https://github.com/testsmith-io/api-spector',
+          rules: [...rules.values()].map(r => ({
+            id: r.id,
+            name: r.name,
+            shortDescription: { text: r.name },
+            ...(r.helpUri ? { helpUri: r.helpUri } : {}),
+          })),
+        },
+      },
+      ...(meta.timestamp ? { invocations: [{ executionSuccessful: sarifResults.length === 0, endTimeUtc: meta.timestamp }] } : {}),
+      results: sarifResults,
+    }],
+  }, null, 2);
 }

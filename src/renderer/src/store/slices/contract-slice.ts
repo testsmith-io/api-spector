@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import type { StateCreator } from 'zustand';
-import type { ContractReport, ContractSnapshot } from '../../../../shared/types';
+import type { ContractReport, ContractSnapshot, DesignInteraction } from '../../../../shared/types';
 import type { FullState } from '../index';
 
 /** Context of the last run, used to fill in the exported HTML report header. */
@@ -21,10 +21,19 @@ export interface ContractSlice {
   /** When set, contract runs use this snapshot's spec instead of a live URL. */
   activeContractSnapshotRelPath: string | null
 
+  /** Whether the Contract Designer modal is open (rendered at the app root so
+   *  it can be triggered from anywhere, e.g. "Send to contract designer"). */
+  contractDesignerOpen: boolean
+  /** Prefill for a new design interaction when the Designer is opened from a
+   *  request/response. Null when opened blank from the Contracts panel. */
+  contractDesignerSeed: Partial<DesignInteraction> | null
+
   setLastContractReport: (r: ContractReport | null, meta?: ContractRunMeta) => void
   loadContractSnapshot: (relPath: string, snapshot: ContractSnapshot) => void
   removeContractSnapshot: (relPath: string) => void
   setActiveContractSnapshot: (relPath: string | null) => void
+  openContractDesigner: (seed?: Partial<DesignInteraction>) => void
+  closeContractDesigner: () => void
 }
 
 // This slice mutates `workspace.contracts` when snapshots are added/removed,
@@ -39,6 +48,8 @@ export const createContractSlice: StateCreator<
   lastContractRunMeta: null,
   contractSnapshots: {},
   activeContractSnapshotRelPath: null,
+  contractDesignerOpen: false,
+  contractDesignerSeed: null,
 
   setLastContractReport: (r, meta) => set(s => {
     s.lastContractReport = r;
@@ -62,4 +73,14 @@ export const createContractSlice: StateCreator<
   }),
 
   setActiveContractSnapshot: (relPath) => set(s => { s.activeContractSnapshotRelPath = relPath; }),
+
+  openContractDesigner: (seed) => set(s => {
+    s.contractDesignerOpen = true;
+    s.contractDesignerSeed = seed ?? null;
+  }),
+
+  closeContractDesigner: () => set(s => {
+    s.contractDesignerOpen = false;
+    s.contractDesignerSeed = null;
+  }),
 });

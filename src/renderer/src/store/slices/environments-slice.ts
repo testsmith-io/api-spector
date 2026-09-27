@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Environment } from '../../../../shared/types';
 import { uniqueName } from '../../../../shared/naming-utils';
 import type { FullState } from '../index';
+import { STORAGE_KEYS } from '../../lib/storage-keys';
 
 /** Hand-rolled env slug — intentionally kept byte-compatible with the paths
  *  this store has always written (it differs slightly from naming-utils'
@@ -41,7 +42,7 @@ export const createEnvironmentsSlice: StateCreator<
   EnvironmentsSlice
 > = (set, get) => ({
   environments: {},
-  activeEnvironmentId: localStorage.getItem('activeEnvironmentId') ?? null,
+  activeEnvironmentId: localStorage.getItem(STORAGE_KEYS.activeEnvironmentId) ?? null,
 
   loadEnvironment: (relPath, data) => set(s => {
     s.environments[data.id] = { relPath, data };
@@ -49,8 +50,8 @@ export const createEnvironmentsSlice: StateCreator<
 
   setActiveEnvironment: id => set(s => {
     s.activeEnvironmentId = id;
-    if (id) localStorage.setItem('activeEnvironmentId', id);
-    else localStorage.removeItem('activeEnvironmentId');
+    if (id) localStorage.setItem(STORAGE_KEYS.activeEnvironmentId, id);
+    else localStorage.removeItem(STORAGE_KEYS.activeEnvironmentId);
   }),
 
   updateEnvironment: (id, data) => set(s => {

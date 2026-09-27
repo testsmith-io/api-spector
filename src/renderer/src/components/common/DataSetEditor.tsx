@@ -3,36 +3,9 @@
 
 import React, { useRef } from 'react';
 import type { DataSet } from '../../../../shared/types';
+import { parseCSV, toCSV } from '../../../../shared/data-csv';
 import { VarInput } from './VarInput';
 import { useT } from '../../i18n';
-
-// ─── CSV helpers ──────────────────────────────────────────────────────────────
-
-export function parseCSV(text: string): DataSet {
-  const lines = text.trim().split(/\r?\n/).filter(Boolean);
-  if (lines.length === 0) return { columns: [], rows: [] };
-  function splitRow(line: string): string[] {
-    const cells: string[] = [];
-    let cur = '';
-    let inQuote = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') { inQuote = !inQuote; }
-      else if (ch === ',' && !inQuote) { cells.push(cur.trim()); cur = ''; }
-      else { cur += ch; }
-    }
-    cells.push(cur.trim());
-    return cells;
-  }
-  const columns = splitRow(lines[0]);
-  const rows    = lines.slice(1).map(splitRow);
-  return { columns, rows };
-}
-
-export function toCSV(ds: DataSet): string {
-  const escape = (s: string) => s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
-  return [ds.columns, ...ds.rows].map(row => row.map(escape).join(',')).join('\n');
-}
 
 // ─── Editor ──────────────────────────────────────────────────────────────────
 
@@ -108,6 +81,9 @@ export function DataSetEditor({ ds, onChange, exportName, scopeLabel = 'collecti
         <code className="text-surface-500">{'{{baseUrl}}'}</code>,{' '}
         <code className="text-surface-500">{'{{$randomEmail}}'}</code>{' '}{t('or')}{' '}
         <code className="text-surface-500">{'{{faker.person.firstName()}}'}</code>.
+      </p>
+      <p className="text-surface-600 text-[11px]">
+        {t('Special columns :status and :owasp turn a data table into an access-control matrix: :status asserts the response code (e.g. 403) and :owasp tags the finding (e.g. BOLA).', { status: 'expectStatus', owasp: 'owasp' })}
       </p>
 
       {/* Toolbar */}

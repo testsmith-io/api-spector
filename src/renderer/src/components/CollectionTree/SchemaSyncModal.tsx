@@ -6,6 +6,7 @@ import { useStore } from '../../store';
 import type { ApiRequest } from '../../../../shared/types';
 import { Modal } from '../common/Modal';
 import { useT } from '../../i18n';
+import { btnSecondaryCls, btnPrimaryCls } from '../../lib/ui-classes';
 
 const { electron } = window;
 
@@ -322,21 +323,21 @@ export function SchemaSyncModal({
           <div className="flex justify-between pt-1">
             <button
               onClick={() => setSpecEntries(null)}
-              className="px-3 py-1.5 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
+              className={btnSecondaryCls}
             >
               {t('Back')}
             </button>
             <div className="flex gap-2">
               <button
                 onClick={onClose}
-                className="px-3 py-1.5 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
+                className={btnSecondaryCls}
               >
                 {t('Cancel')}
               </button>
               <button
                 disabled={loading || selected.size === 0}
                 onClick={applySync}
-                className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors"
+                className={btnPrimaryCls}
               >
                 {loading ? t('Updating…') : t('Update :count schema|Update :count schemas', { count: selected.size })}
               </button>
@@ -395,7 +396,7 @@ export function SchemaSyncModal({
         <div className="flex justify-end pt-1">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
+            className={btnSecondaryCls}
           >
             {t('Cancel')}
           </button>

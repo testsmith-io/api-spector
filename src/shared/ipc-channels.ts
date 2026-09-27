@@ -58,6 +58,13 @@ export const IPC = {
     checkMasterKey: 'secret:checkMasterKey',
     setMasterKey:   'secret:setMasterKey',
     set:            'secret:set',
+    has:            'secret:has',
+    delete:         'secret:delete',
+  },
+
+  // ─── AI (optional; key lives only in the OS keychain) ────────────────────────
+  ai: {
+    generateDocs: 'ai:generateDocs',
   },
 
   // ─── Global variables ──────────────────────────────────────────────────────
@@ -197,6 +204,7 @@ export const IPC = {
     branches:       'git:branches',
     checkout:       'git:checkout',
     deleteBranch:   'git:deleteBranch',
+    fetch:          'git:fetch',
     pull:           'git:pull',
     push:           'git:push',
     remotes:        'git:remotes',
@@ -207,6 +215,8 @@ export const IPC = {
     resolveOurs:    'git:resolveOurs',
     resolveTheirs:  'git:resolveTheirs',
     markResolved:   'git:markResolved',
+    readConflict:   'git:readConflict',
+    writeResolved:  'git:writeResolved',
   },
 
   // ─── Recorder ──────────────────────────────────────────────────────────────

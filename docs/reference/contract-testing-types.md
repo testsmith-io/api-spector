@@ -16,7 +16,7 @@ Each consumer records exactly what it relies on: "when I `GET /users/1`, I need 
 
 | Step | Feature |
 |---|---|
-| Consumer declares expectations | The **Contract tab** on each request (expected status, required headers, body schema or Pact-style body matchers; `⚡ Infer from response` gets you started) |
+| Consumer declares expectations | The **Contract Designer** (design-first, no endpoint needed): the requests a consumer will make and the responses it needs (expected status, required headers, body schema or Pact-style body matchers). **Send to contract designer** seeds an interaction from a request you have already sent |
 | Consumer validates its own assumptions | **Consumer mode**: sends each request live and asserts the response matches the expectation |
 | Provider is verified against consumer contracts | **Provider-live mode**: replays every contract-carrying request against a provider base URL, with [provider state](../cli/contract-testing.md#provider-states) setup/teardown between interactions. This is the real Pact-style provider verification |
 | Contracts travel between teams | **Pact import/export** (`contract pact-import` / `pact-export`): exchange standard Pact v2/v3/v4 files with teams using Pact tooling |
@@ -155,7 +155,7 @@ For a single repo or a small set of repos sharing a workspace, git *is* the brok
 
 | Capability | PactFlow | API Spector |
 |---|---|---|
-| Consumer contracts | Pact files, published to the broker | Contract tab on each request; Pact v2/v3/v4 import & export |
+| Consumer contracts | Pact files, published to the broker | Contract Designer (design-first); Pact v2/v3/v4 import & export |
 | Provider verification (CDCT) | Pact libraries verify in provider CI, results published back | `provider-live` mode: replays contracts against a running provider, with provider states |
 | Bi-directional contract testing | Paid feature: consumer pact statically compared against the provider's uploaded OpenAPI spec; the spec is "proven" by the provider's own uploaded test results | `bidirectional` mode: the same static contract-vs-spec comparison, plus a **live verification in the same run**, so the API itself proves the spec and there is no self-attestation step |
 | Spec pinning | Provider uploads spec versions to the platform | `contract pin` snapshots the spec into the workspace (sha256-stamped, git-committed) |

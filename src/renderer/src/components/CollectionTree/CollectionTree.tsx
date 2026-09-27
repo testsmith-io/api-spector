@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import React, { useState, useRef, useEffect, useContext, createContext } from 'react';
+import React, { useState, useRef, useEffect, useContext, useMemo, createContext } from 'react';
 import { useStore } from '../../store';
 import type { Folder, Collection, ApiRequest, ChildRef } from '../../../../shared/types';
 import { orderedChildren } from '../../../../shared/folder-tree';
@@ -9,7 +9,7 @@ import { FolderSettingsModal } from './FolderSettingsModal';
 import { CollectionSettingsModal } from './CollectionSettingsModal';
 import { SchemaSyncModal } from './SchemaSyncModal';
 import { PushContractModal } from './PushContractModal';
-import { RequestRow } from './RequestRow';
+import { RequestRow, HOOK_LABELS, HOOK_COLORS } from './RequestRow';
 import { cloudEnabled } from '../../lib/cloud-push';
 import { collectTagged } from '../../../../shared/request-collection';
 import { InlineEdit } from '../common/InlineEdit';
@@ -17,7 +17,7 @@ import { ConfirmDialog } from '../common/ConfirmDialog';
 import { DotsBtn } from '../common/ContextMenu';
 import {
   PlayIcon, PlusIcon, FolderIcon, TagIcon, PencilIcon, TrashIcon, TableIcon,
-  CopyIcon, KeyIcon, ExpandAllIcon, CollapseAllIcon, SyncIcon, GearIcon, BanIcon,
+  CopyIcon, ExpandAllIcon, CollapseAllIcon, SyncIcon, GearIcon, BanIcon,
 } from '../common/icons';
 import { useT } from '../../i18n';
 
@@ -192,6 +192,7 @@ export function CollectionTree () {
   const duplicateCollection = useStore( s => s.duplicateCollection );
   const toggleCollectionDisabled = useStore( s => s.toggleCollectionDisabled );
   const duplicateFolder = useStore( s => s.duplicateFolder );
+  const toggleFolderDisabled = useStore( s => s.toggleFolderDisabled );
   const updateFolderTags = useStore( s => s.updateFolderTags );
   const updateRequestTags = useStore( s => s.updateRequestTags );
   const updateRequest = useStore( s => s.updateRequest );
@@ -210,7 +211,9 @@ export function CollectionTree () {
   // ── Multi-select ──────────────────────────────────────────────────────────
   const [selected, setSelected] = useState<Set<string>>( () => new Set() );
   const selKey = ( c: string, r: string ) => `${c} ${r}`;
-  const selectionCtx = {
+  // Memoized so it only changes when the selection changes — otherwise every
+  // RequestRow (a SelectionCtx consumer) would re-render on every tree render.
+  const selectionCtx = useMemo( () => ( {
     active:     selected.size > 0,
     isSelected: ( c: string, r: string ) => selected.has( selKey( c, r ) ),
     toggle:     ( c: string, r: string ) => setSelected( prev => {
@@ -220,7 +223,7 @@ export function CollectionTree () {
       return next;
     } ),
     clear:      () => setSelected( new Set() ),
-  };
+  } ), [selected] );
   function forEachSelected ( fn: ( collectionId: string, requestId: string ) => void ) {
     selected.forEach( k => { const i = k.indexOf( ' ' ); fn( k.slice( 0, i ), k.slice( i + 1 ) ); } );
   }
@@ -339,6 +342,7 @@ export function CollectionTree () {
               onRenameFolder={( folderId, name ) => renameFolder( col.id, folderId, name )}
               onDeleteFolder={folderId => confirmThen( t( 'Delete this folder and all its requests?' ), () => deleteFolder( col.id, folderId ) )}
               onDuplicateFolder={folderId => duplicateFolder( col.id, folderId )}
+              onToggleFolderDisabled={folderId => toggleFolderDisabled( col.id, folderId )}
               onRenameRequest={renameRequest}
               onDeleteRequest={reqId => deleteRequest( col.id, reqId )}
               onDuplicateRequest={reqId => duplicateRequest( col.id, reqId )}
@@ -406,7 +410,17 @@ export function CollectionTree () {
 
 // ─── Collection row ───────────────────────────────────────────────────────────
 
-type ExpandCtrl = { value: boolean; seq: number };
+// `ids` null/undefined means "every folder reacts" (collection-level expand /
+// collapse). A folder-scoped expand sets `ids` to that folder's subtree so only
+// those rows react.
+type ExpandCtrl = { value: boolean; seq: number; ids?: Set<string> | null };
+
+/** All folder ids in a subtree, including the folder itself. */
+function collectFolderIds ( folder: Folder ): Set<string> {
+  const ids = new Set<string>( [folder.id] );
+  for ( const sub of folder.folders ) for ( const id of collectFolderIds( sub ) ) ids.add( id );
+  return ids;
+}
 
 function CollectionNode ( {
   col, isActive, activeRequestId,
@@ -415,7 +429,7 @@ function CollectionNode ( {
   onSelectCollection, onSelectRequest,
   onAddRequest, onAddFolder,
   onRenameCollection, onDeleteCollection, onDuplicateCollection, onToggleCollectionDisabled,
-  onRenameFolder, onDeleteFolder, onDuplicateFolder,
+  onRenameFolder, onDeleteFolder, onDuplicateFolder, onToggleFolderDisabled,
   onRenameRequest, onDeleteRequest, onDuplicateRequest,
   onUpdateFolderTags, onUpdateRequestTags, onSetRequestHookType, onToggleRequestDisabled,
   onRunCollection, onRunFolder,
@@ -436,6 +450,7 @@ function CollectionNode ( {
   onRenameFolder: ( folderId: string, name: string ) => void
   onDeleteFolder: ( folderId: string ) => void
   onDuplicateFolder: ( folderId: string ) => void
+  onToggleFolderDisabled: ( folderId: string ) => void
   onRenameRequest: ( id: string, name: string ) => void
   onDeleteRequest: ( id: string ) => void
   onDuplicateRequest: ( id: string ) => void
@@ -452,17 +467,22 @@ function CollectionNode ( {
   const [showSettings, setShowSettings] = useState( false );
   const [showSchemaSync, setShowSchemaSync] = useState( false );
   const [showPushContract, setShowPushContract] = useState( false );
+  // The collection panel is showing THIS collection (clicked, not just owning
+  // the active request) — highlight the row like a request/folder.
+  const panelActive = useStore( s => s.collectionPanelOpen && s.activeCollectionId === col.id );
   const [expandCtrl, setExpandCtrl] = useState<ExpandCtrl>( { value: true, seq: 0 } );
   const [dropOver, setDropOver] = useState( false );
   const dragCtx = useContext( DragCtx );
 
-  function expandAll () { setExpandCtrl( c => ( { value: true, seq: c.seq + 1 } ) ); }
-  function collapseAll () { setExpandCtrl( c => ( { value: false, seq: c.seq + 1 } ) ); }
+  function expandAll () { setExpandCtrl( c => ( { value: true, seq: c.seq + 1, ids: null } ) ); }
+  function collapseAll () { setExpandCtrl( c => ( { value: false, seq: c.seq + 1, ids: null } ) ); }
+  // Expand / collapse just one folder's subtree (folder context menu).
+  function requestExpand ( ids: Set<string>, value: boolean ) { setExpandCtrl( c => ( { value, seq: c.seq + 1, ids } ) ); }
 
   return (
     <div>
       <div
-        className={`group flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-surface-800 transition-colors ${isActive ? 'text-[var(--text-primary)]' : 'text-surface-400'
+        className={`group flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-surface-800 transition-colors ${panelActive ? 'bg-surface-800 text-[var(--text-primary)]' : isActive ? 'text-[var(--text-primary)]' : 'text-surface-400'
           } ${col.disabled ? 'opacity-50' : ''} ${dropOver ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
         onClick={() => { onSelectCollection(); setExpanded( e => !e ); }}
         onDragOver={dragCtx.dragging ? e => { e.preventDefault(); setDropOver( true ); } : undefined}
@@ -503,13 +523,14 @@ function CollectionNode ( {
             { type: 'item', label: t( 'Expand all' ), icon: <ExpandAllIcon />, onClick: expandAll },
             { type: 'item', label: t( 'Collapse all' ), icon: <CollapseAllIcon />, onClick: collapseAll },
             { type: 'separator' },
+            { type: 'item', label: t( 'Rename' ), icon: <PencilIcon />, onClick: () => setRenaming( true ) },
+            { type: 'item', label: t( 'Duplicate' ), icon: <CopyIcon />, onClick: onDuplicateCollection },
+            { type: 'separator' },
             { type: 'item', label: t( 'Collection data' ), icon: <TableIcon />, onClick: onSelectCollection },
             { type: 'item', label: t( 'Settings' ), icon: <GearIcon />, onClick: () => setShowSettings( true ) },
             { type: 'item', label: t( 'Sync schemas' ), icon: <SyncIcon />, onClick: () => setShowSchemaSync( true ) },
             ...( cloudEnabled() ? [{ type: 'item' as const, label: t( 'Push contract to cloud' ), icon: <SyncIcon />, onClick: () => setShowPushContract( true ) }] : [] ),
             { type: 'item', label: col.disabled ? t( 'Enable' ) : t( 'Disable' ), icon: <BanIcon />, onClick: onToggleCollectionDisabled },
-            { type: 'item', label: t( 'Rename' ), icon: <PencilIcon />, onClick: () => setRenaming( true ) },
-            { type: 'item', label: t( 'Duplicate' ), icon: <CopyIcon />, onClick: onDuplicateCollection },
             { type: 'separator' },
             { type: 'item', label: t( 'Delete collection' ), icon: <TrashIcon />, danger: true, onClick: onDeleteCollection },
           ]} />
@@ -524,12 +545,14 @@ function CollectionNode ( {
           activeRequestId={activeRequestId}
           depth={0}
           expandCtrl={expandCtrl}
+          onRequestExpand={requestExpand}
           onSelectRequest={onSelectRequest}
           onAddRequest={onAddRequest}
           onAddFolder={onAddFolder}
           onRenameFolder={onRenameFolder}
           onDeleteFolder={onDeleteFolder}
           onDuplicateFolder={onDuplicateFolder}
+          onToggleFolderDisabled={onToggleFolderDisabled}
           newRequestId={newRequestId}
           onRenameRequest={onRenameRequest}
           onDeleteRequest={onDeleteRequest}
@@ -562,9 +585,9 @@ function CollectionNode ( {
 
 function FolderRow ( {
   folder, collectionId, depth,
-  expandCtrl,
+  expandCtrl, onRequestExpand,
   onAddRequest, onAddFolder,
-  onRename, onDelete, onDuplicate,
+  onRename, onDelete, onDuplicate, onToggleDisabled,
   onUpdateTags, onRun,
   children,
 }: {
@@ -573,11 +596,13 @@ function FolderRow ( {
   parentFolderId: string
   depth: number
   expandCtrl: ExpandCtrl
+  onRequestExpand: ( ids: Set<string>, value: boolean ) => void
   onAddRequest: () => void
   onAddFolder: () => void
   onRename: ( name: string ) => void
   onDelete: () => void
   onDuplicate: () => void
+  onToggleDisabled: () => void
   onUpdateTags: ( tags: string[] ) => void
   onRun: () => void
   children: React.ReactNode
@@ -588,7 +613,11 @@ function FolderRow ( {
   // context menu, which propagates through expandCtrl.
   const [expanded, setExpanded] = useState( false );
   useEffect( () => {
-    if ( expandCtrl.seq > 0 ) setExpanded( expandCtrl.value );
+    // React to collection-level expand/collapse (ids null) or a folder-scoped
+    // one that names this folder in its subtree.
+    if ( expandCtrl.seq > 0 && ( !expandCtrl.ids || expandCtrl.ids.has( folder.id ) ) ) {
+      setExpanded( expandCtrl.value );
+    }
   }, [expandCtrl.seq] ); // eslint-disable-line react-hooks/exhaustive-deps
   const [renaming, setRenaming] = useState( false );
   const [showSettings, setShowSettings] = useState( false );
@@ -596,6 +625,15 @@ function FolderRow ( {
   const [showPushContract, setShowPushContract] = useState( false );
   const [addingTag, setAddingTag] = useState( false );
   const folderCollection = useStore( s => s.collections[collectionId]?.data );
+  const setFolderHookType = useStore( s => s.setFolderHookType );
+  const openFolderPanel = useStore( s => s.openFolderPanel );
+  const isActive = useStore( s => s.folderPanel?.folderId === folder.id && s.folderPanel?.collectionId === collectionId );
+  // "Hook type" submenu: run the whole folder as a lifecycle hook (or clear it).
+  const hookMenuItems = ( ['beforeAll', 'before', 'after', 'afterAll'] as const ).map( ht => ( {
+    type: 'item' as const,
+    label: ( folder.hookType === ht ? '✓ ' : '    ' ) + t( HOOK_LABELS[ht] ),
+    onClick: () => setFolderHookType( collectionId, folder.id, folder.hookType === ht ? undefined : ht ),
+  } ) );
   // Dropping onto the folder body nests the dragged item inside it; positioning
   // between siblings is handled by the DropLine elements around each row.
   const [dropInside, setDropInside] = useState( false );
@@ -625,9 +663,9 @@ function FolderRow ( {
     <div className="relative">
       <div
         draggable
-        className={`group flex items-center gap-1 py-1 hover:bg-surface-800 transition-colors cursor-pointer text-surface-400 ${dropInside ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
+        className={`group flex items-center gap-1 py-1 transition-colors cursor-pointer ${isActive ? 'bg-surface-800 text-[var(--text-primary)]' : 'text-surface-400 hover:bg-surface-800'} ${folder.disabled ? 'opacity-40' : ''} ${dropInside ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
         style={{ paddingLeft: indent }}
-        onClick={() => setExpanded( e => !e )}
+        onClick={() => { openFolderPanel( collectionId, folder.id ); setExpanded( e => !e ); }}
         onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.stopPropagation(); dragCtx.setDragging( { type: 'folder', folderId: folder.id, collectionId } ); }}
         onDragEnd={() => { dragCtx.setDragging( null ); setDropInside( false ); }}
         onDragOver={handleFolderDragOver}
@@ -646,7 +684,15 @@ function FolderRow ( {
               className="w-full text-xs"
             />
           ) : (
-            <span className="text-xs truncate block">{folder.name}</span>
+            <span className="text-xs truncate flex items-center gap-1.5">
+              <span className="truncate">{folder.name}</span>
+              {folder.hookType && (
+                <span className={`shrink-0 text-[9px] font-bold px-1 py-px rounded ${HOOK_COLORS[folder.hookType]}`}>{t( HOOK_LABELS[folder.hookType] ).toUpperCase()}</span>
+              )}
+              {folder.disabled && (
+                <span className="shrink-0 text-[9px] uppercase tracking-wide px-1 py-px rounded bg-surface-700 text-surface-400">{t( 'Disabled' )}</span>
+              )}
+            </span>
           )}
           {( tags.length > 0 || addingTag ) && (
             <TagChips
@@ -666,12 +712,20 @@ function FolderRow ( {
             { type: 'item', label: t( 'Add request' ), icon: <PlusIcon />, onClick: onAddRequest },
             { type: 'item', label: t( 'Add sub-folder' ), icon: <FolderIcon />, onClick: onAddFolder },
             { type: 'separator' },
-            { type: 'item', label: t( 'Settings' ), icon: <KeyIcon />, onClick: () => setShowSettings( true ) },
-            { type: 'item', label: t( 'Sync schemas' ), icon: <SyncIcon />, onClick: () => setShowSchemaSync( true ) },
-            ...( cloudEnabled() ? [{ type: 'item' as const, label: t( 'Push contract to cloud' ), icon: <SyncIcon />, onClick: () => setShowPushContract( true ) }] : [] ),
-            { type: 'item', label: t( 'Add tag' ), icon: <TagIcon />, onClick: () => setAddingTag( true ) },
+            { type: 'item', label: t( 'Expand all' ), icon: <ExpandAllIcon />, onClick: () => { setExpanded( true ); onRequestExpand( collectFolderIds( folder ), true ); } },
+            { type: 'item', label: t( 'Collapse all' ), icon: <CollapseAllIcon />, onClick: () => { const ids = collectFolderIds( folder ); ids.delete( folder.id ); onRequestExpand( ids, false ); } },
+            { type: 'separator' },
             { type: 'item', label: t( 'Rename' ), icon: <PencilIcon />, onClick: () => setRenaming( true ) },
             { type: 'item', label: t( 'Duplicate' ), icon: <CopyIcon />, onClick: onDuplicate },
+            { type: 'item', label: t( 'Add tag' ), icon: <TagIcon />, onClick: () => setAddingTag( true ) },
+            { type: 'separator' },
+            { type: 'item', label: t( 'Settings' ), icon: <GearIcon />, onClick: () => setShowSettings( true ) },
+            { type: 'item', label: t( 'Sync schemas' ), icon: <SyncIcon />, onClick: () => setShowSchemaSync( true ) },
+            ...( cloudEnabled() ? [{ type: 'item' as const, label: t( 'Push contract to cloud' ), icon: <SyncIcon />, onClick: () => setShowPushContract( true ) }] : [] ),
+            { type: 'item', label: folder.disabled ? t( 'Enable' ) : t( 'Disable' ), icon: <BanIcon />, onClick: onToggleDisabled },
+            { type: 'separator' },
+            { type: 'header', label: t( 'Run folder as hook' ) },
+            ...hookMenuItems,
             { type: 'separator' },
             { type: 'item', label: t( 'Delete folder' ), icon: <TrashIcon />, danger: true, onClick: onDelete },
           ]} />
@@ -709,9 +763,9 @@ function FolderRow ( {
 
 function FolderContents ( {
   folder, collectionId, requests, activeRequestId, depth,
-  expandCtrl, newRequestId,
+  expandCtrl, onRequestExpand, newRequestId,
   onSelectRequest, onAddRequest, onAddFolder,
-  onRenameFolder, onDeleteFolder, onDuplicateFolder,
+  onRenameFolder, onDeleteFolder, onDuplicateFolder, onToggleFolderDisabled,
   onRenameRequest, onDeleteRequest, onDuplicateRequest,
   onUpdateFolderTags, onUpdateRequestTags, onSetRequestHookType, onToggleRequestDisabled, onRunFolder,
 }: {
@@ -721,6 +775,7 @@ function FolderContents ( {
   activeRequestId: string | null
   depth: number
   expandCtrl: ExpandCtrl
+  onRequestExpand: ( ids: Set<string>, value: boolean ) => void
   newRequestId: string | null
   onSelectRequest: ( id: string ) => void
   onAddRequest: ( folderId: string ) => void
@@ -728,6 +783,7 @@ function FolderContents ( {
   onRenameFolder: ( folderId: string, name: string ) => void
   onDeleteFolder: ( folderId: string ) => void
   onDuplicateFolder: ( folderId: string ) => void
+  onToggleFolderDisabled: ( folderId: string ) => void
   onRenameRequest: ( id: string, name: string ) => void
   onDeleteRequest: ( id: string ) => void
   onDuplicateRequest: ( id: string ) => void
@@ -762,11 +818,13 @@ function FolderContents ( {
           parentFolderId={folder.id}
           depth={depth + 1}
           expandCtrl={expandCtrl}
+          onRequestExpand={onRequestExpand}
           onAddRequest={() => onAddRequest( sub.id )}
           onAddFolder={() => onAddFolder( sub.id, 'New Folder' )}
           onRename={name => onRenameFolder( sub.id, name )}
           onDelete={() => onDeleteFolder( sub.id )}
           onDuplicate={() => onDuplicateFolder( sub.id )}
+          onToggleDisabled={() => onToggleFolderDisabled( sub.id )}
           onUpdateTags={tags => onUpdateFolderTags( sub.id, tags )}
           onRun={() => onRunFolder( sub.id )}
         >
@@ -777,6 +835,7 @@ function FolderContents ( {
             activeRequestId={activeRequestId}
             depth={depth + 1}
             expandCtrl={expandCtrl}
+            onRequestExpand={onRequestExpand}
             newRequestId={newRequestId}
             onSelectRequest={onSelectRequest}
             onAddRequest={onAddRequest}
@@ -784,6 +843,7 @@ function FolderContents ( {
             onRenameFolder={onRenameFolder}
             onDeleteFolder={onDeleteFolder}
             onDuplicateFolder={onDuplicateFolder}
+          onToggleFolderDisabled={onToggleFolderDisabled}
             onRenameRequest={onRenameRequest}
             onDeleteRequest={onDeleteRequest}
             onDuplicateRequest={onDuplicateRequest}

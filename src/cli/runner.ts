@@ -14,7 +14,7 @@
  *   --tags       <a,b>       Comma-separated tag filter
  *   --collection <name>      Limit to a specific collection by name (optional)
  *   --output     <path>      Write results to a file (e.g. results.json or results.xml)
- *   --format     json|junit  Output format (default: json; inferred from --output extension)
+ *   --format     json|junit|html|sarif  Output format (default: json; inferred from --output extension)
  *   --verbose                Print per-request console output and test details
  *   --bail                   Stop after first failure
  *   --help                   Show this message
@@ -39,7 +39,7 @@ import {
   maskHeaders,
   maskPii,
 } from '../main/request-exec';
-import { buildJsonReport, buildJUnitReport, buildHtmlReport } from '../shared/report';
+import { buildJsonReport, buildJUnitReport, buildHtmlReport, buildSarifReport } from '../shared/report';
 import { buildRunPlan, expandFolderDataSets, expandRunPlanWithData, resolveInheritedAuthAndHeaders, authIsConfigured } from '../shared/request-collection';
 import { selectEnvironment } from '../shared/environments';
 import {
@@ -82,7 +82,7 @@ async function main() {
   if (args.help) {
     console.log(
       '\nUsage:\n  api-spector run --workspace <path> [--environment <name>] [--tags <a,b>]\n' +
-      '                  [--collection <name>] [--output <path>] [--format json|junit]\n' +
+      '                  [--collection <name>] [--output <path>] [--format json|junit|html|sarif]\n' +
       '                  [--verbose] [--bail]\n'
     );
     process.exit(0);
@@ -103,12 +103,13 @@ async function main() {
 
   // Infer format from file extension if --format not given
   const inferredFormat = outputPath
-    ? extname(outputPath).toLowerCase() === '.xml'  ? 'junit'
-    : extname(outputPath).toLowerCase() === '.html' ? 'html'
+    ? extname(outputPath).toLowerCase() === '.xml'   ? 'junit'
+    : extname(outputPath).toLowerCase() === '.html'  ? 'html'
+    : extname(outputPath).toLowerCase() === '.sarif' ? 'sarif'
     : 'json'
     : 'json';
   const explicitFormat = (args.format as string | undefined)?.toLowerCase();
-  const outputFormat   = (explicitFormat === 'junit' || explicitFormat === 'html') ? explicitFormat : inferredFormat;
+  const outputFormat   = (explicitFormat === 'junit' || explicitFormat === 'html' || explicitFormat === 'sarif') ? explicitFormat : inferredFormat;
 
   // Load workspace
   let workspace: Workspace, wsDir: string;
@@ -252,11 +253,11 @@ async function main() {
       }
     }
 
-    // Data-driven expansion — identical to the in-app runner so CLI/CI runs
-    // (and the report) match the tree: each folder's data table iterates its
-    // requests, then the collection's data table repeats the whole plan.
-    // Done after the auth/header merge so each request is merged once, not
-    // once per iteration.
+    // Expansion — identical to the in-app runner so CLI/CI runs (and the
+    // report) match the tree. Done after the auth/header merge so each request
+    // is merged once, not once per iteration: each folder's own data table,
+    // then the collection's. A data table can carry `expectStatus`/`owasp`
+    // columns to double as an access-control matrix.
     items = expandFolderDataSets(items, col);
     items = expandRunPlanWithData(items, col.dataSet);
 
@@ -306,6 +307,8 @@ async function main() {
           piiMaskPatterns: piiPatterns,
           tls: effectiveTls,
           onScriptOutput,
+          expectStatus: item.expectStatus,
+          owaspTag: item.owaspTag,
         });
         result            = out.result;
         runEnvVars        = out.updatedEnvVars;
@@ -366,6 +369,7 @@ async function main() {
     const maskedResults = allResults.map(maskResult);
     const report = outputFormat === 'junit' ? buildJUnitReport(maskedResults, summary, meta)
                  : outputFormat === 'html'  ? buildHtmlReport(maskedResults, summary, meta)
+                 : outputFormat === 'sarif' ? buildSarifReport(maskedResults, summary, meta)
                  : buildJsonReport(maskedResults, summary, meta);
     await writeFile(resolve(outputPath), report, 'utf8');
     console.log(color(`  Report written: ${outputPath} (${outputFormat})\n`, C.gray));

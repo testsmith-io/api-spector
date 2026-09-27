@@ -86,6 +86,13 @@ export interface Folder {
   description?: string
   folders: Folder[]
   requestIds: string[]
+  /** When set, the entire folder runs as a lifecycle hook within its PARENT
+   *  scope (like {@link ApiRequest.hookType}, but the whole folder is the hook
+   *  body): its requests run as a group in the before/after position and it is
+   *  not run inline in normal sequence. */
+  hookType?: 'beforeAll' | 'before' | 'after' | 'afterAll'
+  /** When true, the folder and its subtree are excluded from runs. */
+  disabled?: boolean
   /** Unified order of this folder's children (requests + sub-folders). When
    *  absent or partial, missing items fall in after it (requests, then folders).
    *  Drives both the tree and the run order. */
@@ -100,6 +107,10 @@ export interface Folder {
    *  those variables injected. Used when running the folder; takes priority
    *  over the collection dataset for folder runs. */
   dataSet?: DataSet
+  /** On-disk pointer to the folder's data table, stored as a separate CSV under
+   *  `data/`. Written in place of an inline `dataSet` when persisted, and
+   *  resolved back into `dataSet` on load — so in memory only `dataSet` is used. */
+  dataSetRef?: string
 }
 
 export interface TlsSettings {
@@ -121,6 +132,10 @@ export interface Collection {
   collectionVariables?: Record<string, string>
   /** Data-driven dataset: each row runs the full collection once with those variables injected. */
   dataSet?: DataSet
+  /** On-disk pointer to the collection's data table (a separate CSV under
+   *  `data/`). Written in place of an inline `dataSet` and resolved back on
+   *  load — in memory only `dataSet` is used. */
+  dataSetRef?: string
   /** TLS overrides applied to every request in this collection (takes priority over workspace TLS). */
   tls?: TlsSettings
   /** Auth inherited by all requests in this collection (can be overridden at folder or request level). */
