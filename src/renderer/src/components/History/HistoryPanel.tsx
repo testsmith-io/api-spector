@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStore } from '../../store';
 import type { HistoryEntry } from '../../../../shared/types';
 import { historyToHar } from '../../../../shared/har';
@@ -49,25 +49,33 @@ export function HistoryPanel() {
   const [selected, setSelected] = useState<HistoryEntry | null>(null);
   const [search, setSearch] = useState('');
 
-  const filtered = search
-    ? history.filter(e =>
-        e.request.name.toLowerCase().includes(search.toLowerCase()) ||
-        e.resolvedUrl.toLowerCase().includes(search.toLowerCase()) ||
-        e.request.method.toLowerCase().includes(search.toLowerCase())
-      )
-    : history;
+  // One id-set for O(1) "does this request still exist" checks (was an
+  // O(collections) scan per history row on every render).
+  const existingRequestIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const c of Object.values(collections)) for (const id in c.data.requests) ids.add(id);
+    return ids;
+  }, [collections]);
 
-  // Group by date label
-  const groups: { label: string; entries: HistoryEntry[] }[] = [];
-  for (const entry of filtered) {
-    const label = formatDate(entry.timestamp, t);
-    const last = groups.at(-1);
-    if (last?.label === label) {
-      last.entries.push(entry);
-    } else {
-      groups.push({ label, entries: [entry] });
+  // Filter + date-group once per [history, search] rather than on every render.
+  const groups = useMemo(() => {
+    const q = search.toLowerCase();
+    const filtered = q
+      ? history.filter(e =>
+          e.request.name.toLowerCase().includes(q) ||
+          e.resolvedUrl.toLowerCase().includes(q) ||
+          e.request.method.toLowerCase().includes(q))
+      : history;
+    const out: { label: string; entries: HistoryEntry[] }[] = [];
+    for (const entry of filtered) {
+      const label = formatDate(entry.timestamp, t);
+      const last = out.at(-1);
+      if (last?.label === label) last.entries.push(entry);
+      else out.push({ label, entries: [entry] });
     }
-  }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [history, search]);
 
   async function downloadHar() {
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
@@ -80,8 +88,7 @@ export function HistoryPanel() {
     // its response. If the request still exists in a collection, open/switch
     // to its tab and load the historical response there. If it was deleted,
     // fall back to showing the response in whatever tab is active.
-    const stillExists = Object.values(collections).some(c => entry.request.id in c.data.requests);
-    if (stillExists) {
+    if (existingRequestIds.has(entry.request.id)) {
       setActiveRequest(entry.request.id);
       const tabId = useStore.getState().activeTabId;
       if (tabId) setTabResponse(tabId, entry.response, entry.scriptResult ?? null);
@@ -98,7 +105,7 @@ export function HistoryPanel() {
   }
 
   function stillExists(entry: HistoryEntry): boolean {
-    return Object.values(collections).some(c => entry.request.id in c.data.requests);
+    return existingRequestIds.has(entry.request.id);
   }
 
   return (

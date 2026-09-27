@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../../store';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
@@ -164,10 +164,13 @@ export function ResponseViewer() {
   const [tab, setTab] = useState<RespTab>('body');
 
   // Past responses for THIS request (Bruno-style per-request history).
-  const requestHistory = requestId ? history.filter(e => e.request.id === requestId) : [];
+  const requestHistory = useMemo(
+    () => requestId ? history.filter(e => e.request.id === requestId) : [],
+    [history, requestId],
+  );
 
   // HTTP semantics: passive RFC conformance check on the current response.
-  const httpFindings = response && !response.error
+  const httpFindings = useMemo(() => response && !response.error
     ? validateHttpSemantics({
         method: sentRequest?.method ?? 'GET',
         status: response.status,
@@ -176,8 +179,26 @@ export function ResponseViewer() {
         body: response.body,
         bodySize: response.bodySize,
       }, { checkXml: xmlWellFormed })
-    : [];
+    : [], [response, sentRequest]);
   const httpErrors = httpFindings.filter(x => x.severity === 'error').length;
+
+  // Body parsing is expensive on large payloads and was re-run on every render
+  // (toast timers, resize, dialog keystrokes). Memoize it on the body itself so
+  // it parses once per response, not once per render.
+  const bodyMeta = useMemo(() => {
+    if (!response || response.error) return null;
+    const contentType = response.headers['content-type'] ?? '';
+    const isJson = contentType.includes('json');
+    const isXml = !isJson && (contentType.includes('xml') || contentType.includes('html'));
+    const supportsTree = isJson || isXml;
+    const showTable = supportsTree && !response.streamed && bodyHasArray(response.body, contentType);
+    const bodyParseError = response.body.trim().length > 0 && (
+      (isJson && (() => { try { JSON.parse(response.body); return false; } catch { return true; } })()) ||
+      (isXml && contentType.includes('xml') && !xmlWellFormed(response.body))
+    );
+    const displayBody = isJson ? prettyJson(response.body) : isXml ? prettyXml(response.body) : response.body;
+    return { contentType, isJson, isXml, supportsTree, showTable, bodyParseError, displayBody };
+  }, [response]);
 
   // Right-click a response header to create an environment variable from it.
   const [headerMenu, setHeaderMenu] = useState<{ x: number; y: number; key: string; value: string } | null>(null);
@@ -308,20 +329,10 @@ export function ResponseViewer() {
     );
   }
 
-  const contentType = response.headers['content-type'] ?? '';
-  const isJson = contentType.includes('json');
-  const isXml = !isJson && (contentType.includes('xml') || contentType.includes('html'));
-  const supportsTree = isJson || isXml;
-  const displayBody = isJson ? prettyJson(response.body) : isXml ? prettyXml(response.body) : response.body;
-  // Show the Table view only when the body actually has an array to tabulate.
-  // (A plain computation, not a hook: this sits after early returns above.)
-  const showTable = supportsTree && !response.streamed && bodyHasArray(response.body, contentType);
-
-  // Body parse error (for a red ! on the Body tab, regardless of tree/raw view).
-  const bodyParseError = response.body.trim().length > 0 && (
-    (isJson && (() => { try { JSON.parse(response.body); return false; } catch { return true; } })()) ||
-    (isXml && contentType.includes('xml') && !xmlWellFormed(response.body))
-  );
+  // Derived from the memoized body parse above (bodyMeta is non-null here since
+  // we've passed the !response / streaming early returns).
+  const { contentType, isJson, isXml, supportsTree, showTable, bodyParseError, displayBody } =
+    bodyMeta ?? { contentType: '', isJson: false, isXml: false, supportsTree: false, showTable: false, bodyParseError: false, displayBody: response.body };
 
   const passedCount = scriptResult?.testResults.filter(t => t.passed).length ?? 0;
   const totalCount = scriptResult?.testResults.length ?? 0;

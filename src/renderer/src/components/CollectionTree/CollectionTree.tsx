@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import React, { useState, useRef, useEffect, useContext, createContext } from 'react';
+import React, { useState, useRef, useEffect, useContext, useMemo, createContext } from 'react';
 import { useStore } from '../../store';
 import type { Folder, Collection, ApiRequest, ChildRef } from '../../../../shared/types';
 import { orderedChildren } from '../../../../shared/folder-tree';
@@ -211,7 +211,9 @@ export function CollectionTree () {
   // ── Multi-select ──────────────────────────────────────────────────────────
   const [selected, setSelected] = useState<Set<string>>( () => new Set() );
   const selKey = ( c: string, r: string ) => `${c} ${r}`;
-  const selectionCtx = {
+  // Memoized so it only changes when the selection changes — otherwise every
+  // RequestRow (a SelectionCtx consumer) would re-render on every tree render.
+  const selectionCtx = useMemo( () => ( {
     active:     selected.size > 0,
     isSelected: ( c: string, r: string ) => selected.has( selKey( c, r ) ),
     toggle:     ( c: string, r: string ) => setSelected( prev => {
@@ -221,7 +223,7 @@ export function CollectionTree () {
       return next;
     } ),
     clear:      () => setSelected( new Set() ),
-  };
+  } ), [selected] );
   function forEachSelected ( fn: ( collectionId: string, requestId: string ) => void ) {
     selected.forEach( k => { const i = k.indexOf( ' ' ); fn( k.slice( 0, i ), k.slice( i + 1 ) ); } );
   }

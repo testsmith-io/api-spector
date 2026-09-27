@@ -1,9 +1,13 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useT } from '../../../i18n';
 import type { JsonPath } from './utils/jsonPath';
+
+// Stable empty root path so the memoized root JsonNode isn't handed a fresh
+// array on every render.
+const ROOT_PATH: JsonPath = [];
 import type { PopoverState } from './types';
 import { JsonNode } from './JsonNode';
 import { XmlNode } from './XmlNode';
@@ -22,15 +26,18 @@ export function InteractiveBody({ body, contentType, onAssert }: Props) {
   const isJson = contentType.includes('json');
   const isXml  = !isJson && (contentType.includes('xml') || contentType.includes('html'));
 
-  let parsedJson: unknown = null;
-  if (isJson) {
-    try { parsedJson = JSON.parse(body); } catch { /* handled below */ }
-  }
+  // Parse once per body (was re-parsed every render, plus again per render in
+  // handleJsonLeaf's closure), keeping the value referentially stable so the
+  // memoized JsonNode tree doesn't re-render on unrelated parent updates.
+  const parsedJson = useMemo<unknown>(() => {
+    if (!isJson) return null;
+    try { return JSON.parse(body); } catch { return null; }
+  }, [body, isJson]);
 
-  function handleJsonLeaf(e: React.MouseEvent, path: JsonPath, value: unknown) {
+  const handleJsonLeaf = useCallback((e: React.MouseEvent, path: JsonPath, value: unknown) => {
     e.stopPropagation();
     setPopover({ type: 'json', path, value, root: parsedJson, x: e.clientX + 10, y: e.clientY + 10 });
-  }
+  }, [parsedJson]);
 
   function handleXmlLeaf(e: React.MouseEvent, selector: string, value: string) {
     e.stopPropagation();
@@ -41,7 +48,7 @@ export function InteractiveBody({ body, contentType, onAssert }: Props) {
     if (parsedJson === null) {
       return <div className="p-4 text-xs text-surface-600">{t('Unable to parse JSON response body')}</div>;
     }
-    return <JsonNode nodeKey={null} value={parsedJson} path={[]} depth={0} onLeaf={handleJsonLeaf} />;
+    return <JsonNode nodeKey={null} value={parsedJson} path={ROOT_PATH} depth={0} onLeaf={handleJsonLeaf} />;
   })() : isXml ? (() => {
     const doc = new DOMParser().parseFromString(body, 'text/xml');
     const root = doc.documentElement;
