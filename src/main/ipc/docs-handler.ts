@@ -5,6 +5,7 @@ import { type IpcMain } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
 import type { Collection, ApiRequest, Folder, SentRequest, ResponsePayload } from '../../shared/types';
+import { escapeHtml } from '../../shared/escape';
 
 // ─── Payload types ────────────────────────────────────────────────────────────
 
@@ -208,13 +209,7 @@ export function generateMarkdown(payload: DocsPayload): string {
 
 // ─── HTML generation ──────────────────────────────────────────────────────────
 
-export function escHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+export const escHtml = escapeHtml;
 
 const METHOD_COLORS: Record<string, string> = {
   GET: '#34d399', POST: '#60a5fa', PUT: '#fbbf24', PATCH: '#fb923c',

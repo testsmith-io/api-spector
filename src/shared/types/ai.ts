@@ -9,6 +9,9 @@
 /** Keychain ref the OpenAI API key is stored under. */
 export const AI_OPENAI_TOKEN_REF = 'ai:openai:token';
 
+/** Default OpenAI model when the user hasn't chosen one. */
+export const DEFAULT_AI_MODEL = 'gpt-4o-mini';
+
 export interface GenerateDocsInput {
   /** Which tree level the docs are for — steers the prompt. */
   level: 'request' | 'folder' | 'collection'

@@ -9,6 +9,7 @@ import { commentKeymap } from './commentKeymap';
 import type { ApiRequest, SoapBody, WsdlParam, WsdlOperation, WsdlEndpoint } from '../../../../shared/types';
 import { contentTypeForSoap, withContentType } from '../../../../shared/soap';
 import { useT } from '../../i18n';
+import { btnPrimaryCls } from '../../lib/ui-classes';
 
 const { electron } = window;
 
@@ -167,7 +168,7 @@ export function SoapEditor({ request, onChange }: Props) {
         <button
           onClick={fetchWsdl}
           disabled={fetching || !soap.wsdlUrl.trim()}
-          className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors whitespace-nowrap"
+          className={`${btnPrimaryCls} whitespace-nowrap`}
         >
           {fetching ? t('Fetching…') : operations.length > 0 ? t('Refresh') : t('Fetch WSDL')}
         </button>

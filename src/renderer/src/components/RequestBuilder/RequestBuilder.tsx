@@ -20,6 +20,7 @@ import { StreamTab } from './StreamTab';
 import { WebSocketPanel } from '../WebSocket/WebSocketPanel';
 import { GrpcPanel } from '../Grpc/GrpcPanel';
 import { FuzzModal } from './FuzzModal';
+import { STORAGE_KEYS } from '../../lib/storage-keys';
 import { useT } from '../../i18n';
 
 const { electron } = window;
@@ -95,12 +96,12 @@ export function RequestBuilder({ request }: Props) {
   const [editingName, setEditingName] = useState(false);
   const [showFuzz, setShowFuzz] = useState(false);
   const [customVerb, setCustomVerb] = useState(false);
-  const [runHooks, setRunHooks] = useState(() => localStorage.getItem('runHooks') !== 'false');
+  const [runHooks, setRunHooks] = useState(() => localStorage.getItem(STORAGE_KEYS.runHooks) !== 'false');
 
   function toggleRunHooks() {
     setRunHooks(prev => {
       const next = !prev;
-      localStorage.setItem('runHooks', String(next));
+      localStorage.setItem(STORAGE_KEYS.runHooks, String(next));
       return next;
     });
   }

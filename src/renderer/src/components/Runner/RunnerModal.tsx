@@ -8,8 +8,9 @@ import { findFolder } from '../../store';
 import { buildJsonReport, buildJUnitReport, buildHtmlReport, buildSarifReport } from '../../../../shared/report';
 import { collectAllTags, buildRunPlan, expandRunPlanWithData, expandFolderDataSets, resolveInheritedAuthAndHeaders, authIsConfigured } from '../../../../shared/request-collection';
 import { buildCliArgs, generateGitHub, generateAzure, generateGitLab } from '../../../../shared/ci-generators';
-import { getMethodColor } from '../../../../shared/colors';
+import { getMethodColor, getStatusColor } from '../../../../shared/colors';
 import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
+import { useCopyFeedback } from '../../hooks/useCopyFeedback';
 import { EmptyState } from '../common/EmptyState';
 import { Modal } from '../common/Modal';
 import { useT } from '../../i18n';
@@ -142,7 +143,7 @@ function ResultDetail({ r }: { r: RunRequestResult }) {
       {r.receivedResponse && (
         <DetailSection label={t('Response')}>
           <p className="font-mono text-[10px]">
-            <span className={r.receivedResponse.status < 400 ? 'text-emerald-400' : 'text-red-400'}>
+            <span className={getStatusColor(r.receivedResponse.status)}>
               {r.receivedResponse.status} {r.receivedResponse.statusText}
             </span>
           </p>
@@ -174,7 +175,7 @@ export function RunnerModal() {
   const [selectedEnvId, setSelectedEnvId] = useState<string>(activeEnvId ?? '');
   const [filterTags,    setFilterTags]    = useState<string[]>(runnerModal.filterTags);
   const [summary,       setSummary]       = useState<RunSummary | null>(null);
-  const [copiedKey,     setCopiedKey]     = useState<string | null>(null);
+  const { copied: copiedKey, copy: copyCI } = useCopyFeedback<string>();
   const [exportFormat,  setExportFormat]  = useState<'json' | 'junit' | 'html' | 'sarif'>('json');
   const [requestDelay,  setRequestDelay]  = useState<number>(0);
   const [expandedRows,  setExpandedRows]  = useState<Set<number>>(new Set());
@@ -304,12 +305,6 @@ export function RunnerModal() {
 
   const envName = selectedEnvId ? environments[selectedEnvId]?.data.name ?? null : null;
 
-  function copyCI(key: string, content: string) {
-    navigator.clipboard.writeText(content);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
-  }
-
   return (
     <Modal
       onClose={closeRunner}
@@ -401,25 +396,25 @@ export function RunnerModal() {
             <div className="flex flex-wrap gap-1.5">
               <button
                 className="px-2 py-1 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors whitespace-nowrap"
-                onClick={() => copyCI('cli', buildCliArgs('./workspace.json', envName, filterTags))}
+                onClick={() => copyCI(buildCliArgs('./workspace.json', envName, filterTags), 'cli')}
               >
                 {copiedKey === 'cli' ? t('✓ Copied') : t('⊞ CLI command')}
               </button>
               <button
                 className="px-2 py-1 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors whitespace-nowrap"
-                onClick={() => copyCI('gh', generateGitHub(envName, filterTags))}
+                onClick={() => copyCI(generateGitHub(envName, filterTags), 'gh')}
               >
                 {copiedKey === 'gh' ? t('✓ Copied') : t('⊞ GitHub Actions')}
               </button>
               <button
                 className="px-2 py-1 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors whitespace-nowrap"
-                onClick={() => copyCI('az', generateAzure(envName, filterTags))}
+                onClick={() => copyCI(generateAzure(envName, filterTags), 'az')}
               >
                 {copiedKey === 'az' ? t('✓ Copied') : t('⊞ Azure Pipelines')}
               </button>
               <button
                 className="px-2 py-1 text-[10px] bg-surface-800 hover:bg-surface-700 rounded transition-colors whitespace-nowrap"
-                onClick={() => copyCI('gl', generateGitLab(envName, filterTags))}
+                onClick={() => copyCI(generateGitLab(envName, filterTags), 'gl')}
               >
                 {copiedKey === 'gl' ? t('✓ Copied') : t('⊞ GitLab CI')}
               </button>

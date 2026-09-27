@@ -11,6 +11,7 @@ import { buildEnvVars, mergeVars, buildUrl } from '../interpolation';
 import { getGlobals } from '../globals-store';
 import { exportPact } from '../contract/pact-format';
 import { designContractToPact } from '../contract/design-pact';
+import { resolveCloudEndpoint } from '../cloud/broker-client';
 import type { ConsumerContract } from '../../shared/types';
 import { load as loadYaml } from 'js-yaml';
 import type { MockServer } from '../../shared/types/mock';
@@ -22,7 +23,7 @@ export const CLOUD_TOKEN_REF = 'cloud:token';
 /** The cloud API base URL. Fixed to production for end users; the developer can
  *  point it at a local stack via the API_SPECTOR_CLOUD_ENDPOINT env var. Not a
  *  user-facing setting. */
-const CLOUD_ENDPOINT = (process.env['API_SPECTOR_CLOUD_ENDPOINT'] || 'https://api-spector.dev').replace(/\/+$/, '');
+const CLOUD_ENDPOINT = resolveCloudEndpoint();
 
 interface PushMonitorInput {
   request: ApiRequest

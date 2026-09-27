@@ -3,6 +3,7 @@
 
 import type { ContractReport, ContractResult, FuzzReport } from '../../shared/types';
 import type { RecordedResult, EnvironmentState } from './results-store';
+import { escapeHtml } from '../../shared/escape';
 
 // ─── HTML contract reports ────────────────────────────────────────────────────
 //
@@ -20,13 +21,7 @@ export interface ReportMeta {
   generatedAt?: string
 }
 
-function esc(s: unknown): string {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+const esc = escapeHtml;
 
 function modeLabel(mode: string): string {
   if (mode === 'bidirectional') return 'Bi-directional';

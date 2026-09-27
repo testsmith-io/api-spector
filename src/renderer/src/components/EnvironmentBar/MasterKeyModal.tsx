@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react';
 import { Modal } from '../common/Modal';
+import { useCopyFeedback } from '../../hooks/useCopyFeedback';
 import { useT } from '../../i18n';
 
 const { electron } = window;
@@ -31,7 +32,7 @@ export function MasterKeyModal({ onSuccess, onCancel }: Props) {
   const t = useT();
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [copied, setCopied] = useState<number | null>(null);
+  const { copied, copy } = useCopyFeedback<number>();
 
   async function confirm() {
     if (!password.trim()) {
@@ -40,12 +41,6 @@ export function MasterKeyModal({ onSuccess, onCancel }: Props) {
     }
     await electron.setMasterKey(password);
     onSuccess(password);
-  }
-
-  function copy(idx: number, text: string) {
-    navigator.clipboard.writeText(text);
-    setCopied(idx);
-    setTimeout(() => setCopied(null), 2000);
   }
 
   return (
@@ -91,7 +86,7 @@ export function MasterKeyModal({ onSuccess, onCancel }: Props) {
                   {ex.code(password)}
                 </code>
                 <button
-                  onClick={() => copy(idx, ex.code(password))}
+                  onClick={() => copy(ex.code(password), idx)}
                   className="text-[10px] text-surface-400 hover:text-white transition-colors shrink-0"
                 >
                   {copied === idx ? t('✓ Copied') : t('Copy')}

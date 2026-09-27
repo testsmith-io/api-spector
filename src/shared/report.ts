@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import type { RunRequestResult, RunSummary } from './types';
+import { escapeHtml } from './escape';
 
 export interface ReportMeta {
   workspace?: string
@@ -51,8 +52,7 @@ export function buildHtmlReport(
   summary: RunSummary,
   meta: ReportMeta = {},
 ): string {
-  const esc = (s: string) =>
-    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const esc = escapeHtml;
 
   function prettyJson(s: string): string {
     try { return esc(JSON.stringify(JSON.parse(s), null, 2)); } catch { return esc(s); }
@@ -332,11 +332,7 @@ export function buildJUnitReport(
   summary: RunSummary,
   meta: ReportMeta = {},
 ): string {
-  const esc = (s: string) =>
-    s.replace(/&/g, '&amp;')
-     .replace(/</g, '&lt;')
-     .replace(/>/g, '&gt;')
-     .replace(/"/g, '&quot;');
+  const esc = escapeHtml;
 
   const suiteName = esc(meta.collection ?? 'API Tests');
   const totalSec  = (summary.durationMs / 1000).toFixed(3);

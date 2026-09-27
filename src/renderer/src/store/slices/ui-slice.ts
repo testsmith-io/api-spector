@@ -9,6 +9,7 @@
 import type { StateCreator } from 'zustand';
 import type { ResponsePayload } from '../../../../shared/types';
 import type { FullState } from '../index';
+import { STORAGE_KEYS } from '../../lib/storage-keys';
 
 export interface UiSliceState {
   showGeneratorPanel: boolean
@@ -82,8 +83,8 @@ export const createUiSlice: StateCreator<
   UiSlice
 > = (set) => ({
   showGeneratorPanel: false,
-  theme: (localStorage.getItem('theme') as 'dark' | 'light' | 'system') ?? 'dark',
-  zoom: Number(localStorage.getItem('zoom') ?? '1.1'),
+  theme: (localStorage.getItem(STORAGE_KEYS.theme) as 'dark' | 'light' | 'system') ?? 'dark',
+  zoom: Number(localStorage.getItem(STORAGE_KEYS.zoom) ?? '1.1'),
   sidebarTab: 'collections' as UiSliceState['sidebarTab'],
   workspaceSettingsOpen: false,
   commandPaletteOpen: false,
@@ -106,7 +107,7 @@ export const createUiSlice: StateCreator<
     s.theme = t;
     // Always mirror to localStorage so the welcome screen (no workspace open)
     // still remembers the most recent choice on next launch.
-    localStorage.setItem('theme', t);
+    localStorage.setItem(STORAGE_KEYS.theme, t);
     if (s.workspace) {
       if (!s.workspace.settings) s.workspace.settings = {};
       s.workspace.settings.theme = t;
@@ -121,7 +122,7 @@ export const createUiSlice: StateCreator<
 
   setZoom: (z) => set(s => {
     s.zoom = z;
-    localStorage.setItem('zoom', String(z));
+    localStorage.setItem(STORAGE_KEYS.zoom, String(z));
     if (s.workspace) {
       if (!s.workspace.settings) s.workspace.settings = {};
       s.workspace.settings.zoom = z;

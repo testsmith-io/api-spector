@@ -8,6 +8,7 @@ import { KVTable } from '../RequestBuilder/KVTable';
 import { Modal } from '../common/Modal';
 import { AuthEditor, type AuthEditorPatch } from '../common/AuthEditor';
 import { useT } from '../../i18n';
+import { labelCls } from '../../lib/ui-classes';
 
 type ModalTab = 'auth' | 'headers' | 'tls'
 
@@ -112,7 +113,7 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
                 {t('TLS settings override the workspace-level configuration for every request in this collection. Leave all paths empty to inherit from the workspace.')}
               </p>
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('CA Certificate path')}</label>
+                <label className={labelCls}>{t('CA Certificate path')}</label>
                 <input
                   value={caCertPath}
                   onChange={e => setCaCertPath(e.target.value)}
@@ -121,7 +122,7 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Client certificate path')}</label>
+                <label className={labelCls}>{t('Client certificate path')}</label>
                 <input
                   value={clientCertPath}
                   onChange={e => setClientCertPath(e.target.value)}
@@ -130,7 +131,7 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Client key path')}</label>
+                <label className={labelCls}>{t('Client key path')}</label>
                 <input
                   value={clientKeyPath}
                   onChange={e => setClientKeyPath(e.target.value)}

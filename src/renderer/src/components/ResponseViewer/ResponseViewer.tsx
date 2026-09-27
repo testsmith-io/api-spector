@@ -23,6 +23,7 @@ import { appendSnippetToScript } from '../RequestBuilder/scriptAppend';
 import { useToast } from '../common/Toast';
 import { ContextMenu } from '../common/ContextMenu';
 import { OverflowMenu } from '../common/OverflowMenu';
+import { labelCls } from '../../lib/ui-classes';
 import { DotsHorizontalIcon } from '../common/icons';
 import { Modal } from '../common/Modal';
 import { validateHttpSemantics } from '../../../../shared/http-semantics';
@@ -732,7 +733,7 @@ export function ResponseViewer() {
         <Modal onClose={() => setVarDialog(null)} title={t('Create environment variable')} panelClassName="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl w-[420px]">
           <div className="flex flex-col gap-3 p-4">
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Variable name')}</span>
+              <span className={labelCls}>{t('Variable name')}</span>
               <input
                 autoFocus
                 value={varDialog.name}
@@ -741,7 +742,7 @@ export function ResponseViewer() {
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Value')}</span>
+              <span className={labelCls}>{t('Value')}</span>
               <input
                 value={varDialog.value}
                 onChange={e => setVarDialog(d => d && { ...d, value: e.target.value })}

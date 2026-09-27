@@ -7,6 +7,7 @@ import type { GitStatus, GitCommit, GitBranch, GitRemote, GitFile, CiPlatform } 
 import { Toast, useToast } from '../common/Toast';
 import { detectPlatform, generateCiContent, ciFilePath, secretManagerOf, requestSecretManagers, type SecretManagerKind } from '../../lib/ci-templates';
 import { ConflictEditor } from './ConflictEditor';
+import { STORAGE_KEYS } from '../../lib/storage-keys';
 import { useT } from '../../i18n';
 
 const { electron } = window;
@@ -63,14 +64,14 @@ function ChangesTab({ status, onRefresh }: { status: GitStatus; onRefresh: () =>
   const [fetching,   setFetching]   = useState(false);
   const [conflictFile, setConflictFile] = useState<string | null>(null);
   const [pullRebase, setPullRebase] = useState(() => {
-    try { return localStorage.getItem('apiSpector.git.pullRebase') === '1'; } catch { return false; }
+    try { return localStorage.getItem(STORAGE_KEYS.gitPullRebase) === '1'; } catch { return false; }
   });
   const { toast, show: showToast }  = useToast();
 
   function toggleRebase() {
     setPullRebase(v => {
       const next = !v;
-      try { localStorage.setItem('apiSpector.git.pullRebase', next ? '1' : '0'); } catch { /* private mode */ }
+      try { localStorage.setItem(STORAGE_KEYS.gitPullRebase, next ? '1' : '0'); } catch { /* private mode */ }
       return next;
     });
   }

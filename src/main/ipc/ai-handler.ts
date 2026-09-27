@@ -6,7 +6,7 @@ import { handleIpc } from './handle';
 import { IPC } from '../../shared/ipc-channels';
 import { getSecret } from './secret-handler';
 import { buildDispatcher } from '../request-exec';
-import { AI_OPENAI_TOKEN_REF, type GenerateDocsInput } from '../../shared/types';
+import { AI_OPENAI_TOKEN_REF, DEFAULT_AI_MODEL, type GenerateDocsInput } from '../../shared/types';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -27,7 +27,7 @@ export function registerAiHandlers(ipc: IpcMain): void {
     if (!token) {
       throw new Error('No OpenAI API key configured. Add one in Settings → AI.');
     }
-    const model = input.model?.trim() || 'gpt-4o-mini';
+    const model = input.model?.trim() || DEFAULT_AI_MODEL;
 
     const userParts = [
       `Name: ${input.name}`,

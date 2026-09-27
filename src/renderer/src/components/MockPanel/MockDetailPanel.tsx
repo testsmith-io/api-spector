@@ -9,7 +9,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { useStore } from '../../store';
 import type { MockRoute, MockServer, MockHit } from '../../../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
-import { getMethodColor } from '../../../../shared/colors';
+import { getMethodColor, getStatusColor } from '../../../../shared/colors';
 import { cloudEnabled } from '../../lib/cloud-push';
 import { PushToCloudModal } from './PushToCloudModal';
 import { useT } from '../../i18n';
@@ -71,10 +71,7 @@ function RouteRow({
         {draft.script?.trim() && (
           <span className="text-[10px] text-purple-400/70 shrink-0">⚡ {t('script')}</span>
         )}
-        <span className={`text-xs font-mono w-10 text-right shrink-0 ${
-          draft.statusCode < 300 ? 'text-emerald-400' :
-          draft.statusCode < 400 ? 'text-amber-400' : 'text-red-400'
-        }`}>{draft.statusCode}</span>
+        <span className={`text-xs font-mono w-10 text-right shrink-0 ${getStatusColor(draft.statusCode)}`}>{draft.statusCode}</span>
         {draft.delay ? (
           <span className="text-[11px] text-surface-600 shrink-0">{draft.delay}ms</span>
         ) : null}
@@ -305,10 +302,7 @@ function HitRow({ hit, matched }: { hit: MockHit; matched: MockRoute | undefined
             ? <span className="text-red-400">{t('no match')}</span>
             : (matched?.description || matched?.path || '-')}
         </span>
-        <span className={`w-12 text-right shrink-0 text-xs ${
-          hit.status < 300 ? 'text-emerald-400' :
-          hit.status < 400 ? 'text-amber-400' : 'text-red-400'
-        }`}>{hit.status}</span>
+        <span className={`w-12 text-right shrink-0 text-xs ${getStatusColor(hit.status)}`}>{hit.status}</span>
         <span className="w-14 text-right shrink-0 text-surface-600 text-xs">{hit.durationMs}ms</span>
         <span className="w-20 text-right shrink-0 text-surface-400 text-xs">
           {timeAgo(hit.timestamp, t)}

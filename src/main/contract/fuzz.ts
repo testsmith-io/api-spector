@@ -85,7 +85,7 @@ function specContextFor(
   requestBaseUrl?: string,
 ): SpecContext | null {
   if (!spec) return null;
-  const url = req.url.replace(/\{\{([^}]+)\}\}/g, (_, k: string) => vars[k] ?? `{{${k}}}`);
+  const url = interpolate(req.url, vars);
   const match = findOperation(spec, req.method, url, requestBaseUrl);
   if (!match) return null;
 

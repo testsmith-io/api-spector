@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../common/Modal';
 import { useT } from '../../i18n';
+import { btnSecondaryCls } from '../../lib/ui-classes';
 
 const { electron } = window;
 
@@ -175,7 +176,7 @@ export function ConflictEditor({ path, onClose, onResolved }: { path: string; on
               : t('All :count conflicts resolved', { count: conflictCount })}
         </span>
         <div className="ml-auto flex gap-2">
-          <button onClick={onClose} className="px-3 py-1.5 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors">{t('Cancel')}</button>
+          <button onClick={onClose} className={btnSecondaryCls}>{t('Cancel')}</button>
           <button
             onClick={save}
             disabled={saving || stillHasMarkers}

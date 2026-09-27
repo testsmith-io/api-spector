@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { useEffect, useState } from 'react';
-import { AI_OPENAI_TOKEN_REF } from '../../../shared/types';
+import { AI_OPENAI_TOKEN_REF, DEFAULT_AI_MODEL } from '../../../shared/types';
+import { STORAGE_KEYS } from './storage-keys';
 import type { ApiRequest, Collection, Folder, GenerateDocsInput } from '../../../shared/types';
 
 const { electron } = window;
@@ -10,14 +11,13 @@ const { electron } = window;
 // AI config (model choice) lives in localStorage — per-machine, so it never
 // lands in the workspace/collection files or version control. The API key
 // itself lives only in the OS keychain (see AI_OPENAI_TOKEN_REF).
-const CFG_KEY = 'apiSpector.ai';
-const DEFAULT_MODEL = 'gpt-4o-mini';
+const CFG_KEY = STORAGE_KEYS.ai;
 
 export interface AiConfig { model: string }
 
 export function getAiConfig(): AiConfig {
-  try { return { model: DEFAULT_MODEL, ...JSON.parse(localStorage.getItem(CFG_KEY) || '{}') }; }
-  catch { return { model: DEFAULT_MODEL }; }
+  try { return { model: DEFAULT_AI_MODEL, ...JSON.parse(localStorage.getItem(CFG_KEY) || '{}') }; }
+  catch { return { model: DEFAULT_AI_MODEL }; }
 }
 
 export function setAiConfig(cfg: AiConfig): void {

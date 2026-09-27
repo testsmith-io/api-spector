@@ -9,6 +9,7 @@ import { envRelPath } from '../../../../shared/naming-utils';
 import { parseCurl } from '../../../../shared/curl-import';
 import { Modal } from './Modal';
 import { useT } from '../../i18n';
+import { btnSecondaryCls, btnPrimaryCls } from '../../lib/ui-classes';
 
 const { electron } = window;
 
@@ -491,21 +492,21 @@ export function ImportModal({ onImport, onClose }: Props) {
           <div className="flex justify-between pt-1">
             <button
               onClick={() => { setPreviewCol(null); setError(null); }}
-              className="px-3 py-1.5 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
+              className={btnSecondaryCls}
             >
               {t('Back')}
             </button>
             <div className="flex gap-2">
               <button
                 onClick={onClose}
-                className="px-3 py-1.5 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
+                className={btnSecondaryCls}
               >
                 {t('Cancel')}
               </button>
               <button
                 disabled={loading || chosenIds.size === 0 || (target === '__new__' && !newColName.trim())}
                 onClick={confirmImport}
-                className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors"
+                className={btnPrimaryCls}
               >
                 {loading ? t('Importing…') : t('Import')}
               </button>
@@ -566,7 +567,7 @@ export function ImportModal({ onImport, onClose }: Props) {
               <button
                 onClick={importFromUrl}
                 disabled={!url.trim() || loading}
-                className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors whitespace-nowrap"
+                className={`${btnPrimaryCls} whitespace-nowrap`}
               >
                 {loading ? t('Fetching…') : t('From URL')}
               </button>
@@ -595,7 +596,7 @@ export function ImportModal({ onImport, onClose }: Props) {
         <div className="flex justify-end gap-2 pt-1">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
+            className={btnSecondaryCls}
           >
             {t('Cancel')}
           </button>
@@ -603,7 +604,7 @@ export function ImportModal({ onImport, onClose }: Props) {
             <button
               disabled={!curlText.trim() || loading}
               onClick={importCurl}
-              className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors"
+              className={btnPrimaryCls}
             >
               {t('Parse')}
             </button>
@@ -614,7 +615,7 @@ export function ImportModal({ onImport, onClose }: Props) {
                 const opt = OPTIONS.find(o => o.id === selected);
                 if (opt) runFileImport(opt);
               }}
-              className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors"
+              className={btnPrimaryCls}
             >
               {loading ? t('Importing…') : t('Choose File')}
             </button>

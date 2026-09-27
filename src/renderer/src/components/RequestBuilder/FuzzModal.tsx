@@ -8,6 +8,7 @@ import { Modal } from '../common/Modal';
 import { FuzzResultsPanel } from '../ContractPanel/FuzzResultsPanel';
 import type { ApiRequest, FuzzReport } from '../../../../shared/types';
 import { useT } from '../../i18n';
+import { labelCls } from '../../lib/ui-classes';
 
 const { electron } = window;
 
@@ -84,7 +85,7 @@ export function FuzzModal({ request, onClose }: { request: ApiRequest; onClose: 
         {/* Options */}
         <div className="flex items-end gap-3 px-4 py-3 border-b border-surface-800 flex-shrink-0 flex-wrap">
           <label className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Level')}</span>
+            <span className={labelCls}>{t('Level')}</span>
             <select
               value={level}
               onChange={e => setLevel(e.target.value as 'basic' | 'standard' | 'aggressive')}
@@ -97,7 +98,7 @@ export function FuzzModal({ request, onClose }: { request: ApiRequest; onClose: 
             </select>
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Cases')}</span>
+            <span className={labelCls}>{t('Cases')}</span>
             <input
               type="number" min={1} value={cases}
               onChange={e => setCases(Math.max(1, Number(e.target.value)))}
@@ -105,7 +106,7 @@ export function FuzzModal({ request, onClose }: { request: ApiRequest; onClose: 
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Seed')}</span>
+            <span className={labelCls}>{t('Seed')}</span>
             <input
               type="number" value={seed}
               onChange={e => setSeed(Number(e.target.value))}
@@ -113,7 +114,7 @@ export function FuzzModal({ request, onClose }: { request: ApiRequest; onClose: 
             />
           </label>
           <label className="flex flex-col gap-1 flex-1 min-w-[180px]">
-            <span className="text-[10px] uppercase tracking-wider text-surface-600 font-medium">{t('Spec (optional)')}</span>
+            <span className={labelCls}>{t('Spec (optional)')}</span>
             <select
               value={snapshotRelPath}
               onChange={e => setSnapshotRelPath(e.target.value)}

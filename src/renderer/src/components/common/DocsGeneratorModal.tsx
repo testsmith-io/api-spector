@@ -7,6 +7,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { Modal } from './Modal';
 import { useT } from '../../i18n';
+import { btnSecondaryCls, btnPrimaryCls } from '../../lib/ui-classes';
 
 const { electron } = window;
 
@@ -188,7 +189,7 @@ export function DocsGeneratorModal({ onClose }: Props) {
         <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-surface-800 flex-shrink-0">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
+            className={btnSecondaryCls}
           >
             {t('Cancel')}
           </button>
@@ -202,7 +203,7 @@ export function DocsGeneratorModal({ onClose }: Props) {
           <button
             onClick={handleGenerateAndSave}
             disabled={generating || selectedIds.size === 0}
-            className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-surface-800 disabled:text-surface-600 rounded transition-colors"
+            className={btnPrimaryCls}
           >
             {generating ? t('Generating…') : t('Generate & Save')}
           </button>

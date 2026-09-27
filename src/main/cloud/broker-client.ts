@@ -8,6 +8,14 @@
 
 import { fetch } from 'undici';
 
+/** Production cloud endpoint; override with API_SPECTOR_CLOUD_ENDPOINT for a local stack. */
+export const DEFAULT_CLOUD_ENDPOINT = 'https://api-spector.dev';
+
+/** The configured cloud endpoint (env override or default), trailing slash trimmed. */
+export function resolveCloudEndpoint(): string {
+  return (process.env['API_SPECTOR_CLOUD_ENDPOINT'] || DEFAULT_CLOUD_ENDPOINT).replace(/\/+$/, '');
+}
+
 export interface BrokerConfig {
   endpoint: string
   token: string
@@ -16,7 +24,7 @@ export interface BrokerConfig {
 /** Resolve the broker config from the environment. Token: API_SPECTOR_TOKEN. */
 export function brokerConfigFromEnv(): BrokerConfig {
   return {
-    endpoint: (process.env['API_SPECTOR_CLOUD_ENDPOINT'] || 'https://api-spector.dev').replace(/\/+$/, ''),
+    endpoint: resolveCloudEndpoint(),
     token: process.env['API_SPECTOR_TOKEN'] || '',
   };
 }

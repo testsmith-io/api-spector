@@ -135,7 +135,7 @@ export function validateRequestAgainstSpec(
 ): ContractViolation[] {
   const violations: ContractViolation[] = [];
   const vars = envVars;
-  const url  = req.url.replace(/\{\{([^}]+)\}\}/g, (_, k: string) => vars[k] ?? `{{${k}}}`);
+  const url  = interpolate(req.url, vars);
 
   const match = findOperation(spec, req.method, url, requestBaseUrl);
   if (!match) {
@@ -213,7 +213,7 @@ export async function runProviderVerification(
   const activeRequests = requests.filter(r => !r.disabled);
   const results: ContractResult[] = activeRequests.map(req => {
     const violations = validateRequestAgainstSpec(spec, req, vars, requestBaseUrl);
-    const url = req.url.replace(/\{\{([^}]+)\}\}/g, (_, k: string) => vars[k] ?? `{{${k}}}`);
+    const url = interpolate(req.url, vars);
     return {
       requestId:   req.id,
       requestName: req.name,

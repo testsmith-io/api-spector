@@ -2,18 +2,10 @@
 // SPDX-License-Identifier: MIT
 
 import type { ContractReport, ContractResult } from '../../shared/types';
+import { escapeXml } from '../../shared/escape';
 
 // ─── Report formatters ────────────────────────────────────────────────────────
 // Machine-readable output so contract runs can gate CI pipelines.
-
-function escapeXml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
 
 function caseXml(r: ContractResult): string {
   const name    = escapeXml(`${r.method} ${r.requestName}`);
