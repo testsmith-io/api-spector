@@ -215,12 +215,13 @@ describe('buildHtmlReport', () => {
       makeResult({ name: 'List orders', scopePath: ['Orders'] }),
     ];
     const html = buildHtmlReport(results, { ...summary, total: 3, passed: 3 }, meta);
-    // Two scope headings, one per distinct path
-    expect(html).toContain('<div class="scope-heading">Users</div>');
-    expect(html).toContain('<div class="scope-heading">Orders</div>');
+    // One folder heading per distinct path, indented by depth (lvl-1 = first
+    // folder level under the collection).
+    expect(html).toContain('scope-heading lvl-1">Users</div>');
+    expect(html).toContain('scope-heading lvl-1">Orders</div>');
     // Users heading appears once, not twice (two consecutive Users requests
     // share a single heading)
-    const usersHeadingMatches = html.match(/scope-heading">Users</g);
+    const usersHeadingMatches = html.match(/scope-heading lvl-1">Users</g);
     expect(usersHeadingMatches?.length).toBe(1);
   });
 
@@ -231,10 +232,18 @@ describe('buildHtmlReport', () => {
     expect(html).not.toContain('<div class="scope-heading">');
   });
 
-  it('renders nested folder paths joined with " / "', () => {
+  it('renders nested folder paths as separate indented headings', () => {
     const results = [makeResult({ scopePath: ['Users', 'Admin'] })];
     const html = buildHtmlReport(results, summary, meta);
-    expect(html).toContain('<div class="scope-heading">Users / Admin</div>');
+    // Each folder level is its own heading, indented by depth, mirroring the tree.
+    expect(html).toContain('scope-heading lvl-1">Users</div>');
+    expect(html).toContain('scope-heading lvl-2">Admin</div>');
+  });
+
+  it('renders a top-level collection heading', () => {
+    const results = [makeResult({ collection: 'My API', scopePath: ['Users'] })];
+    const html = buildHtmlReport(results, summary, { ...meta, collection: 'My API' });
+    expect(html).toContain('scope-heading lvl-0">My API</div>');
   });
 
   it('renders test results with pass/fail indicators', () => {

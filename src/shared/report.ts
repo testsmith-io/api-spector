@@ -29,6 +29,9 @@ export function buildJsonReport(
       method:          r.method,
       url:             r.resolvedUrl,
       status:          r.status,
+      // Tree position: which collection and folder path this request sits under.
+      collection:      r.collection ?? meta.collection ?? null,
+      folderPath:      r.scopePath ?? [],
       isHook:          r.isHook ?? false,
       hookType:        r.hookType ?? null,
       httpStatus:      r.httpStatus ?? null,
@@ -80,16 +83,28 @@ export function buildHtmlReport(
     afterAll:  'AFTER ALL',
   };
 
-  let lastScopeKey: string | null = null;
+    // Emit nested collection / folder headings that mirror the tree in the UI:
+    // a collection heading (level 0) when the collection changes, then a folder
+    // heading for each new level of scopePath, indented by depth. The request
+    // card itself is indented under its deepest folder.
+  let lastCollection: string | null = null;
+  let lastPath: string[] = [];
   const cards = results.map((r, idx) => {
-    // Folder-group heading: insert whenever the request's folder path changes
-    // from the previous row. Produces the same "folder structure" shown in
-    // the runner modal and the collection tree.
-    const scopeKey = (r.scopePath ?? []).join(' / ');
-    const groupHeading = (scopeKey && scopeKey !== lastScopeKey)
-      ? `    <div class="scope-heading">${esc(scopeKey)}</div>\n`
-      : '';
-    lastScopeKey = scopeKey;
+    let groupHeading = '';
+    const coll = r.collection ?? meta.collection ?? '';
+    if (coll && coll !== lastCollection) {
+      groupHeading += `    <div class="scope-heading lvl-0">${esc(coll)}</div>\n`;
+      lastCollection = coll;
+      lastPath = [];
+    }
+    const path = r.scopePath ?? [];
+    let diverge = 0;
+    while (diverge < path.length && diverge < lastPath.length && path[diverge] === lastPath[diverge]) diverge++;
+    for (let d = diverge; d < path.length; d++) {
+      groupHeading += `    <div class="scope-heading lvl-${Math.min(d + 1, 6)}">${esc(path[d])}</div>\n`;
+    }
+    lastPath = path;
+    const cardIndent = `lvl-${Math.min(path.length + 1, 6)}`;
     const statusCls = r.status === 'passed'  ? 'badge-pass'
                     : r.status === 'failed'  ? 'badge-fail'
                     : r.status === 'skipped' ? 'badge-skip'
@@ -146,7 +161,7 @@ export function buildHtmlReport(
     const hookCls  = hookLabel ? (r.hookType?.startsWith('before') ? 'card-hook-before' : 'card-hook-after') : '';
 
     return `${groupHeading}
-    <div class="card ${hookCls}" id="r${idx}">
+    <div class="card ${hookCls} ${cardIndent}" id="r${idx}">
       <div class="card-header" onclick="toggle(${idx})">
         <span class="chevron" id="ch${idx}">▶</span>
         <span class="badge ${statusCls}">${r.status}</span>
@@ -218,8 +233,18 @@ export function buildHtmlReport(
   .stat-skip .stat-val { color: var(--text-muted); }
   /* Cards */
   .card { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
-  .scope-heading { margin: 18px 0 6px; padding: 4px 2px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  .scope-heading { margin: 14px 0 6px; padding: 4px 2px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
   .scope-heading::before { content: "\\25B8 "; color: var(--text-dim); }
+  /* Nested tree indentation: collection (lvl-0) → folders (lvl-1..) → request card. */
+  .lvl-0 { margin-left: 0; }
+  .lvl-1 { margin-left: 16px; }
+  .lvl-2 { margin-left: 32px; }
+  .lvl-3 { margin-left: 48px; }
+  .lvl-4 { margin-left: 64px; }
+  .lvl-5 { margin-left: 80px; }
+  .lvl-6 { margin-left: 96px; }
+  .scope-heading.lvl-0 { font-size: 13px; color: var(--text); text-transform: none; letter-spacing: 0; margin-top: 22px; }
+  .scope-heading.lvl-0::before { content: "\\1F5C0 "; }
   .card-header { display: flex; align-items: baseline; gap: 8px; padding: 10px 14px; cursor: pointer; user-select: none; }
   .card-header:hover { background: var(--bg-surface); }
   .chevron { font-size: 10px; color: var(--text-muted); min-width: 10px; transition: transform .15s; }
@@ -349,7 +374,11 @@ export function buildJUnitReport(
     const label     = r.iterationLabel ? ` #${r.iterationLabel}` : '';
     const hookPrefix = r.isHook && r.hookType ? `[${HOOK_JUNIT_LABELS[r.hookType] ?? 'Hook'}] ` : '';
     const name      = esc(hookPrefix + r.name + label);
-    const classname = esc(`${r.method} ${r.resolvedUrl}`);
+    // classname carries the tree position (collection.folder.subfolder) so CI
+    // dashboards nest results the same way the app does. Dots in names are
+    // replaced so they don't read as extra nesting levels.
+    const classname = esc([r.collection ?? meta.collection, ...(r.scopePath ?? [])]
+      .filter(Boolean).map(s => String(s).replace(/\./g, '_')).join('.') || 'API Tests');
     const timeSec   = ((r.durationMs ?? 0) / 1000).toFixed(3);
 
     const failures: string[] = [];

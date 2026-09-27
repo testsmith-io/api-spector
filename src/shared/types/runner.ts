@@ -8,6 +8,8 @@ import type { TestResult } from './execution';
 
 export interface RunnerItem {
   request: ApiRequest
+  /** Name of the collection this item belongs to (top level of the run tree). */
+  collection?: string
   collectionVars: Record<string, string>
   /** Per-iteration variable values (from data-driven dataset). */
   dataRow?: Record<string, string>
@@ -87,6 +89,9 @@ export interface RunRequestResult {
   isHook?: boolean
   hookType?: 'beforeAll' | 'before' | 'afterAll' | 'after'
   scopeId?: string
+  /** Name of the collection this request belongs to. Lets a workspace-wide
+   *  report group results by collection (the top level of the tree). */
+  collection?: string
   /** Folder names from (just below) the root to the request's owning folder.
    *  Mirror of RunnerItem.scopePath, used for grouped rendering. */
   scopePath?: string[]
