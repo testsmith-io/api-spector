@@ -48,6 +48,7 @@ export function registerRunnerHandler ( ipc: IpcMain ): void {
           isHook: item.isHook,
           hookType: item.hookType,
           scopeId: item.scopeId,
+          collection: item.collection,
           scopePath: item.scopePath,
           iterationLabel: item.iterationLabel,
         };
@@ -60,6 +61,7 @@ export function registerRunnerHandler ( ipc: IpcMain ): void {
       const runningUpdate: Partial<RunRequestResult> = {
         status: 'running', iterationLabel: item.iterationLabel,
         isHook: item.isHook, hookType: item.hookType, scopeId: item.scopeId,
+        collection: item.collection,
         scopePath: item.scopePath,
       };
       event.sender.send( IPC.runner.progress, { requestId: item.request.id, ...runningUpdate } );
@@ -94,6 +96,7 @@ export function registerRunnerHandler ( ipc: IpcMain ): void {
       event.sender.send( IPC.runner.progress, {
         ...result, iterationLabel: item.iterationLabel,
         isHook: item.isHook, hookType: item.hookType, scopeId: item.scopeId,
+        collection: item.collection,
         scopePath: item.scopePath,
       } );
 

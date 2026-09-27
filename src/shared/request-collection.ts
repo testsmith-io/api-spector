@@ -397,12 +397,14 @@ export function buildRunPlan(
 ): RunnerItem[] {
   const collectionVars = collection.collectionVariables ?? {};
 
+  const tag = (items: RunnerItem[]) => items.map(i => ({ ...i, collection: collection.name }));
+
   // ── Whole-collection run ──────────────────────────────────────────────────
   if (!folderId) {
-    return buildFolderPlan(
+    return tag(buildFolderPlan(
       collection.rootFolder, collection.requests, collectionVars, filterTags,
       collection.rootFolder.id, [], [], [], true,
-    );
+    ));
   }
 
   // ── Folder-scoped run ─────────────────────────────────────────────────────
@@ -460,7 +462,7 @@ export function buildRunPlan(
     }
   }
 
-  return result;
+  return tag(result);
 }
 
 /**

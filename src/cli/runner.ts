@@ -293,6 +293,7 @@ async function main() {
           isHook,
           hookType,
           scopeId,
+          collection: item.collection,
           scopePath:  item.scopePath,
           iterationLabel: item.iterationLabel,
         };
@@ -319,6 +320,7 @@ async function main() {
         result.isHook    = isHook;
         result.hookType  = hookType;
         result.scopeId   = scopeId;
+        result.collection = item.collection;
         result.scopePath = item.scopePath;
         result.iterationLabel = item.iterationLabel;
 
