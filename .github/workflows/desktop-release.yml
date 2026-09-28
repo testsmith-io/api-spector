@@ -1,33 +1,17 @@
-name: Build Desktop Apps
+name: Build Desktop App
 
-# Builds the macOS and Windows executables and attaches them to the GitHub
-# Release that triggered the run. Each binary is built on its native OS, then
-# uploaded explicitly to the triggering release (rather than relying on
-# electron-builder's auto-publish, which targets a draft release).
+# Builds the signed Windows installer and attaches it to the GitHub Release
+# that triggered the run. macOS/Linux are distributed via the npm package
+# (which runs under Electron's own notarized binary), so no native bundles are
+# built here — only the code-signed Windows .exe.
 on:
   release:
     types: [published]
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-latest
-            name: macOS
-            args: --mac
-            files: |
-              dist/*.dmg
-              dist/*.zip
-          - os: windows-latest
-            name: Windows
-            args: --win
-            files: |
-              dist/*.exe
-
-    name: ${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
+  windows:
+    name: Windows
+    runs-on: windows-latest
     permissions:
       contents: write # required to upload assets to the release
 
@@ -45,12 +29,22 @@ jobs:
       - name: Build renderer/main
         run: npm run build
 
-      - name: Package executable
-        run: npx electron-builder ${{ matrix.args }} --publish never
+      - name: Package signed installer
+        run: npx electron-builder --win --config electron-builder.config.cjs --publish never
+        env:
+          # Azure Trusted Signing. Signing activates only when these are set;
+          # otherwise the build is unsigned. See electron-builder.config.cjs.
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_CODE_SIGNING_ENDPOINT: ${{ secrets.AZURE_CODE_SIGNING_ENDPOINT }}
+          AZURE_CODE_SIGNING_ACCOUNT: ${{ secrets.AZURE_CODE_SIGNING_ACCOUNT }}
+          AZURE_CODE_SIGNING_PROFILE: ${{ secrets.AZURE_CODE_SIGNING_PROFILE }}
+          AZURE_CODE_SIGNING_PUBLISHER: ${{ secrets.AZURE_CODE_SIGNING_PUBLISHER }}
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          files: ${{ matrix.files }}
+          files: dist/*.exe
           fail_on_unmatched_files: true
