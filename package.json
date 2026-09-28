@@ -1,7 +1,7 @@
 {
   "name": "@testsmith/api-spector",
   "productName": "API Spector",
-  "version": "0.6.8",
+  "version": "0.6.9",
   "description": "Local-first API testing tool to inspect, test and mock APIs",
   "repository": {
     "type": "git",
@@ -154,6 +154,9 @@
     },
     "win": {
       "target": "nsis"
+    },
+    "nsis": {
+      "artifactName": "API-Spector-Setup-${version}.${ext}"
     },
     "linux": {
       "target": "AppImage"

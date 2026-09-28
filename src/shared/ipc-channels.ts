@@ -244,6 +244,7 @@ export const IPC = {
     installUpdate: 'app:installUpdate',
     /** Main → renderer auto-update events (packaged builds only). */
     onUpdateAvailable: 'app:updateAvailable',
+    onUpdateProgress: 'app:updateProgress',
     onUpdateDownloaded: 'app:updateDownloaded',
     onUpdateError: 'app:updateError',
   },
