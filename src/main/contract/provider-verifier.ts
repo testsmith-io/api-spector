@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { readFile } from 'fs/promises';
+import { readFile } from 'node:fs/promises';
 import { fetch } from 'undici';
 import { load as yamlLoad } from 'js-yaml';
 import Ajv from 'ajv';
@@ -93,8 +93,8 @@ function urlPathname(raw: string, baseUrl?: string): string {
 }
 
 function pathTemplateToRegex(base: string, template: string): RegExp {
-  const combined = (base + template).replace(/\/+/g, '/');
-  const pattern  = combined.replace(/\{[^}]+\}/g, '[^/]+');
+  const combined = (base + template).replaceAll(/\/+/g, '/');
+  const pattern  = combined.replaceAll(/\{[^}]+\}/g, '[^/]+');
   return new RegExp('^' + pattern + '/?$');
 }
 

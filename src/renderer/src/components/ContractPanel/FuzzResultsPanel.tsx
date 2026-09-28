@@ -24,7 +24,7 @@ const ORACLE_META: Record<FuzzOracle, { label: string; badge: string; border: st
 
 // ─── Finding row ──────────────────────────────────────────────────────────────
 
-function FindingRow({ finding, onCopy }: { finding: FuzzFinding; onCopy: (text: string) => void }) {
+function FindingRow({ finding, onCopy }: { readonly finding: FuzzFinding; readonly onCopy: (text: string) => void }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const meta = ORACLE_META[finding.oracle];
@@ -102,7 +102,7 @@ function FindingRow({ finding, onCopy }: { finding: FuzzFinding; onCopy: (text: 
 
 // ─── Operation card ───────────────────────────────────────────────────────────
 
-function OperationCard({ result, onCopy }: { result: FuzzTargetResult; onCopy: (text: string) => void }) {
+function OperationCard({ result, onCopy }: { readonly result: FuzzTargetResult; readonly onCopy: (text: string) => void }) {
   const t = useT();
   const [open, setOpen] = useState(true);
 
@@ -145,7 +145,7 @@ function statusTone(status: number, finding: boolean): string {
 
 /** One case in the trace: a compact clickable summary that expands to the full
  *  request body and response. */
-function TraceRow({ trace, onCopy }: { trace: FuzzCaseTrace; onCopy: (t: string) => void }) {
+function TraceRow({ trace, onCopy }: { readonly trace: FuzzCaseTrace; readonly onCopy: (t: string) => void }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   return (
@@ -190,7 +190,7 @@ function TraceRow({ trace, onCopy }: { trace: FuzzCaseTrace; onCopy: (t: string)
   );
 }
 
-function TraceCard({ result, onCopy }: { result: FuzzTargetResult; onCopy: (t: string) => void }) {
+function TraceCard({ result, onCopy }: { readonly result: FuzzTargetResult; readonly onCopy: (t: string) => void }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   if (!result.trace?.length) return null;
@@ -218,7 +218,7 @@ function TraceCard({ result, onCopy }: { result: FuzzTargetResult; onCopy: (t: s
 
 // ─── Main panel ───────────────────────────────────────────────────────────────
 
-export function FuzzResultsPanel({ report, onClear }: { report: FuzzReport; onClear: () => void }) {
+export function FuzzResultsPanel({ report, onClear }: { readonly report: FuzzReport; readonly onClear: () => void }) {
   const { toast, show: showToast } = useToast();
   const t = useT();
 

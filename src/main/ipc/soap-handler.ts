@@ -4,8 +4,8 @@
 import { type IpcMain } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
-import https from 'https';
-import http from 'http';
+import https from 'node:https';
+import http from 'node:http';
 import { DOMParser } from '@xmldom/xmldom';
 
 // ─── WSDL fetch & parse ───────────────────────────────────────────────────────
@@ -72,9 +72,7 @@ function isElement(node: XmlNode): boolean {
 
 function nodeListToArray(list: XmlNodeList | undefined): XmlNode[] {
   if (!list || typeof list.length !== 'number') return [];
-  const out: XmlNode[] = [];
-  for (let i = 0; i < list.length; i++) out.push(list[i]);
-  return out;
+  return Array.from(list);
 }
 
 function children(node: XmlNode): XmlNode[] {
@@ -189,7 +187,7 @@ function indent(level: number): string {
 
 function renderParams(params: Param[], level: number): string {
   return params.map(p => {
-    if (p.children && p.children.length) {
+    if (p.children?.length) {
       return `${indent(level)}<tns:${p.name}>\n${renderParams(p.children, level + 1)}\n${indent(level)}</tns:${p.name}>`;
     }
     return `${indent(level)}<tns:${p.name}><!-- ${p.typeHint} --></tns:${p.name}>`;
@@ -366,7 +364,7 @@ export function parseWsdl(wsdlText: string): WsdlResult {
     const soapActionByName: Record<string, string> = {};
     const blockRx = /<(?:wsdl:)?operation\s+name\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/(?:wsdl:)?operation>/g;
     while ((m = blockRx.exec(wsdlText)) !== null) {
-      const sa = m[2].match(/soapAction\s*=\s*["']([^"']*)["']/);
+      const sa = /soapAction\s*=\s*["']([^"']*)["']/.exec(m[2]);
       if (sa) soapActionByName[m[1]] = sa[1];
     }
     for (const name of seen) {
@@ -425,7 +423,7 @@ const ct = (metadata && metadata.soapVersion === '1.2')
   : 'text/xml; charset=utf-8';
 
 const headers = request.headers || {};
-const sa      = String(headers['soapaction'] || headers['SOAPAction'] || '').replace(/"/g, '');
+const sa      = String(headers['soapaction'] || headers['SOAPAction'] || '').replaceAll('"', '');
 const body    = request.body || '';
 
 let opName = null;

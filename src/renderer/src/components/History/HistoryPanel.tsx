@@ -78,7 +78,7 @@ export function HistoryPanel() {
   }, [history, search]);
 
   async function downloadHar() {
-    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    const stamp = new Date().toISOString().slice(0, 19).replaceAll(/[:T]/g, '-');
     await electron.saveResults(historyToHar(history), `api-spector-history-${stamp}.har`);
   }
 
@@ -172,10 +172,10 @@ export function HistoryPanel() {
 function HistoryRow({
   entry, isSelected, onSelect, onResend,
 }: {
-  entry: HistoryEntry
-  isSelected: boolean
-  onSelect: () => void
-  onResend?: () => void
+  readonly entry: HistoryEntry
+  readonly isSelected: boolean
+  readonly onSelect: () => void
+  readonly onResend?: () => void
 }) {
   const t = useT();
   const status = entry.response.status;

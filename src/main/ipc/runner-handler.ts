@@ -71,7 +71,7 @@ export function registerRunnerHandler ( ipc: IpcMain ): void {
         collectionVars: { ...item.collectionVars, ...runCollectionVars },
         envVars: runEnvVars,
         globals: runGlobals,
-        localVars: { ...runLocalVars, ...( item.dataRow ?? {} ) },
+        localVars: { ...runLocalVars, ...item.dataRow },
         dispatcher,
         piiMaskPatterns,
         proxy,

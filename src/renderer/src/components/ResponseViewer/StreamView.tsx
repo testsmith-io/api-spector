@@ -39,12 +39,12 @@ function preview(ev: StreamEvent): string {
 }
 
 interface Props {
-  events: StreamEvent[]
-  streaming: boolean
+  readonly events: StreamEvent[]
+  readonly streaming: boolean
   /** Present only while live — enables the Stop button. */
-  streamId?: string
-  streamClose?: StreamClose
-  firstEventMs?: number
+  readonly streamId?: string
+  readonly streamClose?: StreamClose
+  readonly firstEventMs?: number
 }
 
 export function StreamView({ events, streaming, streamId, streamClose, firstEventMs }: Props) {

@@ -19,7 +19,7 @@ const linePrefix: Record<DiffLineType, string> = {
   added: '+',
 };
 
-export function DiffView({ pinned, current }: { pinned: ResponsePayload; current: ResponsePayload }) {
+export function DiffView({ pinned, current }: { readonly pinned: ResponsePayload; readonly current: ResponsePayload }) {
   const t = useT();
   const pinnedBody = prettyJson(pinned.body);
   const currentBody = prettyJson(current.body);

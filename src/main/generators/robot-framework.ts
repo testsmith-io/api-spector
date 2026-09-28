@@ -9,21 +9,21 @@ import { resolveEffectiveAuth, mergeHeaders, hasBody, renderTree, ROBOT_REQUESTS
 // ─── Robot Framework generator ────────────────────────────────────────────────
 
 function safeName(name: string): string {
-  return name.replace(/[^\w\s]/g, ' ').split(/\s+/).filter(Boolean)
+  return name.replaceAll(/[^\w\s]/g, ' ').split(/\s+/).filter(Boolean)
     .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
 function robotVar(key: string): string {
-  return '${' + key.replace(/\W+/g, '_').toUpperCase() + '}';
+  return '${' + key.replaceAll(/\W+/g, '_').toUpperCase() + '}';
 }
 
 function envVar(key: string): string {
-  return '%{' + key.replace(/\W+/g, '_').toUpperCase() + '}';
+  return '%{' + key.replaceAll(/\W+/g, '_').toUpperCase() + '}';
 }
 
 /** Replace {{var}} with ${VAR} or %{VAR} depending on whether the var is secret. */
 function interpolate(value: string, vars: Map<string, EnvVariable>): string {
-  return value.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
+  return value.replaceAll(/\{\{([^}]+)\}\}/g, (_, key) => {
     const v = vars.get(key.trim());
     return v?.secret ? envVar(key.trim()) : robotVar(key.trim());
   });
@@ -61,8 +61,7 @@ function buildNameMap(root: Folder, requests: Collection['requests']): Map<strin
 function buildVariablesFile(environment: Environment | null): string {
   const lines = ['*** Variables ***'];
   if (!environment) {
-    lines.push('# No environment - add your variables here');
-    lines.push('${BASE_URL}    http://localhost:8080');
+    lines.push('# No environment - add your variables here', '${BASE_URL}    http://localhost:8080');
     return lines.join('\n') + '\n';
   }
   for (const v of environment.variables) {
@@ -120,14 +119,11 @@ function buildKeywordsFile(
       const url = interpolate(req.url, varMap);
       const method = req.method.charAt(0) + req.method.slice(1).toLowerCase();
 
-      lines.push(kwName);
-      lines.push(`    [Documentation]    Hook: ${req.hookType} - ${req.name}`);
+      lines.push(kwName, `    [Documentation]    Hook: ${req.hookType} - ${req.name}`);
 
       // robotframework-requests has no keyword for QUERY (RFC 10008)
       if (!ROBOT_REQUESTS_METHODS.includes(req.method)) {
-        lines.push(`    Log    ${req.method} is not supported by robotframework-requests - hook skipped    WARN`);
-        lines.push(`    RETURN    \${None}`);
-        lines.push('');
+        lines.push(`    Log    ${req.method} is not supported by robotframework-requests - hook skipped    WARN`, `    RETURN    \${None}`, '');
         continue;
       }
 
@@ -152,14 +148,12 @@ function buildKeywordsFile(
       const parsed = parsePostScript(req.postRequestScript);
       for (const e of parsed.extractions) {
         const jp = accessorToJsonPath(e.accessor);
-        const rfVar = e.varName.replace(/\W+/g, '_').toUpperCase();
+        const rfVar = e.varName.replaceAll(/\W+/g, '_').toUpperCase();
         hookExtractedVars.add(rfVar);
-        lines.push(`    \${${rfVar}}=    Evaluate    str($response.json().get('${jp}', ''))`);
-        lines.push(`    Set Suite Variable    \${${rfVar}}`);
+        lines.push(`    \${${rfVar}}=    Evaluate    str($response.json().get('${jp}', ''))`, `    Set Suite Variable    \${${rfVar}}`);
       }
 
-      lines.push(`    RETURN    \${response}`);
-      lines.push('');
+      lines.push(`    RETURN    \${response}`, '');
     }
     for (const sub of folder.folders) processHooks(sub);
   }
@@ -175,14 +169,11 @@ function buildKeywordsFile(
       const kwName = nameMap.get(reqId)!;
       const url    = interpolate(req.url, varMap);
 
-      lines.push(kwName);
-      lines.push(`    [Documentation]    ${req.description || req.name}`);
+      lines.push(kwName, `    [Documentation]    ${req.description || req.name}`);
 
       // robotframework-requests has no keyword for QUERY (RFC 10008)
       if (!ROBOT_REQUESTS_METHODS.includes(req.method)) {
-        lines.push(`    Log    ${req.method} is not supported by robotframework-requests - request skipped    WARN`);
-        lines.push(`    RETURN    \${None}`);
-        lines.push('');
+        lines.push(`    Log    ${req.method} is not supported by robotframework-requests - request skipped    WARN`, `    RETURN    \${None}`, '');
         continue;
       }
 
@@ -197,8 +188,8 @@ function buildKeywordsFile(
         const token = effectiveAuth.token ?? '';
         if (token.includes('{{')) {
           // Check if it references a hook-extracted variable
-          const varRef = token.match(/\{\{([^}]+)\}\}/)?.[1]?.trim();
-          const rfVar = varRef ? varRef.replace(/\W+/g, '_').toUpperCase() : '';
+          const varRef = (/\{\{([^}]+)\}\}/.exec(token))?.[1]?.trim();
+          const rfVar = varRef ? varRef.replaceAll(/\W+/g, '_').toUpperCase() : '';
           if (rfVar && hookExtractedVars.has(rfVar)) {
             headerPairs.push(`Authorization=Bearer \${${rfVar}}`);
           } else {
@@ -257,8 +248,7 @@ function buildKeywordsFile(
         lines.push(`    ...    ${callArgs.join('    ')}`);
       }
 
-      lines.push(`    RETURN    \${response}`);
-      lines.push('');
+      lines.push(`    RETURN    \${response}`, '');
     }
 
     for (const sub of folder.folders) processFolder(sub);
@@ -313,9 +303,7 @@ function buildTestSuite(
       const req = collection.requests[reqId];
       if (!req || req.disabled || req.hookType) continue;
       const kwName = nameMap.get(reqId)!;
-      lines.push(kwName);
-      lines.push(`    [Documentation]    ${req.description || req.name}`);
-      lines.push(`    \${response}=    ${kwName}`);
+      lines.push(kwName, `    [Documentation]    ${req.description || req.name}`, `    \${response}=    ${kwName}`);
 
       const parsed = parsePostScript(req.postRequestScript);
       if (parsed.assertions.length > 0) {
@@ -326,15 +314,13 @@ function buildTestSuite(
               lines.push(`    Status Should Be    ${a.expected ?? 200}    \${response}`);
               break;
             case 'equals': {
-              const expected = a.expected?.replace(/^"|"$/g, '') ?? '';
-              lines.push(`    \${value}=    Get From Dictionary    \${response.json()}    ${jp}`);
-              lines.push(`    Should Be Equal As Strings    \${value}    ${expected}`);
+              const expected = a.expected?.replaceAll(/^"|"$/g, '') ?? '';
+              lines.push(`    \${value}=    Get From Dictionary    \${response.json()}    ${jp}`, `    Should Be Equal As Strings    \${value}    ${expected}`);
               break;
             }
             case 'contains': {
-              const expected = a.expected?.replace(/^"|"$/g, '') ?? '';
-              lines.push(`    \${value}=    Get From Dictionary    \${response.json()}    ${jp}`);
-              lines.push(`    Should Contain    \${value}    ${expected}`);
+              const expected = a.expected?.replaceAll(/^"|"$/g, '') ?? '';
+              lines.push(`    \${value}=    Get From Dictionary    \${response.json()}    ${jp}`, `    Should Contain    \${value}    ${expected}`);
               break;
             }
             case 'exists':
@@ -350,8 +336,7 @@ function buildTestSuite(
 
       for (const e of parsed.extractions) {
         const jp = accessorToJsonPath(e.accessor);
-        lines.push(`    \${${e.varName}}=    Get From Dictionary    \${response.json()}    ${jp}`);
-        lines.push(`    Set Suite Variable    \${${e.varName}}`);
+        lines.push(`    \${${e.varName}}=    Get From Dictionary    \${response.json()}    ${jp}`, `    Set Suite Variable    \${${e.varName}}`);
       }
 
       lines.push('');
@@ -400,7 +385,7 @@ export function generateRobotFramework(
     (environment?.variables ?? []).map(v => [v.key, v])
   );
   const nameMap = buildNameMap(collection.rootFolder, collection.requests);
-  const slug    = collection.name.replace(/\W+/g, '_').toLowerCase();
+  const slug    = collection.name.replaceAll(/\W+/g, '_').toLowerCase();
 
   const hookExtractedVars = new Set<string>();
   const contentFiles: GeneratedFile[] = [

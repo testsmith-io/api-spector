@@ -9,18 +9,18 @@
 
 import '@testing-library/jest-dom';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const electronStub: any = new Proxy({}, {
   get: () => async () => undefined,
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 (globalThis as any).window = (globalThis as any).window ?? {};
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 (globalThis as any).window.electron = electronStub;
 
 // matchMedia stub for components that read prefers-color-scheme
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 (globalThis as any).window.matchMedia = (globalThis as any).window.matchMedia ?? ((q: string) => ({
   matches: false,
   media: q,

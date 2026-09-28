@@ -13,9 +13,9 @@ import { useT } from '../../i18n';
  *  requests that carry a contract, or a provider OpenAPI spec (from a pinned
  *  contract snapshot) for bi-directional testing. */
 export function PushContractModal({ requests, defaultConsumer, onClose }: {
-  requests: ApiRequest[];
-  defaultConsumer: string;
-  onClose: () => void;
+  readonly requests: ApiRequest[];
+  readonly defaultConsumer: string;
+  readonly onClose: () => void;
 }) {
   const t = useT();
   const snapshots = useStore(s => s.contractSnapshots);

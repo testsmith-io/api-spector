@@ -68,7 +68,7 @@ function getSourceMode(v: EnvVariable): SourceMode {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
+export function EnvironmentEditor({ onClose }: { readonly onClose: () => void }) {
   const t = useT();
   const environments         = useStore(s => s.environments);
   const activeEnvironmentId  = useStore(s => s.activeEnvironmentId);
@@ -117,8 +117,7 @@ export function EnvironmentEditor({ onClose }: { onClose: () => void }) {
 
   function handleDelete(id: string) {
     deleteEnvironment(id);
-    const remaining = Object.keys(environments).filter(k => k !== id);
-    setSelectedId(remaining[0] ?? '');
+    setSelectedId(Object.keys(environments).find(k => k !== id) ?? '');
   }
 
   function handleDuplicate(id: string) {

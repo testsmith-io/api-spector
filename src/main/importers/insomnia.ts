@@ -1,14 +1,14 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { readFile } from 'fs/promises';
+import { readFile } from 'node:fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import type { Collection, ApiRequest, AuthConfig, RequestBody, KeyValuePair, Folder } from '../../shared/types';
 import { translateScript } from './script-translator';
 
 // ─── Insomnia v4 export importer ──────────────────────────────────────────────
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 
 function parseHeaders(headers: any[]): KeyValuePair[] {
   return (headers ?? []).map(h => ({
@@ -56,7 +56,7 @@ function parseBody(body: any): RequestBody {
 }
 
 function parseAuth(auth: any): AuthConfig {
-  if (!auth || !auth.type || auth.type === 'none') return { type: 'none' };
+  if (!auth?.type || auth.type === 'none') return { type: 'none' };
   if (auth.type === 'bearer') {
     return { type: 'bearer', token: auth.token ?? '' };
   }

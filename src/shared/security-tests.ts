@@ -19,7 +19,7 @@ function newId(): string {
 }
 
 function clone(base: ApiRequest, patch: Partial<ApiRequest>): ApiRequest {
-  const copy = JSON.parse(JSON.stringify(base)) as ApiRequest;
+  const copy = structuredClone(base) as ApiRequest;
   copy.id = newId();
   delete copy.examples;
   delete copy.contract;

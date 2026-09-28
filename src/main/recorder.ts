@@ -1,8 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'http';
-import { randomUUID } from 'crypto';
+import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
+import { randomUUID } from 'node:crypto';
 import { fetch, Headers } from 'undici';
 import type {
   RecorderConfig, RecordedEntry, RecordingSession, MockServer, MockRoute,

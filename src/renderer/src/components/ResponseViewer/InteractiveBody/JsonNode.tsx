@@ -6,11 +6,11 @@ import { useT } from '../../../i18n';
 import type { JsonPath } from './utils/jsonPath';
 
 interface Props {
-  nodeKey: string | number | null
-  value: unknown
-  path: JsonPath
-  depth: number
-  onLeaf: (e: React.MouseEvent, path: JsonPath, value: unknown) => void
+  readonly nodeKey: string | number | null
+  readonly value: unknown
+  readonly path: JsonPath
+  readonly depth: number
+  readonly onLeaf: (e: React.MouseEvent, path: JsonPath, value: unknown) => void
 }
 
 // Memoized: a large response tree shouldn't re-render when the ResponseViewer

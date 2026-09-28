@@ -69,8 +69,7 @@ function buildHookLines(req: ApiRequest, sharedVars: Set<string>): string[] {
   const lines: string[] = [`    // ${req.name}`];
   const parsed = parsePostScript(req.postRequestScript);
   if (parsed.extractions.length > 0) {
-    lines.push(`    const hookResponse = await ${hookCall};`);
-    lines.push(`    const hookJson = await hookResponse.json();`);
+    lines.push(`    const hookResponse = await ${hookCall};`, `    const hookJson = await hookResponse.json();`);
     for (const e of parsed.extractions) {
       const jp = e.accessor.replace(/^json\.?/, '');
       const expr = jp ? `hookJson.${jp}` : 'hookJson';
@@ -247,7 +246,7 @@ ${tests.join('\n\n')}
 // ─── Project scaffolding ──────────────────────────────────────────────────────
 
 function buildPackageJson(collectionName: string): string {
-  const name = collectionName.replace(/\W+/g, '-').toLowerCase();
+  const name = collectionName.replaceAll(/\W+/g, '-').toLowerCase();
   return JSON.stringify({
     name: `${name}-api-tests`,
     version: '1.0.0',

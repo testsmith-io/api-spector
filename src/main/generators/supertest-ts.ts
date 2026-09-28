@@ -43,7 +43,7 @@ import * as dotenv from 'dotenv'
 dotenv.config({ path: '.env.local' });
 
 // Add secret env vars to .env.local:
-${envComments ? `// ${envComments.replace(/\n/g, '\n// ')}\n` : ''}\
+${envComments ? `// ${envComments.replaceAll('\n', '\n// ')}\n` : ''}\
 export const BASE_URL = process.env.BASE_URL ?? '${baseUrl}';
 
 export const api = supertest(BASE_URL);
@@ -131,15 +131,11 @@ function buildTestFile(folderName: string, folder: Folder, collection: Collectio
 
     const lines: string[] = [];
     if (!SUPERTEST_VERBS.includes(method)) {
-      lines.push(`  // ${req.method} (RFC 10008) is not supported by supertest`);
-      lines.push(`  it.skip('${nameMap.get(reqId)} [${req.method} unsupported]', () => {});`);
-      lines.push('');
+      lines.push(`  // ${req.method} (RFC 10008) is not supported by supertest`, `  it.skip('${nameMap.get(reqId)} [${req.method} unsupported]', () => {});`, '');
       tests.push(...lines);
       continue;
     }
-    lines.push(`  it('${nameMap.get(reqId)}', async () => {`);
-    lines.push(`    const res = await api`);
-    lines.push(`      .${method}(\`${path}\`)`);
+    lines.push(`  it('${nameMap.get(reqId)}', async () => {`, `    const res = await api`, `      .${method}(\`${path}\`)`);
 
     // Auth header
     if (effectiveAuth.type === 'bearer') {
@@ -173,8 +169,7 @@ function buildTestFile(folderName: string, folder: Folder, collection: Collectio
       } else if (req.body.mode === 'form' && req.body.form) {
         const pairs = req.body.form.filter(p => p.enabled && p.key)
           .map(p => `${p.key}: \`${interpolateValue(p.value, sharedVars)}\``).join(', ');
-        lines.push(`      .type('form')`);
-        lines.push(`      .send({ ${pairs} })`);
+        lines.push(`      .type('form')`, `      .send({ ${pairs} })`);
       }
     }
 
@@ -224,7 +219,7 @@ ${tests.join('\n\n')}
 // ─── Project scaffolding files ────────────────────────────────────────────────
 
 function buildPackageJson(collectionName: string): string {
-  const name = collectionName.replace(/\W+/g, '-').toLowerCase();
+  const name = collectionName.replaceAll(/\W+/g, '-').toLowerCase();
   return JSON.stringify({
     name: `${name}-api-tests`,
     version: '1.0.0',

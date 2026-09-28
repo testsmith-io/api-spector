@@ -10,12 +10,12 @@ import { useT } from '../../i18n';
 // ─── Editor ──────────────────────────────────────────────────────────────────
 
 interface Props {
-  ds: DataSet
-  onChange: (ds: DataSet) => void
+  readonly ds: DataSet
+  readonly onChange: (ds: DataSet) => void
   /** Base filename (without extension) used when exporting to CSV. */
-  exportName: string
+  readonly exportName: string
   /** Scope word shown in the intro line, e.g. "collection" or "folder". */
-  scopeLabel?: string
+  readonly scopeLabel?: string
 }
 
 /** Column/row table editor for a data-driven DataSet, with CSV import/export.
@@ -61,7 +61,7 @@ export function DataSetEditor({ ds, onChange, exportName, scopeLabel = 'collecti
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href     = url;
-    a.download = `${exportName.replace(/\s+/g, '_')}_data.csv`;
+    a.download = `${exportName.replaceAll(/\s+/g, '_')}_data.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }

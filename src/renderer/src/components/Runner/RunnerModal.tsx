@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { Fragment, useEffect, useRef, useState, useCallback } from 'react';
-import { useStore } from '../../store';
+import { useStore, findFolder } from '../../store';
 import type { RunRequestResult, RunSummary, RunnerItem } from '../../../../shared/types';
-import { findFolder } from '../../store';
 import { buildJsonReport, buildJUnitReport, buildHtmlReport, buildSarifReport } from '../../../../shared/report';
 import { collectAllTags, buildRunPlan, expandRunPlanWithData, expandFolderDataSets, resolveInheritedAuthAndHeaders, authIsConfigured } from '../../../../shared/request-collection';
 import { buildCliArgs, generateGitHub, generateAzure, generateGitLab } from '../../../../shared/ci-generators';
@@ -51,7 +50,7 @@ function allTagsIn(collectionId: string, folderId: string | null): string[] {
 
 // ─── Status indicator ─────────────────────────────────────────────────────────
 
-function StatusDot({ status }: { status: RunRequestResult['status'] }) {
+function StatusDot({ status }: { readonly status: RunRequestResult['status'] }) {
   const colors: Record<string, string> = {
     pending: 'bg-surface-700',
     running: 'bg-blue-400 animate-pulse',
@@ -74,7 +73,7 @@ function hasDetail(r: RunRequestResult): boolean {
   );
 }
 
-function DetailSection({ label, children }: { label: string; children: React.ReactNode }) {
+function DetailSection({ label, children }: { readonly label: string; readonly children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
       <span className="text-[9px] uppercase tracking-wider text-surface-600 font-semibold">{label}</span>
@@ -83,7 +82,7 @@ function DetailSection({ label, children }: { label: string; children: React.Rea
   );
 }
 
-function KVRows({ rows }: { rows: [string, string][] }) {
+function KVRows({ rows }: { readonly rows: [string, string][] }) {
   if (rows.length === 0) return null;
   return (
     <div className="flex flex-col gap-0.5">
@@ -99,7 +98,7 @@ function KVRows({ rows }: { rows: [string, string][] }) {
 
 const PRE_CLS = 'text-[10px] font-mono text-surface-300 bg-surface-900 border border-surface-800 rounded px-2 py-1.5 overflow-x-auto whitespace-pre-wrap break-words max-h-56 overflow-y-auto';
 
-function ResultDetail({ r }: { r: RunRequestResult }) {
+function ResultDetail({ r }: { readonly r: RunRequestResult }) {
   const t = useT();
   return (
     <div className="flex flex-col gap-3 text-xs">

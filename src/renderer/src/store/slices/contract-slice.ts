@@ -59,7 +59,7 @@ export const createContractSlice: StateCreator<
   loadContractSnapshot: (relPath, snapshot) => set(s => {
     s.contractSnapshots[relPath] = snapshot;
     if (s.workspace) {
-      if (!s.workspace.contracts) s.workspace.contracts = [];
+      s.workspace.contracts ??= [];
       if (!s.workspace.contracts.includes(relPath)) s.workspace.contracts.push(relPath);
     }
   }),

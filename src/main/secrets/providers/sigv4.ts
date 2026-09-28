@@ -33,15 +33,15 @@ function sha256hex(data: string): string {
 
 // Returns the full header set (including Authorization + x-amz-date) to send.
 export function signSigV4(input: SigV4Input): Record<string, string> {
-  const amzDate = input.now.toISOString().replace(/[:-]|\.\d{3}/g, ''); // YYYYMMDDTHHMMSSZ
+  const amzDate = input.now.toISOString().replaceAll(/[:-]|\.\d{3}/g, ''); // YYYYMMDDTHHMMSSZ
   const dateStamp = amzDate.slice(0, 8);
 
   const headers: Record<string, string> = { ...input.headers, host: input.host, 'x-amz-date': amzDate };
   if (input.sessionToken) headers['x-amz-security-token'] = input.sessionToken;
 
   const lower: Record<string, string> = {};
-  for (const k of Object.keys(headers)) lower[k.toLowerCase()] = headers[k].trim().replace(/\s+/g, ' ');
-  const sortedKeys = Object.keys(lower).sort();
+  for (const k of Object.keys(headers)) lower[k.toLowerCase()] = headers[k].trim().replaceAll(/\s+/g, ' ');
+  const sortedKeys = Object.keys(lower).sort((a, b) => a.localeCompare(b));
 
   const canonicalHeaders = sortedKeys.map((k) => `${k}:${lower[k]}\n`).join('');
   const signedHeaders = sortedKeys.join(';');

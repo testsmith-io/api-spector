@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { createCipheriv, pbkdf2Sync, randomBytes } from 'crypto';
+import { createCipheriv, pbkdf2Sync, randomBytes } from 'node:crypto';
 import { decryptSecret, getSecret } from '../main/ipc/secret-handler';
 
 // ─── Helper: encrypt with the same algorithm used by the renderer ─────────────

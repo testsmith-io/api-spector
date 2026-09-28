@@ -15,12 +15,12 @@ function extractPath(url: string): string {
   try {
     return new URL(url).pathname || '/';
   } catch {
-    const match = url.match(/(?:https?:\/\/[^/]+)?(\/[^?]*)/);
+    const match = /(?:https?:\/\/[^/]+)?(\/[^?]*)/.exec(url);
     return match?.[1] ?? '/';
   }
 }
 
-export function SaveAsMockModal({ onClose }: { onClose: () => void }) {
+export function SaveAsMockModal({ onClose }: { readonly onClose: () => void }) {
   const t = useT();
   const mocks = useStore(s => s.mocks);
   const addMock = useStore(s => s.addMock);

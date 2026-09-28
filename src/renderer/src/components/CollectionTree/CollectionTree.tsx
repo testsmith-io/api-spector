@@ -10,6 +10,7 @@ import { CollectionSettingsModal } from './CollectionSettingsModal';
 import { SchemaSyncModal } from './SchemaSyncModal';
 import { PushContractModal } from './PushContractModal';
 import { RequestRow, HOOK_LABELS, HOOK_COLORS } from './RequestRow';
+import { onActivateKey } from '../../lib/a11y';
 import { cloudEnabled } from '../../lib/cloud-push';
 import { collectTagged } from '../../../../shared/request-collection';
 import { InlineEdit } from '../common/InlineEdit';
@@ -41,10 +42,10 @@ export const DragCtx = createContext<{
 // that drops the dragged item at a specific position among a folder's children.
 
 function DropLine ( { collectionId, parentFolderId, index, indent }: {
-  collectionId: string
-  parentFolderId: string
-  index: number
-  indent: number
+  readonly collectionId: string
+  readonly parentFolderId: string
+  readonly index: number
+  readonly indent: number
 } ) {
   const dragCtx = useContext( DragCtx );
   const [over, setOver] = useState( false );
@@ -79,11 +80,11 @@ export const SelectionCtx = createContext<{
 export function TagChips ( {
   tags, onRemove, onAdd, forceAdding = false, onDoneAdding,
 }: {
-  tags: string[]
-  onRemove: ( tag: string ) => void
-  onAdd: ( tag: string ) => void
-  forceAdding?: boolean
-  onDoneAdding?: () => void
+  readonly tags: string[]
+  readonly onRemove: ( tag: string ) => void
+  readonly onAdd: ( tag: string ) => void
+  readonly forceAdding?: boolean
+  readonly onDoneAdding?: () => void
 } ) {
   const t = useT();
   const [adding, setAdding] = useState( false );
@@ -104,7 +105,13 @@ export function TagChips ( {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-0.5 mt-0.5" onClick={e => e.stopPropagation()}>
+    <div
+      role="group"
+      aria-label="Tags"
+      className="flex flex-wrap items-center gap-0.5 mt-0.5"
+      onClick={e => e.stopPropagation()}
+      onKeyDown={e => e.stopPropagation()}
+    >
       {tags.map( tag => (
         <span
           key={tag}
@@ -235,13 +242,13 @@ export function CollectionTree () {
   }
 
   function onDropRequest ( destCollectionId: string, destFolderId: string, destIndex?: number ) {
-    if ( !dragging || dragging.type !== 'request' ) return;
+    if ( dragging?.type !== 'request' ) return;
     moveRequest( dragging.collectionId, dragging.requestId, destCollectionId, destFolderId, destIndex );
     setDragging( null );
   }
 
   function onDropFolder ( destCollectionId: string, destParentFolderId: string, destIndex?: number ) {
-    if ( !dragging || dragging.type !== 'folder' ) return;
+    if ( dragging?.type !== 'folder' ) return;
     if ( dragging.collectionId !== destCollectionId ) return;  // cross-collection folder moves not supported
     moveFolder( dragging.collectionId, dragging.folderId, destParentFolderId, destIndex );
     setDragging( null );
@@ -434,32 +441,32 @@ function CollectionNode ( {
   onUpdateFolderTags, onUpdateRequestTags, onSetRequestHookType, onToggleRequestDisabled,
   onRunCollection, onRunFolder,
 }: {
-  col: Collection
-  isActive: boolean
-  activeRequestId: string | null
-  existingCollectionNames: string[]
-  newRequestId: string | null
-  onSelectCollection: () => void
-  onSelectRequest: ( id: string ) => void
-  onAddRequest: ( folderId: string ) => void
-  onAddFolder: ( parentId: string, name: string ) => void
-  onRenameCollection: ( name: string ) => void
-  onDeleteCollection: () => void
-  onDuplicateCollection: () => void
-  onToggleCollectionDisabled: () => void
-  onRenameFolder: ( folderId: string, name: string ) => void
-  onDeleteFolder: ( folderId: string ) => void
-  onDuplicateFolder: ( folderId: string ) => void
-  onToggleFolderDisabled: ( folderId: string ) => void
-  onRenameRequest: ( id: string, name: string ) => void
-  onDeleteRequest: ( id: string ) => void
-  onDuplicateRequest: ( id: string ) => void
-  onUpdateFolderTags: ( folderId: string, tags: string[] ) => void
-  onUpdateRequestTags: ( requestId: string, tags: string[] ) => void
-  onSetRequestHookType: ( requestId: string, hookType: ApiRequest['hookType'] ) => void
-  onToggleRequestDisabled: ( requestId: string ) => void
-  onRunCollection: () => void
-  onRunFolder: ( folderId: string ) => void
+  readonly col: Collection
+  readonly isActive: boolean
+  readonly activeRequestId: string | null
+  readonly existingCollectionNames: string[]
+  readonly newRequestId: string | null
+  readonly onSelectCollection: () => void
+  readonly onSelectRequest: ( id: string ) => void
+  readonly onAddRequest: ( folderId: string ) => void
+  readonly onAddFolder: ( parentId: string, name: string ) => void
+  readonly onRenameCollection: ( name: string ) => void
+  readonly onDeleteCollection: () => void
+  readonly onDuplicateCollection: () => void
+  readonly onToggleCollectionDisabled: () => void
+  readonly onRenameFolder: ( folderId: string, name: string ) => void
+  readonly onDeleteFolder: ( folderId: string ) => void
+  readonly onDuplicateFolder: ( folderId: string ) => void
+  readonly onToggleFolderDisabled: ( folderId: string ) => void
+  readonly onRenameRequest: ( id: string, name: string ) => void
+  readonly onDeleteRequest: ( id: string ) => void
+  readonly onDuplicateRequest: ( id: string ) => void
+  readonly onUpdateFolderTags: ( folderId: string, tags: string[] ) => void
+  readonly onUpdateRequestTags: ( requestId: string, tags: string[] ) => void
+  readonly onSetRequestHookType: ( requestId: string, hookType: ApiRequest['hookType'] ) => void
+  readonly onToggleRequestDisabled: ( requestId: string ) => void
+  readonly onRunCollection: () => void
+  readonly onRunFolder: ( folderId: string ) => void
 } ) {
   const t = useT();
   const [expanded, setExpanded] = useState( true );
@@ -484,7 +491,10 @@ function CollectionNode ( {
       <div
         className={`group flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-surface-800 transition-colors ${panelActive ? 'bg-surface-800 text-[var(--text-primary)]' : isActive ? 'text-[var(--text-primary)]' : 'text-surface-400'
           } ${col.disabled ? 'opacity-50' : ''} ${dropOver ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
+        role="button"
+        tabIndex={0}
         onClick={() => { onSelectCollection(); setExpanded( e => !e ); }}
+        onKeyDown={onActivateKey(() => { onSelectCollection(); setExpanded( e => !e ); })}
         onDragOver={dragCtx.dragging ? e => { e.preventDefault(); setDropOver( true ); } : undefined}
         onDragLeave={() => setDropOver( false )}
         onDrop={e => {
@@ -591,21 +601,21 @@ function FolderRow ( {
   onUpdateTags, onRun,
   children,
 }: {
-  folder: Folder
-  collectionId: string
-  parentFolderId: string
-  depth: number
-  expandCtrl: ExpandCtrl
-  onRequestExpand: ( ids: Set<string>, value: boolean ) => void
-  onAddRequest: () => void
-  onAddFolder: () => void
-  onRename: ( name: string ) => void
-  onDelete: () => void
-  onDuplicate: () => void
-  onToggleDisabled: () => void
-  onUpdateTags: ( tags: string[] ) => void
-  onRun: () => void
-  children: React.ReactNode
+  readonly folder: Folder
+  readonly collectionId: string
+  readonly parentFolderId: string
+  readonly depth: number
+  readonly expandCtrl: ExpandCtrl
+  readonly onRequestExpand: ( ids: Set<string>, value: boolean ) => void
+  readonly onAddRequest: () => void
+  readonly onAddFolder: () => void
+  readonly onRename: ( name: string ) => void
+  readonly onDelete: () => void
+  readonly onDuplicate: () => void
+  readonly onToggleDisabled: () => void
+  readonly onUpdateTags: ( tags: string[] ) => void
+  readonly onRun: () => void
+  readonly children: React.ReactNode
 } ) {
   const t = useT();
   // Folders start collapsed so expanding a collection doesn't blow the whole
@@ -665,7 +675,10 @@ function FolderRow ( {
         draggable
         className={`group flex items-center gap-1 py-1 transition-colors cursor-pointer ${isActive ? 'bg-surface-800 text-[var(--text-primary)]' : 'text-surface-400 hover:bg-surface-800'} ${folder.disabled ? 'opacity-40' : ''} ${dropInside ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
         style={{ paddingLeft: indent }}
+        role="button"
+        tabIndex={0}
         onClick={() => { openFolderPanel( collectionId, folder.id ); setExpanded( e => !e ); }}
+        onKeyDown={onActivateKey(() => { openFolderPanel( collectionId, folder.id ); setExpanded( e => !e ); })}
         onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.stopPropagation(); dragCtx.setDragging( { type: 'folder', folderId: folder.id, collectionId } ); }}
         onDragEnd={() => { dragCtx.setDragging( null ); setDropInside( false ); }}
         onDragOver={handleFolderDragOver}
@@ -769,29 +782,29 @@ function FolderContents ( {
   onRenameRequest, onDeleteRequest, onDuplicateRequest,
   onUpdateFolderTags, onUpdateRequestTags, onSetRequestHookType, onToggleRequestDisabled, onRunFolder,
 }: {
-  folder: Folder
-  collectionId: string
-  requests: Collection['requests']
-  activeRequestId: string | null
-  depth: number
-  expandCtrl: ExpandCtrl
-  onRequestExpand: ( ids: Set<string>, value: boolean ) => void
-  newRequestId: string | null
-  onSelectRequest: ( id: string ) => void
-  onAddRequest: ( folderId: string ) => void
-  onAddFolder: ( parentId: string, name: string ) => void
-  onRenameFolder: ( folderId: string, name: string ) => void
-  onDeleteFolder: ( folderId: string ) => void
-  onDuplicateFolder: ( folderId: string ) => void
-  onToggleFolderDisabled: ( folderId: string ) => void
-  onRenameRequest: ( id: string, name: string ) => void
-  onDeleteRequest: ( id: string ) => void
-  onDuplicateRequest: ( id: string ) => void
-  onUpdateFolderTags: ( folderId: string, tags: string[] ) => void
-  onUpdateRequestTags: ( requestId: string, tags: string[] ) => void
-  onSetRequestHookType: ( requestId: string, hookType: ApiRequest['hookType'] ) => void
-  onToggleRequestDisabled: ( requestId: string ) => void
-  onRunFolder: ( folderId: string ) => void
+  readonly folder: Folder
+  readonly collectionId: string
+  readonly requests: Collection['requests']
+  readonly activeRequestId: string | null
+  readonly depth: number
+  readonly expandCtrl: ExpandCtrl
+  readonly onRequestExpand: ( ids: Set<string>, value: boolean ) => void
+  readonly newRequestId: string | null
+  readonly onSelectRequest: ( id: string ) => void
+  readonly onAddRequest: ( folderId: string ) => void
+  readonly onAddFolder: ( parentId: string, name: string ) => void
+  readonly onRenameFolder: ( folderId: string, name: string ) => void
+  readonly onDeleteFolder: ( folderId: string ) => void
+  readonly onDuplicateFolder: ( folderId: string ) => void
+  readonly onToggleFolderDisabled: ( folderId: string ) => void
+  readonly onRenameRequest: ( id: string, name: string ) => void
+  readonly onDeleteRequest: ( id: string ) => void
+  readonly onDuplicateRequest: ( id: string ) => void
+  readonly onUpdateFolderTags: ( folderId: string, tags: string[] ) => void
+  readonly onUpdateRequestTags: ( requestId: string, tags: string[] ) => void
+  readonly onSetRequestHookType: ( requestId: string, hookType: ApiRequest['hookType'] ) => void
+  readonly onToggleRequestDisabled: ( requestId: string ) => void
+  readonly onRunFolder: ( folderId: string ) => void
 } ) {
   // Example actions + the currently-open example are read here so they don't
   // have to be threaded through the whole folder prop chain.

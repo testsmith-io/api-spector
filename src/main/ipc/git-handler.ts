@@ -5,8 +5,8 @@ import { type IpcMain } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
 import { simpleGit } from 'simple-git';
-import { writeFile, readFile, mkdir, stat } from 'fs/promises';
-import { join, dirname } from 'path';
+import { writeFile, readFile, mkdir, stat } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
 import type { GitStatus, GitCommit, GitBranch, GitRemote } from '../../shared/types';
 import { getWorkspaceDir, ensureGitignore } from './file-handler';
 
@@ -152,8 +152,8 @@ export function registerGitHandlers(ipc: IpcMain): void {
       // `--format=%(upstream:track)` → "[ahead 1, behind 2]" or empty
       let ahead: number | undefined;
       let behind: number | undefined;
-      const aheadM  = track?.match(/ahead (\d+)/);
-      const behindM = track?.match(/behind (\d+)/);
+      const aheadM  = /ahead (\d+)/.exec(track);
+      const behindM = /behind (\d+)/.exec(track);
       if (aheadM)  ahead  = Number(aheadM[1]);
       if (behindM) behind = Number(behindM[1]);
 
@@ -258,7 +258,7 @@ function resolveStatus(
   if (staged) {
     if (result.created.includes(filePath))  return 'added';
     if (result.deleted.includes(filePath))  return 'deleted';
-    if (result.renamed.find(r => r.to === filePath || r.from === filePath)) return 'renamed';
+    if (result.renamed.some(r => r.to === filePath || r.from === filePath)) return 'renamed';
     return 'modified';
   }
   if (result.deleted.includes(filePath)) return 'deleted';

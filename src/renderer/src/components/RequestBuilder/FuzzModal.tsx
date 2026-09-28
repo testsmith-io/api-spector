@@ -20,7 +20,7 @@ const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
  * panel (which sweeps the whole workspace against a provider base URL). Both
  * call the same engine; here the request list is just [request].
  */
-export function FuzzModal({ request, onClose }: { request: ApiRequest; onClose: () => void }) {
+export function FuzzModal({ request, onClose }: { readonly request: ApiRequest; readonly onClose: () => void }) {
   const t = useT();
   const environments        = useStore(s => s.environments);
   const activeEnvironmentId = useStore(s => s.activeEnvironmentId);

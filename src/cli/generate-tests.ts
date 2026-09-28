@@ -24,7 +24,7 @@
  *   --help                  Show this help.
  */
 
-import { readFile, writeFile } from 'fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { load as yamlLoad } from 'js-yaml';
 import { fetch } from 'undici';
 import { v4 as uuidv4 } from 'uuid';

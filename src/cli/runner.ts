@@ -20,8 +20,8 @@
  *   --help                   Show this message
  */
 
-import { writeFile } from 'fs/promises';
-import { resolve, extname } from 'path';
+import { writeFile } from 'node:fs/promises';
+import { resolve, extname } from 'node:path';
 
 // Replaced at build time by electron-vite (`define` in main config).
 declare const __APP_VERSION__: string;
@@ -230,7 +230,7 @@ async function main() {
 
     let runEnvVars        = await buildEnvVars(env);
     let runGlobals        = getGlobals();
-    let runCollectionVars: Record<string, string> = { ...col.collectionVariables ?? {} };
+    let runCollectionVars: Record<string, string> = { ...col.collectionVariables };
     let runLocalVars:     Record<string, string> = {};
 
     console.log(color(`  ┌ ${col.name}`, C.bold, C.white));
@@ -303,7 +303,7 @@ async function main() {
           collectionVars: { ...item.collectionVars, ...runCollectionVars },
           envVars: runEnvVars,
           globals: runGlobals,
-          localVars: { ...runLocalVars, ...(item.dataRow ?? {}) },
+          localVars: { ...runLocalVars, ...item.dataRow },
           dispatcher,
           piiMaskPatterns: piiPatterns,
           tls: effectiveTls,

@@ -6,7 +6,7 @@ import type { ApiRequest } from '../../../../shared/types';
 import { KVTable } from './KVTable';
 import { useT } from '../../i18n';
 
-export function ParamsTab({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
+export function ParamsTab({ request, onChange }: { readonly request: ApiRequest; readonly onChange: (p: Partial<ApiRequest>) => void }) {
   const t = useT();
   return (
     <KVTable

@@ -12,7 +12,7 @@ import { STORAGE_KEYS } from '../../lib/storage-keys';
  *  this store has always written (it differs slightly from naming-utils'
  *  `envRelPath` around punctuation, and changing it would orphan files). */
 function envSlugRelPath(name: string): string {
-  return `environments/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.env.json`;
+  return `environments/${name.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')}.env.json`;
 }
 
 export interface EnvironmentsSliceState {

@@ -8,7 +8,7 @@
 // field, a changed type, a dropped response field. Pure and dependency-free;
 // the CLI feeds it into an impact analysis (which tests/consumers a change hits).
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 
 export interface SpecChange {
   kind:
@@ -22,11 +22,11 @@ export interface SpecChange {
   detail: string
 }
 
-const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'];
+const HTTP_METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
 
 function resolveRef(spec: any, ref: string): any {
   const parts = ref.replace(/^#\//, '').split('/');
-  return parts.reduce((o, k) => o?.[decodeURIComponent(k.replace(/~1/g, '/').replace(/~0/g, '~'))], spec);
+  return parts.reduce((o, k) => o?.[decodeURIComponent(k.replaceAll('~1', '/').replaceAll('~0', '~'))], spec);
 }
 function deref(spec: any, node: any, depth = 0, seen: Set<any> = new Set()): any {
   if (!node || typeof node !== 'object' || depth > 8) return node;
@@ -71,7 +71,7 @@ function requestSchema(spec: any, op: any): any {
 }
 function successResponseSchema(spec: any, op: any): any {
   const responses = op?.responses ?? {};
-  const code = Object.keys(responses).filter(c => /^2\d\d$/.test(c)).sort()[0];
+  const code = Object.keys(responses).filter(c => /^2\d\d$/.test(c)).sort((a, b) => a.localeCompare(b))[0];
   return code ? deref(spec, responses[code])?.content?.['application/json']?.schema : undefined;
 }
 function paramRequired(spec: any, pathItem: any, op: any): Map<string, boolean> {
@@ -86,7 +86,7 @@ function operations(spec: any): Map<string, { method: string; path: string; path
   for (const [path, item] of Object.entries<any>(spec?.paths ?? {})) {
     if (!item || typeof item !== 'object') continue;
     for (const [method, op] of Object.entries<any>(item)) {
-      if (!HTTP_METHODS.includes(method.toLowerCase())) continue;
+      if (!HTTP_METHODS.has(method.toLowerCase())) continue;
       map.set(`${method.toUpperCase()} ${path}`, { method: method.toUpperCase(), path, pathItem: item, op });
     }
   }

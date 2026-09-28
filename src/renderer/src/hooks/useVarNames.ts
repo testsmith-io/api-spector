@@ -62,7 +62,7 @@ export function useVarNames(): string[] {
     const envVars = activeEnv?.variables ?? [];
     envVars.filter(v => v.enabled && v.key).forEach(v => names.add(v.key));
 
-    return [...DYNAMIC_VAR_NAMES, ...Array.from(names).sort()];
+    return [...DYNAMIC_VAR_NAMES, ...Array.from(names).sort((a, b) => a.localeCompare(b))];
   }, [
     activeEnv, activeCollectionId,
     collections, globals, sessionVars,

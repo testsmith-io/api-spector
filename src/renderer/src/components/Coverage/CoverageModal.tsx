@@ -11,7 +11,7 @@ import { useT } from '../../i18n';
 
 const { electron } = window;
 
-function Bar({ pct }: { pct: number }) {
+function Bar({ pct }: { readonly pct: number }) {
   const color = pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : 'bg-red-500';
   return (
     <div className="h-2 w-full rounded bg-surface-800 overflow-hidden">
@@ -20,7 +20,7 @@ function Bar({ pct }: { pct: number }) {
   );
 }
 
-function Stat({ value, label }: { value: React.ReactNode; label: string }) {
+function Stat({ value, label }: { readonly value: React.ReactNode; readonly label: string }) {
   return (
     <div className="flex-1">
       <div className="text-2xl font-bold text-white">{value}</div>

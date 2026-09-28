@@ -4,7 +4,7 @@
 import { type IpcMain, shell } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
-import { createServer, type IncomingMessage, type ServerResponse } from 'http';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AuthConfig, Oauth2Auth } from '../../shared/types';
 import { getSecret } from './secret-handler';
 import { interpolate } from '../interpolation';

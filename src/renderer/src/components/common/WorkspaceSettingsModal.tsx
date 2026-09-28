@@ -17,7 +17,7 @@ const ZOOM_STEPS = [0.75, 0.90, 1.0, 1.10, 1.25, 1.50];
 
 type SettingsTab = 'general' | 'appearance' | 'proxy' | 'tls' | 'privacy' | 'cloud' | 'ai' | 'secrets'
 
-export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
+export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => void }) {
   const workspace = useStore(s => s.workspace);
   const updateWorkspaceSettings = useStore(s => s.updateWorkspaceSettings);
   const environments = useStore(s => s.environments);
@@ -143,7 +143,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
     // Start from what's already in the workspace so live-applied appearance
     // settings (theme, zoom) aren't wiped out by this form's rebuild.
     const settings: NonNullable<NonNullable<typeof workspace>['settings']> = {
-      ...(workspace?.settings ?? {}),
+      ...workspace?.settings,
     };
 
     if (proxyUrl.trim()) {
@@ -294,6 +294,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
               <label className="flex items-start gap-2 mt-2 cursor-pointer">
                 <input
                   type="checkbox"
+                  aria-label={t('Persist request history')}
                   checked={persistHistory}
                   onChange={e => setPersistHistory(e.target.checked)}
                   className="mt-0.5"
@@ -445,6 +446,7 @@ export function WorkspaceSettingsModal({ onClose }: { onClose: () => void }) {
               <label className="flex items-start gap-2 cursor-pointer">
                 <input
                   type="checkbox"
+                  aria-label={t('Enable API Spector Cloud')}
                   checked={cloudEnabled}
                   onChange={e => setCloudEnabled(e.target.checked)}
                   className="mt-0.5 accent-blue-500"

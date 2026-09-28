@@ -14,17 +14,17 @@ import type {
 
 /** Rewrite `{{VAR}}` tokens to shell `${VAR}` so curl expands them at runtime. */
 function mapOut(s: string): string {
-  return s.replace(/\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g, (_m, name: string) => `\${${name}}`);
+  return s.replaceAll(/\{\{\s*([A-Za-z_]\w*)\s*\}\}/g, (_m, name: string) => `\${${name}}`);
 }
 
 /** Single-quote a value for the shell, escaping embedded single quotes. */
 function shq(s: string): string {
-  return `'${s.replace(/'/g, `'\\''`)}'`;
+  return `'${s.replaceAll("'", `'\\''`)}'`;
 }
 
 /** Double-quote a value that must still expand ${VAR}; escape " and \\ and $ that are not vars. */
 function dq(s: string): string {
-  return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  return `"${s.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
 }
 
 /** Depth-first list of requests in folder order. */
@@ -136,6 +136,6 @@ export function generateCurl(collection: Collection, environment: Environment | 
     lines.push(args.join(' \\\n  '));
   });
 
-  const slug = collection.name.replace(/\W+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'collection';
+  const slug = collection.name.replaceAll(/\W+/g, '-').replaceAll(/^-+|-+$/g, '').toLowerCase() || 'collection';
   return [{ path: `${slug}.sh`, content: lines.join('\n') + '\n' }];
 }

@@ -12,7 +12,7 @@ import { btnSecondaryCls, btnPrimaryCls } from '../../lib/ui-classes';
 const { electron } = window;
 
 interface Props {
-  onClose: () => void
+  readonly onClose: () => void
 }
 
 export function DocsGeneratorModal({ onClose }: Props) {

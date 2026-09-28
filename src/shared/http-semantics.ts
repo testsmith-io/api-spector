@@ -79,7 +79,7 @@ export function validateHttpSemantics(res: HttpResponseView, opts: HttpSemantics
   const body = hasBody(res);
   const contentType = header(res.headers, 'content-type');
   const contentEncoding = header(res.headers, 'content-encoding');
-  const clNum = Number(header(res.headers, 'content-length') ?? NaN);
+  const clNum = Number(header(res.headers, 'content-length') ?? Number.NaN);
   const isBodiless = status in BODILESS || (status >= 100 && status < 200);
 
   // ── Bodies that must be empty ─────────────────────────────────────────────

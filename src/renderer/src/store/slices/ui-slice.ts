@@ -11,9 +11,11 @@ import type { ResponsePayload } from '../../../../shared/types';
 import type { FullState } from '../index';
 import { STORAGE_KEYS } from '../../lib/storage-keys';
 
+export type Theme = 'dark' | 'light' | 'system';
+
 export interface UiSliceState {
   showGeneratorPanel: boolean
-  theme: 'dark' | 'light' | 'system'
+  theme: Theme
   zoom: number
   sidebarTab: 'collections' | 'history' | 'mocks' | 'contracts' | 'git'
 
@@ -55,7 +57,7 @@ export interface UiSliceState {
 
 export interface UiSliceActions {
   setShowGeneratorPanel: (v: boolean) => void
-  setTheme: (t: 'dark' | 'light' | 'system') => void
+  setTheme: (t: Theme) => void
   setZoom: (z: number) => void
   setSidebarTab: (tab: UiSliceState['sidebarTab']) => void
   setWorkspaceSettingsOpen: (open: boolean) => void
@@ -83,7 +85,7 @@ export const createUiSlice: StateCreator<
   UiSlice
 > = (set) => ({
   showGeneratorPanel: false,
-  theme: (localStorage.getItem(STORAGE_KEYS.theme) as 'dark' | 'light' | 'system') ?? 'dark',
+  theme: (localStorage.getItem(STORAGE_KEYS.theme) as Theme) ?? 'dark',
   zoom: Number(localStorage.getItem(STORAGE_KEYS.zoom) ?? '1.1'),
   sidebarTab: 'collections' as UiSliceState['sidebarTab'],
   workspaceSettingsOpen: false,
@@ -109,7 +111,7 @@ export const createUiSlice: StateCreator<
     // still remembers the most recent choice on next launch.
     localStorage.setItem(STORAGE_KEYS.theme, t);
     if (s.workspace) {
-      if (!s.workspace.settings) s.workspace.settings = {};
+      s.workspace.settings ??= {};
       s.workspace.settings.theme = t;
     }
     if (t === 'system') {

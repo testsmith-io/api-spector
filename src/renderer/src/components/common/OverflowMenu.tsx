@@ -12,16 +12,16 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 
 interface Props {
   /** Trigger label (e.g. "More ▾" or "…"). */
-  button: React.ReactNode;
-  ariaLabel: string;
-  title?: string;
+  readonly button: React.ReactNode;
+  readonly ariaLabel: string;
+  readonly title?: string;
   /** Classes for the relative wrapper — put container-query show/hide here so
    *  the whole control appears only at the widths where it is needed. */
-  wrapperClassName?: string;
-  buttonClassName?: string;
+  readonly wrapperClassName?: string;
+  readonly buttonClassName?: string;
   /** Which edge to anchor the menu to. */
-  align?: 'left' | 'right';
-  children: React.ReactNode;
+  readonly align?: 'left' | 'right';
+  readonly children: React.ReactNode;
 }
 
 export function OverflowMenu({ button, ariaLabel, title, wrapperClassName = '', buttonClassName = '', align = 'right', children }: Props) {
@@ -88,6 +88,7 @@ export function OverflowMenu({ button, ariaLabel, title, wrapperClassName = '', 
           ref={menuRef}
           id={menuId}
           role="menu"
+          tabIndex={-1}
           aria-label={ariaLabel}
           onKeyDown={onMenuKeyDown}
           // Close after a menu item is activated (mouse or keyboard).

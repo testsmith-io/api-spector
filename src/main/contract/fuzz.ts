@@ -180,7 +180,7 @@ export async function runFuzz(opts: FuzzOptions): Promise<FuzzRunResult> {
   const level: FuzzLevel = opts.level ?? 'standard';
   const vars = mergeVars(opts.envVars, opts.collectionVars ?? {}, {}, {}, await buildDynamicVars());
 
-  const dispatcher: ProxyAgent | Agent | undefined = await buildDispatcher(undefined, undefined);
+  const dispatcher: ProxyAgent | Agent | undefined = await buildDispatcher();
 
   const start = Date.now();
   const results: FuzzTargetResult[] = [];

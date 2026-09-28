@@ -35,11 +35,11 @@ function newContract(): ConsumerContract {
 
 /** Editable key/value rows (query params, headers). Compiles into the pact. */
 function KVRows({ label, rows, onChange, keyPlaceholder = 'name', valuePlaceholder = 'value' }: {
-  label: string;
-  rows: KeyValuePair[] | undefined;
-  onChange: (rows: KeyValuePair[]) => void;
-  keyPlaceholder?: string;
-  valuePlaceholder?: string;
+  readonly label: string;
+  readonly rows: KeyValuePair[] | undefined;
+  readonly onChange: (rows: KeyValuePair[]) => void;
+  readonly keyPlaceholder?: string;
+  readonly valuePlaceholder?: string;
 }) {
   const t = useT();
   const list = rows ?? [];
@@ -61,7 +61,7 @@ function KVRows({ label, rows, onChange, keyPlaceholder = 'name', valuePlacehold
   );
 }
 
-export function ContractDesignerModal({ seed, onClose }: { seed?: Partial<DesignInteraction>; onClose: () => void }) {
+export function ContractDesignerModal({ seed, onClose }: { readonly seed?: Partial<DesignInteraction>; readonly onClose: () => void }) {
   const workspace     = useStore(s => s.workspace);
   const workspacePath = useStore(s => s.workspacePath);
   const setWorkspace  = useStore(s => s.setWorkspace);
@@ -89,8 +89,8 @@ export function ContractDesignerModal({ seed, onClose }: { seed?: Partial<Design
       ...base,
       ...seed,
       id: uid(),
-      request:  { ...base.request,  ...(seed.request  ?? {}) },
-      response: { ...base.response, ...(seed.response ?? {}) },
+      request:  { ...base.request,  ...seed.request },
+      response: { ...base.response, ...seed.response },
     };
     const contract: ConsumerContract = { ...newContract(), interactions: [interaction] };
     setSelectedId(contract.id);

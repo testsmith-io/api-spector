@@ -53,7 +53,7 @@ export function bodyHasArray(body: string, contentType: string): boolean {
   return parsed.ok && findPrimaryArray(parsed.value) !== null;
 }
 
-interface Props { body: string; contentType: string }
+interface Props { readonly body: string; readonly contentType: string }
 
 export function ResponseTable({ body, contentType }: Props) {
   const t = useT();
@@ -209,7 +209,7 @@ export function ResponseTable({ body, contentType }: Props) {
   );
 }
 
-function Cell({ value, onDrill }: { value: unknown; onDrill: () => void }) {
+function Cell({ value, onDrill }: { readonly value: unknown; readonly onDrill: () => void }) {
   const t = useT();
   const kind = classify(value);
   if (kind === 'array' || kind === 'object') {

@@ -13,7 +13,7 @@ const { electron } = window;
 
 interface SpecInput { source: string; text: string }
 
-function SpecField({ label, value, onSource, onText }: { label: string; value: SpecInput; onSource: (s: string) => void; onText: (s: string) => void }) {
+function SpecField({ label, value, onSource, onText }: { readonly label: string; readonly value: SpecInput; readonly onSource: (s: string) => void; readonly onText: (s: string) => void }) {
   const t = useT();
   return (
     <div className="flex-1">

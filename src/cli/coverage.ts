@@ -24,7 +24,7 @@
  *   --help                 Show this help.
  */
 
-import { readFile, writeFile } from 'fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { load as yamlLoad } from 'js-yaml';
 import { fetch } from 'undici';
 import type { Workspace, Collection, ApiRequest } from '../shared/types';
@@ -119,7 +119,7 @@ function toHtml(report: CoverageReport): string {
       <td><code>${op.path}</code></td>
       <td>${op.declaredStatuses.length ? `${op.coveredStatuses.length}/${op.declaredStatuses.length}` : '-'}</td>
       <td>${op.tested ? (op.hasNegativeTest ? 'yes' : '<span class="warn">missing</span>') : '-'}</td>
-      <td>${op.requests.map(r => r.replace(/</g, '&lt;')).join('<br>') || '-'}</td>
+      <td>${op.requests.map(r => r.replaceAll('<', '&lt;')).join('<br>') || '-'}</td>
     </tr>`).join('');
   const title = (report.spec.title ?? 'API') + (report.spec.version ? ` v${report.spec.version}` : '');
   return `<!doctype html><meta charset="utf-8"><title>${title} coverage</title>

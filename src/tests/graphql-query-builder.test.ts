@@ -81,7 +81,7 @@ describe('insertField', () => {
     expect(query).not.toContain('(');           // no page / args anywhere
     expect(query).not.toContain('__typename');  // ancestors get real selections, not a placeholder
     expect(variables).toBe('');                 // no variables
-    expect(query.replace(/\s+/g, ' ').trim()).toBe('{ brands { data { name } } }');
+    expect(query.replaceAll(/\s+/g, ' ').trim()).toBe('{ brands { data { name } } }');
   });
 
   it('all-fields insert selects every leaf field of the entity, no args or variables', () => {

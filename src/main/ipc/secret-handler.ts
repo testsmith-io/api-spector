@@ -1,14 +1,13 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { type IpcMain } from 'electron';
+import { type IpcMain, type safeStorage as SafeStorageType } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
 import { hasSecretScheme, resolveExternalSecret } from '../secrets';
-import type { safeStorage as SafeStorageType } from 'electron';
-import { pbkdf2Sync, createDecipheriv } from 'crypto';
-import { readFile, writeFile } from 'fs/promises';
-import { join } from 'path';
+import { pbkdf2Sync, createDecipheriv } from 'node:crypto';
+import { readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 const MASTER_KEY_ENV = 'API_SPECTOR_MASTER_KEY';
 
@@ -78,7 +77,7 @@ export function registerSecretHandlers(ipc: IpcMain): void {
    */
   handleIpc(ipc, IPC.secret.set, async (_e, ref: string, value: string) => {
     const ss = getSafeStorage();
-    if (!ss || !ss.isEncryptionAvailable()) {
+    if (!ss?.isEncryptionAvailable()) {
       throw new Error('OS encryption is not available - set the secret via environment variable instead');
     }
     secretStore[ref] = ss.encryptString(value).toString('base64');
@@ -120,8 +119,8 @@ export function decryptSecret(
   const encBuf  = Buffer.from(encrypted, 'base64');
 
   const key      = pbkdf2Sync(password, saltBuf, 100_000, 32, 'sha256');
-  const authTag  = encBuf.subarray(encBuf.length - 16);
-  const ciphertext = encBuf.subarray(0, encBuf.length - 16);
+  const authTag  = encBuf.subarray(-16);
+  const ciphertext = encBuf.subarray(0, -16);
 
   const decipher = createDecipheriv('aes-256-gcm', key, ivBuf);
   decipher.setAuthTag(authTag);
@@ -144,7 +143,7 @@ export async function getSecret(ref: string): Promise<string | null> {
   const stored = secretStore[ref];
   if (stored) {
     const ss = getSafeStorage();
-    if (ss && ss.isEncryptionAvailable()) {
+    if (ss?.isEncryptionAvailable()) {
       try {
         return ss.decryptString(Buffer.from(stored, 'base64'));
       } catch {

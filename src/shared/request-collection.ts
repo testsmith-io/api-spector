@@ -248,7 +248,7 @@ export function collectAllTags(folder: Folder, requests: Collection['requests'])
   }
 
   walk(folder);
-  return Array.from(tags).sort();
+  return Array.from(tags).sort((a, b) => a.localeCompare(b));
 }
 
 /**
@@ -333,7 +333,8 @@ export function getHooksForRequest(
     afterReversed.push(...aEach, ...aAll);
   }
 
-  return { before, after: afterReversed.reverse() };
+  afterReversed.reverse();
+  return { before, after: afterReversed };
 }
 
 /**
@@ -353,7 +354,7 @@ export function getHooksForRequest(
  */
 export function authIsConfigured(auth?: AuthConfig): boolean {
   if (!auth || auth.type === 'none') return false;
-  const set = (s?: string): boolean => !!(s && s.trim());
+  const set = (s?: string): boolean => !!(s?.trim());
   switch (auth.type) {
     case 'bearer': return set(auth.token) || set(auth.tokenSecretRef);
     case 'basic':
@@ -511,7 +512,7 @@ export function parseDataRow(columns: string[], row: string[]): ParsedDataRow {
     const key = col.toLowerCase();
     const val = row[ci] ?? '';
     if (RESERVED_STATUS.has(key)) {
-      const nums = val.split(/[\s,|]+/).map(x => parseInt(x, 10)).filter(n => Number.isFinite(n));
+      const nums = val.split(/[\s,|]+/).map(x => Number.parseInt(x, 10)).filter(n => Number.isFinite(n));
       if (nums.length) expectStatus = nums;
     } else if (RESERVED_OWASP.has(key)) {
       if (val.trim()) owaspTag = val.trim().toUpperCase();

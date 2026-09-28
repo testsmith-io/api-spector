@@ -31,6 +31,7 @@ import { CommandPalette } from './components/common/CommandPalette';
 import { DocsGeneratorModal } from './components/common/DocsGeneratorModal';
 import { UpdateToast } from './components/common/UpdateToast';
 import { ProductTour } from './components/common/ProductTour';
+import { onActivateKey } from './lib/a11y';
 import { useT } from './i18n';
 
 const { electron } = window;
@@ -96,12 +97,12 @@ function ActivityBarBtn ( {
   children,
   dataTour,
 }: {
-  active: boolean
-  onClick: () => void
-  title: string
-  badge?: number
-  children: React.ReactNode
-  dataTour?: string
+  readonly active: boolean
+  readonly onClick: () => void
+  readonly title: string
+  readonly badge?: number
+  readonly children: React.ReactNode
+  readonly dataTour?: string
 } ) {
   return (
     <div className="relative group/ab" data-tour={dataTour}>
@@ -147,13 +148,13 @@ const TAB_METHOD_COLORS: Record<string, string> = {
 // state (active/response/sending) changes. Props are intentionally scalar so
 // React.memo's shallow comparison catches no-op renders.
 interface TabRowProps {
-  tabId: string
-  method?: string
-  name: string
-  isActive: boolean
-  onActivate: ( id: string ) => void
-  onClose: ( id: string ) => void
-  onContextMenu: ( id: string, x: number, y: number ) => void
+  readonly tabId: string
+  readonly method?: string
+  readonly name: string
+  readonly isActive: boolean
+  readonly onActivate: ( id: string ) => void
+  readonly onClose: ( id: string ) => void
+  readonly onContextMenu: ( id: string, x: number, y: number ) => void
 }
 
 const TabRow = React.memo( function TabRow ( {
@@ -162,7 +163,10 @@ const TabRow = React.memo( function TabRow ( {
   const t = useT();
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={() => onActivate( tabId )}
+      onKeyDown={onActivateKey( () => onActivate( tabId ) )}
       onContextMenu={e => {
         e.preventDefault();
         onContextMenu( tabId, e.clientX, e.clientY );
@@ -509,13 +513,27 @@ export default function App () {
               </aside>
               {/* Sidebar resize handle */}
               <div
-                className="flex-shrink-0 w-1 cursor-col-resize border-r border-surface-800 hover:border-blue-500 transition-colors"
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize sidebar"
+                aria-valuemin={160}
+                aria-valuemax={520}
+                aria-valuenow={sidebarWidth}
+                tabIndex={0}
+                className="flex-shrink-0 w-1 cursor-col-resize border-r border-surface-800 hover:border-blue-500 focus:border-blue-500 focus:outline-none transition-colors"
                 onMouseDown={e => {
                   dragging.current = 'sidebar';
                   dragStart.current = { x: e.clientX, w: sidebarWidth };
                   document.body.style.cursor = 'col-resize';
                   document.body.style.userSelect = 'none';
                   e.preventDefault();
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    const step = e.key === 'ArrowLeft' ? -16 : 16;
+                    setSidebarWidth(w => Math.max(160, Math.min(520, w + step)));
+                  }
                 }}
               />
             </>
@@ -567,8 +585,12 @@ export default function App () {
             {tabContextMenu && (
               <>
                 <div
+                  role="button"
+                  tabIndex={-1}
+                  aria-label={t( 'Close menu' )}
                   className="fixed inset-0 z-40"
                   onClick={() => setTabContextMenu( null )}
+                  onKeyDown={e => { if ( e.key === 'Escape' ) setTabContextMenu( null ); }}
                   onContextMenu={e => { e.preventDefault(); setTabContextMenu( null ); }}
                 />
                 <div
@@ -634,7 +656,7 @@ export default function App () {
                       await electron.saveMock(relPath, newRoutes);
                       const ws = useStore.getState().workspace;
                       if (ws) {
-                        if (!ws.mocks) ws.mocks = [];
+                        ws.mocks ??= [];
                         ws.mocks.push(relPath);
                         await electron.saveWorkspace(ws);
                       }
@@ -668,13 +690,27 @@ export default function App () {
                 </div>
                 {/* Resize + collapse handle */}
                 <div
-                  className="flex-shrink-0 w-1 relative cursor-col-resize border-x border-surface-800 hover:border-blue-500 transition-colors group"
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="Resize request pane"
+                  aria-valuemin={200}
+                  aria-valuenow={requestPaneWidth ?? leftPaneRef.current?.offsetWidth ?? 400}
+                  tabIndex={0}
+                  className="flex-shrink-0 w-1 relative cursor-col-resize border-x border-surface-800 hover:border-blue-500 focus:border-blue-500 focus:outline-none transition-colors group"
                   onMouseDown={e => {
                     dragging.current = 'request';
                     dragStart.current = { x: e.clientX, w: leftPaneRef.current?.offsetWidth ?? requestPaneWidth ?? 400 };
                     document.body.style.cursor = 'col-resize';
                     document.body.style.userSelect = 'none';
                     e.preventDefault();
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                      e.preventDefault();
+                      const step = e.key === 'ArrowLeft' ? -16 : 16;
+                      const cur = leftPaneRef.current?.offsetWidth ?? requestPaneWidth ?? 400;
+                      setRequestPaneWidth(Math.max(200, Math.min(window.innerWidth - 300, cur + step)));
+                    }
                   }}
                 >
                   <button

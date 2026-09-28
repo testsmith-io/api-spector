@@ -66,7 +66,7 @@ export function registerWsHandlers(ipc: IpcMain): void {
   // ws:send — send a text message on an existing connection
   handleIpc(ipc, IPC.ws.send, async (_event: IpcMainInvokeEvent, requestId: string, data: string) => {
     const ws = connections.get(requestId);
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
+    if (ws?.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket is not connected');
     }
     ws.send(data);

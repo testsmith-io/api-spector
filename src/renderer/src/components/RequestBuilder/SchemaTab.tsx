@@ -15,8 +15,8 @@ import { SchemaSyncModal } from '../CollectionTree/SchemaSyncModal';
 const { electron } = window;
 
 interface Props {
-  request: ApiRequest
-  onChange: (p: Partial<ApiRequest>) => void
+  readonly request: ApiRequest
+  readonly onChange: (p: Partial<ApiRequest>) => void
 }
 
 export function SchemaTab({ request, onChange }: Props) {

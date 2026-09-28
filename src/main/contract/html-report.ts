@@ -115,7 +115,7 @@ function violationHtml(r: ContractResult): string {
     const ea = (v.expected || v.actual)
       ? `<div class="ea">${v.expected ? `<span><span class="lab">expected </span><span class="exp">${esc(v.expected)}</span></span>` : ''}${v.actual ? `<span><span class="lab">actual </span><span class="act">${esc(v.actual)}</span></span>` : ''}</div>`
       : '';
-    return `<div class="v"><div><span class="t">${esc(v.type.replace(/_/g, ' '))}</span>${path}</div><p class="m">${esc(v.message)}</p>${ea}</div>`;
+    return `<div class="v"><div><span class="t">${esc(v.type.replaceAll('_', ' '))}</span>${path}</div><p class="m">${esc(v.message)}</p>${ea}</div>`;
   }).join('');
   return `<div class="viol">${items}</div>`;
 }
@@ -174,8 +174,8 @@ export function dashboardToHtml(
   generatedAt?: string,
   opts: { runLinkBase?: string; environments?: EnvironmentState[] } = {},
 ): string {
-  const pacticipants = [...new Set(records.map(r => r.pacticipant))].sort();
-  const versions     = [...new Set(records.map(r => r.version))].sort();
+  const pacticipants = [...new Set(records.map(r => r.pacticipant))].sort((a, b) => a.localeCompare(b));
+  const versions     = [...new Set(records.map(r => r.version))].sort((a, b) => a.localeCompare(b));
   const byKey = new Map(records.map(r => [`${r.pacticipant}@@${r.version}`, r]));
 
   const header = `<tr><th>Pacticipant \\ Version</th>${versions.map(v => `<th>${esc(v)}</th>`).join('')}</tr>`;

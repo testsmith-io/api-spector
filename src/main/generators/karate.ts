@@ -26,14 +26,14 @@ import { javaClass, resolveEffectiveAuth, mergeHeaders, hasBody, getEnvBaseUrl, 
  *  every part so SCREAMING_SNAKE acronyms collapse to `baseUrl`/`authToken`/
  *  `userId` rather than `baseURL`/`authTOKEN`/`userID`. */
 function jsVar(name: string): string {
-  const parts = name.replace(/[^a-zA-Z0-9]+/g, ' ').split(/\s+/).filter(Boolean).map(p => p.toLowerCase());
+  const parts = name.replaceAll(/[^a-zA-Z0-9]+/g, ' ').split(/\s+/).filter(Boolean).map(p => p.toLowerCase());
   if (parts.length === 0) return '_';
   return parts[0] + parts.slice(1).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
 }
 
 /** Lowercase, hyphenated file-stem suitable for a `.feature` filename. */
 function featureFileName(name: string): string {
-  const slug = name.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-').toLowerCase();
+  const slug = name.replaceAll(/[^\w\s-]/g, '').trim().replaceAll(/\s+/g, '-').toLowerCase();
   return slug || 'tests';
 }
 
@@ -44,7 +44,7 @@ function configKey(envKey: string): string {
 
 /** Escape characters that would break a single-quoted Karate string. */
 function escSingle(s: string): string {
-  return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return s.replaceAll('\\', '\\\\').replaceAll("'", "\\'");
 }
 
 /**
@@ -84,7 +84,7 @@ function interpolateKarate(value: string): string {
  * array, so the first one becomes `Given …` and the rest `And …`.
  */
 function urlSteps(url: string): string[][] {
-  const leadingVar = url.match(/^\{\{([^}]+)\}\}(.*)$/);
+  const leadingVar = /^\{\{([^}]+)\}\}(.*)$/.exec(url);
   if (leadingVar) {
     const baseVar = configKey(leadingVar[1].trim());
     const rest = leadingVar[2].replace(/^\//, '');
@@ -104,7 +104,7 @@ function urlSteps(url: string): string[][] {
 // ─── pom.xml ─────────────────────────────────────────────────────────────────
 
 function buildPom(collectionName: string): string {
-  const artifact = collectionName.replace(/\W+/g, '-').toLowerCase();
+  const artifact = collectionName.replaceAll(/\W+/g, '-').toLowerCase();
   return `<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -163,12 +163,7 @@ function buildKarateConfig(environment: Environment | null): string {
   // values keep their default; secrets/sensitive values come from
   // System.getenv at runtime so the generated project never embeds them.
   const lines: string[] = [];
-  lines.push(`function fn() {`);
-  lines.push(`  var env = karate.env || 'dev';`);
-  lines.push(`  karate.log('karate env:', env);`);
-  lines.push(``);
-  lines.push(`  var config = {`);
-  lines.push(`    baseUrl: '${escSingle(baseUrl)}'`);
+  lines.push(`function fn() {`, `  var env = karate.env || 'dev';`, `  karate.log('karate env:', env);`, ``, `  var config = {`, `    baseUrl: '${escSingle(baseUrl)}'`);
 
   const otherVars = (environment?.variables ?? []).filter(v => {
     const k = v.key.toLowerCase();
@@ -177,24 +172,13 @@ function buildKarateConfig(environment: Environment | null): string {
   for (const v of otherVars) {
     const key = configKey(v.key);
     const def = v.secret ? "''" : `'${escSingle(v.value ?? '')}'`;
-    lines.push(`,`);
-    lines.push(`    ${key}: ${def}`);
+    lines.push(`,`, `    ${key}: ${def}`);
   }
-  lines.push(`  };`);
-  lines.push(``);
-  lines.push(`  // Allow each variable to be overridden via a process env var of the same`);
-  lines.push(`  // SHOUTY_SNAKE_CASE name (e.g. AUTH_TOKEN populates config.authToken).`);
-  lines.push(`  function envOverride(name, key) {`);
-  lines.push(`    var v = java.lang.System.getenv(name);`);
-  lines.push(`    if (v) config[key] = v;`);
-  lines.push(`  }`);
-  lines.push(`  envOverride('BASE_URL', 'baseUrl');`);
+  lines.push(`  };`, ``, `  // Allow each variable to be overridden via a process env var of the same`, `  // SHOUTY_SNAKE_CASE name (e.g. AUTH_TOKEN populates config.authToken).`, `  function envOverride(name, key) {`, `    var v = java.lang.System.getenv(name);`, `    if (v) config[key] = v;`, `  }`, `  envOverride('BASE_URL', 'baseUrl');`);
   for (const v of otherVars) {
     lines.push(`  envOverride('${v.key}', '${configKey(v.key)}');`);
   }
-  lines.push(``);
-  lines.push(`  return config;`);
-  lines.push(`}`);
+  lines.push(``, `  return config;`, `}`);
   return lines.join('\n') + '\n';
 }
 
@@ -286,7 +270,7 @@ function buildBackground(folderId: string, collection: Collection): BackgroundBl
  *     """
  */
 function bodyDocstring(json: string): string[] {
-  const expanded = json.replace(/\{\{([^}]+)\}\}/g, (_, k) => `#(${configKey(k.trim())})`);
+  const expanded = json.replaceAll(/\{\{([^}]+)\}\}/g, (_, k) => `#(${configKey(k.trim())})`);
   let pretty = expanded.trim();
   try {
     pretty = JSON.stringify(JSON.parse(expanded), null, 2);
@@ -307,9 +291,9 @@ function bodyDocstring(json: string): string[] {
  * namespaces, whitespace-sensitive payloads) survives.
  */
 function rawDocstring(text: string): string[] {
-  const expanded = text.replace(/\{\{([^}]+)\}\}/g, (_, k) => `#(${configKey(k.trim())})`);
+  const expanded = text.replaceAll(/\{\{([^}]+)\}\}/g, (_, k) => `#(${configKey(k.trim())})`);
   const out: string[] = ['    """'];
-  for (const l of expanded.replace(/\r\n/g, '\n').split('\n')) out.push(`    ${l}`);
+  for (const l of expanded.replaceAll('\r\n', '\n').split('\n')) out.push(`    ${l}`);
   out.push('    """');
   return out;
 }
@@ -391,8 +375,7 @@ function buildFeature(folderName: string, folder: Folder, collection: Collection
     const method = req.method.toLowerCase();
 
     const lines: string[] = [];
-    lines.push(`@${tag}`);
-    lines.push(`Scenario: ${req.name}`);
+    lines.push(`@${tag}`, `Scenario: ${req.name}`);
 
     // Setup steps: first one is `Given`, the rest `And`. We collect them as
     // (firstLine, ...continuationLines) tuples so a multi-line `request`
@@ -402,7 +385,7 @@ function buildFeature(folderName: string, folder: Folder, collection: Collection
     if (effectiveAuth.type === 'bearer') {
       const token = effectiveAuth.token ?? '';
       if (token.includes('{{')) {
-        const single = token.match(/^\{\{([^}]+)\}\}$/);
+        const single = /^\{\{([^}]+)\}\}$/.exec(token);
         if (single) {
           setup.push([`header Authorization = 'Bearer ' + ${configKey(single[1].trim())}`]);
         } else {
@@ -464,7 +447,7 @@ function buildFeature(folderName: string, folder: Folder, collection: Collection
             asserts.push(`match ${target} != null`);
             break;
           case 'type': {
-            const t = (a.expected ?? '').replace(/"/g, '');
+            const t = (a.expected ?? '').replaceAll('"', '');
             const fuzzy = ['string', 'number', 'boolean', 'array', 'object'].includes(t)
               ? `'#${t}'`
               : `'#notnull'`;

@@ -4,10 +4,10 @@
 import { type IpcMain, dialog, app } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
-import { readFile, writeFile, mkdir, readdir, unlink } from 'fs/promises';
-import type { Dirent } from 'fs';
-import { join, dirname, resolve, basename, sep } from 'path';
-import { randomUUID } from 'crypto';
+import { readFile, writeFile, mkdir, readdir, unlink } from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
+import { join, dirname, resolve, basename, sep } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import JSZip from 'jszip';
 import type { Collection, Environment, Workspace } from '../../shared/types';
 import { externalizeDataSets, inlineDataSets } from '../data-files';
@@ -243,7 +243,7 @@ function dialogStartDir(): string | undefined {
 function defaultWorkspaceName(): string {
   const cwd = process.env.API_SPECTOR_LAUNCH_CWD;
   if (cwd) {
-    const base = cwd.split(/[\\/]/).filter(Boolean).pop();
+    const base = cwd.split(/[\\/]/).findLast(Boolean);
     if (base && /^[a-zA-Z0-9._-]+$/.test(base)) return `${base}.spector`;
   }
   return 'my-workspace.spector';
@@ -541,9 +541,9 @@ export function registerFileHandlers(ipc: IpcMain): void {
     // Derive a folder name from the repo, and refuse to overwrite existing
     // content so a clone never clobbers a folder the user already uses.
     const repoName =
-      (repoUrl.match(/github\.com\/[^/]+\/([^/#?]+)/i)?.[1] ?? 'repository')
+      ((/github\.com\/[^/]+\/([^/#?]+)/i.exec(repoUrl))?.[1] ?? 'repository')
         .replace(/\.git$/i, '')
-        .replace(/[^a-zA-Z0-9._-]+/g, '-') || 'repository';
+        .replaceAll(/[^a-zA-Z0-9._-]+/g, '-') || 'repository';
     const destDir = join(parent, repoName);
     try {
       const existing = await readdir(destDir);
@@ -634,7 +634,7 @@ async function resolveArchiveUrl(input: string): Promise<string | null> {
 
   // GitHub repository URL: https://github.com/<owner>/<repo>[/tree/<branch>]
   if (url.hostname === 'github.com' || url.hostname === 'www.github.com') {
-    const parts = url.pathname.replace(/^\/+|\/+$/g, '').split('/');
+    const parts = url.pathname.replaceAll(/^\/+|\/+$/g, '').split('/');
     if (parts.length < 2) return null;
     const owner = parts[0];
     const repo = parts[1].replace(/\.git$/i, '');
@@ -741,7 +741,7 @@ async function wrapCollectionAsWorkspace(
 ): Promise<{ workspace: Workspace; workspacePath: string }> {
   const dir = dirname(collFilePath);
   const base = basename(collFilePath).replace(/\.(spector|json)$/i, '');
-  const safe = base.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'collection';
+  const safe = base.replaceAll(/[^a-zA-Z0-9._-]+/g, '-').replaceAll(/^-+|-+$/g, '') || 'collection';
   const collRel = `collections/${safe}.json`;
 
   if (!collection.id) collection.id = randomUUID();

@@ -17,7 +17,7 @@ export interface UpdateInfo {
 /** Numeric semver comparison. Returns true when `a` is strictly newer than `b`.
  *  Pre-release tags are ignored (compared on the numeric core only). */
 export function isNewer(a: string, b: string): boolean {
-  const core = (v: string) => v.split('-')[0].split('.').map(n => parseInt(n, 10) || 0);
+  const core = (v: string) => v.split('-')[0].split('.').map(n => Number.parseInt(n, 10) || 0);
   const [a0, a1, a2] = core(a);
   const [b0, b1, b2] = core(b);
   if (a0 !== b0) return a0 > b0;

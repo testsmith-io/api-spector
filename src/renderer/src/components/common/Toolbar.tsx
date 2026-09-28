@@ -2,21 +2,20 @@
 // SPDX-License-Identifier: MIT
 
 import { useState } from 'react';
-import { useStore } from '../../store';
+import { useStore, colRelPath } from '../../store';
 import type { Collection } from '../../../../shared/types';
 import { EnvironmentBar } from '../EnvironmentBar/EnvironmentBar';
 import { WorkspaceSettingsModal } from './WorkspaceSettingsModal';
 import { DocsGeneratorModal } from './DocsGeneratorModal';
 import { ImportModal } from './ImportModal';
 import { useWorkspaceLoader } from '../../hooks/useWorkspaceLoader';
-import { colRelPath } from '../../store';
 import { useT } from '../../i18n';
 
 const { electron } = window;
 
 // ─── Toolbar ──────────────────────────────────────────────────────────────────
 
-export function Toolbar({ onOpenDocs: _onOpenDocs }: { onOpenDocs?: () => void }) {
+export function Toolbar({ onOpenDocs: _onOpenDocs }: { readonly onOpenDocs?: () => void }) {
   const t = useT();
   const { applyWorkspace } = useWorkspaceLoader();
   const workspace = useStore(s => s.workspace);

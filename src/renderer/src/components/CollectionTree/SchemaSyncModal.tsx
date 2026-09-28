@@ -49,7 +49,7 @@ function normalisePath(url: string): string {
   // Drop query string
   path = path.split('?')[0];
   // Rewrite {{x}} back to {x}
-  path = path.replace(/\{\{([^}]+)\}\}/g, '{$1}');
+  path = path.replaceAll(/\{\{([^}]+)\}\}/g, '{$1}');
   return path;
 }
 
@@ -62,7 +62,7 @@ function collectRequestIds(folder: { requestIds: string[]; folders: { requestIds
   return ids;
 }
 
-function findFolder(root: { id: string; folders: any[]; requestIds: string[] }, id: string): any | null {
+function findFolder(root: { id: string; folders: any[]; requestIds: string[] }, id: string): any {
   if (root.id === id) return root;
   for (const sub of root.folders) {
     const found = findFolder(sub, id);
@@ -76,9 +76,9 @@ export function SchemaSyncModal({
   scope = { type: 'collection' },
   onClose,
 }: {
-  collectionId: string
-  scope?: SchemaSyncScope
-  onClose: () => void
+  readonly collectionId: string
+  readonly scope?: SchemaSyncScope
+  readonly onClose: () => void
 }) {
   const t = useT();
   const collections = useStore(s => s.collections);

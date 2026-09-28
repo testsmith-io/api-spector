@@ -41,7 +41,7 @@ function renderInline(text: string, keyBase: string): React.ReactNode[] {
 // ── Blocks ──────────────────────────────────────────────────────────────────
 
 export function renderMarkdown(md: string): React.ReactNode {
-  const lines = md.replace(/\r\n/g, '\n').split('\n');
+  const lines = md.replaceAll('\r\n', '\n').split('\n');
   const blocks: React.ReactNode[] = [];
   let i = 0;
   let key = 0;
@@ -51,10 +51,10 @@ export function renderMarkdown(md: string): React.ReactNode {
     const line = lines[i];
 
     // Fenced code block
-    if (/^```/.test(line.trim())) {
+    if (line.trim().startsWith("```")) {
       const buf: string[] = [];
       i++;
-      while (i < lines.length && !/^```/.test(lines[i].trim())) { buf.push(lines[i]); i++; }
+      while (i < lines.length && !lines[i].trim().startsWith("```")) { buf.push(lines[i]); i++; }
       i++; // consume closing fence
       blocks.push(
         <pre key={k()} className="bg-surface-800 border border-surface-700 rounded p-2.5 overflow-x-auto text-[11px] font-mono leading-relaxed">
@@ -120,7 +120,7 @@ export function renderMarkdown(md: string): React.ReactNode {
     const buf: string[] = [];
     while (
       i < lines.length && lines[i].trim() !== ''
-      && !/^```/.test(lines[i].trim())
+      && !lines[i].trim().startsWith("```")
       && !/^(#{1,6})\s+/.test(lines[i])
       && !/^\s*>\s?/.test(lines[i])
       && !/^\s*[-*+]\s+/.test(lines[i])

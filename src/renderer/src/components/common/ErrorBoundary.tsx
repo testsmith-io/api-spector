@@ -9,12 +9,12 @@ import React from 'react';
 // fallback still renders even if the failure is CSS/theme-related.
 
 interface Props {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
   /** When this value changes, a caught error is cleared (e.g. on a new request
    *  or tab switch) so a scoped boundary auto-recovers without a full reload. */
-  resetKey?: unknown;
+  readonly resetKey?: unknown;
   /** Custom fallback; defaults to the full-screen panel. */
-  fallback?: (error: Error, reset: () => void) => React.ReactNode;
+  readonly fallback?: (error: Error, reset: () => void) => React.ReactNode;
 }
 
 interface State {
@@ -22,7 +22,7 @@ interface State {
 }
 
 export class ErrorBoundary extends React.Component<Props, State> {
-  state: State = { error: null };
+  readonly state: State = { error: null };
 
   static getDerivedStateFromError(error: Error): State {
     return { error };

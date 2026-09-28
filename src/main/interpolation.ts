@@ -6,11 +6,11 @@ import { decryptSecret } from './ipc/secret-handler';
 import { hasSecretScheme, resolveExternalSecret } from './secrets';
 import type { faker as FakerType } from '@faker-js/faker';
 import dayjs from 'dayjs';
-import * as vm from 'vm';
+import * as vm from 'node:vm';
 
 let _fakerCache: { faker: typeof FakerType } | null = null;
 async function getFaker(): Promise<typeof FakerType> {
-  if (!_fakerCache) _fakerCache = await import('@faker-js/faker');
+  _fakerCache ??= await import('@faker-js/faker');
   return _fakerCache.faker;
 }
 
@@ -50,7 +50,7 @@ export async function buildDynamicVars(): Promise<Record<string, string>> {
  *  Tokens that don't match a variable and look like expressions (contain `.` or `(`)
  *  are evaluated with faker and dayjs in scope when available. */
 export function interpolate(str: string, vars: Record<string, string>): string {
-  return str.replace(/\{\{([^}]+)\}\}/g, (match, key) => {
+  return str.replaceAll(/\{\{([^}]+)\}\}/g, (match, key) => {
     const trimmed = key.trim();
     if (trimmed in vars) return vars[trimmed];
     // Try evaluating as an expression (e.g. faker.internet.email(), dayjs().format(...))
@@ -90,7 +90,7 @@ export function buildUrl(
   //   - AND either paramType === 'path' OR its key appears in the URL template
   // Everything else gets appended as a query string parameter.
   const templateTokens = new Set<string>();
-  baseUrl.replace(/\{\{([^}]+)\}\}/g, (_m, name) => {
+  baseUrl.replaceAll(/\{\{([^}]+)\}\}/g, (_m, name) => {
     templateTokens.add(String(name).trim());
     return '';
   });
@@ -135,7 +135,7 @@ export function rebaseUrl(fullUrl: string, baseUrl?: string): string {
     const orig = new URL(fullUrl, 'http://placeholder.invalid');
     const base = new URL(baseUrl);
     const basePath = base.pathname.replace(/\/$/, '');
-    base.pathname = (basePath + orig.pathname).replace(/\/{2,}/g, '/');
+    base.pathname = (basePath + orig.pathname).replaceAll(/\/{2,}/g, '/');
     base.search = orig.search;
     return base.toString();
   } catch {

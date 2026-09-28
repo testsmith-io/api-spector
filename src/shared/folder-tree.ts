@@ -104,7 +104,7 @@ export function reIdFolderTree(root: Folder, mapRequestId: (oldId: string) => st
  * duplicate-folder / merge-collection flows that must avoid id collisions.
  */
 export function cloneAndReId(folder: Folder, mapRequestId: (oldId: string) => string): Folder {
-  const cloned: Folder = JSON.parse(JSON.stringify(folder));
+  const cloned: Folder = structuredClone(folder);
   reIdFolderTree(cloned, mapRequestId);
   return cloned;
 }

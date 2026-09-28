@@ -19,7 +19,7 @@
  *   --help                 Show this help.
  */
 
-import { readFile } from 'fs/promises';
+import { readFile } from 'node:fs/promises';
 import { load as yamlLoad } from 'js-yaml';
 import { fetch } from 'undici';
 import type { ApiRequest } from '../shared/types';

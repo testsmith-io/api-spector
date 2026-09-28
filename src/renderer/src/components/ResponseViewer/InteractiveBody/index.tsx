@@ -14,9 +14,9 @@ import { XmlNode } from './XmlNode';
 import { AssertMenu } from './AssertMenu';
 
 interface Props {
-  body: string
-  contentType: string
-  onAssert: (snippet: string) => void
+  readonly body: string
+  readonly contentType: string
+  readonly onAssert: (snippet: string) => void
 }
 
 export function InteractiveBody({ body, contentType, onAssert }: Props) {

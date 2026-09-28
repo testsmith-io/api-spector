@@ -59,7 +59,7 @@ export const createMocksSlice: StateCreator<
     s.mocks[mock.id] = { relPath, data: mock, running: false };
     s.activeMockId = mock.id;
     if (s.workspace) {
-      if (!s.workspace.mocks) s.workspace.mocks = [];
+      s.workspace.mocks ??= [];
       s.workspace.mocks.push(relPath);
     }
   }),

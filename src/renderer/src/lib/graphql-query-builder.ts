@@ -8,10 +8,11 @@
 // and seeded into the variables JSON), and object/interface/union fields get a
 // non-empty, valid selection set. Printing the AST guarantees valid syntax.
 
-import { parse, print, validate, Kind, type GraphQLSchema } from 'graphql';
-import type {
-  DocumentNode, OperationDefinitionNode, FieldNode, SelectionSetNode,
-  VariableDefinitionNode, ArgumentNode, TypeNode, SelectionNode,
+import {
+  parse, print, validate, Kind,
+  type GraphQLSchema,
+  type DocumentNode, type OperationDefinitionNode, type FieldNode, type SelectionSetNode,
+  type VariableDefinitionNode, type ArgumentNode, type TypeNode, type SelectionNode,
 } from 'graphql';
 import {
   type GqlField, type GqlType, type GqlTypeRef, type ParsedSchema,
@@ -258,7 +259,7 @@ export function validateQuery(schema: GraphQLSchema | null, query: string, varia
   let provided: Record<string, unknown> = {};
   try { provided = variablesJson.trim() ? JSON.parse(variablesJson) : {}; } catch { /* invalid JSON handled elsewhere */ }
   const used = new Set<string>();
-  for (const m of query.matchAll(/\$([A-Za-z_][A-Za-z0-9_]*)/g)) used.add(m[1]);
+  for (const m of query.matchAll(/\$([A-Za-z_]\w*)/g)) used.add(m[1]);
   for (const v of used) {
     if (!(v in provided)) problems.push({ message: `Variable "$${v}" is not set in Variables`, severity: 'warning' });
   }

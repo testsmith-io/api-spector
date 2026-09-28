@@ -10,7 +10,7 @@ import { useT } from '../../i18n';
 
 const { electron } = window;
 
-export function EnvironmentBar({ inline = false }: { inline?: boolean }) {
+export function EnvironmentBar({ inline = false }: { readonly inline?: boolean }) {
   const t = useT();
   const environments = useStore(s => s.environments);
   const activeEnvironmentId = useStore(s => s.activeEnvironmentId);
@@ -60,7 +60,7 @@ export function EnvironmentBar({ inline = false }: { inline?: boolean }) {
         <option value="">{t('No env')}</option>
         {envList.map(({ data: env }) => (
           <option key={env.id} value={env.id}>
-            {defaultEnvName && env.name.toLowerCase() === defaultEnvName.toLowerCase()
+            {env.name.toLowerCase() === defaultEnvName?.toLowerCase()
               ? t(':name (default)', { name: env.name })
               : env.name}
           </option>

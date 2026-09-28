@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../../store';
+import { onActivateKey } from '../../lib/a11y';
 import { MethodBadge } from './MethodBadge';
 import { Modal } from './Modal';
 import { useT } from '../../i18n';
@@ -111,7 +112,10 @@ export function CommandPalette() {
             filtered.map((item, idx) => (
               <div
                 key={item.requestId}
+                role="button"
+                tabIndex={0}
                 onClick={() => { openInTab(item.requestId, item.collectionId); setOpen(false); }}
+                onKeyDown={onActivateKey(() => { openInTab(item.requestId, item.collectionId); setOpen(false); })}
                 onMouseEnter={() => setActiveIdx(idx)}
                 className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
                   idx === activeIdx ? 'bg-surface-800' : 'hover:bg-surface-800/50'

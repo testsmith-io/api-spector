@@ -101,19 +101,19 @@ function PortalDropdown({
 type SuggestionMode = 'var' | 'static'
 
 interface Props extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
-  value: string
-  onChange: (value: string) => void
+  readonly value: string
+  readonly onChange: (value: string) => void
   /** Classes for the outer wrapper div (layout: flex-1, w-full, etc.) */
-  wrapperClassName?: string
+  readonly wrapperClassName?: string
   /**
    * Optional static suggestions (e.g. HTTP header names or common values).
    * Shown when the field is focused and the user has not opened a {{var}} query.
    * The user can always ignore the list and type a custom value.
    */
-  staticSuggestions?: string[]
+  readonly staticSuggestions?: string[]
 }
 
-export function VarInput({ value, onChange, className, wrapperClassName, staticSuggestions, ...rest }: Props) {
+export function VarInput({ value, onChange, className, wrapperClassName, staticSuggestions, ...rest }: Readonly<Props>) {
   const t         = useT();
   const varNames  = useVarNames();
   const varValues = useVarValues();

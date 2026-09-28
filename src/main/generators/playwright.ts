@@ -84,8 +84,7 @@ function buildHookLines(req: ApiRequest, sharedVars: Set<string>): string[] {
   // Parse post-script for variable extractions
   const parsed = parsePostScript(req.postRequestScript);
   if (parsed.extractions.length > 0) {
-    lines.push(`    const hookResponse = await ${hookCall};`);
-    lines.push(`    const hookJson = await hookResponse.json();`);
+    lines.push(`    const hookResponse = await ${hookCall};`, `    const hookJson = await hookResponse.json();`);
     for (const e of parsed.extractions) {
       const jsonPath = e.accessor.replace(/^json\.?/, '');
       const expr = jsonPath ? `hookJson.${jsonPath}` : 'hookJson';
@@ -235,8 +234,7 @@ function buildSpec(folderName: string, folder: Folder, collection: Collection, n
 
     // Schema validation (JSON Schema on the request)
     if (req.schema?.trim()) {
-      lines.push(`    // JSON Schema validation`);
-      lines.push(`    // Schema: ${req.schema.replace(/\n/g, ' ').slice(0, 80)}...`);
+      lines.push(`    // JSON Schema validation`, `    // Schema: ${req.schema.replaceAll('\n', ' ').slice(0, 80)}...`);
     }
 
     // Assertions from post-script
@@ -278,8 +276,7 @@ function buildSpec(folderName: string, folder: Folder, collection: Collection, n
     for (const e of parsed.extractions) {
       const path = e.accessor.replace(/^json\.?/, '');
       const expr = path ? `json.${path}` : 'json';
-      lines.push(`    // Extract: ${e.varName} = ${expr}`);
-      lines.push(`    process.env.${toEnvVar(e.varName)} = String(${expr});`);
+      lines.push(`    // Extract: ${e.varName} = ${expr}`, `    process.env.${toEnvVar(e.varName)} = String(${expr});`);
     }
 
     lines.push(`  });`);
@@ -299,7 +296,7 @@ ${tests.join('\n\n')}
 // ─── Project scaffolding ──────────────────────────────────────────────────────
 
 function buildPackageJson(collectionName: string): string {
-  const name = collectionName.replace(/\W+/g, '-').toLowerCase();
+  const name = collectionName.replaceAll(/\W+/g, '-').toLowerCase();
   return JSON.stringify({
     name: `${name}-api-tests`,
     version: '1.0.0',

@@ -51,18 +51,18 @@ export interface SecretFieldSupport {
 const DEFAULT_AUTH_TYPES: AuthConfig['type'][] = ['none', 'bearer', 'basic', 'digest', 'ntlm', 'apikey'];
 
 interface AuthEditorProps {
-  auth: AuthConfig
-  onChange: (p: AuthEditorPatch) => void
+  readonly auth: AuthConfig
+  readonly onChange: (p: AuthEditorPatch) => void
   /** Auth types offered in the radio row. Defaults to all except oauth2. */
-  types?: AuthConfig['type'][]
+  readonly types?: AuthConfig['type'][]
   /** Call-site chrome rendered above the type selector (inheritance hints etc.). */
-  intro?: React.ReactNode
+  readonly intro?: React.ReactNode
   /** Enables the keychain-backed secret inputs (request AuthTab flavour). */
-  secrets?: SecretFieldSupport
+  readonly secrets?: SecretFieldSupport
   /** Extra classes on the root container. */
-  className?: string
+  readonly className?: string
   /** Rendered after the per-type fields (e.g. the AuthTab's OAuth 2.0 panel). */
-  children?: React.ReactNode
+  readonly children?: React.ReactNode
 }
 
 export function AuthEditor({
@@ -303,8 +303,8 @@ function PlainCredentialsFields({
   auth,
   onChange,
 }: {
-  auth: { username?: string; password?: string }
-  onChange: (p: AuthEditorPatch) => void
+  readonly auth: { username?: string; password?: string }
+  readonly onChange: (p: AuthEditorPatch) => void
 }) {
   const t = useT();
   return (
@@ -342,14 +342,14 @@ function BasicCredentialsFields({
   label,
   note,
 }: {
-  auth: { username?: string; password?: string; passwordSecretRef?: string }
-  secretValue: string
-  setSecretValue: (v: string) => void
-  saved: boolean
-  setAuth: (p: AuthEditorPatch) => void
-  saveSecret: (ref: string) => Promise<void>
-  label: string
-  note?: string
+  readonly auth: { username?: string; password?: string; passwordSecretRef?: string }
+  readonly secretValue: string
+  readonly setSecretValue: (v: string) => void
+  readonly saved: boolean
+  readonly setAuth: (p: AuthEditorPatch) => void
+  readonly saveSecret: (ref: string) => Promise<void>
+  readonly label: string
+  readonly note?: string
 }) {
   const t = useT();
   const [keychainOpen, setKeychainOpen] = useState(!!auth.passwordSecretRef);
@@ -434,12 +434,12 @@ function BasicCredentialsFields({
 function BearerPanel({
   auth, secretValue, setSecretValue, saved, setAuth, saveSecret,
 }: {
-  auth: { token?: string; tokenSecretRef?: string }
-  secretValue: string
-  setSecretValue: (v: string) => void
-  saved: boolean
-  setAuth: (p: AuthEditorPatch) => void
-  saveSecret: (ref: string) => Promise<void>
+  readonly auth: { token?: string; tokenSecretRef?: string }
+  readonly secretValue: string
+  readonly setSecretValue: (v: string) => void
+  readonly saved: boolean
+  readonly setAuth: (p: AuthEditorPatch) => void
+  readonly saveSecret: (ref: string) => Promise<void>
 }) {
   const t = useT();
   const [keychainOpen, setKeychainOpen] = useState(!!auth.tokenSecretRef);

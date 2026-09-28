@@ -3,7 +3,7 @@
 
 /** Escape backslashes, double-quotes, and newlines for safe string interpolation. */
 export function esc(s: string): string {
-  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '');
+  return s.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('\n', '\\n').replaceAll(/\r/g, '');
 }
 
 /** Render a primitive value as a JavaScript literal: strings get quoted+escaped. */

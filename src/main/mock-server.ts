@@ -1,9 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'http';
-import { randomUUID } from 'crypto';
-import * as vm from 'vm';
+import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
+import { randomUUID } from 'node:crypto';
+import * as vm from 'node:vm';
 import dayjs from 'dayjs';
 import { DOMParser } from '@xmldom/xmldom';
 import type { MockServer, MockRoute, MockHit } from '../shared/types';
@@ -13,7 +13,7 @@ import type { faker as FakerType } from '@faker-js/faker';
 
 let _fakerCache: { faker: typeof FakerType } | null = null;
 async function getFaker(): Promise<typeof FakerType> {
-  if (!_fakerCache) _fakerCache = await import('@faker-js/faker');
+  _fakerCache ??= await import('@faker-js/faker');
   return _fakerCache.faker;
 }
 
@@ -37,8 +37,8 @@ export function updateMockRoutes(id: string, routes: MockRoute[]): void {
 
 function matchPath(pattern: string, urlPath: string): boolean {
   const regexStr = pattern
-    .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
-    .replace(/:[^/]+/g, '[^/]+');
+    .replaceAll(/[.+?^${}()|[\]\\]/g, '\\$&')
+    .replaceAll(/:[^/]+/g, '[^/]+');
   try {
     const regex = new RegExp('^' + regexStr + '/?$');
     return regex.test(urlPath.split('?')[0]);
@@ -117,16 +117,14 @@ function elementToValue(el: XmlNode): unknown {
   const obj: Record<string, unknown> = {};
 
   if (el.attributes) {
-    for (let i = 0; i < el.attributes.length; i++) {
-      const a = el.attributes[i];
+    for (const a of Array.from(el.attributes)) {
       obj['@' + a.nodeName] = a.nodeValue ?? '';
     }
   }
 
   let text = '';
   const childEls: XmlNode[] = [];
-  for (let i = 0; i < el.childNodes.length; i++) {
-    const c = el.childNodes[i];
+  for (const c of Array.from(el.childNodes)) {
     if (c.nodeType === ELEMENT_NODE) childEls.push(c);
     else if (c.nodeType === TEXT_NODE || c.nodeType === CDATA_NODE) text += c.nodeValue ?? '';
   }
@@ -154,7 +152,7 @@ function parseXmlToObject(xml: string): Record<string, unknown> | null {
     const doc = new DOMParser({ errorHandler: silent })
       .parseFromString(xml, 'text/xml') as unknown as { documentElement: XmlNode | null };
     const root = doc.documentElement;
-    if (!root || root.nodeType !== ELEMENT_NODE) return null;
+    if (root?.nodeType !== ELEMENT_NODE) return null;
     return { [root.nodeName]: elementToValue(root) };
   } catch {
     return null;
@@ -186,7 +184,7 @@ function parseRequestBody(bodyRaw: string, contentType: string): unknown {
  * Supports faker expressions, dayjs expressions, and request.xxx access.
  */
 function interpolateMockBody(body: string, context: Record<string, unknown>): string {
-  return body.replace(/\{\{([^}]+)\}\}/g, (match, key) => {
+  return body.replaceAll(/\{\{([^}]+)\}\}/g, (match, key) => {
     const expr = key.trim();
     if (expr.includes('.') || expr.includes('(')) {
       try {

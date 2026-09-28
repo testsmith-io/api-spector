@@ -123,8 +123,7 @@ function formatRequestError(
 
   if (stack) {
     const preview = stack.split('\n').slice(0, 6).join('\n');
-    lines.push('[request:send] stack:');
-    lines.push(preview);
+    lines.push('[request:send] stack:', preview);
   }
 
   return lines.join('\n');

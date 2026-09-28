@@ -17,13 +17,13 @@ function statusColor(code: number): string {
 
 // ─── Violation row ────────────────────────────────────────────────────────────
 
-function ViolationRow({ v }: { v: ContractViolation }) {
+function ViolationRow({ v }: { readonly v: ContractViolation }) {
   const t = useT();
   return (
     <div className="flex flex-col gap-1 px-4 py-2.5 border-l-2 border-red-600 bg-red-950/20 rounded-r">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-[10px] font-mono font-bold text-red-400 uppercase tracking-wide">
-          {v.type.replace(/_/g, ' ')}
+          {v.type.replaceAll('_', ' ')}
         </span>
         {v.path && (
           <span className="text-[10px] font-mono text-surface-500 bg-surface-800 px-1.5 py-0.5 rounded">
@@ -54,7 +54,7 @@ function ViolationRow({ v }: { v: ContractViolation }) {
 
 // ─── Result card ─────────────────────────────────────────────────────────────
 
-function ResultCard({ result }: { result: ContractResult }) {
+function ResultCard({ result }: { readonly result: ContractResult }) {
   const t = useT();
   const [open, setOpen] = useState(!result.passed);
 

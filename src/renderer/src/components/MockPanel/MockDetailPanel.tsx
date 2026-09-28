@@ -31,11 +31,11 @@ function RouteRow({
   onDuplicate,
   initialEditing = false,
 }: {
-  route: MockRoute
-  onSave: (r: MockRoute) => void
-  onDelete: () => void
-  onDuplicate: () => void
-  initialEditing?: boolean
+  readonly route: MockRoute
+  readonly onSave: (r: MockRoute) => void
+  readonly onDelete: () => void
+  readonly onDuplicate: () => void
+  readonly initialEditing?: boolean
 }) {
   const t = useT();
   const [editing,      setEditing]      = useState(initialEditing);
@@ -269,7 +269,7 @@ function timeAgo(ts: number, t: ReturnType<typeof useT>): string {
   return t(':v ago', { v: `${Math.floor(s / 3600)}h` });
 }
 
-function HitRow({ hit, matched }: { hit: MockHit; matched: MockRoute | undefined | null }) {
+function HitRow({ hit, matched }: { readonly hit: MockHit; readonly matched: MockRoute | undefined | null }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const unmatched = !hit.matchedRouteId;
@@ -340,7 +340,7 @@ function HitRow({ hit, matched }: { hit: MockHit; matched: MockRoute | undefined
   );
 }
 
-function RequestLog({ serverId, routes, running }: { serverId: string; routes: MockRoute[]; running: boolean }) {
+function RequestLog({ serverId, routes, running }: { readonly serverId: string; readonly routes: MockRoute[]; readonly running: boolean }) {
   const t         = useT();
   const hits      = useStore(s => s.mockLogs[serverId]) ?? [];
   const clearLogs = useStore(s => s.clearMockLogs);
@@ -404,7 +404,7 @@ function RequestLog({ serverId, routes, running }: { serverId: string; routes: M
 
 // ─── MockDetailPanel ──────────────────────────────────────────────────────────
 
-export function MockDetailPanel({ mockId }: { mockId: string }) {
+export function MockDetailPanel({ mockId }: { readonly mockId: string }) {
   const t          = useT();
   const entry      = useStore(s => s.mocks[mockId]);
   const updateMock = useStore(s => s.updateMock);

@@ -52,8 +52,8 @@ export function toJsonPathExpr(path: JsonPath, filterKey: string, filterValue: s
   const prefix    = path.slice(0, arrayIdx).join('.');
   const arrayPart = prefix ? '$.' + prefix : '$';                    // e.g. $.data or just $
   const leafPart  = path.slice(arrayIdx + 1).join('.');               // e.g. price
-  const filterVal = isNaN(Number(filterValue))
-    ? `"${filterValue.replace(/"/g, '\\"')}"`
+  const filterVal = Number.isNaN(Number(filterValue))
+    ? `"${filterValue.replaceAll('"', '\\"')}"`
     : filterValue;
 
   return leafPart

@@ -8,7 +8,7 @@
 // via Intl.PluralRules. The chosen locale is persisted to localStorage and
 // mirrored onto <html lang>. No external dependencies — this app ships to npm.
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import en from './locales/en.json';
 import de from './locales/de.json';
 import fr from './locales/fr.json';
@@ -54,7 +54,7 @@ export type TVars = Record<string, string | number>;
 
 function interpolate(str: string, vars?: TVars): string {
   if (!vars) return str;
-  return str.replace(/:([a-zA-Z][a-zA-Z0-9]*)/g, (m, k) => (k in vars ? String(vars[k]) : m));
+  return str.replaceAll(/:([a-zA-Z][a-zA-Z0-9]*)/g, (m, k) => (k in vars ? String(vars[k]) : m));
 }
 
 /** Look up a key in the locale (falling back to English source), then apply
@@ -88,7 +88,7 @@ const I18nContext = createContext<I18nValue>({
   t: (key, vars) => translate('en', key, vars),
 });
 
-export function I18nProvider({ children }: { children: React.ReactNode }) {
+export function I18nProvider({ children }: { readonly children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(detectLocale);
 
   useEffect(() => {
@@ -106,7 +106,8 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   const t = useCallback((key: string, vars?: TVars) => translate(locale, key, vars), [locale]);
 
-  return <I18nContext.Provider value={{ locale, setLocale, t }}>{children}</I18nContext.Provider>;
+  const ctx = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t]);
+  return <I18nContext.Provider value={ctx}>{children}</I18nContext.Provider>;
 }
 
 /** Translation function bound to the active locale. */

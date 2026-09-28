@@ -4,8 +4,6 @@
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type { Workspace, ScriptExecutionMeta } from '../../../shared/types';
-import { uniqueName, colRelPath } from '../../../shared/naming-utils';
-import { findFolder, findFolderPath } from '../../../shared/folder-tree';
 import { createWsSlice, type WsSlice } from './slices/ws-slice';
 import { createGrpcSlice, type GrpcSlice } from './slices/grpc-slice';
 import { createStreamSlice, type StreamSlice } from './slices/stream-slice';
@@ -13,7 +11,7 @@ import { createHistorySlice, type HistorySlice } from './slices/history-slice';
 import { createRunnerSlice, type RunnerSlice } from './slices/runner-slice';
 import { createRecorderSlice, type RecorderSlice } from './slices/recorder-slice';
 import { createContractSlice, type ContractSlice } from './slices/contract-slice';
-import { createTabsSlice, type TabsSlice, type AppTab } from './slices/tabs-slice';
+import { createTabsSlice, type TabsSlice } from './slices/tabs-slice';
 import { createCollectionsSlice, type CollectionsSlice } from './slices/collections-slice';
 import { createEnvironmentsSlice, type EnvironmentsSlice } from './slices/environments-slice';
 import { createMocksSlice, type MocksSlice } from './slices/mocks-slice';
@@ -21,9 +19,9 @@ import { createUiSlice, type UiSlice } from './slices/ui-slice';
 
 // Re-exports kept for backwards compatibility — components import these
 // helpers from the store rather than from src/shared directly.
-export { uniqueName, colRelPath };
-export { findFolder, findFolderPath };
-export type { AppTab };
+export { uniqueName, colRelPath } from '../../../shared/naming-utils';
+export { findFolder, findFolderPath } from '../../../shared/folder-tree';
+export type { AppTab } from './slices/tabs-slice';
 
 // ─── State shape ─────────────────────────────────────────────────────────────
 
@@ -152,7 +150,7 @@ export const useStore: UseBoundStore<StoreApi<FullState>> = create<FullState>()(
       if (activeColId && s.collections[activeColId]) {
         const col = s.collections[activeColId].data;
         col.collectionVariables = {
-          ...(col.collectionVariables ?? {}),
+          ...col.collectionVariables,
           ...safeColVars,
         };
         s.collections[activeColId].dirty = true;

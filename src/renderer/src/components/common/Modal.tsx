@@ -17,20 +17,20 @@ const DEFAULT_OVERLAY = 'bg-black/50 z-50 flex items-center justify-center';
 const DEFAULT_PANEL   = 'bg-surface-900 border border-surface-800 rounded-lg shadow-2xl flex flex-col';
 
 interface ModalProps {
-  onClose: () => void
+  readonly onClose: () => void
   /** When set, renders the standard title bar (title + × close button). */
-  title?: React.ReactNode
+  readonly title?: React.ReactNode
   /** Small line under the title — only rendered when `title` is set. */
-  subtitle?: React.ReactNode
+  readonly subtitle?: React.ReactNode
   /** Overlay classes (darkness, z-index, alignment). Replaces the default. */
-  overlayClassName?: string
+  readonly overlayClassName?: string
   /** Panel classes (width, layout, border). Replaces the default. */
-  panelClassName?: string
+  readonly panelClassName?: string
   /** Close when the backdrop is clicked. Default true. */
-  closeOnBackdrop?: boolean
+  readonly closeOnBackdrop?: boolean
   /** Close when Escape is pressed. Default true. */
-  closeOnEscape?: boolean
-  children: React.ReactNode
+  readonly closeOnEscape?: boolean
+  readonly children: React.ReactNode
 }
 
 export function Modal({
@@ -54,10 +54,20 @@ export function Modal({
 
   return (
     <div
+      role={closeOnBackdrop ? 'button' : undefined}
+      tabIndex={closeOnBackdrop ? -1 : undefined}
+      aria-label={closeOnBackdrop ? 'Close dialog' : undefined}
       className={`fixed inset-0 ${overlayClassName}`}
-      onClick={closeOnBackdrop ? onClose : undefined}
+      // Close only when the click/keypress lands on the backdrop itself, not on
+      // content bubbling up from the dialog — so the dialog needs no guard handlers.
+      onClick={closeOnBackdrop ? (e => { if (e.target === e.currentTarget) onClose(); }) : undefined}
+      onKeyDown={closeOnBackdrop ? (e => { if (e.key === 'Escape') onClose(); }) : undefined}
     >
-      <div className={panelClassName} onClick={e => e.stopPropagation()}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        className={panelClassName}
+      >
         {title !== undefined && (
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-surface-800 flex-shrink-0">
             <div>

@@ -111,7 +111,7 @@ async function resolve(refBody: string): Promise<string> {
     return String(f?.section?.label ?? '').toLowerCase() === sectionLabel.toLowerCase();
   });
 
-  if (!match || match.value === undefined) {
+  if (match?.value === undefined) {
     throw new Error(`1Password: field '${fieldLabel}' not found on item '${item}'`);
   }
   return String(match.value);

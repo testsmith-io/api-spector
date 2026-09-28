@@ -1,8 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { readFile, readdir, stat } from 'fs/promises';
-import { join, basename } from 'path';
+import { readFile, readdir, stat } from 'node:fs/promises';
+import { join, basename } from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 import type { Collection, ApiRequest, AuthConfig, RequestBody, KeyValuePair, Folder } from '../../shared/types';
 import { translateScript } from './script-translator';

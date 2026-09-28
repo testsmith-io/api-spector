@@ -16,8 +16,8 @@ if (process.env.ELECTRON_NO_SANDBOX === '1') {
   app.commandLine.appendSwitch('no-sandbox');
   app.commandLine.appendSwitch('disable-features', 'RendererCodeIntegrity');
 }
-import { join, resolve } from 'path';
-import { existsSync, readFileSync } from 'fs';
+import { join, resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 import { registerFileHandlers } from './ipc/file-handler';
 import { registerRequestHandler } from './ipc/request-handler';
 import { registerSecretHandlers, initSecretStore } from './ipc/secret-handler';
@@ -74,7 +74,7 @@ function parseOpenFromGit(deepLink: string): string | null {
   const action = u.hostname || u.pathname.replace(/^\/+/, '').split('/')[0];
   if (action !== 'open-from-git') return null;
   const repo = u.searchParams.get('url');
-  return repo && repo.trim() ? repo.trim() : null;
+  return repo?.trim() ? repo.trim() : null;
 }
 
 /** Route a deep link to the renderer, focusing an existing window or creating

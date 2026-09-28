@@ -16,10 +16,10 @@
  * the matching response envelope by SOAPAction / operation element.
  */
 
-import { writeFile, mkdir } from 'fs/promises';
-import { dirname, resolve } from 'path';
-import https from 'https';
-import http from 'http';
+import { writeFile, mkdir } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import https from 'node:https';
+import http from 'node:http';
 import type { Workspace } from '../shared/types';
 import { parseWsdl } from '../main/ipc/soap-handler';
 import { importWsdl, defaultCollectionRelPath, defaultMockRelPath } from '../main/wsdl/import';

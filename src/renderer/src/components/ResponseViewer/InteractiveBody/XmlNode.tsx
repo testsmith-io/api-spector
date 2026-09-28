@@ -6,9 +6,9 @@ import { useT } from '../../../i18n';
 import { buildSelector } from './utils/xmlPath';
 
 interface Props {
-  element: Element
-  depth: number
-  onLeaf: (e: React.MouseEvent, selector: string, value: string) => void
+  readonly element: Element
+  readonly depth: number
+  readonly onLeaf: (e: React.MouseEvent, selector: string, value: string) => void
 }
 
 export function XmlNode({ element, depth, onLeaf }: Props) {

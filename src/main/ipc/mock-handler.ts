@@ -4,11 +4,10 @@
 import { type IpcMain } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
-import { readFile, writeFile, mkdir } from 'fs/promises';
-import { join, dirname } from 'path';
-import type { MockServer } from '../../shared/types';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
+import type { MockServer, MockRoute } from '../../shared/types';
 import { startMock, stopMock, isRunning, getRunningIds, setHitCallback, updateMockRoutes } from '../mock-server';
-import type { MockRoute } from '../../shared/types';
 import { getWorkspaceDir } from './file-handler';
 
 export function registerMockHandlers(ipc: IpcMain): void {

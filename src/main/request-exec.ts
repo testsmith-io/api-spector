@@ -13,7 +13,7 @@
  */
 
 import { fetch, Headers, ProxyAgent, Agent } from 'undici';
-import { readFile } from 'fs/promises';
+import { readFile } from 'node:fs/promises';
 import type {
   ApiRequest,
   SendRequestPayload,
@@ -81,11 +81,11 @@ function maskObject(obj: unknown, patterns: string[]): unknown {
 export function maskHeaders(headers: Record<string, string>, patterns: string[]): Record<string, string> {
   if (!patterns.length) return headers;
   // Always mask Authorization regardless of patterns
-  const alwaysMask = ['authorization', 'cookie', 'set-cookie'];
+  const alwaysMask = new Set(['authorization', 'cookie', 'set-cookie']);
   const result: Record<string, string> = {};
   for (const [k, v] of Object.entries(headers)) {
     const lower = k.toLowerCase();
-    if (alwaysMask.includes(lower) || patterns.some(p => lower.includes(p.toLowerCase()))) {
+    if (alwaysMask.has(lower) || patterns.some(p => lower.includes(p.toLowerCase()))) {
       result[k] = '[REDACTED]';
     } else {
       result[k] = v;
@@ -230,14 +230,16 @@ export function applyRequestDefaults(req: ApiRequest): void {
 // frames and an SSE/NDJSON stream arrives all at once at the end.
 let _defaultAgent: Agent | undefined;
 function defaultAgent(): Agent {
-  if (!_defaultAgent) _defaultAgent = new Agent({ allowH2: true } as ConstructorParameters<typeof Agent>[0]);
+  _defaultAgent ??= new Agent({ allowH2: true } as ConstructorParameters<typeof Agent>[0]);
   return _defaultAgent;
 }
+
+type Dispatcher = ProxyAgent | Agent | undefined;
 
 export async function buildDispatcher(
   proxy?: ProxyConfig,
   tls?: TlsConfig,
-): Promise<ProxyAgent | Agent | undefined> {
+): Promise<Dispatcher> {
   const connectOpts: Record<string, unknown> = {};
   let hasTls = false;
 
@@ -785,9 +787,9 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
  */
 export class HookSkipTracker {
   /** Scopes whose beforeAll hook failed — all their requests are skipped. */
-  private failedScopes = new Set<string>();
+  private readonly failedScopes = new Set<string>();
   /** Main request IDs whose before hook failed — that request is skipped. */
-  private skipRequests = new Set<string>();
+  private readonly skipRequests = new Set<string>();
 
   /** Returns the human-readable skip reason, or undefined to run the item. */
   shouldSkip(item: RunnerItem): string | undefined {

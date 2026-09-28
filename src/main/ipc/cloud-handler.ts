@@ -88,9 +88,9 @@ async function cloudFetch(path: string, method: 'GET' | 'POST' | 'PUT', body?: u
  *  regenerates a fresh value on every check, instead of freezing one value at
  *  push time (which would, e.g., make a "create" call 409 on the second run). */
 function interpolateStatic(str: string, vars: Record<string, string>): string {
-  return str.replace(/\{\{([^}]+)\}\}/g, (m, key) => {
+  return str.replaceAll(/\{\{([^}]+)\}\}/g, (m, key) => {
     const trimmed = String(key).trim();
-    return Object.prototype.hasOwnProperty.call(vars, trimmed) ? vars[trimmed] : m;
+    return Object.hasOwn(vars, trimmed) ? vars[trimmed] : m;
   });
 }
 
@@ -125,7 +125,7 @@ function resolveHeaders(
 /** Resolve static {{var}} in the body's text fields; dynamic/faker templates are
  *  left in place so the runner regenerates fresh data on every check. */
 function resolveBody(body: ApiRequest['body'] | undefined, vars: Record<string, string>): ApiRequest['body'] {
-  if (!body || !body.mode || body.mode === 'none') return { mode: 'none' };
+  if (!body?.mode || body.mode === 'none') return { mode: 'none' };
   const b: ApiRequest['body'] = { ...body };
   if (body.mode === 'json' && body.json != null) b.json = interpolateStatic(body.json, vars);
   else if (body.mode === 'raw' && body.raw != null) b.raw = interpolateStatic(body.raw, vars);
@@ -170,8 +170,8 @@ function omitKeys(vars: Record<string, string>, names: Set<string>): Record<stri
 function slugify(name: string): string {
   return (name || 'mock')
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/^-+|-+$/g, '')
     .slice(0, 63) || 'mock';
 }
 

@@ -162,7 +162,7 @@ export function importWsdl(wsdlText: string, opts: { name?: string; existingMock
 
 /** Workspace-relative path helpers, used after importing into a workspace. */
 export function defaultCollectionRelPath(ws: Workspace, collection: Collection): string {
-  const safe = collection.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'wsdl';
+  const safe = collection.name.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-').replaceAll(/^-+|-+$/g, '') || 'wsdl';
   let i = 0;
   let candidate = `collections/${safe}.json`;
   const existing = new Set(ws.collections);

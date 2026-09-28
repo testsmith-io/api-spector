@@ -104,7 +104,7 @@ const api = {
   deleteSecret: (ref: string): Promise<void> =>
     ipcRenderer.invoke(IPC.secret.delete, ref),
   /** Optional: generate markdown docs for an item via the configured LLM. */
-  generateDocs: (input: GenerateDocsInput): Promise<string> =>
+  generateAiDocs: (input: GenerateDocsInput): Promise<string> =>
     ipcRenderer.invoke(IPC.ai.generateDocs, input),
 
   // ─── Globals ──────────────────────────────────────────────────────────────

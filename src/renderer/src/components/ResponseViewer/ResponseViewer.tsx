@@ -55,7 +55,7 @@ function requestBodyText(body: HistoryEntry['request']['body']): string {
   }
 }
 
-function KVBlock({ label, rows }: { label: string; rows: [string, string][] }) {
+function KVBlock({ label, rows }: { readonly label: string; readonly rows: [string, string][] }) {
   if (rows.length === 0) return null;
   return (
     <div className="flex flex-col gap-0.5">
@@ -72,7 +72,7 @@ function KVBlock({ label, rows }: { label: string; rows: [string, string][] }) {
 
 /** One history entry, expandable to show the full request and response.
  *  Loading brings the response back into the main viewer. */
-function HistoryTabRow({ entry, onLoad, onResend }: { entry: HistoryEntry; onLoad: () => void; onResend?: () => void }) {
+function HistoryTabRow({ entry, onLoad, onResend }: { readonly entry: HistoryEntry; readonly onLoad: () => void; readonly onResend?: () => void }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const reqBody = requestBodyText(entry.request.body);
@@ -149,7 +149,7 @@ export function ResponseViewer() {
   const setTabScriptTab = useStore(s => s.setTabScriptTab);
   const isSending = activeTab?.isSending ?? false;
   const liveStream = useStore(s => s.liveStream);
-  const streamForTab = liveStream && liveStream.tabId === activeTabId ? liveStream : null;
+  const streamForTab = liveStream?.tabId === activeTabId ? liveStream : null;
   const response = activeTab?.lastResponse ?? null;
   const scriptResult = activeTab?.lastScriptResult ?? null;
   const sentRequest = activeTab?.lastSentRequest ?? null;
@@ -448,7 +448,7 @@ export function ResponseViewer() {
             <span className="text-xs text-surface-400">{(response.bodySize / 1024).toFixed(1)} KB</span>
           </div>
 
-          <div role="tablist" aria-label={t('Response sections')} onKeyDown={onTablistKey} className="flex items-center gap-0 min-w-0 ml-1">
+          <div role="tablist" tabIndex={-1} aria-label={t('Response sections')} onKeyDown={onTablistKey} className="flex items-center gap-0 min-w-0 ml-1">
             {tabList.map(def => renderTabButton(def, 'inline'))}
             <OverflowMenu
               wrapperClassName="flex @min-[720px]:hidden"
@@ -730,7 +730,7 @@ export function ResponseViewer() {
                   type: 'item',
                   label: t('Create variable in ":env"', { env: activeEnvName ?? '' }),
                   onClick: () => {
-                    setVarDialog({ name: headerMenu.key.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, ''), value: headerMenu.value });
+                    setVarDialog({ name: headerMenu.key.replaceAll(/[^a-zA-Z0-9]+/g, '_').replaceAll(/^_+|_+$/g, ''), value: headerMenu.value });
                     setHeaderMenu(null);
                   },
                 }

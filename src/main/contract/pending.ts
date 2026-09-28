@@ -1,9 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { readFile, writeFile, mkdir } from 'fs/promises';
-import { join, dirname } from 'path';
-import { createHash } from 'crypto';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
+import { createHash } from 'node:crypto';
 import type { ApiRequest, ContractReport } from '../../shared/types';
 
 // ─── Pending contracts (Pact's "pending pacts") ───────────────────────────────

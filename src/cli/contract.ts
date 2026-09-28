@@ -28,8 +28,8 @@
  * webhooks [--test], report [--html <path>], pact-import, pact-export.
  */
 
-import { readFile, writeFile } from 'fs/promises';
-import { join, resolve as resolvePath } from 'path';
+import { readFile, writeFile, writeFile as fsWriteFile } from 'node:fs/promises';
+import { join, resolve as resolvePath } from 'node:path';
 import type { Workspace, ApiRequest, ContractSnapshot, ContractMode, ContractReport, ContractExpectation } from '../shared/types';
 import { runConsumerContracts, hasContract } from '../main/contract/consumer-verifier';
 import { runProviderVerification } from '../main/contract/provider-verifier';
@@ -43,9 +43,8 @@ import { recordResult, canIDeploy, listResults, recordDeployment, listEnvironmen
 import { importPact, pactToCollection, exportPact } from '../main/contract/pact-format';
 import { loadPendingStore, savePendingStore, applyPendingSemantics } from '../main/contract/pending';
 import { loadWebhookConfig, fireWebhooks } from '../main/contract/webhooks';
-import { writeFile as fsWriteFile } from 'fs/promises';
-import { tmpdir } from 'os';
-import { randomUUID } from 'crypto';
+import { tmpdir } from 'node:os';
+import { randomUUID } from 'node:crypto';
 import { parseArgs, loadWorkspace, loadCollections, loadEnvironments, loadDesignContractRequests } from './cli-common';
 import { brokerConfigFromEnv, publishPact as brokerPublishPact, publishSpec as brokerPublishSpec, canIDeploy as brokerCanIDeploy, recordDeployment as brokerRecordDeployment, deployPreview as brokerDeployPreview, checkCompatibility as brokerCheckCompatibility, fetchContracts as brokerFetchContracts, publishVerification as brokerPublishVerification } from '../main/cloud/broker-client';
 import { resolveVersion } from '../main/cloud/git';
@@ -782,7 +781,7 @@ async function cmdCheck ( args: Record<string, string | boolean> ): Promise<void
   for ( const c of checks.filter( c => !c.passed ) ) {
     console.error( `    ${c.interaction}` );
     for ( const m of c.mismatches ?? [] ) console.error( `      ${m.location}: consumer requires ${m.consumer}, provider ${m.provider}` );
-    if ( ( !c.mismatches || !c.mismatches.length ) && c.error ) console.error( `      ${c.error}` );
+    if ( !c.mismatches?.length && c.error ) console.error( `      ${c.error}` );
   }
   process.exit( 1 );
 }

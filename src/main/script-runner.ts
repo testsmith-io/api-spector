@@ -1,8 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import * as vm from 'vm';
-import * as crypto from 'crypto';
+import * as vm from 'node:vm';
+import * as crypto from 'node:crypto';
 import dayjs from 'dayjs';
 import tv4 from 'tv4';
 import { JSONPath } from 'jsonpath-plus';
@@ -30,16 +30,16 @@ function xmlQuerySelector(root: XmlNode, selector: string): XmlNode | null {
   const parts = selector.trim().split(/\s*>\s*/);
 
   // First part: search entire subtree
-  const m0 = parts[0].match(/^([A-Za-z0-9_:.-]+?)(?::nth-of-type\((\d+)\))?$/);
+  const m0 = /^([A-Za-z0-9_:.-]+?)(?::nth-of-type\((\d+)\))?$/.exec(parts[0]);
   if (!m0) return null;
-  let candidates = xmlFindAll(root, m0[1], m0[2] ? parseInt(m0[2]) - 1 : 0);
+  let candidates = xmlFindAll(root, m0[1], m0[2] ? Number.parseInt(m0[2]) - 1 : 0);
 
   // Remaining parts: direct-child traversal
   for (let i = 1; i < parts.length; i++) {
-    const m = parts[i].match(/^([A-Za-z0-9_:.-]+?)(?::nth-of-type\((\d+)\))?$/);
+    const m = /^([A-Za-z0-9_:.-]+?)(?::nth-of-type\((\d+)\))?$/.exec(parts[i]);
     if (!m) return null;
     const tag = m[1];
-    const idx = m[2] ? parseInt(m[2]) - 1 : 0;
+    const idx = m[2] ? Number.parseInt(m[2]) - 1 : 0;
     const next: XmlNode[] = [];
     for (const node of candidates) {
       const children = Array.from(node.childNodes).filter(c => c.nodeType === 1 && c.tagName === tag);
@@ -66,7 +66,7 @@ import type { faker as FakerType } from '@faker-js/faker';
 // @faker-js/faker v10 is ESM-only — must use dynamic import
 let _fakerCache: { faker: typeof FakerType } | null = null;
 async function getFaker(): Promise<typeof FakerType> {
-  if (!_fakerCache) _fakerCache = await import('@faker-js/faker');
+  _fakerCache ??= await import('@faker-js/faker');
   return _fakerCache.faker;
 }
 
@@ -326,7 +326,7 @@ function buildAt(
 
       // Decode base32 secret
       const base32chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-      const cleaned = secret.replace(/[\s=-]/g, '').toUpperCase();
+      const cleaned = secret.replaceAll(/[\s=-]/g, '').toUpperCase();
       let bits = '';
       for (const c of cleaned) {
         const val = base32chars.indexOf(c);
@@ -335,7 +335,7 @@ function buildAt(
       }
       const keyBytes = Buffer.alloc(Math.floor(bits.length / 8));
       for (let i = 0; i < keyBytes.length; i++) {
-        keyBytes[i] = parseInt(bits.slice(i * 8, i * 8 + 8), 2);
+        keyBytes[i] = Number.parseInt(bits.slice(i * 8, i * 8 + 8), 2);
       }
 
       // Compute HMAC over the time counter
@@ -441,8 +441,9 @@ export async function runScript(
     JSON,
     Math,
     Date,
-    parseInt,
-    parseFloat,
+    parseInt: Number.parseInt,
+    parseFloat: Number.parseFloat,
+    // isNaN/isFinite intentionally expose the global (coercing) semantics user scripts expect
     isNaN,
     isFinite,
     encodeURIComponent,

@@ -1,8 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { join } from 'path';
-import { readFile, writeFile, mkdir, unlink } from 'fs/promises';
+import { join } from 'node:path';
+import { readFile, writeFile, mkdir, unlink } from 'node:fs/promises';
 import type { Collection, Folder, DataSet } from '../shared/types';
 import { toCSV, parseCSV } from '../shared/data-csv';
 
@@ -22,7 +22,7 @@ interface DataHolder { id: string; dataSet?: DataSet; dataSetRef?: string }
  *  The in-memory collection is never mutated. Emptied tables drop their ref and
  *  their stale CSV is removed. */
 export async function externalizeDataSets(col: Collection, colDir: string): Promise<Collection> {
-  const clone: Collection = JSON.parse(JSON.stringify(col));
+  const clone: Collection = structuredClone(col);
   const writes: { path: string; content: string }[] = [];
   const removals: string[] = [];
 

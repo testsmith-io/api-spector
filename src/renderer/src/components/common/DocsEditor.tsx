@@ -6,15 +6,15 @@ import { useT } from '../../i18n';
 import { renderMarkdown } from '../../lib/markdown';
 
 interface Props {
-  value: string
-  onChange: (v: string) => void
-  placeholder?: string
+  readonly value: string
+  readonly onChange: (v: string) => void
+  readonly placeholder?: string
   /** Build + run AI generation, returning markdown (or null on cancel/failure).
    *  When omitted, the AI button is hidden entirely. */
-  onGenerate?: () => Promise<string | null>
+  readonly onGenerate?: () => Promise<string | null>
   /** Whether an LLM key is configured. When false, the AI button is disabled
    *  with a hint to configure one. */
-  aiAvailable?: boolean
+  readonly aiAvailable?: boolean
 }
 
 /** Markdown documentation editor shared by request / folder / collection docs.

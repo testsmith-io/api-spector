@@ -19,8 +19,8 @@
  *   api-spector agents list             — show available agents
  */
 
-import { readFile, writeFile, mkdir, stat } from 'fs/promises';
-import { join, dirname } from 'path';
+import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
 // This CLI colours unconditionally (not TTY-gated), hence colorAlways.
 import { C, colorAlways as color } from './cli-common';
 

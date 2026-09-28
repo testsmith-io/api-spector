@@ -12,7 +12,7 @@ type AuthType = AuthConfig['type']
 
 const AUTH_TYPES: AuthType[] = ['none', 'bearer', 'basic', 'digest', 'ntlm', 'apikey', 'oauth2'];
 
-export function AuthTab({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
+export function AuthTab({ request, onChange }: { readonly request: ApiRequest; readonly onChange: (p: Partial<ApiRequest>) => void }) {
   const t = useT();
   const auth = request.auth;
   const [secretValue, setSecretValue]       = useState('');
@@ -151,7 +151,7 @@ export function AuthTab({ request, onChange }: { request: ApiRequest; onChange: 
                 <input
                   type="number"
                   value={auth.oauth2RedirectPort ?? 9876}
-                  onChange={e => setAuth({ oauth2RedirectPort: parseInt(e.target.value, 10) || 9876 })}
+                  onChange={e => setAuth({ oauth2RedirectPort: Number.parseInt(e.target.value, 10) || 9876 })}
                   className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
                 />
               </div>

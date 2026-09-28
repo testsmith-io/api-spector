@@ -43,7 +43,7 @@ export function useAiAvailable(): boolean {
 }
 
 export async function generateDocs(input: Omit<GenerateDocsInput, 'model'>): Promise<string> {
-  return electron.generateDocs({ ...input, model: getAiConfig().model });
+  return electron.generateAiDocs({ ...input, model: getAiConfig().model });
 }
 
 // ── Context builders (readable summaries fed to the model) ───────────────────
@@ -60,8 +60,7 @@ export function requestDocsContext(req: ApiRequest, example?: { response?: { sta
     `Method: ${req.method}`,
     `URL: ${req.url}`,
   ];
-  lines.push(...kvLines('Query params', req.params));
-  lines.push(...kvLines('Headers', req.headers));
+  lines.push(...kvLines('Query params', req.params), ...kvLines('Headers', req.headers));
   if (req.auth && req.auth.type !== 'none') lines.push(`Auth: ${req.auth.type}`);
   if (req.body && req.body.mode !== 'none') {
     lines.push(`Request body (${req.body.mode}):`);
@@ -69,8 +68,7 @@ export function requestDocsContext(req: ApiRequest, example?: { response?: { sta
     if (raw) lines.push(raw.slice(0, 2000));
   }
   if (example?.response) {
-    lines.push(`Example response (status ${example.response.status}):`);
-    lines.push((example.response.body || '').slice(0, 2000));
+    lines.push(`Example response (status ${example.response.status}):`, (example.response.body || '').slice(0, 2000));
   }
   return lines.join('\n');
 }
@@ -93,8 +91,7 @@ export function collectionDocsContext(col: Collection): string {
   const lines: string[] = [`API collection with ${reqs.length} request(s).`];
   const byMethod: Record<string, number> = {};
   for (const r of reqs) byMethod[r.method] = (byMethod[r.method] ?? 0) + 1;
-  lines.push('Methods: ' + Object.entries(byMethod).map(([m, n]) => `${m}×${n}`).join(', '));
-  lines.push('Endpoints:');
+  lines.push('Methods: ' + Object.entries(byMethod).map(([m, n]) => `${m}×${n}`).join(', '), 'Endpoints:');
   for (const r of reqs.slice(0, 60)) lines.push(`  - ${r.method} ${r.url}`);
   if (reqs.length > 60) lines.push(`  … and ${reqs.length - 60} more`);
   return lines.join('\n');
