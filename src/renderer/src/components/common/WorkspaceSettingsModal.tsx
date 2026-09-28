@@ -467,7 +467,7 @@ export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => vo
                   type="password"
                   value={cloudToken}
                   onChange={e => setCloudToken(e.target.value)}
-                  placeholder={cloudTokenSet ? t('•••••••• (saved — type to replace)') : t('Paste a token from the cloud dashboard')}
+                  placeholder={cloudTokenSet ? t('•••••••• (saved - type to replace)') : t('Paste a token from the cloud dashboard')}
                   className={`${inputCls} placeholder-surface-600`}
                 />
                 <span className="text-surface-600 text-[11px]">
@@ -550,7 +550,7 @@ export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => vo
                   type="password"
                   value={aiKey}
                   onChange={e => setAiKey(e.target.value)}
-                  placeholder={aiKeySet ? t('•••••••• (stored in keychain — type to replace)') : 'sk-...'}
+                  placeholder={aiKeySet ? t('•••••••• (stored in keychain - type to replace)') : 'sk-...'}
                   autoComplete="off"
                   className={`${inputCls} placeholder-surface-600`}
                 />
@@ -618,7 +618,7 @@ export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => vo
               <p className="text-surface-600 text-[11px]">
                 {t('Reference secrets from an external manager instead of storing them. Put a reference like')}{' '}
                 <span className="font-mono text-surface-400">vault:secret/data/app#token</span>{' '}
-                {t('in an environment variable or an auth field; it is resolved at send-time and never written to the workspace. This connection config is non-secret — tokens and secret-ids come from your environment (or the Vault sign-in below).')}
+                {t('in an environment variable or an auth field; it is resolved at send-time and never written to the workspace. This connection config is non-secret - tokens and secret-ids come from your environment (or the Vault sign-in below).')}
               </p>
 
               {/* HashiCorp Vault */}

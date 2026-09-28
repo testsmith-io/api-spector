@@ -62,7 +62,7 @@ export function ContractPanel() {
         version: specVersion.trim(),
         specUrl: specUrl.trim(),
       });
-      setPublishNote(t('Published :name@:version — :count contract(s) re-verified', { name: providerName.trim(), version: specVersion.trim(), count: res.verified_contracts }));
+      setPublishNote(t('Published :name@:version - :count contract(s) re-verified', { name: providerName.trim(), version: specVersion.trim(), count: res.verified_contracts }));
     } catch (e) {
       setError((e as Error).message);
     } finally {
