@@ -460,6 +460,9 @@ const api = {
   onUpdateAvailable: (cb: (info: { version: string }) => void): void => {
     ipcRenderer.on(IPC.app.onUpdateAvailable, (_e, info) => cb(info));
   },
+  onUpdateProgress: (cb: (info: { percent: number; transferred: number; total: number }) => void): void => {
+    ipcRenderer.on(IPC.app.onUpdateProgress, (_e, info) => cb(info));
+  },
   onUpdateDownloaded: (cb: (info: { version: string }) => void): void => {
     ipcRenderer.on(IPC.app.onUpdateDownloaded, (_e, info) => cb(info));
   },

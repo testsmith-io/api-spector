@@ -34,6 +34,9 @@ export function initAutoUpdater(): void {
   autoUpdater.on('update-available', info => {
     send(IPC.app.onUpdateAvailable, { version: info.version });
   });
+  autoUpdater.on('download-progress', p => {
+    send(IPC.app.onUpdateProgress, { percent: p.percent, transferred: p.transferred, total: p.total });
+  });
   autoUpdater.on('update-downloaded', info => {
     installReady = true;
     send(IPC.app.onUpdateDownloaded, { version: info.version });
