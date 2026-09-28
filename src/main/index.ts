@@ -38,6 +38,7 @@ import { registerGitHandlers }    from './ipc/git-handler';
 import { registerRecordHandlers }  from './ipc/record-handler';
 import { registerCloudHandlers }   from './ipc/cloud-handler';
 import { checkForUpdate }          from './update-check';
+import { initAutoUpdater, installUpdate, updateMode } from './auto-updater';
 import { stopAll } from './mock-server';
 
 // ─── Deep links (spector://) ─────────────────────────────────────────────────
@@ -273,8 +274,13 @@ app.whenReady().then(async () => {
   registerCloudHandlers(ipcMain);
   handleIpc(ipcMain, IPC.shell.openExternal, (_e, url: string) => shell.openExternal(url));
   handleIpc(ipcMain, IPC.app.checkUpdate, () => checkForUpdate());
+  handleIpc(ipcMain, IPC.app.updateMode, () => updateMode());
+  handleIpc(ipcMain, IPC.app.installUpdate, () => installUpdate());
 
   createWindow();
+
+  // Packaged builds: kick off the in-app update check/download. No-op on npm.
+  initAutoUpdater();
 
   // Cold start via a deep link on Windows/Linux: the URL is in our own argv.
   // (macOS routes it through open-url instead, handled above.)

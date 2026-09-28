@@ -453,6 +453,19 @@ const api = {
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke(IPC.shell.openExternal, url),
   checkForUpdate: (): Promise<{ current: string; latest: string; updateAvailable: boolean; command: string } | null> =>
     ipcRenderer.invoke(IPC.app.checkUpdate),
+  // 'auto' = packaged desktop app (electron-updater); 'npm' = run from npm.
+  getUpdateMode: (): Promise<'auto' | 'npm'> => ipcRenderer.invoke(IPC.app.updateMode),
+  // Quit and apply a downloaded update (packaged builds only).
+  installUpdate: (): Promise<void> => ipcRenderer.invoke(IPC.app.installUpdate),
+  onUpdateAvailable: (cb: (info: { version: string }) => void): void => {
+    ipcRenderer.on(IPC.app.onUpdateAvailable, (_e, info) => cb(info));
+  },
+  onUpdateDownloaded: (cb: (info: { version: string }) => void): void => {
+    ipcRenderer.on(IPC.app.onUpdateDownloaded, (_e, info) => cb(info));
+  },
+  onUpdateError: (cb: (info: { message: string }) => void): void => {
+    ipcRenderer.on(IPC.app.onUpdateError, (_e, info) => cb(info));
+  },
 
   // ─── Zoom ─────────────────────────────────────────────────────────────────
   setZoomFactor: (factor: number): void => webFrame.setZoomFactor(factor),
