@@ -151,13 +151,13 @@ export function ContractDesignerModal({ seed, onClose }: { readonly seed?: Parti
       const st = useStore.getState();
       const id = st.activeMockId;
       const entry = id ? st.mocks[id] : null;
-      if (!id || !entry) { show(t('Could not create the mock — open a workspace first.'), false); return; }
+      if (!id || !entry) { show(t('Could not create the mock - open a workspace first.'), false); return; }
       const mock: MockServer = { ...designContractToMock(selected), id, name: t(':consumer → :provider (contract mock)', { consumer: selected.consumer, provider: selected.provider }) };
       updateMock(id, mock);
       await electron.saveMock(entry.relPath, mock);
       const ws = useStore.getState().workspace;
       if (ws) await electron.saveWorkspace(ws);
-      show(t('Created mock with :count route — open the Mocks panel to run it|Created mock with :count routes — open the Mocks panel to run it', { count: mock.routes.length }), true);
+      show(t('Created mock with :count route - open the Mocks panel to run it|Created mock with :count routes - open the Mocks panel to run it', { count: mock.routes.length }), true);
     } catch (e) {
       show((e as Error).message, false);
     }
@@ -186,7 +186,7 @@ export function ContractDesignerModal({ seed, onClose }: { readonly seed?: Parti
     <Modal
       onClose={onClose}
       title={t('Contract Designer')}
-      subtitle={t('Design a consumer-driven contract up front — no endpoint required — then publish it to API Spector Cloud.')}
+      subtitle={t('Design a consumer-driven contract up front - no endpoint required - then publish it to API Spector Cloud.')}
       panelClassName="bg-surface-900 border border-surface-700 rounded-xl w-[min(1000px,94vw)] h-[min(760px,90vh)] flex flex-col"
     >
       <div className="flex flex-1 min-h-0">
@@ -258,7 +258,7 @@ export function ContractDesignerModal({ seed, onClose }: { readonly seed?: Parti
             </div>
             {!cloudConnected && (
               <p className="px-4 py-1.5 text-[11px] text-amber-400 bg-amber-950/20 border-b border-surface-800">
-                {t('Not connected to API Spector Cloud — connect in Settings → Cloud to publish. You can still design and save the contract.')}
+                {t('Not connected to API Spector Cloud - connect in Settings → Cloud to publish. You can still design and save the contract.')}
               </p>
             )}
 
@@ -285,7 +285,7 @@ export function ContractDesignerModal({ seed, onClose }: { readonly seed?: Parti
                   </div>
 
                   <input value={it.providerState ?? ''} onChange={e => patchInteraction(ix, { providerState: e.target.value })}
-                    placeholder={t('provider state (e.g. "brand 1 exists") — optional')}
+                    placeholder={t('provider state (e.g. "brand 1 exists") - optional')}
                     className="text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500" />
 
                   <div className="grid grid-cols-2 gap-4">
@@ -320,7 +320,7 @@ export function ContractDesignerModal({ seed, onClose }: { readonly seed?: Parti
                       <label className="flex flex-col gap-1">
                         <span className="text-[10px] uppercase tracking-wider text-surface-500">{t('Body')}</span>
                         <textarea value={it.response.body ?? ''} onChange={e => patchInteraction(ix, { response: { ...it.response, body: e.target.value } })}
-                          rows={3} placeholder={t('[{ id: string, name: string, slug: string }]  — or a JSON example')} spellCheck={false}
+                          rows={3} placeholder={t('[{ id: string, name: string, slug: string }]  - or a JSON example')} spellCheck={false}
                           className="text-[11px] font-mono bg-surface-800 border border-surface-700 rounded px-2 py-1.5 focus:outline-none focus:border-blue-500 resize-y" />
                         <span className="text-[10px] text-surface-500 leading-relaxed">
                           {t('A JSON example (matched by type when the toggle is on), or a')} <span className="text-surface-300">{t('type shape')}</span> {t('to check each property\'s type:')} <span className="font-mono text-surface-300">string, number, integer, boolean, null</span> {t('plus nested')} <span className="font-mono">{'{ }'}</span> / <span className="font-mono">[ ]</span>{t('. E.g.')} <span className="font-mono text-surface-300">{'[{ id: string, qty: integer }]'}</span>{t('. Compiles to Pact')} <span className="font-mono">matchingRules</span>{'.'}
@@ -332,7 +332,7 @@ export function ContractDesignerModal({ seed, onClose }: { readonly seed?: Parti
                   <label className="flex items-center gap-2 text-[11px] text-surface-400">
                     <input type="checkbox" checked={it.looseMatch !== false}
                       onChange={e => patchInteraction(ix, { looseMatch: e.target.checked })} className="accent-blue-500" />
-                    {t('Match a JSON example by type, not exact value (tolerant — recommended)')}
+                    {t('Match a JSON example by type, not exact value (tolerant - recommended)')}
                   </label>
                 </div>
               ))}
