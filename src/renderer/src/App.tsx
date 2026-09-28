@@ -86,9 +86,6 @@ function IconGit () {
   );
 }
 
-// How long the welcome screen stays before the last workspace auto-loads.
-const WELCOME_SCREEN_DELAY_MS = 1500;
-
 function ActivityBarBtn ( {
   active,
   onClick,
@@ -265,18 +262,6 @@ export default function App () {
       window.removeEventListener( 'mouseup', onMouseUp );
     };
   }, [] );
-
-  // Auto-load last opened workspace on startup, but after a short beat so the
-  // welcome screen (recents + update banner) is actually visible first instead
-  // of flashing by.
-  useEffect( () => {
-    const id = setTimeout( () => {
-      electron.getLastWorkspace().then( ( result: { workspace: unknown; workspacePath: string } | null ) => {
-        if ( result ) applyWorkspace( result.workspace, result.workspacePath );
-      } );
-    }, WELCOME_SCREEN_DELAY_MS );
-    return () => clearTimeout( id );
-  }, [applyWorkspace] );
 
   // "Open in API Spector" deep link (spector://open-from-git?url=…) from the web
   // courses: run the same open-from-Git flow as the welcome-screen button.
