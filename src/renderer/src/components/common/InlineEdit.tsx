@@ -8,8 +8,8 @@ import { useEffect, useRef, useState } from 'react';
 export function InlineEdit ( {
   value, onCommit, onCancel, className = '', validate,
 }: {
-  value: string; onCommit: ( v: string ) => void; onCancel: () => void; className?: string
-  validate?: ( v: string ) => string | null
+  readonly value: string; readonly onCommit: ( v: string ) => void; readonly onCancel: () => void; readonly className?: string
+  readonly validate?: ( v: string ) => string | null
 } ) {
   const [draft, setDraft] = useState( value );
   const [error, setError] = useState<string | null>( null );
@@ -25,10 +25,11 @@ export function InlineEdit ( {
   }
 
   return (
-    <div onClick={e => e.stopPropagation()}>
+    <div>
       <input
         ref={ref}
         value={draft}
+        onClick={e => e.stopPropagation()}
         onChange={e => { setDraft( e.target.value ); setError( null ); }}
         onBlur={() => tryCommit( draft )}
         onKeyDown={e => {

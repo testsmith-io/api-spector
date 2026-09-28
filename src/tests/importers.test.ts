@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, it, expect } from 'vitest';
-import { join } from 'path';
+import { join } from 'node:path';
 import { importOpenApi } from '../main/importers/openapi';
 import { importPostman } from '../main/importers/postman';
 
@@ -159,9 +159,9 @@ describe('importOpenApi', () => {
 });
 
 // ─── Inline-spec helper for narrow regression tests ──────────────────────────
-import { writeFileSync, mkdtempSync } from 'fs';
-import { tmpdir } from 'os';
-import { join as pjoin } from 'path';
+import { writeFileSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join as pjoin } from 'node:path';
 
 async function importInlineSpec(spec: object) {
   const dir = mkdtempSync(pjoin(tmpdir(), 'oapi-'));

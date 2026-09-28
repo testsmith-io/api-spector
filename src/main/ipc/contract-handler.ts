@@ -4,11 +4,11 @@
 import { type IpcMain, dialog } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
-import { writeFile, mkdir } from 'fs/promises';
-import { tmpdir } from 'os';
-import { join } from 'path';
-import { randomUUID } from 'crypto';
-import type { ContractRunPayload, ContractReport, ContractSnapshot, ApiRequest } from '../../shared/types';
+import { writeFile, mkdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import type { ContractRunPayload, ContractReport, ContractSnapshot, ApiRequest, ConsumerContract } from '../../shared/types';
 import { loadDesignContractRequests } from '../contract/design-contracts';
 import { runConsumerContracts }   from '../contract/consumer-verifier';
 import { runProviderVerification } from '../contract/provider-verifier';
@@ -19,7 +19,6 @@ import { runFuzz, type FuzzOptions, type FuzzRunResult } from '../contract/fuzz'
 import { inferSchemaFromJson }    from '../contract/schema-inferrer';
 import { reportToHtml, type ReportMeta } from '../contract/html-report';
 import { designContractToPact } from '../contract/design-pact';
-import type { ConsumerContract } from '../../shared/types';
 import {
   captureSnapshot, listSnapshots, loadSnapshot, deleteSnapshot, relPathOf,
 } from '../contract/snapshots';
@@ -113,7 +112,7 @@ export function registerContractHandlers(ipc: IpcMain): void {
   handleIpc(ipc, IPC.contract.exportDesignPact, async (_e, contract: ConsumerContract): Promise<string> => {
     const dir = getWorkspaceDir();
     if (!dir) throw new Error('No workspace open — open or save a workspace first.');
-    const safe = (s: string) => (s || 'unnamed').replace(/[^a-zA-Z0-9._-]+/g, '-');
+    const safe = (s: string) => (s || 'unnamed').replaceAll(/[^a-zA-Z0-9._-]+/g, '-');
     const relPath = join('pacts', `${safe(contract.consumer)}-${safe(contract.provider)}.pact.json`);
     const fullPath = join(dir, relPath);
     await mkdir(join(dir, 'pacts'), { recursive: true });

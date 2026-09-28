@@ -51,7 +51,7 @@ function resolveProtoFile(src: ProtoSource): { file: string; includeDirs: string
   if (src.protoPath) {
     return { file: src.protoPath, includeDirs: [path.dirname(src.protoPath), ...importPaths] };
   }
-  if (src.protoSource && src.protoSource.trim()) {
+  if (src.protoSource?.trim()) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'apispector-proto-'));
     const file = path.join(dir, 'main.proto');
     fs.writeFileSync(file, src.protoSource, 'utf8');

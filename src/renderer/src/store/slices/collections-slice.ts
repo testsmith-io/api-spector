@@ -338,8 +338,8 @@ export const createCollectionsSlice: StateCreator<
       s.tabs = s.tabs.filter(t => t.collectionId !== id);
       if (s.activeCollectionId === id) {
         s.activeCollectionId = Object.keys(s.collections)[0] ?? null;
-        const activeTab = s.tabs.find(t => t.id === s.activeTabId);
-        if (!activeTab) s.activeTabId = s.tabs[0]?.id ?? null;
+        const hasActiveTab = s.tabs.some(t => t.id === s.activeTabId);
+        if (!hasActiveTab) s.activeTabId = s.tabs[0]?.id ?? null;
       }
     });
   },
@@ -498,7 +498,7 @@ export const createCollectionsSlice: StateCreator<
     const entry = Object.values(s.collections).find(c => c.data.requests[requestId]);
     const ex = entry?.data.requests[requestId].examples?.find(e => e.id === exampleId);
     if (!entry || !ex) return;
-    ex.request = { ...(ex.request ?? {}), ...patch };
+    ex.request = { ...ex.request, ...patch };
     entry.dirty = true;
   }),
 
@@ -587,7 +587,7 @@ export const createCollectionsSlice: StateCreator<
 
   duplicateRequest: (collectionId, id) => set(s => {
     const col = s.collections[collectionId]?.data;
-    if (!col || !col.requests[id]) return;
+    if (!col?.requests[id]) return;
     const orig = col.requests[id];
     const copy: ApiRequest = { ...JSON.parse(JSON.stringify(orig)), id: uuidv4(), name: orig.name + ' (copy)' };
     col.requests[copy.id] = copy;
@@ -735,7 +735,7 @@ export const createCollectionsSlice: StateCreator<
     const entry = Object.values(s.collections).find(c => c.data.requests[requestId]);
     if (!entry) return;
     const req = entry.data.requests[requestId];
-    req.meta = { ...(req.meta ?? {}), tags };
+    req.meta = { ...req.meta, tags };
     entry.dirty = true;
   }),
 

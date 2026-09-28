@@ -21,7 +21,7 @@ export function designContractToMock(cc: ConsumerContract, port = 4100): MockSer
     id: it.id || `route-${i}`,
     // Pact path templates use {id}; the mock router uses :id.
     method: (it.request.method || 'GET').toUpperCase() as HttpMethod | 'ANY',
-    path: (it.request.path || '/').replace(/\{([^}]+)\}/g, ':$1'),
+    path: (it.request.path || '/').replaceAll(/\{([^}]+)\}/g, ':$1'),
     statusCode: it.response.status,
     headers: { 'Content-Type': 'application/json', ...kvToHeaders(it.response.headers) },
     body: it.response.body?.trim() ? it.response.body : '',

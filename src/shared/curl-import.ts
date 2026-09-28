@@ -160,14 +160,14 @@ export function parseCurl(command: string): ParsedCurl {
   } else if (hasData) {
     const data = dataParts.join('&');
     const ct = headers.find(h => h.key.toLowerCase() === 'content-type')?.value;
-    if ((ct && ct.includes('json')) || looksJson(data)) body = { mode: 'json', json: data };
+    if ((ct?.includes('json')) || looksJson(data)) body = { mode: 'json', json: data };
     else body = { mode: 'raw', raw: data, rawContentType: ct ?? 'application/x-www-form-urlencoded' };
   }
 
   // A friendly name from the URL path.
   let name: string;
   try {
-    const u = new URL(url.replace(/\{\{[^}]+\}\}/g, 'x'));
+    const u = new URL(url.replaceAll(/\{\{[^}]+\}\}/g, 'x'));
     name = `${resolvedMethod} ${u.pathname === '/' ? u.hostname : u.pathname}`;
   } catch {
     // Templated or protocol-less URL: strip scheme/query and keep the rest.

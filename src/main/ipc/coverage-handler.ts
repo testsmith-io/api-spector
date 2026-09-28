@@ -13,7 +13,7 @@ import { handleIpc } from './handle';
 // YAML access, so it lives here.
 export function registerCoverageHandlers(ipc: IpcMain): void {
   handleIpc(ipc, IPC.coverage.loadSpec, async (_e, source: { path?: string; url?: string; text?: string }): Promise<unknown> => {
-    if (source.text && source.text.trim()) {
+    if (source.text?.trim()) {
       const t = source.text.trim();
       return t.startsWith('{') ? JSON.parse(t) : yamlLoad(t);
     }

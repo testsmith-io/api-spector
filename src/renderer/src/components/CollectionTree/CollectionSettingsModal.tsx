@@ -13,8 +13,8 @@ import { labelCls } from '../../lib/ui-classes';
 type ModalTab = 'auth' | 'headers' | 'tls'
 
 interface Props {
-  collection: Collection
-  onClose: () => void
+  readonly collection: Collection
+  readonly onClose: () => void
 }
 
 export function CollectionSettingsModal({ collection, onClose }: Props) {

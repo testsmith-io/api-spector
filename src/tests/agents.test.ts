@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtempSync, existsSync, readFileSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
-import { execSync } from 'child_process';
+import { mkdtempSync, existsSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { execSync } from 'node:child_process';
 
 const CLI = join(__dirname, '..', 'cli', 'agents.ts');
 const run = (args: string, cwd: string) =>

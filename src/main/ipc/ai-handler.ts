@@ -57,7 +57,7 @@ export function registerAiHandlers(ipc: IpcMain): void {
         }),
         signal: controller.signal,
         // @ts-expect-error undici accepts a dispatcher for proxy/TLS support
-        dispatcher: await buildDispatcher(undefined, undefined),
+        dispatcher: await buildDispatcher(),
       });
       if (!res.ok) {
         let detail = `HTTP ${res.status}`;

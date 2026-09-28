@@ -56,33 +56,24 @@ function langForContentType(ct: string | undefined): string {
 // ─── Markdown generation ─────────────────────────────────────────────────────
 
 export function escMd(s: string): string {
-  return s.replace(/[|\\`*_{}[\]()#+\-.!]/g, c => `\\${c}`);
+  return s.replaceAll(/[|\\`*_{}[\]()#+\-.!]/g, c => `\\${c}`);
 }
 
 function requestToMarkdown(req: ApiRequest, example?: ExampleSnapshot): string {
   const lines: string[] = [];
 
   const methodLabel = req.protocol === 'websocket' ? 'WS' : req.method;
-  lines.push(`#### ${methodLabel} ${escMd(req.name)}`);
-  lines.push('');
+  lines.push(`#### ${methodLabel} ${escMd(req.name)}`, '');
 
   if (req.description?.trim()) {
-    lines.push(req.description.trim());
-    lines.push('');
+    lines.push(req.description.trim(), '');
   }
 
-  lines.push('**URL**');
-  lines.push('```');
-  lines.push(req.url || '(no url)');
-  lines.push('```');
-  lines.push('');
+  lines.push('**URL**', '```', req.url || '(no url)', '```', '');
 
   const enabledParams = req.params.filter(p => p.enabled && p.key);
   if (enabledParams.length) {
-    lines.push('**Query Parameters**');
-    lines.push('');
-    lines.push('| Key | Value | Description |');
-    lines.push('|-----|-------|-------------|');
+    lines.push('**Query Parameters**', '', '| Key | Value | Description |', '|-----|-------|-------------|');
     for (const p of enabledParams) {
       lines.push(`| ${escMd(p.key)} | ${escMd(p.value)} | ${escMd(p.description ?? '')} |`);
     }
@@ -91,10 +82,7 @@ function requestToMarkdown(req: ApiRequest, example?: ExampleSnapshot): string {
 
   const enabledHeaders = req.headers.filter(h => h.enabled && h.key);
   if (enabledHeaders.length) {
-    lines.push('**Headers**');
-    lines.push('');
-    lines.push('| Key | Value |');
-    lines.push('|-----|-------|');
+    lines.push('**Headers**', '', '| Key | Value |', '|-----|-------|');
     for (const h of enabledHeaders) {
       lines.push(`| ${escMd(h.key)} | ${escMd(h.value)} |`);
     }
@@ -102,56 +90,33 @@ function requestToMarkdown(req: ApiRequest, example?: ExampleSnapshot): string {
   }
 
   if (req.auth.type !== 'none') {
-    lines.push(`**Auth**: ${req.auth.type}`);
-    lines.push('');
+    lines.push(`**Auth**: ${req.auth.type}`, '');
   }
 
   const mode = req.body.mode;
   if (mode === 'json' && req.body.json?.trim()) {
-    lines.push('**Body** (JSON)');
-    lines.push('```json');
-    lines.push(req.body.json.trim());
-    lines.push('```');
-    lines.push('');
+    lines.push('**Body** (JSON)', '```json', req.body.json.trim(), '```', '');
   } else if (mode === 'raw' && req.body.raw?.trim()) {
     const ct = req.body.rawContentType ?? 'text';
-    lines.push(`**Body** (${ct})`);
-    lines.push('```');
-    lines.push(req.body.raw.trim());
-    lines.push('```');
-    lines.push('');
+    lines.push(`**Body** (${ct})`, '```', req.body.raw.trim(), '```', '');
   } else if (mode === 'graphql' && req.body.graphql?.query?.trim()) {
-    lines.push('**Body** (GraphQL)');
-    lines.push('```graphql');
-    lines.push(req.body.graphql.query.trim());
-    lines.push('```');
-    lines.push('');
+    lines.push('**Body** (GraphQL)', '```graphql', req.body.graphql.query.trim(), '```', '');
   } else if (mode === 'soap' && req.body.soap?.envelope?.trim()) {
-    lines.push('**Body** (SOAP)');
-    lines.push('```xml');
-    lines.push(req.body.soap.envelope.trim());
-    lines.push('```');
-    lines.push('');
+    lines.push('**Body** (SOAP)', '```xml', req.body.soap.envelope.trim(), '```', '');
   }
 
   // ── Captured example exchange (sent body + response body) ─────────────────
   if (example?.sent?.body?.trim()) {
     const ct   = example.sent.headers?.['Content-Type'] ?? example.sent.headers?.['content-type'];
     const lang = langForContentType(ct);
-    lines.push('**Example Request Body**');
-    lines.push('```' + lang);
-    lines.push(formatBody(example.sent.body, ct));
-    lines.push('```');
-    lines.push('');
+    lines.push('**Example Request Body**', '```' + lang, formatBody(example.sent.body, ct), '```', '');
   }
   if (example?.response) {
     const ct   = example.response.headers['content-type'] ?? example.response.headers['Content-Type'];
     const lang = langForContentType(ct);
     lines.push(`**Example Response** (${example.response.status})`);
     if (example.response.body?.trim()) {
-      lines.push('```' + lang);
-      lines.push(formatBody(example.response.body, ct));
-      lines.push('```');
+      lines.push('```' + lang, formatBody(example.response.body, ct), '```');
     } else {
       lines.push('_(empty body)_');
     }
@@ -166,11 +131,9 @@ function folderToMarkdown(folder: Folder, requests: Record<string, ApiRequest>, 
   const heading = '#'.repeat(depth);
 
   if (folder.name !== 'root') {
-    lines.push(`${heading} ${escMd(folder.name)}`);
-    lines.push('');
+    lines.push(`${heading} ${escMd(folder.name)}`, '');
     if (folder.description?.trim()) {
-      lines.push(folder.description.trim());
-      lines.push('');
+      lines.push(folder.description.trim(), '');
     }
   }
 
@@ -190,16 +153,13 @@ function folderToMarkdown(folder: Folder, requests: Record<string, ApiRequest>, 
 
 export function generateMarkdown(payload: DocsPayload): string {
   const lines: string[] = [];
-  lines.push('# API Documentation');
-  lines.push('');
+  lines.push('# API Documentation', '');
 
   const examples = payload.examples ?? {};
   for (const { collection, requests } of payload.collections) {
-    lines.push(`## ${escMd(collection.name)}`);
-    lines.push('');
+    lines.push(`## ${escMd(collection.name)}`, '');
     if (collection.description?.trim()) {
-      lines.push(collection.description.trim());
-      lines.push('');
+      lines.push(collection.description.trim(), '');
     }
     lines.push(folderToMarkdown(collection.rootFolder, requests, 3, examples));
   }

@@ -15,9 +15,9 @@ import {
 } from './utils/snippets';
 
 interface Props {
-  state: PopoverState
-  onClose: () => void
-  onConfirm: (snippet: string) => void
+  readonly state: PopoverState
+  readonly onClose: () => void
+  readonly onConfirm: (snippet: string) => void
 }
 
 export function AssertMenu({ state, onClose, onConfirm }: Props) {

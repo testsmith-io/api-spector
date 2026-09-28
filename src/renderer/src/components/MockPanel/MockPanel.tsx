@@ -52,7 +52,7 @@ export function MockPanel() {
       await electron.saveMock(relPath, mock);
       const ws = useStore.getState().workspace;
       if (ws) {
-        if (!ws.mocks) ws.mocks = [];
+        ws.mocks ??= [];
         ws.mocks.push(relPath);
         await electron.saveWorkspace(ws);
       }

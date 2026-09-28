@@ -15,9 +15,9 @@ import { useT } from '../../i18n';
 type ModalTab = 'auth' | 'headers'
 
 interface Props {
-  collectionId: string
-  folder: Folder
-  onClose: () => void
+  readonly collectionId: string
+  readonly folder: Folder
+  readonly onClose: () => void
 }
 
 export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {

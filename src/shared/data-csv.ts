@@ -8,7 +8,7 @@ import type { DataSet } from './types';
 // files on save (see main/data-files.ts) so they are git-diffable and editable.
 
 export function toCSV(ds: DataSet): string {
-  const escape = (s: string) => (s.includes(',') || s.includes('"') || s.includes('\n')) ? `"${s.replace(/"/g, '""')}"` : s;
+  const escape = (s: string) => (s.includes(',') || s.includes('"') || s.includes('\n')) ? `"${s.replaceAll('"', '""')}"` : s;
   return [ds.columns, ...ds.rows].map(row => row.map(escape).join(',')).join('\n');
 }
 

@@ -14,13 +14,13 @@ import { btnPrimaryCls } from '../../lib/ui-classes';
 const { electron } = window;
 
 interface Props {
-  request: ApiRequest
-  onChange: (p: Partial<ApiRequest>) => void
+  readonly request: ApiRequest
+  readonly onChange: (p: Partial<ApiRequest>) => void
 }
 
 // ─── Param tree (read-only) ──────────────────────────────────────────────────
 
-function ParamTree({ params, depth = 0 }: { params: WsdlParam[]; depth?: number }) {
+function ParamTree({ params, depth = 0 }: { readonly params: WsdlParam[]; readonly depth?: number }) {
   const t = useT();
   if (params.length === 0) {
     return <p className="text-[10px] text-surface-600 italic">{t('No parameters declared in WSDL.')}</p>;
@@ -143,7 +143,7 @@ export function SoapEditor({ request, onChange }: Props) {
     ?? operations.find(o => o.name === soap.operationName)
     ?? operations[0];
   const primaryEndpoint = endpoints[0]?.address;
-  const versions = Array.from(new Set(operations.map(o => o.soapVersion))).sort();
+  const versions = Array.from(new Set(operations.map(o => o.soapVersion))).sort((a, b) => a.localeCompare(b));
 
   // What we have available, regardless of whether operations are loaded.
   const hasSavedSoap = Boolean(soap.envelope?.trim() || soap.operationName || soap.wsdlUrl?.trim());
@@ -213,7 +213,7 @@ export function SoapEditor({ request, onChange }: Props) {
             </div>
             <div className="overflow-y-auto flex-1">
               {operations.map(op => {
-                const active = selected && op.name === selected.name && op.soapVersion === selected.soapVersion && (op.binding ?? '') === (selected.binding ?? '');
+                const active = op.name === selected?.name && op.soapVersion === selected.soapVersion && (op.binding ?? '') === (selected.binding ?? '');
                 return (
                   <button
                     key={`${op.binding ?? ''}:${op.name}:${op.soapVersion}`}

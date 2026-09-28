@@ -10,9 +10,9 @@ import { useT } from '../../i18n';
 const { electron } = window;
 
 interface Props {
-  onImportMock:        (session: RecordingSession, targetMockId: string | null) => Promise<void>;
-  onClose:             () => void;
-  defaultTargetMockId: string;   // '' = new server
+  readonly onImportMock:        (session: RecordingSession, targetMockId: string | null) => Promise<void>;
+  readonly onClose:             () => void;
+  readonly defaultTargetMockId: string;   // '' = new server
 }
 
 function statusColor(status: number): string {
@@ -211,7 +211,7 @@ export function RecorderPanel({ onImportMock, onClose, defaultTargetMockId }: Pr
 
 // ─── Entry detail ─────────────────────────────────────────────────────────────
 
-function EntryDetail({ entry }: { entry: RecordedEntry }) {
+function EntryDetail({ entry }: { readonly entry: RecordedEntry }) {
   const t = useT();
   const [tab, setTab] = useState<'request' | 'response'>('request');
   const mc = methodColor(entry.request.method);
@@ -296,7 +296,7 @@ function EntryDetail({ entry }: { entry: RecordedEntry }) {
   );
 }
 
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
+function Section({ label, children }: { readonly label: string; readonly children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-surface-500">{label}</div>
@@ -305,7 +305,7 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function HeadersTable({ headers }: { headers: Record<string, string> }) {
+function HeadersTable({ headers }: { readonly headers: Record<string, string> }) {
   const t = useT();
   const entries = Object.entries(headers);
   if (entries.length === 0) return <span className="text-surface-500 text-[11px]">{t('none')}</span>;

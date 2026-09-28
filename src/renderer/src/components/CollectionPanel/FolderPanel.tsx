@@ -66,7 +66,7 @@ export function FolderPanel() {
       <div className="flex border-b border-surface-800 px-6 flex-shrink-0">
         {([
           { id: 'documentation', label: 'Documentation', badge: folder.description?.trim() ? 1 : 0 },
-          { id: 'data',          label: 'Data',          badge: iterCount > 0 ? iterCount : 0 },
+          { id: 'data',          label: 'Data',          badge: Math.max(iterCount, 0) },
           { id: 'variables',     label: 'Variables',     badge: varRows.length },
         ] as const).map(tab => (
           <button

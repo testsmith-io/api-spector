@@ -23,7 +23,7 @@ if (savedTheme === 'light') {
 }
 
 const savedZoom = localStorage.getItem(STORAGE_KEYS.zoom);
-if (savedZoom) window.electron.setZoomFactor(parseFloat(savedZoom));
+if (savedZoom) window.electron.setZoomFactor(Number.parseFloat(savedZoom));
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

@@ -8,14 +8,14 @@ import { HEADER_NAMES, getValueSuggestions } from './header-suggestions';
 import { useT } from '../../i18n';
 
 interface Props {
-  rows: KeyValuePair[]
-  onChange: (rows: KeyValuePair[]) => void
-  keyPlaceholder?: string
-  valuePlaceholder?: string
+  readonly rows: KeyValuePair[]
+  readonly onChange: (rows: KeyValuePair[]) => void
+  readonly keyPlaceholder?: string
+  readonly valuePlaceholder?: string
   /** When true, provides autocomplete for HTTP header names and common values. */
-  headerMode?: boolean
+  readonly headerMode?: boolean
   /** When true, each row shows a "query/path" type selector. */
-  paramMode?: boolean
+  readonly paramMode?: boolean
 }
 
 export function KVTable({ rows, onChange, keyPlaceholder, valuePlaceholder, headerMode, paramMode }: Props) {

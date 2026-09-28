@@ -1,8 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { readFile, writeFile, mkdir, readdir } from 'fs/promises';
-import { join } from 'path';
+import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { ContractReport } from '../../shared/types';
 
 // ─── Verification results store (local can-i-deploy) ──────────────────────────
@@ -27,7 +27,7 @@ export interface RecordedResult {
 }
 
 function safe(part: string): string {
-  return part.trim().replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'unknown';
+  return part.trim().replaceAll(/[^a-zA-Z0-9._-]+/g, '-').replaceAll(/^-+|-+$/g, '') || 'unknown';
 }
 
 function resultPath(dir: string, pacticipant: string, version: string): string {

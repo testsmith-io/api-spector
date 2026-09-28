@@ -1,8 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { readFile, readdir } from 'fs/promises';
-import { join } from 'path';
+import { readFile, readdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { Workspace, ApiRequest } from '../../shared/types';
 import { importPact } from './pact-format';
 import { designContractToPact } from './design-pact';
@@ -51,7 +51,8 @@ export async function loadDesignContractRequests(
     } catch {
       // no pacts/ directory - nothing to add
     }
-    for (const f of files.sort()) {
+    files.sort((a, b) => a.localeCompare(b));
+    for (const f of files) {
       try {
         add(importPact(await readFile(join(dir, 'pacts', f), 'utf8')).requests);
       } catch {

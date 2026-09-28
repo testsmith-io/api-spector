@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'http';
-import type { Socket } from 'net';
-import crypto from 'crypto';
+import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
+import type { Socket } from 'node:net';
+import crypto from 'node:crypto';
 
 vi.mock('../main/ipc/secret-handler', () => ({ getSecret: vi.fn().mockResolvedValue(null) }));
 

@@ -1,14 +1,14 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { readFile } from 'fs/promises';
+import { readFile } from 'node:fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import type { Collection, ApiRequest, AuthConfig, RequestBody, KeyValuePair, Folder, RequestExample } from '../../shared/types';
 import { translateScript } from './script-translator';
 
 // ─── Postman v2.1 importer ────────────────────────────────────────────────────
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 
 function parseHeaders(raw: any[]): KeyValuePair[] {
   return (raw ?? []).map(h => ({

@@ -8,6 +8,7 @@ import { SchemaSyncModal } from './SchemaSyncModal';
 import { DragCtx, SelectionCtx, TagChips } from './CollectionTree';
 import { InlineEdit } from '../common/InlineEdit';
 import { type MenuItem, DotsBtn } from '../common/ContextMenu';
+import { onActivateKey } from '../../lib/a11y';
 import { PencilIcon, CopyIcon, TagIcon, SyncIcon, TrashIcon, ShieldIcon, BanIcon } from '../common/icons';
 import { useStore } from '../../store';
 import { useToast, Toast } from '../common/Toast';
@@ -52,34 +53,34 @@ const AUTH_BADGE_LABELS: Record<string, string> = {
 // ─── RequestRow ──────────────────────────────────────────────────────────────
 
 export interface RequestRowProps {
-  reqId: string
-  collectionId: string
-  folderId: string
-  name: string
-  url: string
-  method: string
-  protocol?: ApiRequest['protocol']
-  authType: string
-  hookType?: ApiRequest['hookType']
-  disabled?: boolean
-  tags: string[]
-  isActive: boolean
-  indent: number
-  autoRename?: boolean
-  examples?: { id: string; name: string }[]
-  activeExampleId?: string | null
-  onSelect: () => void
-  onRename: (name: string) => void
-  onDelete: () => void
-  onDuplicate: () => void
-  onUpdateTags: (tags: string[]) => void
-  onSetHookType: (ht: ApiRequest['hookType']) => void
-  onToggleDisabled: () => void
-  onAddExample?: () => void
-  onOpenExample?: (exampleId: string) => void
-  onRenameExample?: (exampleId: string, name: string) => void
-  onDeleteExample?: (exampleId: string) => void
-  onDuplicateExample?: (exampleId: string) => void
+  readonly reqId: string
+  readonly collectionId: string
+  readonly folderId: string
+  readonly name: string
+  readonly url: string
+  readonly method: string
+  readonly protocol?: ApiRequest['protocol']
+  readonly authType: string
+  readonly hookType?: ApiRequest['hookType']
+  readonly disabled?: boolean
+  readonly tags: string[]
+  readonly isActive: boolean
+  readonly indent: number
+  readonly autoRename?: boolean
+  readonly examples?: { id: string; name: string }[]
+  readonly activeExampleId?: string | null
+  readonly onSelect: () => void
+  readonly onRename: (name: string) => void
+  readonly onDelete: () => void
+  readonly onDuplicate: () => void
+  readonly onUpdateTags: (tags: string[]) => void
+  readonly onSetHookType: (ht: ApiRequest['hookType']) => void
+  readonly onToggleDisabled: () => void
+  readonly onAddExample?: () => void
+  readonly onOpenExample?: (exampleId: string) => void
+  readonly onRenameExample?: (exampleId: string, name: string) => void
+  readonly onDeleteExample?: (exampleId: string) => void
+  readonly onDuplicateExample?: (exampleId: string) => void
 }
 
 export function RequestRow({
@@ -128,6 +129,9 @@ export function RequestRow({
     <div className="relative">
       <div
         draggable
+        role="button"
+        tabIndex={0}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRowClick(e as unknown as React.MouseEvent); } }}
         className={`group flex items-start gap-1.5 py-1 pr-1 rounded-sm cursor-pointer transition-colors ${
           disabled ? 'opacity-40' : ''
         } ${
@@ -281,13 +285,13 @@ export function RequestRow({
 // A saved request/response snapshot nested under its request in the tree.
 
 function ExampleRow({ name, indent, isActive, onOpen, onRename, onDelete, onDuplicate }: {
-  name: string
-  indent: number
-  isActive: boolean
-  onOpen: () => void
-  onRename: (n: string) => void
-  onDelete: () => void
-  onDuplicate: () => void
+  readonly name: string
+  readonly indent: number
+  readonly isActive: boolean
+  readonly onOpen: () => void
+  readonly onRename: (n: string) => void
+  readonly onDelete: () => void
+  readonly onDuplicate: () => void
 }) {
   const t = useT();
   const [renaming, setRenaming] = useState(false);
@@ -297,7 +301,10 @@ function ExampleRow({ name, indent, isActive, onOpen, onRename, onDelete, onDupl
         isActive ? 'bg-surface-800 text-[var(--text-primary)]' : 'text-surface-400 hover:bg-surface-800'
       }`}
       style={{ paddingLeft: indent }}
+      role="button"
+      tabIndex={0}
       onClick={onOpen}
+      onKeyDown={onActivateKey(onOpen)}
       onDoubleClick={() => setRenaming(true)}
     >
       <span className="shrink-0 text-[8px] font-bold px-1 py-px rounded bg-surface-700 text-surface-300" title={t('Example')}>EX</span>

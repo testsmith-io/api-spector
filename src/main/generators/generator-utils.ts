@@ -13,12 +13,12 @@ import { authIsConfigured } from '../../shared/request-collection';
 
 /** Lowercase, hyphenated file-stem (e.g. for spec/test filenames). */
 export function slug(name: string): string {
-  return name.replace(/\W+/g, '-').toLowerCase().replace(/^-|-$/g, '');
+  return name.replaceAll(/\W+/g, '-').toLowerCase().replaceAll(/^-|-$/g, '');
 }
 
 /** SHOUTY_SNAKE_CASE env-variable name for a `{{var}}` key. */
 export function toEnvVar(key: string): string {
-  return key.replace(/\W+/g, '_').toUpperCase();
+  return key.replaceAll(/\W+/g, '_').toUpperCase();
 }
 
 /**
@@ -27,7 +27,7 @@ export function toEnvVar(key: string): string {
  * `${process.env.VAR ?? ''}`.
  */
 export function interpolateEnvVars(value: string, sharedVars: Set<string> = new Set()): string {
-  return value.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
+  return value.replaceAll(/\{\{([^}]+)\}\}/g, (_, key) => {
     const envKey = toEnvVar(key.trim());
     return sharedVars.has(envKey) ? `\${${envKey}}` : `\${process.env.${envKey} ?? ''}`;
   });
@@ -78,7 +78,7 @@ export function buildNameMap(folder: Folder, requests: Collection['requests']): 
 
 /** UpperCamelCase Java class name from a display name. */
 export function javaClass(name: string): string {
-  return name.replace(/[^\w\s]/g, ' ').split(/\s+/).filter(Boolean)
+  return name.replaceAll(/[^\w\s]/g, ' ').split(/\s+/).filter(Boolean)
     .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
 }
 
@@ -118,7 +118,7 @@ export function getEnvBaseUrl(environment: Environment | null, fallback: string)
 export function renderTree(paths: string[]): string {
   interface Node { [k: string]: Node }
   const root: Node = {};
-  for (const p of [...paths].sort()) {
+  for (const p of [...paths].sort((a, b) => a.localeCompare(b))) {
     let cur = root;
     for (const part of p.split('/')) { cur = (cur[part] ??= {}); }
   }

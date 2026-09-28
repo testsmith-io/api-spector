@@ -26,8 +26,8 @@ export function envRelPath(name: string, id: string): string {
 function safeName(name: string): string {
   return name.trim()
     .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-_]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+    .replaceAll(/\s+/g, '-')
+    .replaceAll(/[^a-z0-9-_]/g, '')
+    .replaceAll(/-+/g, '-')
+    .replaceAll(/^-|-$/g, '');
 }

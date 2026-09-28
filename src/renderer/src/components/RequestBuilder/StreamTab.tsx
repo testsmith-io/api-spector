@@ -10,7 +10,7 @@ import { useT } from '../../i18n';
 // field blank uses the default; 0 disables that cap.
 const DEFAULTS = { idleSec: 60, totalSec: 300 };
 
-export function StreamTab({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
+export function StreamTab({ request, onChange }: { readonly request: ApiRequest; readonly onChange: (p: Partial<ApiRequest>) => void }) {
   const t = useT();
   const stream = request.stream ?? {};
 

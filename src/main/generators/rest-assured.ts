@@ -12,12 +12,12 @@ import {
 // ─── REST Assured (Java + JUnit 5 + Maven) generator ─────────────────────────
 
 function javaMethod(name: string): string {
-  const parts = name.replace(/[^\w\s]/g, ' ').split(/\s+/).filter(Boolean);
+  const parts = name.replaceAll(/[^\w\s]/g, ' ').split(/\s+/).filter(Boolean);
   return parts[0].toLowerCase() + parts.slice(1).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
 }
 
 function javaTypeFor(expected?: string): string {
-  switch (expected?.replace(/"/g, '')) {
+  switch (expected?.replaceAll('"', '')) {
     case 'string':  return 'String.class';
     case 'number':  return 'Number.class';
     case 'boolean': return 'Boolean.class';
@@ -32,7 +32,7 @@ function javaTypeFor(expected?: string): string {
  * everything else falls back to `System.getenv("VAR")`.
  */
 function interpolateJava(value: string, sharedVars: Set<string> = new Set()): string {
-  return '"' + value.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
+  return '"' + value.replaceAll(/\{\{([^}]+)\}\}/g, (_, key) => {
     const envKey = toEnvConst(key.trim());
     if (sharedVars.has(envKey)) {
       return `" + ${envKey} + "`;
@@ -44,7 +44,7 @@ function interpolateJava(value: string, sharedVars: Set<string> = new Set()): st
 // ─── pom.xml ──────────────────────────────────────────────────────────────────
 
 function buildPom(collectionName: string): string {
-  const artifact = collectionName.replace(/\W+/g, '-').toLowerCase();
+  const artifact = collectionName.replaceAll(/\W+/g, '-').toLowerCase();
   return `<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -178,7 +178,7 @@ function buildTestClass(folderName: string, folder: Folder, collection: Collecti
     if (parsed.extractions.length > 0) {
       lines.push(`        var hookResponse = given().spec(requestSpec)`);
       if (h.body.mode === 'json' && h.body.json) {
-        const escaped = h.body.json.replace(/"/g, '\\"').replace(/\n/g, '\\n');
+        const escaped = h.body.json.replaceAll('"', '\\"').replaceAll('\n', '\\n');
         lines.push(`            .body("${escaped}")`);
       }
       lines.push(`            .when()${restAssuredCall(method, `"${path}"`)};`);
@@ -239,17 +239,14 @@ function buildTestClass(folderName: string, folder: Folder, collection: Collecti
     const enabledParams = req.params.filter(p => p.enabled && p.key);
 
     const lines: string[] = [];
-    lines.push(`    @Test`);
-    lines.push(`    public void ${methodName}() {`);
-    lines.push(`        given()`);
-    lines.push(`            .spec(requestSpec)`);
+    lines.push(`    @Test`, `    public void ${methodName}() {`, `        given()`, `            .spec(requestSpec)`);
 
     // Auth header — use shared variable if extracted by a hook
     if (effectiveAuth.type === 'bearer') {
       const token = effectiveAuth.token ?? '';
       if (token.includes('{{')) {
         // Check if any referenced var comes from a hook extraction
-        const varRef = token.match(/\{\{([^}]+)\}\}/)?.[1]?.trim();
+        const varRef = (/\{\{([^}]+)\}\}/.exec(token))?.[1]?.trim();
         const envKey = varRef ? toEnvConst(varRef) : '';
         if (envKey && sharedVars.has(envKey)) {
           lines.push(`            .header("Authorization", "Bearer " + ${envKey})`);
@@ -273,14 +270,12 @@ function buildTestClass(folderName: string, folder: Folder, collection: Collecti
       if (req.body.mode === 'json' && req.body.json) {
         // Inline the JSON body as a Java string. Escape quotes/newlines and
         // interpolate {{var}} tokens into shared-var references or getenv calls.
-        const escaped = req.body.json.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+        const escaped = req.body.json.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('\n', '\\n');
         lines.push(`            .body(${interpolateJava(escaped, sharedVars)})`);
       }
     }
 
-    lines.push(`        .when()`);
-    lines.push(`            ${restAssuredCall(method, javaPath)}`);
-    lines.push(`        .then()`);
+    lines.push(`        .when()`, `            ${restAssuredCall(method, javaPath)}`, `        .then()`);
 
     const parsed = parsePostScript(req.postRequestScript);
     if (parsed.assertions.length > 0) {
@@ -291,11 +286,7 @@ function buildTestClass(folderName: string, folder: Folder, collection: Collecti
             lines.push(`            .statusCode(${a.expected ?? 200})`);
             break;
           case 'equals':
-            if (a.expected?.startsWith('"')) {
-              lines.push(`            .body("${jp}", equalTo(${a.expected}))`);
-            } else {
-              lines.push(`            .body("${jp}", equalTo(${a.expected}))`);
-            }
+            lines.push(`            .body("${jp}", equalTo(${a.expected}))`);
             break;
           case 'contains':
             lines.push(`            .body("${jp}", containsString(${a.expected}))`);

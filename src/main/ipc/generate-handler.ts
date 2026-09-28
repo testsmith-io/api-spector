@@ -4,8 +4,8 @@
 import { type IpcMain, dialog } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
-import { writeFile, mkdir } from 'fs/promises';
-import { join, dirname } from 'path';
+import { writeFile, mkdir } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
 import JSZip from 'jszip';
 import { generateRobotFramework } from '../generators/robot-framework';
 import { generatePlaywright }     from '../generators/playwright';
@@ -44,8 +44,8 @@ export function registerGenerateHandlers(ipc: IpcMain): void {
   });
 
   handleIpc(ipc, IPC.generate.saveZip, async (_e, files: GeneratedFile[], collectionName: string, target: string): Promise<boolean> => {
-    const colSlug    = collectionName.replace(/\W+/g, '-').toLowerCase();
-    const targetSlug = target.replace(/_/g, '-');
+    const colSlug    = collectionName.replaceAll(/\W+/g, '-').toLowerCase();
+    const targetSlug = target.replaceAll('_', '-');
     const defaultName = `${colSlug}-${targetSlug}.zip`;
     const { canceled, filePath } = await dialog.showSaveDialog({
       title: 'Save as ZIP',

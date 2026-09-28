@@ -52,35 +52,35 @@ export function parsePostScript(script: string | undefined): ParsedScript {
     const body = match[3];
 
     // sp.expect(expr).to.equal(value)
-    const equalMatch = body.match(/sp\.expect\(([^)]+)\)\.to(?:\.be)?\.equal\(([^)]+)\)/);
+    const equalMatch = /sp\.expect\(([^)]+)\)\.to(?:\.be)?\.equal\(([^)]+)\)/.exec(body);
     if (equalMatch) {
       assertions.push({ name, accessor: equalMatch[1].trim(), kind: 'equals', expected: equalMatch[2].trim() });
       continue;
     }
 
     // sp.expect(expr).to.include(value) / .to.contain(value)
-    const includeMatch = body.match(/sp\.expect\(([^)]+)\)\.to\.(?:include|contain)\(([^)]+)\)/);
+    const includeMatch = /sp\.expect\(([^)]+)\)\.to\.(?:include|contain)\(([^)]+)\)/.exec(body);
     if (includeMatch) {
       assertions.push({ name, accessor: includeMatch[1].trim(), kind: 'contains', expected: includeMatch[2].trim() });
       continue;
     }
 
     // sp.expect(expr).to.not.be.oneOf([null, undefined])  (exists check)
-    const existsMatch = body.match(/sp\.expect\(([^)]+)\)\.to\.not\.be\.oneOf\(\[null,\s*undefined\]\)/);
+    const existsMatch = /sp\.expect\(([^)]+)\)\.to\.not\.be\.oneOf\(\[null,\s*undefined\]\)/.exec(body);
     if (existsMatch) {
       assertions.push({ name, accessor: existsMatch[1].trim(), kind: 'exists' });
       continue;
     }
 
     // sp.expect(expr).to.be.a("type")
-    const typeMatch = body.match(/sp\.expect\(([^)]+)\)\.to\.be\.a\(\s*"([^"]+)"\s*\)/);
+    const typeMatch = /sp\.expect\(([^)]+)\)\.to\.be\.a\(\s*"([^"]+)"\s*\)/.exec(body);
     if (typeMatch) {
       assertions.push({ name, accessor: typeMatch[1].trim(), kind: 'type', expected: `"${typeMatch[2]}"` });
       continue;
     }
 
     // sp.expect(expr).to.be.above(n)
-    const aboveMatch = body.match(/sp\.expect\(([^)]+)\)\.to\.be\.above\((\d+)\)/);
+    const aboveMatch = /sp\.expect\(([^)]+)\)\.to\.be\.above\((\d+)\)/.exec(body);
     if (aboveMatch) {
       assertions.push({ name, accessor: aboveMatch[1].trim(), kind: 'above', expected: aboveMatch[2] });
       continue;
@@ -92,7 +92,7 @@ export function parsePostScript(script: string | undefined): ParsedScript {
 
   // ── Status code assertions outside of sp.test ────────────────────────────
   // sp.response.to.have.status(200)
-  const statusMatch = script.match(/sp\.response\.to\.have\.status\((\d+)\)/);
+  const statusMatch = /sp\.response\.to\.have\.status\((\d+)\)/.exec(script);
   if (statusMatch) {
     assertions.push({ name: `status is ${statusMatch[1]}`, accessor: '', kind: 'status', expected: statusMatch[1] });
   }
@@ -105,7 +105,7 @@ export function parsePostScript(script: string | undefined): ParsedScript {
     const varName = match[2];
     let accessor = match[3].trim();
     // Clean up common wrappers: String(...), JSON.stringify(...)
-    const stringWrap = accessor.match(/^String\((.+)\)$/);
+    const stringWrap = /^String\((.+)\)$/.exec(accessor);
     if (stringWrap) accessor = stringWrap[1];
     extractions.push({ varName, accessor, target });
   }
@@ -121,5 +121,5 @@ export function parsePostScript(script: string | undefined): ParsedScript {
  *   json["my key"].val  →  ['my key'].val
  */
 export function accessorToJsonPath(accessor: string): string {
-  return accessor.replace(/^json\.?/, '').replace(/\["([^"]+)"\]/g, "['$1']");
+  return accessor.replace(/^json\.?/, '').replaceAll(/\["([^"]+)"\]/g, "['$1']");
 }

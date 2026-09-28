@@ -15,8 +15,8 @@ import { useStore } from '../../store';
 import { useT } from '../../i18n';
 
 interface Props {
-  request: ApiRequest
-  onChange: (patch: Partial<ApiRequest>) => void
+  readonly request: ApiRequest
+  readonly onChange: (patch: Partial<ApiRequest>) => void
 }
 
 type ScriptType = 'pre' | 'post' | 'gql'

@@ -32,13 +32,14 @@ function kvToQuery(kv?: KeyValuePair[]): Record<string, string[]> | undefined {
   const out: Record<string, string[]> = {};
   for (const p of kv ?? []) {
     if (p.enabled === false || !p.key) continue;
-    (out[p.key] ??= []).push(p.value);
+    out[p.key] ??= [];
+    out[p.key].push(p.value);
   }
   return Object.keys(out).length ? out : undefined;
 }
 
 function parseJson(s?: string): unknown {
-  if (!s || !s.trim()) return undefined;
+  if (!s?.trim()) return undefined;
   try { return JSON.parse(s); } catch { return undefined; }
 }
 
@@ -99,7 +100,7 @@ function tokenizeShape(src: string): string[] | undefined {
   while (i < src.length) {
     re.lastIndex = i;
     const m = re.exec(src);
-    if (!m || m.index !== i) return undefined;
+    if (m?.index !== i) return undefined;
     tokens.push(m[1].startsWith('"') ? m[1].slice(1, -1) : m[1]);
     i = re.lastIndex;
   }
@@ -108,7 +109,7 @@ function tokenizeShape(src: string): string[] | undefined {
 
 /** Parse a type-shape shorthand into a Shape, or undefined if it isn't one. */
 export function parseShape(src?: string): Shape | undefined {
-  if (!src || !src.trim()) return undefined;
+  if (!src?.trim()) return undefined;
   const tokens = tokenizeShape(src);
   if (!tokens || tokens.length === 0) return undefined;
 
@@ -203,7 +204,7 @@ function compileShape(shape: Shape): { body: unknown; rules: BodyRules } {
  * the text is neither valid JSON nor a parseable shape.
  */
 export function compileResponseBody(text?: string, loose = true): { body: unknown; rules?: BodyRules } | undefined {
-  if (!text || !text.trim()) return undefined;
+  if (!text?.trim()) return undefined;
 
   try {
     const json = JSON.parse(text);

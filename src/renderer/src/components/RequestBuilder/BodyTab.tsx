@@ -19,7 +19,7 @@ const SoapEditor = lazy(() => import('./SoapEditor').then(m => ({ default: m.Soa
 
 type BodyMode = RequestBody['mode']
 
-export function BodyTab({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
+export function BodyTab({ request, onChange }: { readonly request: ApiRequest; readonly onChange: (p: Partial<ApiRequest>) => void }) {
   const t = useT();
   const editorFallback = <div className="p-4 text-xs text-surface-500">{t('Loading editor…')}</div>;
   const body     = request.body;

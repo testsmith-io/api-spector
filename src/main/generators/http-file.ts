@@ -15,7 +15,7 @@ import { SPECTOR_TO_HTTP } from '../importers/http-file';
 
 /** Rewrite API Spector `{{$dynamic}}` tokens back to REST Client names. */
 function mapOut(s: string): string {
-  return s.replace(/\{\{\s*(\$[A-Za-z]+)\s*\}\}/g, (_m, name: string) =>
+  return s.replaceAll(/\{\{\s*(\$[A-Za-z]+)\s*\}\}/g, (_m, name: string) =>
     `{{${SPECTOR_TO_HTTP[name] ?? name}}}`);
 }
 
@@ -125,11 +125,10 @@ export function generateHttpFile(collection: Collection, environment: Environmen
     for (const h of headers) lines.push(`${h.key}: ${mapOut(h.value)}`);
 
     if (body.text) {
-      lines.push('');
-      lines.push(mapOut(body.text));
+      lines.push('', mapOut(body.text));
     }
   });
 
-  const slug = collection.name.replace(/\W+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'collection';
+  const slug = collection.name.replaceAll(/\W+/g, '-').replaceAll(/^-+|-+$/g, '').toLowerCase() || 'collection';
   return [{ path: `${slug}.http`, content: lines.join('\n') + '\n' }];
 }

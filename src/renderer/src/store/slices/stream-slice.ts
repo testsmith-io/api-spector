@@ -45,7 +45,7 @@ export const createStreamSlice: StateCreator<
   }),
 
   pushLiveStreamEvents: (streamId, events) => set(s => {
-    if (!s.liveStream || s.liveStream.streamId !== streamId) return;
+    if (s.liveStream?.streamId !== streamId) return;
     s.liveStream.events.push(...events);
     const overflow = s.liveStream.events.length - LIVE_EVENT_CAP;
     if (overflow > 0) s.liveStream.events.splice(0, overflow);

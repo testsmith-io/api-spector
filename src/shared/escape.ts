@@ -8,13 +8,13 @@
  *  Accepts anything and coerces to string (null/undefined → ""). */
 export function escapeHtml(s: unknown): string {
   return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
 }
 
 /** Like {@link escapeHtml} but also escapes `'` as `&apos;` (XML attributes). */
 export function escapeXml(s: unknown): string {
-  return escapeHtml(s).replace(/'/g, '&apos;');
+  return escapeHtml(s).replaceAll("'", '&apos;');
 }

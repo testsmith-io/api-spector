@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { readFile } from 'fs/promises';
+import { readFile } from 'node:fs/promises';
 import { load as yamlLoad } from 'js-yaml';
 import { fetch } from 'undici';
 import { v4 as uuidv4 } from 'uuid';
@@ -9,7 +9,7 @@ import type { Collection, ApiRequest, AuthConfig, RequestBody, KeyValuePair, Fol
 
 // ─── OpenAPI 3.x importer ─────────────────────────────────────────────────────
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 
 async function loadSpec(filePath: string): Promise<any> {
   const raw = await readFile(filePath, 'utf8');
@@ -32,7 +32,7 @@ async function loadSpecFromUrl(url: string): Promise<any> {
 
 function resolveRef(spec: any, ref: string): any {
   const parts = ref.replace(/^#\//, '').split('/');
-  return parts.reduce((obj, key) => obj?.[decodeURIComponent(key.replace(/~1/g, '/').replace(/~0/g, '~'))], spec);
+  return parts.reduce((obj, key) => obj?.[decodeURIComponent(key.replaceAll('~1', '/').replaceAll('~0', '~'))], spec);
 }
 
 function resolve(spec: any, obj: any, seen = new Set<any>()): any {
@@ -89,7 +89,8 @@ function buildResponseSchema(operation: any, spec: any): string | undefined {
   const ordered: string[] = [];
   if (codes.includes('200')) ordered.push('200');
   if (codes.includes('201')) ordered.push('201');
-  for (const code of codes.sort()) {
+  codes.sort((a, b) => a.localeCompare(b));
+  for (const code of codes) {
     if (/^2\d\d$/.test(code) && !ordered.includes(code)) ordered.push(code);
   }
   // OpenAPI range form (case-insensitive in the spec, but Swagger UI / many
@@ -263,7 +264,7 @@ function buildPathParamRows(operation: any): KeyValuePair[] {
  * from collection/environment variables at send-time.
  */
 function rewritePathTemplate(url: string): string {
-  return url.replace(/\{([^/{}]+)\}/g, (_m, name) => `{{${name}}}`);
+  return url.replaceAll(/\{([^/{}]+)\}/g, (_m, name) => `{{${name}}}`);
 }
 
 function buildHeaders(operation: any): KeyValuePair[] {

@@ -4,7 +4,7 @@
 import type { SentRequest } from '../../../../shared/types';
 import { useT } from '../../i18n';
 
-export function RequestPanel({ sentRequest }: { sentRequest: SentRequest | null }) {
+export function RequestPanel({ sentRequest }: { readonly sentRequest: SentRequest | null }) {
   const t = useT();
   if (!sentRequest) {
     return (

@@ -40,13 +40,13 @@ function FieldNode({
   opType,
   onInsert,
 }: {
-  field: GqlField
-  typeMap: Map<string, GqlType>
-  depth: number
+  readonly field: GqlField
+  readonly typeMap: Map<string, GqlType>
+  readonly depth: number
   /** Ancestor field names from the operation root to this field's parent. */
-  path: string[]
-  opType: OperationType
-  onInsert: InsertHandler
+  readonly path: string[]
+  readonly opType: OperationType
+  readonly onInsert: InsertHandler
 }) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
@@ -125,13 +125,13 @@ function RootTypeSection({
   listOnly,
   onInsert,
 }: {
-  label: string
-  typeName: string
-  typeMap: Map<string, GqlType>
+  readonly label: string
+  readonly typeName: string
+  readonly typeMap: Map<string, GqlType>
   /** Hide root fields that require an argument (the by-id lookups), leaving the
    *  list/collection fields. */
-  listOnly: boolean
-  onInsert: InsertHandler
+  readonly listOnly: boolean
+  readonly onInsert: InsertHandler
 }) {
   const t = useT();
   const [expanded, setExpanded] = useState(true);
@@ -161,8 +161,8 @@ function SchemaExplorer({
   schema,
   onInsert,
 }: {
-  schema: ParsedSchema
-  onInsert: InsertHandler
+  readonly schema: ParsedSchema
+  readonly onInsert: InsertHandler
 }) {
   const t = useT();
   const [search, setSearch] = useState('');
@@ -231,8 +231,8 @@ function SchemaExplorer({
 // ─── GraphQL Editor ───────────────────────────────────────────────────────────
 
 interface Props {
-  request: ApiRequest
-  onChange: (p: Partial<ApiRequest>) => void
+  readonly request: ApiRequest
+  readonly onChange: (p: Partial<ApiRequest>) => void
 }
 
 const EMPTY_GQL: GraphQLBody = { query: '', variables: '' };
@@ -358,8 +358,8 @@ export function GraphQLEditor({ request, onChange }: Props) {
       const extraHeaders: Record<string, string> = {};
       for (const h of request.headers) {
         if (h.enabled && h.key) {
-          const key = h.key.replace(/\{\{([^}]+)\}\}/g, (_, k) => resolvedVars[k.trim()] ?? '');
-          const val = h.value.replace(/\{\{([^}]+)\}\}/g, (_, k) => resolvedVars[k.trim()] ?? '');
+          const key = h.key.replaceAll(/\{\{([^}]+)\}\}/g, (_, k) => resolvedVars[k.trim()] ?? '');
+          const val = h.value.replaceAll(/\{\{([^}]+)\}\}/g, (_, k) => resolvedVars[k.trim()] ?? '');
           extraHeaders[key] = val;
         }
       }
@@ -442,13 +442,13 @@ export function GraphQLEditor({ request, onChange }: Props) {
                   try {
                     // Temporarily replace {{var}} tokens so parseGql doesn't choke
                     const vars: string[] = [];
-                    const safe = gql.query.replace(/\{\{([^}]+)\}\}/g, (_m, v) => {
+                    const safe = gql.query.replaceAll(/\{\{([^}]+)\}\}/g, (_m, v) => {
                       vars.push(v);
                       return `__TPL${vars.length - 1}__`;
                     });
                     let formatted = printGql(parseGql(safe));
                     // Restore {{var}} tokens
-                    formatted = formatted.replace(/__TPL(\d+)__/g, (_m, i) => `{{${vars[Number(i)]}}}`);
+                    formatted = formatted.replaceAll(/__TPL(\d+)__/g, (_m, i) => `{{${vars[Number(i)]}}}`);
                     updateGql({ query: formatted });
                   } catch { /* invalid query */ }
                 }}

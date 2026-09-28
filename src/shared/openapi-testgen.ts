@@ -43,13 +43,13 @@ export interface GenerateOptions {
 
 // ─── Spec walking ─────────────────────────────────────────────────────────────
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 
-const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'];
+const HTTP_METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
 
 function resolveRef(spec: any, ref: string): any {
   const parts = ref.replace(/^#\//, '').split('/');
-  return parts.reduce((o, k) => o?.[decodeURIComponent(k.replace(/~1/g, '/').replace(/~0/g, '~'))], spec);
+  return parts.reduce((o, k) => o?.[decodeURIComponent(k.replaceAll('~1', '/').replaceAll('~0', '~'))], spec);
 }
 
 /** Inline $refs into a self-contained schema, bounded so a recursive schema
@@ -67,7 +67,7 @@ function deref(spec: any, node: any, depth = 0, seen: Set<any> = new Set()): any
   return out;
 }
 
-function jsonSchemaFor(spec: any, responses: any, code: string): any | undefined {
+function jsonSchemaFor(spec: any, responses: any, code: string): any {
   const resp = responses?.[code];
   const schema = resp?.content?.['application/json']?.schema
     ?? resp?.content?.['application/json;charset=utf-8']?.schema;
@@ -165,7 +165,7 @@ function baseTest(method: string, path: string, op: any, params: Param[]): Omit<
   return { operationId: op?.operationId, method, path, pathParams, query, headers };
 }
 
-function requestBodySchema(spec: any, op: any): any | undefined {
+function requestBodySchema(spec: any, op: any): any {
   const rb = deref(spec, op?.requestBody);
   const schema = rb?.content?.['application/json']?.schema;
   return schema;
@@ -251,7 +251,7 @@ export function generateTests(spec: unknown, options: GenerateOptions = {}): Gen
   for (const [path, item] of Object.entries<any>(doc.paths ?? {})) {
     if (!item || typeof item !== 'object') continue;
     for (const [method, op] of Object.entries<any>(item)) {
-      if (!HTTP_METHODS.includes(method.toLowerCase())) continue;
+      if (!HTTP_METHODS.has(method.toLowerCase())) continue;
       if (!op || typeof op !== 'object') continue;
       if (opts.only.size && !opts.only.has(`${method.toUpperCase()} ${path}`)) continue;
       out.push(...generateForOperation(doc, method.toUpperCase(), path, item, op, opts));

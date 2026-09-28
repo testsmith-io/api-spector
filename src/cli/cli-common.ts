@@ -13,8 +13,8 @@
  *    callers decide whether an unreadable file warns or is skipped silently.
  */
 
-import { readFile, stat, readdir } from 'fs/promises';
-import { join, dirname, resolve } from 'path';
+import { readFile, stat, readdir } from 'node:fs/promises';
+import { join, dirname, resolve } from 'node:path';
 import type { Workspace, Collection, Environment, MockServer } from '../shared/types';
 import { inlineDataSets } from '../main/data-files';
 
@@ -48,16 +48,18 @@ export function colorAlways(str: string, ...codes: string[]): string {
 
 // ─── Arg parsing ──────────────────────────────────────────────────────────────
 
+type ArgValue = string | boolean | string[];
+
 export function parseArgs(argv: string[]): Record<string, string | boolean>;
-export function parseArgs(argv: string[], repeatableKeys: string[]): Record<string, string | boolean | string[]>;
+export function parseArgs(argv: string[], repeatableKeys: string[]): Record<string, ArgValue>;
 
 /**
  * Parse `--key value` / `--flag` style arguments. Keys listed in
  * `repeatableKeys` accumulate into a string[] when given more than once;
  * all other keys keep the last value.
  */
-export function parseArgs(argv: string[], repeatableKeys: string[] = []): Record<string, string | boolean | string[]> {
-  const args: Record<string, string | boolean | string[]> = {};
+export function parseArgs(argv: string[], repeatableKeys: string[] = []): Record<string, ArgValue> {
+  const args: Record<string, ArgValue> = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (!arg.startsWith('--')) continue;

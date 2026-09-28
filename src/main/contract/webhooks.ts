@@ -1,8 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { readFile } from 'fs/promises';
-import { join } from 'path';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { fetch } from 'undici';
 import type { RecordedResult, EnvironmentState } from './results-store';
 
@@ -43,7 +43,7 @@ export interface WebhookPayload {
 
 /** Replace $NAME tokens with values from `env`. Unknown names resolve to ''. */
 export function substituteEnv(value: string, env: Record<string, string | undefined>): string {
-  return value.replace(/\$([A-Z_][A-Z0-9_]*)/g, (_, name: string) => env[name] ?? '');
+  return value.replaceAll(/\$([A-Z_][A-Z0-9_]*)/g, (_, name: string) => env[name] ?? '');
 }
 
 export async function loadWebhookConfig(dir: string): Promise<WebhookConfig[]> {

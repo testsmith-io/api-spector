@@ -42,7 +42,7 @@ export function findPrimaryArray(data: unknown): { path: string; array: unknown[
     const { node, path, depth } = queue.shift()!;
     if (depth > 6 || node === null || typeof node !== 'object') continue;
     if (Array.isArray(node)) {
-      const key = (path.split('.').pop() ?? '').replace(/\[\d+\]/g, '');
+      const key = (path.split('.').pop() ?? '').replaceAll(/\[\d+\]/g, '');
       const objs = node.filter(x => x && typeof x === 'object' && !Array.isArray(x)).length;
       found.push({ path, array: node, pref: PREFERRED.test(key) ? 1 : 0, objs, depth });
       // Do not descend into array elements: the primary array is near the top.

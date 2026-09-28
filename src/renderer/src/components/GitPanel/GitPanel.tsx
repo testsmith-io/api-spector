@@ -8,6 +8,7 @@ import { Toast, useToast } from '../common/Toast';
 import { detectPlatform, generateCiContent, ciFilePath, secretManagerOf, requestSecretManagers, type SecretManagerKind } from '../../lib/ci-templates';
 import { ConflictEditor } from './ConflictEditor';
 import { STORAGE_KEYS } from '../../lib/storage-keys';
+import { onActivateKey } from '../../lib/a11y';
 import { useT } from '../../i18n';
 
 const { electron } = window;
@@ -16,7 +17,7 @@ type Tab = 'changes' | 'log' | 'branches' | 'ci';
 
 // ─── File status badge ────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: GitFile['status'] }) {
+function StatusBadge({ status }: { readonly status: GitFile['status'] }) {
   const map: Record<GitFile['status'], { label: string; color: string }> = {
     modified:  { label: 'M', color: 'text-amber-400' },
     added:     { label: 'A', color: 'text-emerald-400' },
@@ -30,7 +31,7 @@ function StatusBadge({ status }: { status: GitFile['status'] }) {
 
 // ─── Diff viewer ─────────────────────────────────────────────────────────────
 
-export function DiffViewer({ diff }: { diff: string }) {
+export function DiffViewer({ diff }: { readonly diff: string }) {
   const t = useT();
   if (!diff) return <p className="text-xs text-surface-500 p-3">{t('No changes.')}</p>;
   return (
@@ -52,7 +53,7 @@ export function DiffViewer({ diff }: { diff: string }) {
 
 // ─── Changes tab ─────────────────────────────────────────────────────────────
 
-function ChangesTab({ status, onRefresh }: { status: GitStatus; onRefresh: () => void }) {
+function ChangesTab({ status, onRefresh }: { readonly status: GitStatus; readonly onRefresh: () => void }) {
   const t = useT();
   const [message,    setMessage]    = useState('');
   const [diffFile,   setDiffFile]   = useState<string | null>(null);
@@ -266,7 +267,10 @@ function ChangesTab({ status, onRefresh }: { status: GitStatus; onRefresh: () =>
               <div
                 key={f.path}
                 className={`flex items-center gap-2 px-3 py-1 hover:bg-surface-800/50 cursor-pointer group text-xs ${diffFile === f.path && diffStaged ? 'bg-surface-800' : ''}`}
+                role="button"
+                tabIndex={0}
                 onClick={() => showDiff(f, true)}
+                onKeyDown={onActivateKey(() => showDiff(f, true))}
               >
                 <StatusBadge status={f.status} />
                 <span className="flex-1 truncate text-surface-200">{f.path}</span>
@@ -296,7 +300,10 @@ function ChangesTab({ status, onRefresh }: { status: GitStatus; onRefresh: () =>
               <div
                 key={f.path}
                 className={`flex items-center gap-2 px-3 py-1 hover:bg-surface-800/50 cursor-pointer group text-xs ${diffFile === f.path && !diffStaged ? 'bg-surface-800' : ''}`}
+                role="button"
+                tabIndex={0}
                 onClick={() => showDiff(f, false)}
+                onKeyDown={onActivateKey(() => showDiff(f, false))}
               >
                 <StatusBadge status={f.status} />
                 <span className="flex-1 truncate text-surface-200">{f.path}</span>
@@ -322,7 +329,10 @@ function ChangesTab({ status, onRefresh }: { status: GitStatus; onRefresh: () =>
               <div
                 key={path}
                 className={`flex items-center gap-2 px-3 py-1 hover:bg-surface-800/50 cursor-pointer group text-xs ${diffFile === path && !diffStaged ? 'bg-surface-800' : ''}`}
+                role="button"
+                tabIndex={0}
                 onClick={() => showDiff({ path, status: 'modified' }, false)}
+                onKeyDown={onActivateKey(() => showDiff({ path, status: 'modified' }, false))}
               >
                 <span className="font-mono text-[11px] font-bold w-4 shrink-0 text-red-400">!</span>
                 <span className="flex-1 truncate text-red-300">{path}</span>
@@ -431,7 +441,7 @@ function LogTab() {
 
 // ─── Branches tab ─────────────────────────────────────────────────────────────
 
-function BranchesTab({ onRefresh }: { onRefresh: () => void }) {
+function BranchesTab({ onRefresh }: { readonly onRefresh: () => void }) {
   const t = useT();
   const [branches,     setBranches]     = useState<GitBranch[]>([]);
   const [remotes,      setRemotes]      = useState<GitRemote[]>([]);

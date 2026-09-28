@@ -42,7 +42,7 @@ export class StreamFramer {
   /** Feed a decoded text chunk; returns the frames that completed. */
   push(text: string): RawFrame[] {
     // Normalize CR / CRLF to LF so delimiter scanning is uniform.
-    this.carry += text.replace(/\r\n?/g, '\n');
+    this.carry += text.replaceAll(/\r\n?/g, '\n');
     return this.mode === 'sse' ? this.drainSse() : this.drainNdjson();
   }
 
@@ -111,7 +111,7 @@ export class StreamFramer {
 function toEvent(frame: RawFrame, kind: StreamKind, seq: number, tMs: number): StreamEvent {
   let json: unknown;
   const trimmed = frame.data.trim();
-  if (trimmed && (trimmed[0] === '{' || trimmed[0] === '[')) {
+  if (trimmed && (trimmed.startsWith('{') || trimmed.startsWith('['))) {
     try { json = JSON.parse(trimmed); } catch { /* leave undefined (e.g. "[DONE]") */ }
   }
   const ev: StreamEvent = { seq, tMs, kind, data: frame.data };
@@ -229,5 +229,5 @@ export async function readStream(
     try { await reader.cancel(); } catch { /* already closed */ }
   }
 
-  return { events, text, close, firstEventMs: firstEventMs < 0 ? 0 : firstEventMs };
+  return { events, text, close, firstEventMs: Math.max(firstEventMs, 0) };
 }

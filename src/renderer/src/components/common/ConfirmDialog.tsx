@@ -7,9 +7,9 @@ import { useT } from '../../i18n';
 // ─── Confirm dialog ───────────────────────────────────────────────────────────
 
 export function ConfirmDialog ( { message, onConfirm, onCancel }: {
-  message: string
-  onConfirm: () => void
-  onCancel: () => void
+  readonly message: string
+  readonly onConfirm: () => void
+  readonly onCancel: () => void
 } ) {
   const t = useT();
   return (

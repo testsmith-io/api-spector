@@ -378,7 +378,7 @@ export function buildJUnitReport(
     // dashboards nest results the same way the app does. Dots in names are
     // replaced so they don't read as extra nesting levels.
     const classname = esc([r.collection ?? meta.collection, ...(r.scopePath ?? [])]
-      .filter(Boolean).map(s => String(s).replace(/\./g, '_')).join('.') || 'API Tests');
+      .filter(Boolean).map(s => String(s).replaceAll('.', '_')).join('.') || 'API Tests');
     const timeSec   = ((r.durationMs ?? 0) / 1000).toFixed(3);
 
     const failures: string[] = [];

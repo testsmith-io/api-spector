@@ -10,8 +10,8 @@ import type { ApiRequest, GrpcBody, GrpcMessage, GrpcServiceInfo, KeyValuePair }
 const { electron } = window;
 
 interface Props {
-  request: ApiRequest
-  onChange: (patch: Partial<ApiRequest>) => void
+  readonly request: ApiRequest
+  readonly onChange: (patch: Partial<ApiRequest>) => void
 }
 
 function formatTime(ts: number): string {
@@ -38,7 +38,7 @@ function textToMeta(text: string): KeyValuePair[] {
 
 export function GrpcPanel({ request, onChange }: Props) {
   const t = useT();
-  const grpc = { ...DEFAULT_GRPC, ...(request.body.grpc ?? {}) };
+  const grpc = { ...DEFAULT_GRPC, ...request.body.grpc };
 
   const grpcCalls          = useStore(s => s.grpcCalls);
   const setGrpcStatus      = useStore(s => s.setGrpcStatus);

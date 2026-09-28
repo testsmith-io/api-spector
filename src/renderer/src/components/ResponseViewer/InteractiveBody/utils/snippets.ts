@@ -46,7 +46,7 @@ export function makeXmlSnippet(
   value: string,
   mode: 'equals' | 'exists' | 'contains',
 ): string {
-  const sel = selector.replace(/"/g, '\\"');
+  const sel = selector.replaceAll('"', '\\"');
   switch (mode) {
     case 'equals':
       return `sp.test('${selector} equals "${esc(value)}"', function() {\n  sp.expect(sp.response.xmlText("${sel}")).to.equal("${esc(value)}");\n});`;
@@ -77,5 +77,5 @@ export function makeJsonPathExtractSnippet(
 }
 
 export function makeXmlExtractSnippet(selector: string, target: 'variables' | 'environment'): string {
-  return `sp.${target}.set("extracted_value", sp.response.xmlText("${selector.replace(/"/g, '\\"')}") ?? '');`;
+  return `sp.${target}.set("extracted_value", sp.response.xmlText("${selector.replaceAll('"', '\\"')}") ?? '');`;
 }

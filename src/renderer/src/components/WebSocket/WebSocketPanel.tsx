@@ -9,7 +9,7 @@ import type { ApiRequest, WsMessage } from '../../../../shared/types';
 const { electron } = window;
 
 interface Props {
-  request: ApiRequest
+  readonly request: ApiRequest
 }
 
 // Format timestamp as HH:MM:SS.mmm

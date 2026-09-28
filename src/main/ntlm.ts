@@ -12,7 +12,7 @@
 // auth-builder.ts; this module is pure encoding and is unit-tested against the
 // worked example in [MS-NLMP] §4.2.4.
 
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 
 const SIGNATURE = Buffer.from('NTLMSSP\0', 'latin1');
 

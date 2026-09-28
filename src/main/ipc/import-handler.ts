@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { type IpcMain, dialog } from 'electron';
-import { readFile } from 'fs/promises';
-import { randomUUID } from 'crypto';
+import { readFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import type { Collection } from '../../shared/types';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
@@ -88,7 +88,7 @@ export function registerImportHandlers(ipc: IpcMain): void {
       throw new Error('Not a valid JSON file.');
     }
     if (Array.isArray(parsed['collections'])) {
-      throw new Error('This is a workspace file, not a collection. Open it with File > Open Workspace instead.');
+      throw new TypeError('This is a workspace file, not a collection. Open it with File > Open Workspace instead.');
     }
     if (!parsed['rootFolder'] || !parsed['requests']) {
       throw new Error('This does not look like an API Spector collection (no rootFolder / requests).');

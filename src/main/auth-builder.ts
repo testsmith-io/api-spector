@@ -1,9 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import crypto from 'crypto';
-import { STATUS_CODES } from 'http';
-import { readFile } from 'fs/promises';
+import crypto from 'node:crypto';
+import { STATUS_CODES } from 'node:http';
+import { readFile } from 'node:fs/promises';
 import type { AuthConfig, DigestAuth, NtlmAuth, Oauth2Auth, TlsSettings } from '../shared/types';
 import { getSecret } from './ipc/secret-handler';
 import { interpolate } from './interpolation';

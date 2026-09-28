@@ -43,6 +43,8 @@ export function ContextMenu ( { items, x, y, onClose }: {
   return createPortal(
     <div
       ref={ref}
+      role="menu"
+      tabIndex={-1}
       style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
       className="bg-surface-900 border border-surface-700 rounded-lg shadow-2xl py-1 min-w-[170px]"
       onMouseDown={e => e.stopPropagation()}
@@ -73,7 +75,7 @@ export function ContextMenu ( { items, x, y, onClose }: {
   );
 }
 
-export function DotsBtn ( { items }: { items: MenuItem[] } ) {
+export function DotsBtn ( { items }: { readonly items: MenuItem[] } ) {
   const t = useT();
   const [menu, setMenu] = useState<{ x: number; y: number } | null>( null );
 

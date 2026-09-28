@@ -15,7 +15,7 @@ function routeKey(method: string, path: string): string {
 
 /** Pick which routes of a mock to push to the cloud (defaults to all). Routes
  *  merge into the cloud mock: new ones are added, matching ones overwritten. */
-export function PushToCloudModal({ mock, onClose }: { mock: MockServer; onClose: () => void }) {
+export function PushToCloudModal({ mock, onClose }: { readonly mock: MockServer; readonly onClose: () => void }) {
   const t = useT();
   const routes = mock.routes ?? [];
   const [selected, setSelected] = useState<Set<string>>(new Set(routes.map(r => r.id)));

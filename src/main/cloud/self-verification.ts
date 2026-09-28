@@ -18,11 +18,11 @@ export function parseSelfVerification(text: string, path: string): Record<string
 
   if (isXml) {
     const num = (tag: string, name: string): number => {
-      const m = tag.match(new RegExp(`\\b${name}="(\\d+(?:\\.\\d+)?)"`));
+      const m = new RegExp(`\\b${name}="(\\d+(?:\\.\\d+)?)"`).exec(tag);
       return m ? Math.round(Number(m[1])) : 0;
     };
     // Prefer the aggregate <testsuites> tag; otherwise sum every <testsuite>.
-    const agg = text.match(/<testsuites\b[^>]*>/);
+    const agg = /<testsuites\b[^>]*>/.exec(text);
     let tests = 0, failures = 0, errors = 0;
     if (agg) {
       tests = num(agg[0], 'tests'); failures = num(agg[0], 'failures'); errors = num(agg[0], 'errors');

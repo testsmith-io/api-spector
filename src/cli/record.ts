@@ -17,8 +17,8 @@
  *   --help              Show this message
  */
 
-import { writeFile, mkdir } from 'fs/promises';
-import { resolve, join } from 'path';
+import { writeFile, mkdir } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
 import {
   startRecorder, stopRecorder, setRecorderHitCallback, entriesToMockServer,
 } from '../main/recorder';
@@ -59,7 +59,7 @@ async function main() {
     process.exit(1);
   }
 
-  const port      = parseInt((args.port    as string | undefined) ?? '4001', 10);
+  const port      = Number.parseInt((args.port    as string | undefined) ?? '4001', 10);
   const outputDir = resolve((args.output   as string | undefined) ?? './recordings');
   const extraMask:   string[] = Array.isArray(args.mask)   ? args.mask   as string[] : args.mask   ? [args.mask   as string] : [];
   const extraIgnore: string[] = Array.isArray(args.ignore) ? args.ignore as string[] : args.ignore ? [args.ignore as string] : [];
@@ -93,7 +93,7 @@ async function main() {
     }
 
     await mkdir(outputDir, { recursive: true });
-    const slug = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const slug = new Date().toISOString().replaceAll(/[:.]/g, '-').slice(0, 19);
 
     const sessionPath = join(outputDir, `session-${slug}.recording.json`);
     await writeFile(sessionPath, JSON.stringify(session, null, 2), 'utf8');

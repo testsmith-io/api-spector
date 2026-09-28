@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, mkdir, writeFile, rm } from 'fs/promises';
-import { tmpdir } from 'os';
-import { join } from 'path';
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { loadDesignContractRequests } from '../cli/cli-common';
 import type { Workspace, ConsumerContract } from '../shared/types';
 

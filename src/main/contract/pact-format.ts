@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import type { ApiRequest, Collection, ContractExpectation, HttpMethod, KeyValuePair } from '../../shared/types';
 import { MATCH_KEY, type MatcherNode } from './matchers';
 
@@ -338,7 +338,8 @@ export function exportPact(consumer: string, provider: string, requests: ApiRequ
       const query: Record<string, string[]> = {};
       for (const p of r.params ?? []) {
         if (p.enabled === false || !p.key) continue;
-        (query[p.key] ??= []).push(p.value);
+        query[p.key] ??= [];
+        query[p.key].push(p.value);
       }
 
       const response: Record<string, unknown> = {};

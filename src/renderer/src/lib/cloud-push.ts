@@ -99,7 +99,7 @@ export async function pushRequestAsMonitor(
   // Collection vars: collection-level + folder-chain + session (same as send).
   const colEntry = Object.values(s.collections).find(c => c.data.requests[request.id]);
   const collectionVars: Record<string, string> = {
-    ...(colEntry?.data.collectionVariables ?? {}),
+    ...colEntry?.data.collectionVariables,
     ...s.getInheritedVariables(request.id),
     ...s.sessionVars,
   };

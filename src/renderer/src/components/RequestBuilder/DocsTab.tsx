@@ -8,8 +8,8 @@ import { DocsEditor } from '../common/DocsEditor';
 import { useAiAvailable, generateDocs, requestDocsContext } from '../../lib/ai';
 
 interface Props {
-  request: ApiRequest
-  onChange: (p: Partial<ApiRequest>) => void
+  readonly request: ApiRequest
+  readonly onChange: (p: Partial<ApiRequest>) => void
 }
 
 /** Markdown documentation for a request (stored in `description`, so it travels

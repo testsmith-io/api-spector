@@ -53,7 +53,7 @@ function assemble(parts: Part[]): string {
 
 /** Inline merge-conflict resolver: per-hunk Accept ours/theirs/both, or free
  *  manual editing, then stage the resolved file. */
-export function ConflictEditor({ path, onClose, onResolved }: { path: string; onClose: () => void; onResolved: () => void }) {
+export function ConflictEditor({ path, onClose, onResolved }: { readonly path: string; readonly onClose: () => void; readonly onResolved: () => void }) {
   const t = useT();
   const [parts, setParts] = useState<Part[] | null>(null);
   const [manual, setManual] = useState<string | null>(null); // non-null = manual edit mode
@@ -68,7 +68,7 @@ export function ConflictEditor({ path, onClose, onResolved }: { path: string; on
 
   const conflictCount = useMemo(() => parts?.filter(p => p.type === 'conflict').length ?? 0, [parts]);
   const unresolved = useMemo(() => parts?.filter(p => p.type === 'conflict' && !p.choice).length ?? 0, [parts]);
-  const content = manual != null ? manual : (parts ? assemble(parts) : '');
+  const content = manual ?? (parts ? assemble(parts) : '');
   const stillHasMarkers = /^(<{7}|={7}|>{7})/m.test(content);
 
   function choose(idx: number, choice: 'ours' | 'theirs' | 'both') {

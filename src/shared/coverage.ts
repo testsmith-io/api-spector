@@ -33,7 +33,7 @@ export interface CoverageObservation {
   responsePaths?: string[]
 }
 
-const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'];
+const HTTP_METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
 
 // ─── Outputs ────────────────────────────────────────────────────────────────
 
@@ -88,9 +88,9 @@ export interface CoverageReport {
 export function normalizePath(url: string): string {
   let u = (url || '').trim();
   u = u.split('#')[0].split('?')[0];
-  u = u.replace(/\{\{[^}]*\}\}/g, '');          // strip {{baseUrl}} etc.
+  u = u.replaceAll(/\{\{[^}]*\}\}/g, '');          // strip {{baseUrl}} etc.
   u = u.replace(/^[a-z0-9+.-]+:\/\/[^/]*/i, ''); // strip scheme://host
-  u = u.replace(/\/{2,}/g, '/');
+  u = u.replaceAll(/\/{2,}/g, '/');
   if (!u.startsWith('/')) u = '/' + u;
   u = u.replace(/\/+$/, '');
   return u === '' ? '/' : u;
@@ -131,13 +131,13 @@ export interface SpecOperation {
   responses?: Record<string, unknown>
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 
 // Minimal $ref resolver + inliner (bounded), so response schemas can be
 // flattened into property paths without pulling in a full OpenAPI library.
 function resolveRef(spec: any, ref: string): any {
   const parts = ref.replace(/^#\//, '').split('/');
-  return parts.reduce((o, k) => o?.[decodeURIComponent(k.replace(/~1/g, '/').replace(/~0/g, '~'))], spec);
+  return parts.reduce((o, k) => o?.[decodeURIComponent(k.replaceAll('~1', '/').replaceAll('~0', '~'))], spec);
 }
 function deref(spec: any, node: any, depth = 0, seen: Set<any> = new Set()): any {
   if (!node || typeof node !== 'object' || depth > 8) return node;
@@ -162,8 +162,7 @@ export function flattenSchemaPaths(schema: any, prefix = '', depth = 0): string[
   if (type === 'object' || schema.properties) {
     for (const [name, sub] of Object.entries<any>(schema.properties ?? {})) {
       const path = prefix ? `${prefix}.${name}` : name;
-      out.push(path);
-      out.push(...flattenSchemaPaths(sub, path, depth + 1));
+      out.push(path, ...flattenSchemaPaths(sub, path, depth + 1));
     }
   } else if (type === 'array' && schema.items) {
     out.push(...flattenSchemaPaths(schema.items, `${prefix}[]`, depth + 1));
@@ -181,15 +180,14 @@ export function flattenValuePaths(value: any, prefix = '', depth = 0): string[] 
   } else {
     for (const [k, v] of Object.entries(value)) {
       const path = prefix ? `${prefix}.${k}` : k;
-      out.push(path);
-      out.push(...flattenValuePaths(v, path, depth + 1));
+      out.push(path, ...flattenValuePaths(v, path, depth + 1));
     }
   }
   return [...new Set(out)];
 }
 
-function successResponseSchema(spec: any, responses: any): any | undefined {
-  const code = Object.keys(responses ?? {}).filter(c => /^2\d\d$/.test(c)).sort()[0];
+function successResponseSchema(spec: any, responses: any): any {
+  const code = Object.keys(responses ?? {}).filter(c => /^2\d\d$/.test(c)).sort((a, b) => a.localeCompare(b))[0];
   if (!code) return undefined;
   const schema = responses[code]?.content?.['application/json']?.schema
     ?? responses[code]?.content?.['application/json;charset=utf-8']?.schema;
@@ -205,7 +203,7 @@ export function enumerateOperations(spec: unknown): SpecOperation[] {
   for (const [path, item] of Object.entries(doc.paths ?? {})) {
     if (!item || typeof item !== 'object') continue;
     for (const [method, op] of Object.entries(item)) {
-      if (!HTTP_METHODS.includes(method.toLowerCase())) continue;
+      if (!HTTP_METHODS.has(method.toLowerCase())) continue;
       if (!op || typeof op !== 'object') continue;
       const declaredStatuses = Object.keys(op.responses ?? {}).filter(c => /^\d{3}$/.test(c));
       ops.push({ method: method.toUpperCase(), path, operationId: op.operationId, declaredStatuses, responses: op.responses });

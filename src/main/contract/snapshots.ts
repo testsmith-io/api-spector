@@ -1,9 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { readFile, writeFile, mkdir, unlink, readdir } from 'fs/promises';
-import { join, resolve } from 'path';
-import { createHash, randomUUID } from 'crypto';
+import { readFile, writeFile, mkdir, unlink, readdir } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
 import { fetch } from 'undici';
 import { load as yamlLoad } from 'js-yaml';
 import type { ContractSnapshot } from '../../shared/types';
@@ -18,7 +18,7 @@ import type { ContractSnapshot } from '../../shared/types';
 const SNAPSHOT_DIR = 'contracts';
 
 function safeName(raw: string): string {
-  return raw.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'spec';
+  return raw.trim().toLowerCase().replaceAll(/[^a-z0-9]+/g, '-').replaceAll(/^-+|-+$/g, '').slice(0, 40) || 'spec';
 }
 
 function sha256(text: string): string {

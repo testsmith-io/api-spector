@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { type IpcMain, shell } from 'electron';
-import { createServer, type IncomingMessage, type ServerResponse } from 'http';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
 

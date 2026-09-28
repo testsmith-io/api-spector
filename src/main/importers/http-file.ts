@@ -1,8 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { readFile } from 'fs/promises';
-import { basename } from 'path';
+import { readFile } from 'node:fs/promises';
+import { basename } from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 import type {
   Collection, ApiRequest, Folder, KeyValuePair, RequestBody, AuthConfig, HttpMethod,
@@ -38,7 +38,7 @@ export const SPECTOR_TO_HTTP: Record<string, string> = {
 /** Rewrite `{{$dynamic ...}}` tokens from REST Client names to API Spector names.
  *  Arguments we can't represent (e.g. `$randomInt 1 100`) are dropped. */
 export function mapDynamicVars(s: string): string {
-  return s.replace(/\{\{\s*(\$[A-Za-z]+)[^}]*\}\}/g, (_m, name: string) =>
+  return s.replaceAll(/\{\{\s*(\$[A-Za-z]+)[^}]*\}\}/g, (_m, name: string) =>
     `{{${HTTP_TO_SPECTOR[name] ?? name}}}`);
 }
 
@@ -89,9 +89,9 @@ function extractAuth(headers: KeyValuePair[]): { headers: KeyValuePair[]; auth: 
 function stripScriptBlocks(bodyLines: string[]): string {
   const joined = bodyLines.join('\n');
   return joined
-    .replace(/[<>]\s*\{%[\s\S]*?%\}/g, '')      // inline script blocks
-    .replace(/^\s*>\s+\S.*$/gm, '')             // > ./response-handler.js
-    .replace(/^\s*<\s+\S.*$/gm, '')             // < ./body-from-file (unsupported)
+    .replaceAll(/[<>]\s*\{%[\s\S]*?%\}/g, '')      // inline script blocks
+    .replaceAll(/^\s*>\s+\S.*$/gm, '')             // > ./response-handler.js
+    .replaceAll(/^\s*<\s+\S.*$/gm, '')             // < ./body-from-file (unsupported)
     .trim();
 }
 
@@ -129,7 +129,7 @@ function parseBlock(block: Block): ApiRequest | null {
     const named = /^(?:#|\/\/)\s*@name\s*=?\s*(.+)$/.exec(t);
     if (named) { name = named[1].trim(); continue; }
     if (t.startsWith('#') || t.startsWith('//')) continue;      // plain comment / directive
-    if (/^@[A-Za-z0-9_]+\s*=/.test(t)) continue;                // file variable
+    if (/^@\w+\s*=/.test(t)) continue;                // file variable
     break;                                                       // → request line
   }
   if (i >= lines.length) return null;
@@ -175,7 +175,7 @@ export function parseHttpFile(text: string, name: string): Collection {
   // File-level variables: @name = value (collected across the whole file).
   const collectionVariables: Record<string, string> = {};
   for (const line of text.split(/\r?\n/)) {
-    const m = /^@([A-Za-z0-9_]+)\s*=\s*(.*)$/.exec(line);
+    const m = /^@(\w+)\s*=\s*(.*)$/.exec(line);
     if (m) collectionVariables[m[1]] = mapDynamicVars(m[2].trim());
   }
 

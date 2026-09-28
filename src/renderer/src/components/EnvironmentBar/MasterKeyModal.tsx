@@ -24,8 +24,8 @@ const EXAMPLES = [
 ];
 
 interface Props {
-  onSuccess: (password: string) => void
-  onCancel: () => void
+  readonly onSuccess: (password: string) => void
+  readonly onCancel: () => void
 }
 
 export function MasterKeyModal({ onSuccess, onCancel }: Props) {

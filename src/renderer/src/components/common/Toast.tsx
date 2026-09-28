@@ -16,7 +16,7 @@ export function useToast(durationMs = 3000) {
   return { toast, show };
 }
 
-export function Toast({ toast }: { toast: { msg: string; ok: boolean } | null }) {
+export function Toast({ toast }: { readonly toast: { msg: string; ok: boolean } | null }) {
   if (!toast) return null;
   return (
     <div className={`mx-3 mb-2 px-2 py-1.5 rounded text-[11px] flex-shrink-0 ${

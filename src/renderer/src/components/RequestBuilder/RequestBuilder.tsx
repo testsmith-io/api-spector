@@ -39,7 +39,7 @@ const METHOD_COLORS: Record<string, string> = {
 };
 
 interface Props {
-  request: ApiRequest
+  readonly request: ApiRequest
 }
 
 /**

@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import type { RunRequestResult } from '../../../../shared/types';
+import { onActivateKey } from '../../lib/a11y';
 import { useT } from '../../i18n';
 
 const HOOK_BADGE: Record<string, { label: string; cls: string }> = {
@@ -12,7 +13,7 @@ const HOOK_BADGE: Record<string, { label: string; cls: string }> = {
   afterAll:  { label: 'AFTER ALL',  cls: 'bg-cyan-800 text-white' },
 };
 
-export function HookResultsPanel({ results }: { results: RunRequestResult[] }) {
+export function HookResultsPanel({ results }: { readonly results: RunRequestResult[] }) {
   const t = useT();
   const [open, setOpen] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -52,7 +53,7 @@ export function HookResultsPanel({ results }: { results: RunRequestResult[] }) {
               <div key={r.requestId + i} className="text-xs">
                 <div
                   className={`flex items-center gap-2 py-0.5 ${hasDetail ? 'cursor-pointer hover:bg-surface-800/20 rounded px-1 -mx-1' : ''}`}
-                  onClick={() => hasDetail && toggle(r.requestId + i)}
+                  {...(hasDetail ? { role: 'button', tabIndex: 0, onClick: () => toggle(r.requestId + i), onKeyDown: onActivateKey(() => toggle(r.requestId + i)) } : {})}
                 >
                   {/* status dot */}
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${

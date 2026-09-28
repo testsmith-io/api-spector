@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, it, expect } from 'vitest';
-import { join } from 'path';
+import { join } from 'node:path';
 import { importInsomnia } from '../main/importers/insomnia';
 import { importBruno } from '../main/importers/bruno';
 import { parseBruFile } from '../main/importers/bruno';

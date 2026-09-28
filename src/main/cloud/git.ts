@@ -5,7 +5,7 @@
 // and gating key off the exact commit without anyone typing it. Prefers the CI
 // provider's env var, then falls back to the local git checkout.
 
-import { execSync } from 'child_process';
+import { execSync } from 'node:child_process';
 
 /** The commit SHA to key a publish/gate on. Override wins, then CI env, then git. */
 export function resolveVersion(override?: string): string {

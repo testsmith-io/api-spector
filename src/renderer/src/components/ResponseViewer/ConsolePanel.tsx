@@ -4,7 +4,7 @@
 import type { ScriptExecutionMeta } from '../../../../shared/types';
 import { useT } from '../../i18n';
 
-export function ConsolePanel({ scriptResult }: { scriptResult: ScriptExecutionMeta | null }) {
+export function ConsolePanel({ scriptResult }: { readonly scriptResult: ScriptExecutionMeta | null }) {
   const t = useT();
   const sr = scriptResult;
   const hasErrors = !!(sr?.preScriptError || sr?.postScriptError);

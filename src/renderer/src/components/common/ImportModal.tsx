@@ -14,8 +14,8 @@ import { btnSecondaryCls, btnPrimaryCls } from '../../lib/ui-classes';
 const { electron } = window;
 
 interface Props {
-  onImport: (col: Collection | null) => void
-  onClose: () => void
+  readonly onImport: (col: Collection | null) => void
+  readonly onClose: () => void
 }
 
 interface ImportOption {
