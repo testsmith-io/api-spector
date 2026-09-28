@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useWorkspaceLoader } from '../../hooks/useWorkspaceLoader';
 import { useT } from '../../i18n';
 
@@ -19,6 +19,11 @@ export function WelcomeScreen() {
   const [gitUrl, setGitUrl] = useState('');
   const [gitBusy, setGitBusy] = useState(false);
   const [gitError, setGitError] = useState<string | null>(null);
+  // Only one workspace action (open/new/clone/recent) may run at a time, so
+  // rapid clicks can't stack multiple native file dialogs / windows. The ref is
+  // the race-free guard (set synchronously); `busy` just drives the disabled UI.
+  const busyRef = useRef(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     electron.getRecentWorkspaces().then(setRecents).catch(() => setRecents([]));
@@ -34,21 +39,31 @@ export function WelcomeScreen() {
   }, []);
 
   async function openWorkspace() {
-    const result = await electron.openWorkspace();
-    if (!result) return;
-    await applyWorkspace(result.workspace, result.workspacePath);
+    if (busyRef.current) return;
+    busyRef.current = true; setBusy(true);
+    try {
+      const result = await electron.openWorkspace();
+      if (result) await applyWorkspace(result.workspace, result.workspacePath);
+    } finally {
+      busyRef.current = false; setBusy(false);
+    }
   }
 
   async function newWorkspace() {
-    const result = await electron.newWorkspace();
-    if (!result) return;
-    await applyWorkspace(result.workspace, result.workspacePath);
+    if (busyRef.current) return;
+    busyRef.current = true; setBusy(true);
+    try {
+      const result = await electron.newWorkspace();
+      if (result) await applyWorkspace(result.workspace, result.workspacePath);
+    } finally {
+      busyRef.current = false; setBusy(false);
+    }
   }
 
   async function openFromGit() {
     const url = gitUrl.trim();
-    if (!url || gitBusy) return;
-    setGitBusy(true);
+    if (!url || busyRef.current) return;
+    busyRef.current = true; setGitBusy(true);
     setGitError(null);
     try {
       const result = await electron.openFromGit(url);
@@ -57,18 +72,24 @@ export function WelcomeScreen() {
     } catch (err) {
       setGitError(err instanceof Error ? err.message : t('Could not open the repository'));
     } finally {
-      setGitBusy(false);
+      busyRef.current = false; setGitBusy(false);
     }
   }
 
   async function openRecent(path: string) {
-    const result = await electron.openWorkspacePath(path);
-    if (!result) {
-      // File vanished or is no longer a workspace: drop it from the list.
-      setRecents(prev => prev.filter(r => r.path !== path));
-      return;
+    if (busyRef.current) return;
+    busyRef.current = true; setBusy(true);
+    try {
+      const result = await electron.openWorkspacePath(path);
+      if (!result) {
+        // File vanished or is no longer a workspace: drop it from the list.
+        setRecents(prev => prev.filter(r => r.path !== path));
+        return;
+      }
+      await applyWorkspace(result.workspace, result.workspacePath);
+    } finally {
+      busyRef.current = false; setBusy(false);
     }
-    await applyWorkspace(result.workspace, result.workspacePath);
   }
 
   return (
@@ -107,13 +128,15 @@ export function WelcomeScreen() {
       <div className="flex flex-col gap-3 w-64">
         <button
           onClick={openWorkspace}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition-colors"
+          disabled={busy || gitBusy}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {t('Open Workspace')}
         </button>
         <button
           onClick={newWorkspace}
-          className="px-4 py-2 bg-surface-800 hover:bg-surface-700 rounded text-sm font-medium transition-colors"
+          disabled={busy || gitBusy}
+          className="px-4 py-2 bg-surface-800 hover:bg-surface-700 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {t('New Workspace')}
         </button>
@@ -126,12 +149,12 @@ export function WelcomeScreen() {
               onKeyDown={e => { if (e.key === 'Enter') openFromGit(); }}
               placeholder="https://github.com/owner/repo"
               autoFocus
-              disabled={gitBusy}
+              disabled={busy || gitBusy}
               className="px-3 py-2 bg-surface-900 border border-surface-700 rounded text-xs focus:outline-none focus:border-blue-600 disabled:opacity-60"
             />
             <button
               onClick={openFromGit}
-              disabled={gitBusy || !gitUrl.trim()}
+              disabled={busy || gitBusy || !gitUrl.trim()}
               className="px-4 py-2 bg-surface-800 hover:bg-surface-700 rounded text-sm font-medium transition-colors disabled:opacity-50"
             >
               {gitBusy ? t('Cloning…') : t('Clone & Open')}
@@ -159,8 +182,9 @@ export function WelcomeScreen() {
               <button
                 key={r.path}
                 onClick={() => openRecent(r.path)}
+                disabled={busy || gitBusy}
                 title={r.path}
-                className="flex flex-col items-start px-2 py-1.5 rounded hover:bg-surface-800 transition-colors text-left group shrink-0"
+                className="flex flex-col items-start px-2 py-1.5 rounded hover:bg-surface-800 transition-colors text-left group shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="text-xs text-surface-200 group-hover:text-white truncate max-w-full">{r.name}</span>
                 <span className="text-[10px] text-surface-500 truncate max-w-full">{r.path}</span>
