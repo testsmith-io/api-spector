@@ -17,12 +17,14 @@ const config = { ...pkg.build };
 if (process.env.AZURE_CLIENT_ID && process.env.AZURE_CODE_SIGNING_ACCOUNT) {
   config.win = {
     ...config.win,
-    // Shown in the NSIS installer / UAC prompt; must match the certificate CN.
-    publisherName: process.env.AZURE_CODE_SIGNING_PUBLISHER || undefined,
+    // All four fields are REQUIRED by electron-builder's WindowsAzureSigningConfiguration.
+    // publisherName lives INSIDE azureSignOptions (not at win level) and must match
+    // the certificate subject CN.
     azureSignOptions: {
       endpoint: process.env.AZURE_CODE_SIGNING_ENDPOINT,
       codeSigningAccountName: process.env.AZURE_CODE_SIGNING_ACCOUNT,
       certificateProfileName: process.env.AZURE_CODE_SIGNING_PROFILE,
+      publisherName: process.env.AZURE_CODE_SIGNING_PUBLISHER,
     },
   };
 }
