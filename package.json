@@ -94,6 +94,7 @@
     "ajv": "^8.18.0",
     "cm6-graphql": "^0.2.1",
     "dayjs": "^1.11.20",
+    "electron-updater": "^6.8.9",
     "graphql": "^16.13.2",
     "immer": "^11.1.4",
     "js-yaml": "^4.1.1",

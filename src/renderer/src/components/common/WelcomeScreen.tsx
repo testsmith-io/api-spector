@@ -23,7 +23,14 @@ export function WelcomeScreen() {
   useEffect(() => {
     electron.getRecentWorkspaces().then(setRecents).catch(() => setRecents([]));
     // Non-blocking, best-effort: stays null (nothing shown) if offline or current.
-    electron.checkForUpdate().then(info => { if (info?.updateAvailable) setUpdate(info); }).catch(() => {});
+    // Only the npm install surfaces a command here; packaged builds update
+    // in-app (electron-updater) and are handled by UpdateToast instead.
+    electron.getUpdateMode()
+      .then(mode => {
+        if (mode !== 'npm') return;
+        return electron.checkForUpdate().then(info => { if (info?.updateAvailable) setUpdate(info); });
+      })
+      .catch(() => {});
   }, []);
 
   async function openWorkspace() {

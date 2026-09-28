@@ -42,9 +42,18 @@ jobs:
           AZURE_CODE_SIGNING_PROFILE: ${{ secrets.AZURE_CODE_SIGNING_PROFILE }}
           AZURE_CODE_SIGNING_PUBLISHER: ${{ secrets.AZURE_CODE_SIGNING_PUBLISHER }}
 
+      - name: List build output
+        run: Get-ChildItem dist | Select-Object Name, Length
+        shell: pwsh
+
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          files: dist/*.exe
+          # latest.yml + *.blockmap are what electron-updater reads to detect and
+          # download updates in-app — they must be attached alongside the .exe.
+          files: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest.yml
           fail_on_unmatched_files: true

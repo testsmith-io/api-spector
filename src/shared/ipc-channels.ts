@@ -238,6 +238,14 @@ export const IPC = {
   // ─── App ───────────────────────────────────────────────────────────────────
   app: {
     checkUpdate: 'app:checkUpdate',
+    /** 'auto' (packaged → electron-updater) vs 'npm' (run from the npm package). */
+    updateMode: 'app:updateMode',
+    /** Renderer asks the main process to quit and apply a downloaded update. */
+    installUpdate: 'app:installUpdate',
+    /** Main → renderer auto-update events (packaged builds only). */
+    onUpdateAvailable: 'app:updateAvailable',
+    onUpdateDownloaded: 'app:updateDownloaded',
+    onUpdateError: 'app:updateError',
   },
 
   // ─── Cloud (API Spector Cloud integration) ──────────────────────────────────
