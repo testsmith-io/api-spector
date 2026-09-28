@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useStore, colRelPath } from '../../store';
 import type { Collection } from '../../../../shared/types';
 import { EnvironmentBar } from '../EnvironmentBar/EnvironmentBar';
@@ -64,6 +64,33 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { readonly onOpenDocs?: () 
       const updated = { ...ws, collections: [...ws.collections, relPath] };
       useStore.setState({ workspace: updated });
       await electron.saveWorkspace(updated);
+    }
+  }
+
+  // Guard so rapid clicks on Open/New WS can't stack multiple native dialogs.
+  // busyRef is the race-free guard (synchronous); wsBusy drives the disabled UI.
+  const wsBusyRef = useRef(false);
+  const [wsBusy, setWsBusy] = useState(false);
+
+  async function openWs() {
+    if (wsBusyRef.current) return;
+    wsBusyRef.current = true; setWsBusy(true);
+    try {
+      const result = await electron.openWorkspace();
+      if (result) await applyWorkspace(result.workspace, result.workspacePath);
+    } finally {
+      wsBusyRef.current = false; setWsBusy(false);
+    }
+  }
+
+  async function newWs() {
+    if (wsBusyRef.current) return;
+    wsBusyRef.current = true; setWsBusy(true);
+    try {
+      const result = await electron.newWorkspace();
+      if (result) await applyWorkspace(result.workspace, result.workspacePath);
+    } finally {
+      wsBusyRef.current = false; setWsBusy(false);
     }
   }
 
@@ -165,21 +192,17 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { readonly onOpenDocs?: () 
         <div className="flex items-center gap-2 px-3 py-1.5 shrink-0 border-l border-surface-800">
           {/* Workspace switcher */}
           <button
-            onClick={async () => {
-              const result = await electron.openWorkspace();
-              if (result) await applyWorkspace(result.workspace, result.workspacePath);
-            }}
-            className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
+            onClick={openWs}
+            disabled={wsBusy}
+            className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title={t('Open a different workspace')}
           >
             {t('Open WS')}
           </button>
           <button
-            onClick={async () => {
-              const result = await electron.newWorkspace();
-              if (result) await applyWorkspace(result.workspace, result.workspacePath);
-            }}
-            className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
+            onClick={newWs}
+            disabled={wsBusy}
+            className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title={t('Create a new workspace')}
           >
             {t('New WS')}
