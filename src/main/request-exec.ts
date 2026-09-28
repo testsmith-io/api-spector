@@ -282,8 +282,6 @@ function defaultAgent(): Agent {
   return _defaultAgent;
 }
 
-type Dispatcher = ProxyAgent | Agent | undefined;
-
 export async function buildDispatcher(
   proxy?: ProxyConfig,
   tls?: TlsConfig,
