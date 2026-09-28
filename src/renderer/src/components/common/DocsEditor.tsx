@@ -22,7 +22,9 @@ interface Props {
  *  "Generate with AI" action. Docs are stored as plain markdown. */
 export function DocsEditor({ value, onChange, placeholder, onGenerate, aiAvailable }: Props) {
   const t = useT();
-  const [mode, setMode] = useState<'write' | 'preview'>('write');
+  // Open in Preview when there's already documentation to read; fall back to
+  // Write only when the doc is empty (nothing to preview yet).
+  const [mode, setMode] = useState<'write' | 'preview'>(value.trim() ? 'preview' : 'write');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
