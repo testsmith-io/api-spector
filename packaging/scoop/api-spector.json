@@ -6,7 +6,7 @@
     "architecture": {
         "64bit": {
             "url": "https://github.com/testsmith-io/api-spector/releases/download/v0.6.9/API-Spector-0.6.9-x64.zip",
-            "hash": "REPLACE_WITH_SHA256_OF_THE_ZIP"
+            "hash": "0000000000000000000000000000000000000000000000000000000000000000"
         }
     },
     "bin": "API Spector.exe",
@@ -16,7 +16,6 @@
             "API Spector"
         ]
     ],
-    "persist": [],
     "checkver": "github",
     "autoupdate": {
         "architecture": {
