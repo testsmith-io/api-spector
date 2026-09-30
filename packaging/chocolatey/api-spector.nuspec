@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>api-spector</id>
+    <version>0.6.9</version>
+    <packageSourceUrl>https://github.com/testsmith-io/api-spector/tree/main/packaging/chocolatey</packageSourceUrl>
+    <owners>Testsmith</owners>
+    <title>API Spector</title>
+    <authors>Testsmith</authors>
+    <projectUrl>https://github.com/testsmith-io/api-spector</projectUrl>
+    <iconUrl>https://raw.githubusercontent.com/testsmith-io/api-spector/main/build/icon.png</iconUrl>
+    <copyright>Testsmith.io</copyright>
+    <licenseUrl>https://github.com/testsmith-io/api-spector/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectSourceUrl>https://github.com/testsmith-io/api-spector</projectSourceUrl>
+    <bugTrackerUrl>https://github.com/testsmith-io/api-spector/issues</bugTrackerUrl>
+    <tags>api testing rest graphql grpc soap mock contract electron</tags>
+    <summary>Local-first API testing tool to inspect, test and mock APIs.</summary>
+    <description>
+API Spector is a European, open-source, local-first API testing tool: inspect,
+test and mock REST, GraphQL, gRPC and SOAP APIs, generate test code, author
+contracts, and run local mocks. All local work stays on your machine.
+
+This package installs the code-signed Windows desktop app.
+    </description>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

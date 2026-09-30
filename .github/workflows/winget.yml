@@ -1,0 +1,27 @@
+name: Publish to winget
+
+# Submits/updates the winget manifest in microsoft/winget-pkgs on every stable
+# release. Fires only for real (non-draft, non-prerelease) releases.
+#
+# One-time setup required before this works:
+#   1. The package must already exist in winget once. Create the first version
+#      manually: `wingetcreate new` (or `wingetcreate update`) using the signed
+#      .exe URL, then submit that PR. After that, this workflow keeps it current.
+#   2. Add a repo secret WINGET_TOKEN: a GitHub PAT (classic: public_repo scope,
+#      or fine-grained with fork + PR rights) used to fork winget-pkgs and open
+#      the update PR.
+on:
+  release:
+    types: [released]
+
+jobs:
+  winget:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Submit to winget
+        uses: vedantmgoyal2009/winget-releaser@v2
+        with:
+          identifier: Testsmith.APISpector
+          # Match only the signed NSIS installer asset (not the .zip/.blockmap).
+          installers-regex: 'API-Spector-Setup-.*\.exe$'
+          token: ${{ secrets.WINGET_TOKEN }}

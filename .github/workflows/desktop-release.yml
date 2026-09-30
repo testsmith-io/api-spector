@@ -56,4 +56,5 @@ jobs:
             dist/*.exe
             dist/*.blockmap
             dist/latest.yml
+            dist/*.zip
           fail_on_unmatched_files: true
