@@ -18,6 +18,7 @@ const [, , cmd = 'ui', ...rest] = process.argv
 const COMMANDS = {
   ui:       { entrypoint: null,        runner: 'electron' },
   run:      { entrypoint: 'runner.js',  runner: 'node' },
+  flow:     { entrypoint: 'flow.js',    runner: 'node' },
   mock:     { entrypoint: 'mock.js',    runner: 'node' },
   record:   { entrypoint: 'record.js',  runner: 'node' },
   agents:   { entrypoint: 'agents.js',  runner: 'node' },
@@ -35,6 +36,7 @@ function printHelp() {
   console.log('  Usage:')
   console.log('    api-spector ui                            Launch the app')
   console.log('    api-spector run      --workspace <path>   Run tests from CLI')
+  console.log('    api-spector flow     list|run <name>       Run a visual flow from CLI')
   console.log('    api-spector mock     --workspace <path>   Start mock servers from CLI')
   console.log('    api-spector record   --upstream <url>     Record API traffic as mock stubs')
   console.log('    api-spector contract list|run             Manage & run pinned contract snapshots')

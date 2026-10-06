@@ -16,6 +16,8 @@ import type {
   RunnerPayload,
   RunSummary,
   RunRequestResult,
+  Flow,
+  RunFlowPayload,
   MockServer,
   MockRoute,
   MockHit,
@@ -39,6 +41,7 @@ import type {
   RecordedEntry,
   RecordingSession,
 } from '../shared/types';
+import type { FlowRunEvent, FlowRunSummary } from '../shared/flow-engine';
 
 
 // Expose a typed API to the renderer. Note: getSecret is intentionally absent —
@@ -125,6 +128,16 @@ const api = {
   saveResults: (content: string, defaultName: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC.results.save, content, defaultName),
 
+  // ─── Flow runner ──────────────────────────────────────────────────────────
+  runFlow: (payload: RunFlowPayload): Promise<FlowRunSummary> =>
+    ipcRenderer.invoke(IPC.flow.run, payload),
+  onFlowProgress: (cb: (evt: FlowRunEvent) => void): void => {
+    ipcRenderer.on(IPC.flow.progress, (_e, evt) => cb(evt));
+  },
+  offFlowProgress: (): void => {
+    ipcRenderer.removeAllListeners(IPC.flow.progress);
+  },
+
   // ─── Import ────────────────────────────────────────────────────────────────
   importPostman: (): Promise<Collection | null> =>
     ipcRenderer.invoke(IPC.import.postman),
@@ -202,6 +215,13 @@ const api = {
   }> =>
     ipcRenderer.invoke(IPC.cloud.pushSpec, input),
   cloudOpenMatrix: (): Promise<void> => ipcRenderer.invoke(IPC.cloud.openMatrix),
+  cloudPushFlow: (input: { flow: Flow; collections: Collection[]; flows: Flow[]; environment: Environment | null; globals: Record<string, string> }): Promise<{ url?: string; slug: string }> =>
+    ipcRenderer.invoke(IPC.cloud.pushFlow, input),
+  cloudRunFlow: (name: string): Promise<{ id: number | string; status: string }> =>
+    ipcRenderer.invoke(IPC.cloud.runFlow, name),
+  cloudGetFlowRun: (arg: { name: string; runId: number | string }): Promise<{ id: number | string; status: string; summary?: FlowRunSummary }> =>
+    ipcRenderer.invoke(IPC.cloud.getFlowRun, arg),
+  cloudOpenFlow: (name: string): Promise<void> => ipcRenderer.invoke(IPC.cloud.openFlow, name),
 
   // ─── Mock servers ─────────────────────────────────────────────────────────────
   mockStart:    (server: MockServer): Promise<void> =>
@@ -216,6 +236,10 @@ const api = {
     ipcRenderer.invoke(IPC.file.saveMock, relPath, server),
   loadMock:     (relPath: string): Promise<MockServer> =>
     ipcRenderer.invoke(IPC.file.loadMock, relPath),
+  saveFlow:     (relPath: string, flow: Flow): Promise<void> =>
+    ipcRenderer.invoke(IPC.file.saveFlow, relPath, flow),
+  loadFlow:     (relPath: string): Promise<Flow> =>
+    ipcRenderer.invoke(IPC.file.loadFlow, relPath),
   mockUpdateRoutes: (id: string, routes: MockRoute[]): Promise<void> =>
     ipcRenderer.invoke(IPC.mock.updateRoutes, id, routes),
   onMockHit:    (cb: (hit: MockHit) => void): void => {

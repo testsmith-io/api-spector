@@ -27,6 +27,8 @@ import { ContractResultsPanel } from './components/ContractPanel/ContractResults
 import { ContractDesignerModal } from './components/ContractPanel/ContractDesignerModal';
 import { GitDiffPane } from './components/GitPanel/GitDiffPane';
 import { GitPanel } from './components/GitPanel/GitPanel';
+import { FlowsPanel } from './components/Flows/FlowsPanel';
+import { FlowCanvas } from './components/Flows/FlowCanvas';
 import { CommandPalette } from './components/common/CommandPalette';
 import { DocsGeneratorModal } from './components/common/DocsGeneratorModal';
 import { UpdateToast } from './components/common/UpdateToast';
@@ -82,6 +84,17 @@ function IconGit () {
       <circle cx="18" cy="6"  r="2.5" />
       <line x1="6" y1="8.5" x2="6"  y2="15.5" />
       <path d="M6 8.5 C6 13 18 10 18 8.5" />
+    </svg>
+  );
+}
+
+function IconFlows () {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+      <rect x="2" y="7.5" width="5" height="5" rx="1" />
+      <rect x="13" y="2.5" width="5" height="5" rx="1" />
+      <rect x="13" y="12.5" width="5" height="5" rx="1" />
+      <path d="M7 10h3a2 2 0 002-2V6.5M7 10h3a2 2 0 012 2v3" />
     </svg>
   );
 }
@@ -215,6 +228,7 @@ export default function App () {
   const closeContractDesigner = useStore( s => s.closeContractDesigner );
   const historyCount = useStore( s => s.history.length );
   const addCollection = useStore( s => s.addCollection );
+  const addFlow = useStore( s => s.addFlow );
   const addMockHit = useStore( s => s.addMockHit );
   const activeMockId       = useStore( s => s.activeMockId );
   const recorderRunning       = useStore( s => s.recorderRunning );
@@ -375,7 +389,7 @@ export default function App () {
     setResponseOpen( Boolean( activeTab?.lastResponse ) );
   }, [activeTabId, activeTab?.lastResponse] );
 
-  function selectPanel ( tab: 'collections' | 'history' | 'mocks' | 'contracts' | 'git' ) {
+  function selectPanel ( tab: 'collections' | 'history' | 'mocks' | 'contracts' | 'git' | 'flows' ) {
     if ( sidebarTab === tab && sidebarOpen ) {
       setSidebarOpen( false );
     } else {
@@ -459,6 +473,14 @@ export default function App () {
             >
               <IconGit />
             </ActivityBarBtn>
+            <ActivityBarBtn
+              active={sidebarOpen && sidebarTab === 'flows'}
+              onClick={() => selectPanel( 'flows' )}
+              title={t( 'Flows' )}
+              dataTour="flows"
+            >
+              <IconFlows />
+            </ActivityBarBtn>
           </div>
 
           {/* Side panel */}
@@ -467,7 +489,7 @@ export default function App () {
               <aside data-tour="collections-panel" style={{ width: sidebarWidth }} className="flex-shrink-0 flex flex-col overflow-hidden">
                 <div className="px-3 py-2 flex items-center justify-between border-b border-surface-800 flex-shrink-0">
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-600">
-                    {sidebarTab === 'collections' ? t( 'Collections' ) : sidebarTab === 'history' ? t( 'History' ) : sidebarTab === 'mocks' ? t( 'Mocks' ) : sidebarTab === 'git' ? t( 'Git' ) : t( 'Contracts' )}
+                    {sidebarTab === 'collections' ? t( 'Collections' ) : sidebarTab === 'history' ? t( 'History' ) : sidebarTab === 'mocks' ? t( 'Mocks' ) : sidebarTab === 'git' ? t( 'Git' ) : sidebarTab === 'flows' ? t( 'Flows' ) : t( 'Contracts' )}
                   </span>
                   <div className="flex items-center gap-1.5">
                     {sidebarTab === 'history' && historyCount > 0 && (
@@ -483,6 +505,13 @@ export default function App () {
                         className="text-surface-600 hover:text-surface-300 transition-colors text-sm leading-none px-0.5"
                       >+</button>
                     )}
+                    {sidebarTab === 'flows' && (
+                      <button
+                        onClick={() => addFlow( 'New Flow' )}
+                        title={t( 'New flow' )}
+                        className="text-surface-600 hover:text-surface-300 transition-colors text-sm leading-none px-0.5"
+                      >+</button>
+                    )}
                     <button
                       onClick={() => setSidebarOpen( false )}
                       title={t( 'Collapse sidebar' )}
@@ -494,7 +523,8 @@ export default function App () {
                   sidebarTab === 'history' ? <HistoryPanel /> :
                     sidebarTab === 'mocks' ? <MockPanel /> :
                       sidebarTab === 'git' ? <GitPanel /> :
-                        <ContractPanel />}
+                        sidebarTab === 'flows' ? <FlowsPanel /> :
+                          <ContractPanel />}
               </aside>
               {/* Sidebar resize handle */}
               <div
@@ -605,7 +635,11 @@ export default function App () {
               </>
             )}
 
-            {sidebarTab === 'git' ? (
+            {sidebarTab === 'flows' ? (
+              <div className="flex-1 min-h-0 flex flex-col">
+                <FlowCanvas />
+              </div>
+            ) : sidebarTab === 'git' ? (
               <div className="flex-1 min-h-0 flex flex-col">
                 <GitDiffPane />
               </div>

@@ -15,6 +15,7 @@ import { createTabsSlice, type TabsSlice } from './slices/tabs-slice';
 import { createCollectionsSlice, type CollectionsSlice } from './slices/collections-slice';
 import { createEnvironmentsSlice, type EnvironmentsSlice } from './slices/environments-slice';
 import { createMocksSlice, type MocksSlice } from './slices/mocks-slice';
+import { createFlowsSlice, type FlowsSlice } from './slices/flows-slice';
 import { createUiSlice, type UiSlice } from './slices/ui-slice';
 
 // Re-exports kept for backwards compatibility — components import these
@@ -66,7 +67,7 @@ interface WorkspaceActions {
 
 export type FullState =
   WorkspaceState & WorkspaceActions &
-  TabsSlice & CollectionsSlice & EnvironmentsSlice & MocksSlice & UiSlice &
+  TabsSlice & CollectionsSlice & EnvironmentsSlice & MocksSlice & FlowsSlice & UiSlice &
   WsSlice & GrpcSlice & StreamSlice & HistorySlice & RunnerSlice & RecorderSlice & ContractSlice
 
 export const useStore: UseBoundStore<StoreApi<FullState>> = create<FullState>()(
@@ -83,6 +84,7 @@ export const useStore: UseBoundStore<StoreApi<FullState>> = create<FullState>()(
     ...createCollectionsSlice(set, get, api),
     ...createEnvironmentsSlice(set, get, api),
     ...createMocksSlice(set, get, api),
+    ...createFlowsSlice(set, get, api),
     ...createUiSlice(set, get, api),
 
     // ── Workspace-level state ─────────────────────────────────────────────────
@@ -100,6 +102,8 @@ export const useStore: UseBoundStore<StoreApi<FullState>> = create<FullState>()(
       s.collections         = {};
       s.environments        = {};
       s.mocks               = {};
+      s.flows               = {};
+      s.activeFlowId        = null;
       s.tabs                = [];
       s.activeTabId         = null;
       s.activeCollectionId  = null;

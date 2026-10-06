@@ -9,6 +9,7 @@
   - [Environments, Variables & Secrets](gui/environments.md)
   - [Data-Driven Runs](gui/data-driven.md)
   - [Mock Servers](gui/mock-servers.md)
+  - [Flows](gui/flows.md)
   - [Export to Code](gui/code-generation.md)
   - [Table View for Arrays](gui/response-table.md)
   - [TLS & Certificates](gui/tls-certificates.md)
@@ -20,6 +21,7 @@
 
 - **CLI**
   - [Run Tests](cli/run.md)
+  - [Flows](cli/flows.md)
   - [Mock Servers](cli/mock.md)
   - [Contract Testing](cli/contract-testing.md)
   - [Test Coverage](reference/coverage.md)

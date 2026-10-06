@@ -35,6 +35,8 @@ export const IPC = {
     deleteWorkspaceFile: 'file:deleteWorkspaceFile',
     saveMock:            'file:saveMock',
     loadMock:            'file:loadMock',
+    saveFlow:            'file:saveFlow',
+    loadFlow:            'file:loadFlow',
     loadHistory:         'file:loadHistory',
     saveHistory:         'file:saveHistory',
   },
@@ -78,6 +80,13 @@ export const IPC = {
     start:    'runner:start',
     /** Event: per-request progress pushed from main during a run. */
     progress: 'runner:progress',
+  },
+
+  // ─── Flow runner ───────────────────────────────────────────────────────────
+  flow: {
+    run:      'flow:run',
+    /** Event: per-block progress pushed from main during a flow run. */
+    progress: 'flow:progress',
   },
 
   // ─── Run results export ────────────────────────────────────────────────────
@@ -265,6 +274,14 @@ export const IPC = {
     pushDesignContract: 'cloud:pushDesignContract',
     /** Publish a provider OpenAPI spec (PUT /api/provider-contracts). */
     pushSpec:    'cloud:pushSpec',
+    /** Upload a self-contained flow definition (POST /api/flows). */
+    pushFlow:    'cloud:pushFlow',
+    /** Trigger a server-side run of an uploaded flow (POST /api/flows/{slug}/run). */
+    runFlow:     'cloud:runFlow',
+    /** Poll a flow run's status/result (GET /api/flows/{slug}/runs/{id}). */
+    getFlowRun:  'cloud:getFlowRun',
+    /** Open a flow's page in the cloud UI. */
+    openFlow:    'cloud:openFlow',
     /** Open the cloud deployment matrix in the browser. */
     openMatrix:  'cloud:openMatrix',
   },
