@@ -71,6 +71,22 @@ export {
 } from '../main/secrets';
 export type { SecretProvider, SecretResolveContext } from '../main/secrets';
 
+// ── Flow engine ──
+// runFlowHeadless() runs a whole flow (graph of request / logic / loop /
+// visualize blocks) headlessly, resolving request blocks from a pre-baked
+// requests map. This is what the cloud `runtime/flow` worker calls to execute
+// an uploaded flow with semantics identical to the desktop app and CLI.
+export { runFlowHeadless } from '../main/flow-run';
+export type { HeadlessFlowInput } from '../main/flow-run';
+export { runFlow } from '../shared/flow-engine';
+export type {
+  FlowRunSummary,
+  FlowRunEvent,
+  FlowBlockRunRecord,
+  FlowEngineDeps,
+} from '../shared/flow-engine';
+export { normalizeFlow, BLOCK_SPECS } from '../shared/flow-blocks';
+
 // ── Shared types ──
 export type {
   MockServer,
@@ -81,4 +97,7 @@ export type {
   TestResult,
   KeyValuePair,
   AuthConfig,
+  Flow,
+  FlowBlock,
+  FlowEdge,
 } from '../shared/types';

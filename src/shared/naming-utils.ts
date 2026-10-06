@@ -23,6 +23,12 @@ export function envRelPath(name: string, id: string): string {
   return `environments/${safe}.env.json`;
 }
 
+/** Derive a relative file path for a flow from its display name + id. */
+export function flowRelPath(name: string, id: string): string {
+  const safe = safeName(name) || id.slice(0, 8);
+  return `flows/${safe}.flow.json`;
+}
+
 function safeName(name: string): string {
   return name.trim()
     .toLowerCase()

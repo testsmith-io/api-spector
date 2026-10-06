@@ -205,6 +205,8 @@ export interface Workspace {
   mocks?: string[]
   /** Paths (relative to the workspace dir) of pinned contract snapshots. */
   contracts?: string[]
+  /** Paths (relative to the workspace dir) of flow definitions under flows/. */
+  flows?: string[]
   /** Design-first consumer contracts authored in-app, stored inline. */
   designContracts?: ConsumerContract[]
   settings?: {

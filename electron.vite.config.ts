@@ -17,6 +17,7 @@ export default defineConfig( {
         input: {
           index: resolve( __dirname, 'src/main/index.ts' ),
           runner:   resolve( __dirname, 'src/cli/runner.ts' ),
+          flow:     resolve( __dirname, 'src/cli/flow.ts' ),
           mock:     resolve( __dirname, 'src/cli/mock.ts' ),
           record:   resolve( __dirname, 'src/cli/record.ts' ),
           agents:   resolve( __dirname, 'src/cli/agents.ts' ),

@@ -9,8 +9,10 @@ import { useStore } from '../store';
 import { resolveEnvironmentById } from '../hooks/useActiveEnvironment';
 import { authIsConfigured, getHooksForRequest } from '../../../shared/request-collection';
 import type { ApiRequest } from '../../../shared/types/collection';
+import type { Flow } from '../../../shared/types/flow';
 import type { MockServer } from '../../../shared/types/mock';
 import type { KeyValuePair } from '../../../shared/types/http';
+import type { FlowRunSummary } from '../../../shared/flow-engine';
 
 /** Whether a request carries a usable contract (so it can become a pact interaction). */
 export function hasContract(r: ApiRequest): boolean {
@@ -62,6 +64,52 @@ export async function pushProviderSpecToCloud(
 /** Open the cloud deployment matrix in the browser. */
 export function openCloudMatrix(): void {
   void electron.cloudOpenMatrix();
+}
+
+// ─── Flows ────────────────────────────────────────────────────────────────
+
+/** Upload a flow to the cloud as a self-contained definition (graph + the
+ *  referenced requests + resolved environment/globals). The main process bakes
+ *  the definition; the cloud stores it and a Node runtime runs it. */
+export async function pushFlowToCloud(flow: Flow): Promise<{ url?: string; slug: string }> {
+  assertEnabled();
+  const s = useStore.getState();
+  const environment = resolveEnvironmentById(s.environments, s.activeEnvironmentId);
+  return electron.cloudPushFlow({
+    flow,
+    collections: Object.values(s.collections).map(c => c.data),
+    flows: Object.values(s.flows).map(f => f.data),
+    environment,
+    globals: { ...s.globals },
+  });
+}
+
+/** Trigger a server-side run and poll until it completes (or times out). */
+export async function runFlowInCloud(
+  flow: Flow,
+  onStatus?: (status: string) => void,
+): Promise<FlowRunSummary> {
+  assertEnabled();
+  const started = await electron.cloudRunFlow(flow.name);
+  onStatus?.(started.status);
+  const deadlineMs = 2 * 60 * 1000;
+  const t0 = Date.now();
+  // Poll the run until it reaches a terminal state.
+  for (;;) {
+    const run = await electron.cloudGetFlowRun({ name: flow.name, runId: started.id });
+    onStatus?.(run.status);
+    if (run.status === 'passed' || run.status === 'failed' || run.status === 'error' || run.status === 'done') {
+      if (run.summary) return run.summary;
+      throw new Error('Flow run finished but no summary was returned.');
+    }
+    if (Date.now() - t0 > deadlineMs) throw new Error('Timed out waiting for the cloud flow run.');
+    await new Promise(r => setTimeout(r, 1500));
+  }
+}
+
+/** Open the flow's page in the cloud UI. */
+export function openCloudFlow(flow: Flow): void {
+  void electron.cloudOpenFlow(flow.name);
 }
 
 /** The routes an existing cloud mock already has (for overwrite warnings), or

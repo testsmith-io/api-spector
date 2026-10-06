@@ -25,6 +25,7 @@ import { registerAiHandlers } from './ipc/ai-handler';
 import { registerImportHandlers } from './ipc/import-handler';
 import { registerGenerateHandlers } from './ipc/generate-handler';
 import { registerRunnerHandler } from './ipc/runner-handler';
+import { registerFlowHandler } from './ipc/flow-handler';
 import { registerMockHandlers } from './ipc/mock-handler';
 import { registerOAuth2Handlers } from './ipc/oauth2-handler';
 import { registerVaultHandlers } from './ipc/vault-handler';
@@ -260,6 +261,7 @@ app.whenReady().then(async () => {
   registerImportHandlers(ipcMain);
   registerGenerateHandlers(ipcMain);
   registerRunnerHandler(ipcMain);
+  registerFlowHandler(ipcMain);
   registerMockHandlers(ipcMain);
   registerOAuth2Handlers(ipcMain);
   registerVaultHandlers(ipcMain);

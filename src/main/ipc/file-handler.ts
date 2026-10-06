@@ -9,7 +9,7 @@ import type { Dirent } from 'node:fs';
 import { join, dirname, resolve, basename, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import JSZip from 'jszip';
-import type { Collection, Environment, Workspace } from '../../shared/types';
+import type { Collection, Environment, Workspace, Flow } from '../../shared/types';
 import { externalizeDataSets, inlineDataSets } from '../data-files';
 import { loadGlobals, getGlobals, setGlobals, persistGlobals } from '../globals-store';
 import { setSecretsConfig } from '../secrets';
@@ -125,6 +125,7 @@ function readmeContents(workspaceFileName: string): string {
     `environments/             ← per-env variable files (dev, staging, prod, …)`,
     `mocks/                    ← saved mock servers (optional)`,
     `contracts/                ← pinned OpenAPI snapshots (optional)`,
+    `flows/                    ← visual flows chaining saved requests (optional)`,
     `.gitignore                ← excludes secrets, generated docs, run reports`,
     `.vscode/settings.json     ← maps *.spector to JSON for editor highlighting`,
     '```',
@@ -308,6 +309,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     // Create data dirs
     await mkdir(join(workspaceDir, 'collections'), { recursive: true });
     await mkdir(join(workspaceDir, 'environments'), { recursive: true });
+    await mkdir(join(workspaceDir, 'flows'), { recursive: true });
 
     // Write .gitignore (covers secrets, generated docs, run reports, etc.)
     await ensureGitignore(workspaceDir);
@@ -369,6 +371,20 @@ export function registerFileHandlers(ipc: IpcMain): void {
     const fullPath = resolve(workspaceDir, relPath);
     await mkdir(dirname(fullPath), { recursive: true });
     await atomicWrite(fullPath, JSON.stringify(env, null, 2));
+  });
+
+  handleIpc(ipc, IPC.file.loadFlow, async (_e, relPath: string) => {
+    if (!workspaceDir) throw new Error('No workspace open');
+    const raw = await readFile(resolve(workspaceDir, relPath), 'utf8');
+    return JSON.parse(raw) as Flow;
+  });
+
+  handleIpc(ipc, IPC.file.saveFlow, async (_e, relPath: string, flow: Flow) => {
+    if (!workspaceDir) throw new Error('No workspace open');
+    const fullPath = resolve(workspaceDir, relPath);
+    // Older workspaces predate the flows/ dir; create it on first save.
+    await mkdir(dirname(fullPath), { recursive: true });
+    await atomicWrite(fullPath, JSON.stringify(flow, null, 2));
   });
 
   /** Delete a workspace-relative file (collection, environment, mock, …).

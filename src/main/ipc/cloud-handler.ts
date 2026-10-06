@@ -12,10 +12,50 @@ import { getGlobals } from '../globals-store';
 import { exportPact } from '../contract/pact-format';
 import { designContractToPact } from '../contract/design-pact';
 import { resolveCloudEndpoint } from '../cloud/broker-client';
-import type { ConsumerContract } from '../../shared/types';
+import type { ConsumerContract, Collection, Flow } from '../../shared/types';
+import { resolveInheritedAuthAndHeaders, authIsConfigured } from '../../shared/request-collection';
 import { load as loadYaml } from 'js-yaml';
 import type { MockServer } from '../../shared/types/mock';
 import type { ApiRequest, Environment } from '../../shared/types/collection';
+
+interface PushFlowInput {
+  flow: Flow
+  collections: Collection[]
+  flows: Flow[]
+  environment: Environment | null
+  globals: Record<string, string>
+}
+
+/** Build a self-contained, runnable flow definition for the cloud: the graph,
+ *  the referenced requests (resolved with inherited auth/headers, templates
+ *  left intact for run-time), referenced sub-flows, the resolved environment
+ *  vars + globals. The cloud stores this blob; the Node flow runtime executes
+ *  it with the shared engine (identical semantics to desktop/CLI). */
+async function buildFlowDefinition(input: PushFlowInput): Promise<unknown> {
+  const envVars = await buildEnvVars(input.environment);
+  const colById = new Map(input.collections.map(c => [c.id, c]));
+  const collectionVars: Record<string, string> = {};
+  for (const c of input.collections) Object.assign(collectionVars, c.collectionVariables ?? {});
+
+  const requests: Record<string, ApiRequest> = {};
+  for (const f of [input.flow, ...(input.flows ?? [])]) {
+    for (const node of f.nodes ?? []) {
+      const ref = node.config?.ref;
+      if (node.type !== 'request' || !ref) continue;
+      const col = colById.get(ref.collectionId);
+      const req = col?.requests[ref.requestId];
+      if (!col || !req) continue;
+      const cloned = JSON.parse(JSON.stringify(req)) as ApiRequest;
+      const inherited = resolveInheritedAuthAndHeaders(req.id, col);
+      if (!authIsConfigured(cloned.auth) && inherited.auth && inherited.auth.type !== 'none') cloned.auth = inherited.auth;
+      const inhHeaders = inherited.headers.filter(h => h.enabled && h.key);
+      if (inhHeaders.length) cloned.headers = [...inhHeaders, ...(cloned.headers ?? [])];
+      requests[`${ref.collectionId}:${ref.requestId}`] = cloned;
+    }
+  }
+
+  return { flow: input.flow, flows: input.flows ?? [], requests, envVars, collectionVars, globals: input.globals ?? {} };
+}
 
 /** Keychain ref the cloud API token is stored under (see secret-handler). */
 export const CLOUD_TOKEN_REF = 'cloud:token';
@@ -264,6 +304,33 @@ export function registerCloudHandlers(ipc: IpcMain): void {
   // Open the cloud deployment matrix in the default browser.
   handleIpc(ipc, IPC.cloud.openMatrix, async () => {
     await shell.openExternal(CLOUD_ENDPOINT + '/matrix');
+  });
+
+  // ─── Flows ─────────────────────────────────────────────────────────────────
+  // Upload a self-contained flow definition (graph + resolved requests + env).
+  handleIpc(ipc, IPC.cloud.pushFlow, async (_e, input: PushFlowInput) => {
+    const definition = await buildFlowDefinition(input);
+    return cloudFetch('/api/flows', 'POST', {
+      name: input.flow.name,
+      slug: slugify(input.flow.name),
+      definition,
+    });
+  });
+
+  // Trigger a server-side run (the Node flow runtime picks it up). Returns the
+  // queued run record ({ id, status }).
+  handleIpc(ipc, IPC.cloud.runFlow, async (_e, name: string) => {
+    return cloudFetch('/api/flows/' + encodeURIComponent(slugify(name)) + '/run', 'POST');
+  });
+
+  // Poll a run's status/result ({ id, status, summary? }).
+  handleIpc(ipc, IPC.cloud.getFlowRun, async (_e, arg: { name: string; runId: number | string }) => {
+    return cloudFetch(`/api/flows/${encodeURIComponent(slugify(arg.name))}/runs/${encodeURIComponent(String(arg.runId))}`, 'GET');
+  });
+
+  // Open the flow's page in the cloud UI.
+  handleIpc(ipc, IPC.cloud.openFlow, async (_e, name: string) => {
+    await shell.openExternal(CLOUD_ENDPOINT + '/flows/' + encodeURIComponent(slugify(name)));
   });
 
   // Push a request as a monitor. The URL is resolved to a concrete value here

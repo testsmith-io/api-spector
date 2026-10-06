@@ -83,6 +83,10 @@ export interface ScriptContext {
    *  that secrets extracted via post-script (e.g. access_token) don't leak
    *  into reports or verbose CLI output. */
   piiMaskPatterns?: string[]
+  /** Rich data channel for flows: loop items, evaluate outputs, collected
+   *  lists. Exposed in the sandbox as the global `data` (and `sp.data`), so a
+   *  flow condition can read `data.item.id` without JSON round-tripping. */
+  data?: Record<string, unknown>
 }
 
 export interface ScriptOutput {
@@ -396,6 +400,49 @@ function buildAt(
   return sp;
 }
 
+// ─── Sandbox ────────────────────────────────────────────────────────────────
+
+/** Build the vm sandbox shared by runScript and evaluateExpression. The four
+ *  variable scopes inside `scriptCtx` are mutated in place by sp.*; `data` is
+ *  passed through by reference so flow blocks can read/write the rich channel. */
+function buildSandbox(
+  scriptCtx: ScriptContext,
+  testResults: TestResult[],
+  consoleOutput: string[],
+  faker: typeof FakerType,
+): Record<string, unknown> {
+  const sp = buildAt(scriptCtx, testResults, consoleOutput);
+  const captureConsole = {
+    log:   (...args: unknown[]) => consoleOutput.push(args.map(String).join(' ')),
+    warn:  (...args: unknown[]) => consoleOutput.push('[warn] ' + args.map(String).join(' ')),
+    error: (...args: unknown[]) => consoleOutput.push('[error] ' + args.map(String).join(' ')),
+    info:  (...args: unknown[]) => consoleOutput.push('[info] ' + args.map(String).join(' ')),
+  };
+  return {
+    sp,
+    data: scriptCtx.data ?? {},
+    DOMParser: makeSandboxDOMParser,
+    dayjs,
+    faker,
+    tv4,
+    console: captureConsole,
+    JSON,
+    Math,
+    Date,
+    parseInt: Number.parseInt,
+    parseFloat: Number.parseFloat,
+    // isNaN/isFinite intentionally expose the global (coercing) semantics user scripts expect
+    isNaN,
+    isFinite,
+    encodeURIComponent,
+    decodeURIComponent,
+    btoa: (s: string) => Buffer.from(s, 'binary').toString('base64'),
+    atob: (s: string) => Buffer.from(s, 'base64').toString('binary'),
+    setTimeout: undefined,  // not available in sync vm context
+    setInterval: undefined,
+  };
+}
+
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
 export async function runScript(
@@ -422,37 +469,7 @@ export async function runScript(
     piiMaskPatterns: ctx.piiMaskPatterns,
   };
 
-  const sp = buildAt(scriptCtx, testResults, consoleOutput);
-
-  const captureConsole = {
-    log:   (...args: unknown[]) => consoleOutput.push(args.map(String).join(' ')),
-    warn:  (...args: unknown[]) => consoleOutput.push('[warn] ' + args.map(String).join(' ')),
-    error: (...args: unknown[]) => consoleOutput.push('[error] ' + args.map(String).join(' ')),
-    info:  (...args: unknown[]) => consoleOutput.push('[info] ' + args.map(String).join(' ')),
-  };
-
-  const sandbox = {
-    sp,
-    DOMParser: makeSandboxDOMParser,
-    dayjs,
-    faker,
-    tv4,
-    console: captureConsole,
-    JSON,
-    Math,
-    Date,
-    parseInt: Number.parseInt,
-    parseFloat: Number.parseFloat,
-    // isNaN/isFinite intentionally expose the global (coercing) semantics user scripts expect
-    isNaN,
-    isFinite,
-    encodeURIComponent,
-    decodeURIComponent,
-    btoa: (s: string) => Buffer.from(s, 'binary').toString('base64'),
-    atob: (s: string) => Buffer.from(s, 'base64').toString('binary'),
-    setTimeout: undefined,  // not available in sync vm context
-    setInterval: undefined,
-  };
+  const sandbox = buildSandbox(scriptCtx, testResults, consoleOutput, faker);
 
   try {
     vm.runInNewContext(code, sandbox, { timeout: timeoutMs, filename: 'script.js' });
@@ -477,4 +494,69 @@ export async function runScript(
     updatedGlobals:        globalsCopy,
     updatedLocalVars:      localVarsCopy,
   };
+}
+
+export interface ExpressionOutput {
+  /** Completion value of the evaluated expression (vm returns the last value). */
+  value: unknown
+  consoleOutput: string[]
+  updatedEnvVars: Record<string, string>
+  updatedCollectionVars: Record<string, string>
+  updatedGlobals: Record<string, string>
+  updatedLocalVars: Record<string, string>
+  error?: string
+}
+
+/**
+ * Evaluate a JS expression (or short script) in the same sandbox as runScript
+ * and return its completion value. Used by flow logic blocks: `if`/`condition`
+ * booleans and `forEach` list expressions. Side effects (sp.variables.set,
+ * mutations to `data`) are honored and the updated scopes returned.
+ */
+export async function evaluateExpression(
+  code: string,
+  ctx: ScriptContext,
+  timeoutMs = 5000,
+): Promise<ExpressionOutput> {
+  const faker = await getFaker();
+  const testResults: TestResult[] = [];
+  const consoleOutput: string[] = [];
+
+  const envVarsCopy    = { ...ctx.envVars };
+  const collectionCopy = { ...ctx.collectionVars };
+  const globalsCopy    = { ...ctx.globals };
+  const localVarsCopy  = { ...ctx.localVars };
+
+  const scriptCtx: ScriptContext = {
+    envVars: envVarsCopy,
+    collectionVars: collectionCopy,
+    globals: globalsCopy,
+    localVars: localVarsCopy,
+    response: ctx.response,
+    piiMaskPatterns: ctx.piiMaskPatterns,
+    data: ctx.data,
+  };
+
+  const sandbox = buildSandbox(scriptCtx, testResults, consoleOutput, faker);
+
+  const scopes = {
+    updatedEnvVars: envVarsCopy,
+    updatedCollectionVars: collectionCopy,
+    updatedGlobals: globalsCopy,
+    updatedLocalVars: localVarsCopy,
+  };
+
+  try {
+    // `(code)` so a bare object literal / ternary is read as an expression, not
+    // a block. Falls back to running as statements if that doesn't parse.
+    let value: unknown;
+    try {
+      value = vm.runInNewContext(`(${code})`, sandbox, { timeout: timeoutMs, filename: 'expression.js' });
+    } catch {
+      value = vm.runInNewContext(code, sandbox, { timeout: timeoutMs, filename: 'expression.js' });
+    }
+    return { value, consoleOutput, ...scopes };
+  } catch (err) {
+    return { value: undefined, consoleOutput, ...scopes, error: err instanceof Error ? err.message : String(err) };
+  }
 }

@@ -12,6 +12,7 @@
 - **CLI:** run test collections and start mock servers from the terminal or CI/CD pipelines
 - **Encrypted secrets:** AES-256-GCM encryption with a master password, never stored in plain text
 - **Mock servers:** define and run HTTP mock servers with per-route delay and status control
+- **Flows:** visual graphs of API calls (requests, branching, loops, sub-flows), run in the app, CLI, or cloud — with an HTML report ([GUI](gui/flows.md) · [CLI](cli/flows.md))
 - **Contract testing:** consumer, provider, live provider verification (with provider states), and bi-directional modes; Pact-style matchers, Pact file import/export, a local `deploy-check` gate, and HTML/JUnit reports
 - **OpenAPI test coverage:** measure which spec operations are actually tested, with a CI gate (`api-spector coverage --fail-under 80`)
 - **Test generation:** generate happy-path, negative, and boundary tests from an OpenAPI spec (`api-spector generate-tests`), or fill coverage gaps from the app

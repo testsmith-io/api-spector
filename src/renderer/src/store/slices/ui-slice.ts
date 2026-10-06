@@ -17,7 +17,7 @@ export interface UiSliceState {
   showGeneratorPanel: boolean
   theme: Theme
   zoom: number
-  sidebarTab: 'collections' | 'history' | 'mocks' | 'contracts' | 'git'
+  sidebarTab: 'collections' | 'history' | 'mocks' | 'contracts' | 'git' | 'flows'
 
   workspaceSettingsOpen: boolean
 

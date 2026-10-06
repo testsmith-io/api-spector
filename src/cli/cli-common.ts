@@ -15,7 +15,7 @@
 
 import { readFile, stat, readdir } from 'node:fs/promises';
 import { join, dirname, resolve } from 'node:path';
-import type { Workspace, Collection, Environment, MockServer } from '../shared/types';
+import type { Workspace, Collection, Environment, MockServer, Flow } from '../shared/types';
 import { inlineDataSets } from '../main/data-files';
 
 // Design-first contract loading lives in main/contract so the app's IPC can share
@@ -150,4 +150,21 @@ export async function loadMocks(
     }
   }
   return mocks;
+}
+
+export async function loadFlows(
+  workspace: Workspace,
+  dir: string,
+  onError?: (relPath: string) => void,
+): Promise<Flow[]> {
+  const flows: Flow[] = [];
+  for (const relPath of workspace.flows ?? []) {
+    try {
+      const raw = await readFile(join(dir, relPath), 'utf8');
+      flows.push(JSON.parse(raw));
+    } catch {
+      onError?.(relPath);
+    }
+  }
+  return flows;
 }

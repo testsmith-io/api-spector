@@ -8,6 +8,7 @@
 export * from './types/http';
 export * from './types/contract';
 export * from './types/collection';
+export * from './types/flow';
 export * from './types/consumer-contract';
 export * from './types/execution';
 export * from './types/generate';

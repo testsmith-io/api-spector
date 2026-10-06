@@ -13,10 +13,13 @@ const { electron } = window;
 export function useAutoSave() {
   const collections = useStore(s => s.collections);
   const _environments = useStore(s => s.environments);
+  const flows = useStore(s => s.flows);
   const workspace = useStore(s => s.workspace);
   const markCollectionClean = useStore(s => s.markCollectionClean);
+  const markFlowClean = useStore(s => s.markFlowClean);
 
   const colTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wsTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Save dirty collections (request/folder edits and deletes)
@@ -40,6 +43,28 @@ export function useAutoSave() {
 
     return () => { if (colTimerRef.current) clearTimeout(colTimerRef.current); };
   }, [collections, markCollectionClean]);
+
+  // Save dirty flows (node/edge edits, rename)
+  useEffect(() => {
+    const dirtyFlows = Object.values(flows).filter(f => f.dirty);
+    if (dirtyFlows.length === 0) return;
+
+    if (flowTimerRef.current) clearTimeout(flowTimerRef.current);
+
+    flowTimerRef.current = setTimeout(async () => {
+      for (const { relPath, data, dirty } of dirtyFlows) {
+        if (!dirty) continue;
+        try {
+          await electron.saveFlow(relPath, data);
+          markFlowClean(data.id);
+        } catch (e) {
+          console.error('Auto-save failed for', relPath, e);
+        }
+      }
+    }, 600);
+
+    return () => { if (flowTimerRef.current) clearTimeout(flowTimerRef.current); };
+  }, [flows, markFlowClean]);
 
   // Save workspace manifest whenever it changes (covers collection/env add & delete)
   useEffect(() => {
