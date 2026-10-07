@@ -54,7 +54,15 @@ async function buildFlowDefinition(input: PushFlowInput): Promise<unknown> {
     }
   }
 
-  return { flow: input.flow, flows: input.flows ?? [], requests, envVars, collectionVars, globals: input.globals ?? {} };
+  return {
+    flow: input.flow, flows: input.flows ?? [], requests, envVars, collectionVars,
+    globals: input.globals ?? {},
+    // Record which environment's values were baked (for the cloud UI). null when
+    // no environment was active at push time — a common cause of "works locally,
+    // fails in the cloud" when requests rely on environment variables.
+    environmentName: input.environment?.name ?? null,
+    envVarCount: Object.keys(envVars).length,
+  };
 }
 
 /** Keychain ref the cloud API token is stored under (see secret-handler). */

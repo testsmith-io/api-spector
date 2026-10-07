@@ -62,6 +62,12 @@ export async function runFlowHeadless(input: HeadlessFlowInput): Promise<FlowRun
         envVars: updatedEnvVars, collectionVars: updatedCollectionVars, globals: updatedGlobals, localVars: updatedLocalVars,
         response, status: result.status, httpStatus: result.httpStatus, durationMs: result.durationMs,
         error: result.error, testResults: result.testResults, name: result.name, method: result.method, resolvedUrl: result.resolvedUrl,
+        sentRequest: {
+          method: result.method,
+          url: result.resolvedUrl,
+          headers: result.sentRequest?.headers ?? {},
+          body: result.sentRequest?.body,
+        },
       };
     },
     runScript: async (code, i) => {

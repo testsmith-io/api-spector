@@ -47,6 +47,8 @@ export interface EngineRequestResult extends EngineScopes {
   name: string
   method: string
   resolvedUrl: string
+  /** The request actually sent (resolved URL/headers/body) — for the run log. */
+  sentRequest?: { method: string; url: string; headers: Record<string, string>; body?: string }
 }
 
 export interface FlowEngineDeps {
@@ -108,6 +110,21 @@ export interface FlowBlockRunRecord {
   display?: unknown
   /** Milliseconds since the run started. */
   atMs?: number
+  /**
+   * For request blocks: the actual HTTP request sent and response received, so
+   * a run can be inspected after the fact (especially failures) in the UI / CLI
+   * report / cloud. Bodies are truncated to keep the stored summary small.
+   */
+  http?: {
+    reqHeaders?: Record<string, string>
+    reqBody?: string
+    statusText?: string
+    resHeaders?: Record<string, string>
+    resBody?: string
+    bodySize?: number
+    /** True when reqBody or resBody was clipped. */
+    truncated?: boolean
+  }
 }
 
 export interface FlowRunSummary {
@@ -143,6 +160,15 @@ function toScalar(v: unknown): string {
 function parseBody(body: string | undefined): unknown {
   if (body == null) return undefined;
   try { return JSON.parse(body); } catch { return body; }
+}
+
+// Cap a captured request/response body so the stored run summary stays small.
+// Returns the (possibly clipped) string and whether it was clipped.
+const MAX_CAPTURED_BODY = 20_000;
+function clipBody(body: string | undefined): { text?: string; clipped: boolean } {
+  if (body == null) return { clipped: false };
+  if (body.length <= MAX_CAPTURED_BODY) return { text: body, clipped: false };
+  return { text: body.slice(0, MAX_CAPTURED_BODY) + `\n… [truncated ${body.length - MAX_CAPTURED_BODY} more chars]`, clipped: true };
 }
 
 // ─── Engine ──────────────────────────────────────────────────────────────
@@ -353,9 +379,20 @@ export async function runFlow(
           // success = ran OK (2xx/3xx, assertions passed, or nothing to assert).
           const ok = r.status === 'passed' || r.status === 'skipped';
           const reqStatus: FlowBlockStatus = r.status === 'skipped' ? 'done' : r.status === 'pending' ? 'running' : r.status;
+          const reqBody = clipBody(r.sentRequest?.body);
+          const resBody = clipBody(r.response?.body);
           record(block, reqStatus, {
             iteration, httpStatus: r.httpStatus, durationMs: r.durationMs,
             error: r.error, testResults: r.testResults, method: r.method, resolvedUrl: r.resolvedUrl,
+            http: {
+              reqHeaders: r.sentRequest?.headers,
+              reqBody: reqBody.text,
+              statusText: r.response?.statusText,
+              resHeaders: r.response?.headers,
+              resBody: resBody.text,
+              bodySize: r.response?.bodySize,
+              truncated: reqBody.clipped || resBody.clipped,
+            },
           });
           return [ok ? 'success' : 'fail'];
         }
