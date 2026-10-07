@@ -197,5 +197,19 @@ export function mergeVars(
   localVars: Record<string, string> = {},
   dynamicVars: Record<string, string> = {}
 ): Record<string, string> {
-  return { ...dynamicVars, ...globals, ...collectionVars, ...envVars, ...localVars };
+  // Precedence low→high: dynamic < globals < collection < env < local. A
+  // null/undefined value is treated as UNSET: it must not shadow a real value
+  // from a lower-precedence scope, and must never render as the literal string
+  // "null"/"undefined" in a template (e.g. a stale env placeholder `token:null`
+  // shadowing a token a flow just set globally -> "Authorization: Bearer null").
+  // Values arrive typed as string, but baked/serialized definitions can carry
+  // real nulls, so guard at runtime.
+  const out: Record<string, string> = {};
+  for (const src of [dynamicVars, globals, collectionVars, envVars, localVars]) {
+    for (const [k, v] of Object.entries(src ?? {})) {
+      if (v == null) continue;
+      out[k] = v;
+    }
+  }
+  return out;
 }
