@@ -287,9 +287,15 @@ export interface OnePasswordSettings {
   connectHost?: string
 }
 
+export interface GcpSecretManagerSettings {
+  /** Default GCP project id for refs that omit it (env: GCP_PROJECT). */
+  project?: string
+}
+
 export interface SecretsSettings {
   vault?: VaultSettings
   aws?: AwsSecretsSettings
   azure?: AzureKeyVaultSettings
   onePassword?: OnePasswordSettings
+  gcp?: GcpSecretManagerSettings
 }

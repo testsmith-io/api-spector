@@ -144,7 +144,7 @@ export function HistoryPanel() {
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto">
-          {filtered.length === 0 && (
+          {groups.length === 0 && (
             <p className="px-3 py-4 text-xs text-surface-400">{t('No matches.')}</p>
           )}
           {groups.map(group => (

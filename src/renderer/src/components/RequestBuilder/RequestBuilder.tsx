@@ -17,6 +17,7 @@ import { ScriptsTab } from './ScriptsTab';
 import { SchemaTab } from './SchemaTab';
 import { DocsTab } from './DocsTab';
 import { StreamTab } from './StreamTab';
+import { VariablesTab } from './VariablesTab';
 import { WebSocketPanel } from '../WebSocket/WebSocketPanel';
 import { GrpcPanel } from '../Grpc/GrpcPanel';
 import { FuzzModal } from './FuzzModal';
@@ -61,6 +62,7 @@ function deriveHookStatus(r: {
 const TAB_HINTS: Record<string, string> = {
   schema: 'Schema: validate the response body against a JSON Schema, synced from your OpenAPI spec or created from a response. Checked automatically on every send.',
   stream: 'Stream: idle and total timeouts for streamed responses (SSE / NDJSON / chunked).',
+  variables: 'Variables: every variable in scope for this request (environment, collection, globals), their resolved values, and which ones the request references.',
 };
 
 export function RequestBuilder({ request }: Props) {
@@ -366,6 +368,7 @@ export function RequestBuilder({ request }: Props) {
     ...(!isWs ? [
       { id: 'body',    label: isSoap ? 'SOAP' : 'Body', count: request.body.mode !== 'none' ? 1 : 0 },
       { id: 'auth',    label: 'Auth',    count: request.auth.type !== 'none' ? 1 : 0 },
+      { id: 'variables', label: 'Variables', count: 0 },
       ...(!isExample ? [
         { id: 'scripts', label: 'Scripts', count: (hasPreScript ? 1 : 0) + (hasPostScript ? 1 : 0) },
         { id: 'schema',   label: 'Schema',   count: request.schema?.trim() ? 1 : 0 },
@@ -624,6 +627,7 @@ export function RequestBuilder({ request }: Props) {
                 {shown === 'headers' && <HeadersTab request={request} onChange={update} />}
                 {shown === 'body'    && <BodyTab    request={request} onChange={update} />}
                 {shown === 'auth'    && <AuthTab    request={request} onChange={update} />}
+                {shown === 'variables' && <VariablesTab request={request} />}
                 {!isExample && shown === 'scripts' && <ScriptsTab request={request} onChange={update} />}
                 {!isExample && shown === 'schema'   && <SchemaTab   request={request} onChange={update} />}
                 {!isExample && shown === 'docs'     && <DocsTab     request={request} onChange={update} />}

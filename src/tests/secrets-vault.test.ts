@@ -63,8 +63,9 @@ describe('secret scheme detection', () => {
   it('recognises registered schemes only', () => {
     expect(hasSecretScheme('vault:secret/data/app#token')).toBe(true);
     expect(hasSecretScheme('aws:prod/db#password')).toBe(true);
+    expect(hasSecretScheme('gcp:my-project/db#password')).toBe(true);
     expect(hasSecretScheme('PLAIN_ENV_NAME')).toBe(false);
-    expect(hasSecretScheme('gcp:foo')).toBe(false); // not registered
+    expect(hasSecretScheme('nope:foo')).toBe(false); // not registered
   });
 });
 

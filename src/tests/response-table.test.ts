@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, it, expect } from 'vitest';
-import { getByPath, joinPath, findPrimaryArray, tableColumns, sortRows, classify, cellPreview } from '../shared/response-table';
+import { getByPath, joinPath, findPrimaryArray, tableColumns, sortRows, classify, cellPreview, exportCell, tableMatrix, tableToCsv, tableToTsv } from '../shared/response-table';
 
 describe('getByPath / joinPath', () => {
   const data = { data: { items: [{ id: 1, tags: ['a', 'b'] }, { id: 2 }] } };
@@ -72,5 +72,44 @@ describe('classify / cellPreview', () => {
     expect(cellPreview(null)).toBe('');
     expect(cellPreview('hi')).toBe('hi');
     expect(cellPreview({ a: 1 })).toBe('{"a":1}');
+  });
+});
+
+describe('table export (copy / CSV)', () => {
+  const rows = [
+    { id: 1, name: 'Ann', tags: ['x', 'y'] },
+    { id: 2, name: 'Bo, Jr.' },
+  ];
+
+  it('exportCell stringifies for a spreadsheet cell', () => {
+    expect(exportCell(null)).toBe('');
+    expect(exportCell(undefined)).toBe('');
+    expect(exportCell(42)).toBe('42');
+    expect(exportCell('hi')).toBe('hi');
+    expect(exportCell(['x', 'y'])).toBe('["x","y"]');
+    expect(exportCell({ a: 1 })).toBe('{"a":1}');
+  });
+
+  it('builds a header + cell matrix, blanking missing columns', () => {
+    const m = tableMatrix(rows, tableColumns(rows));
+    expect(m.headers).toEqual(['id', 'name', 'tags']);
+    expect(m.rows).toEqual([
+      ['1', 'Ann', '["x","y"]'],
+      ['2', 'Bo, Jr.', ''],
+    ]);
+  });
+
+  it('primitive rows export under a single "value" column', () => {
+    expect(tableMatrix([1, 'a', null], [])).toEqual({ headers: ['value'], rows: [['1'], ['a'], ['']] });
+  });
+
+  it('CSV quotes fields with commas/quotes/newlines and uses CRLF', () => {
+    const csv = tableToCsv(['id', 'name'], [['2', 'Bo, Jr.'], ['3', 'say "hi"']]);
+    expect(csv).toBe('id,name\r\n2,"Bo, Jr."\r\n3,"say ""hi"""');
+  });
+
+  it('TSV flattens tabs/newlines so the grid stays aligned', () => {
+    const tsv = tableToTsv(['a', 'b'], [['x\ty', 'line1\nline2']]);
+    expect(tsv).toBe('a\tb\nx y\tline1 line2');
   });
 });
