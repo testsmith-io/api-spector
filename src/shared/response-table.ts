@@ -125,3 +125,36 @@ export function sortedIndices(rows: unknown[], col: string, dir: 'asc' | 'desc')
 export function sortRows<T>(rows: T[], col: string, dir: 'asc' | 'desc'): T[] {
   return sortedIndices(rows as unknown[], col, dir).map(i => rows[i]);
 }
+
+// ─── Export (copy / CSV) ─────────────────────────────────────────────────────
+
+/** A cell rendered for CSV/TSV export: empty for null/undefined, compact JSON
+ *  for nested arrays/objects, otherwise the plain string form. */
+export function exportCell(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
+/** Header row + string-cell matrix for a tabular view. An empty `columns` means
+ *  primitive rows, so the single column is "value" and each row is itself. */
+export function tableMatrix(rows: unknown[], columns: string[]): { headers: string[]; rows: string[][] } {
+  if (columns.length === 0) return { headers: ['value'], rows: rows.map(r => [exportCell(r)]) };
+  return { headers: columns, rows: rows.map(r => columns.map(c => exportCell(cellAt(r, c)))) };
+}
+
+/** RFC-4180-style CSV: fields containing a comma, quote, or newline are wrapped
+ *  in double quotes with inner quotes doubled; CRLF line endings so Excel and
+ *  other spreadsheet tools import it cleanly. */
+export function tableToCsv(headers: string[], rows: string[][]): string {
+  const esc = (s: string) => /[",\r\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+  return [headers, ...rows].map(r => r.map(esc).join(',')).join('\r\n');
+}
+
+/** Tab-separated text for the clipboard: pastes straight into Excel / Google
+ *  Sheets as a grid. A tab or newline inside a cell would split the grid, so
+ *  those collapse to a single space. */
+export function tableToTsv(headers: string[], rows: string[][]): string {
+  const clean = (s: string) => s.replace(/[\t\r\n]+/g, ' ');
+  return [headers, ...rows].map(r => r.map(clean).join('\t')).join('\n');
+}

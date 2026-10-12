@@ -12,6 +12,7 @@ import { PushContractModal } from './PushContractModal';
 import { RequestRow, HOOK_LABELS, HOOK_COLORS } from './RequestRow';
 import { onActivateKey } from '../../lib/a11y';
 import { cloudEnabled } from '../../lib/cloud-push';
+import { isCollectionCollapsed, setCollectionCollapsed } from '../../lib/collapsed-collections';
 import { collectTagged } from '../../../../shared/request-collection';
 import { InlineEdit } from '../common/InlineEdit';
 import { ConfirmDialog } from '../common/ConfirmDialog';
@@ -236,6 +237,10 @@ export function CollectionTree () {
   }
   const [newRequestId, setNewRequestId] = useState<string | null>( null );
   const [dragging, setDragging] = useState<DragState | null>( null );
+  // Collapse / expand every collection at once. `value` is the intended state
+  // (true = expanded); `seq` increments on each click so collection rows react
+  // even when toggled back to a value they already appear to hold.
+  const [colExpand, setColExpand] = useState<{ value: boolean; seq: number }>( { value: true, seq: 0 } );
 
   function confirmThen ( message: string, action: () => void ) {
     setPendingConfirm( { message, onConfirm: () => { action(); setPendingConfirm( null ); } } );
@@ -281,8 +286,8 @@ export function CollectionTree () {
           />
         )}
         {colList.length > 0 && (
-          <div className="px-2 py-1.5 border-b border-surface-800 shrink-0">
-            <div className="relative">
+          <div className="px-2 py-1.5 border-b border-surface-800 shrink-0 flex items-center gap-1">
+            <div className="relative flex-1 min-w-0">
               <input
                 value={query}
                 onChange={e => setQuery( e.target.value )}
@@ -300,6 +305,14 @@ export function CollectionTree () {
                 </button>
               )}
             </div>
+            <button
+              onClick={() => setColExpand( c => ( { value: !c.value, seq: c.seq + 1 } ) )}
+              title={colExpand.value ? t( 'Collapse all collections' ) : t( 'Expand all collections' )}
+              aria-label={colExpand.value ? t( 'Collapse all collections' ) : t( 'Expand all collections' )}
+              className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-surface-400 hover:text-surface-100 hover:bg-surface-800 transition-colors"
+            >
+              {colExpand.value ? <CollapseAllIcon /> : <ExpandAllIcon />}
+            </button>
           </div>
         )}
         <div className="flex-1 overflow-y-auto">
@@ -336,6 +349,7 @@ export function CollectionTree () {
               col={col}
               isActive={col.id === activeCollectionId}
               activeRequestId={activeRequestId}
+              collapseSignal={colExpand}
               existingCollectionNames={colList.map( c => c.data.name )}
               onSelectCollection={() => { setActiveCollection( col.id ); setCollectionPanelOpen( true ); }}
               onSelectRequest={( reqId ) => openInTab( reqId, col.id )}
@@ -431,6 +445,7 @@ function collectFolderIds ( folder: Folder ): Set<string> {
 
 function CollectionNode ( {
   col, isActive, activeRequestId,
+  collapseSignal,
   existingCollectionNames,
   newRequestId,
   onSelectCollection, onSelectRequest,
@@ -444,6 +459,7 @@ function CollectionNode ( {
   readonly col: Collection
   readonly isActive: boolean
   readonly activeRequestId: string | null
+  readonly collapseSignal: { value: boolean; seq: number }
   readonly existingCollectionNames: string[]
   readonly newRequestId: string | null
   readonly onSelectCollection: () => void
@@ -469,7 +485,18 @@ function CollectionNode ( {
   readonly onRunFolder: ( folderId: string ) => void
 } ) {
   const t = useT();
-  const [expanded, setExpanded] = useState( true );
+  // Restore the collapsed/expanded state from the previous session (default
+  // expanded). Keyed per collection id so it survives relaunch.
+  const [expanded, setExpanded] = useState( () => !isCollectionCollapsed( col.id ) );
+  // React to the tree-wide collapse / expand-all button. Keyed on `seq` so a
+  // repeated click re-applies even if this collection was toggled individually
+  // in between; skips the initial mount (seq 0) to preserve the restored state.
+  useEffect( () => {
+    if ( collapseSignal.seq > 0 ) setExpanded( collapseSignal.value );
+  }, [collapseSignal.seq, collapseSignal.value] );
+  // Persist every change (individual toggle or tree-wide button) so it's
+  // remembered next launch.
+  useEffect( () => { setCollectionCollapsed( col.id, !expanded ); }, [col.id, expanded] );
   const [renaming, setRenaming] = useState( false );
   const [showSettings, setShowSettings] = useState( false );
   const [showSchemaSync, setShowSchemaSync] = useState( false );

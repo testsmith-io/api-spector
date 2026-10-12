@@ -4,7 +4,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   findPrimaryArray, getByPath, joinPath, tableColumns, sortedIndices, classify, cellPreview,
+  sortRows, exportCell, tableMatrix, tableToCsv, tableToTsv,
 } from '../../../../shared/response-table';
+import { useCopyFeedback } from '../../hooks/useCopyFeedback';
 import { useT } from '../../i18n';
 
 const MAX_ROWS = 1000;
@@ -62,6 +64,7 @@ export function ResponseTable({ body, contentType }: Props) {
 
   const [path, setPath] = useState('');
   const [sort, setSort] = useState<{ col: string; dir: 'asc' | 'desc' } | null>(null);
+  const { copied, copy } = useCopyFeedback();
 
   // Reset to the auto-detected array whenever the response changes.
   useEffect(() => { setPath(detected?.path ?? ''); setSort(null); }, [detected]);
@@ -82,6 +85,33 @@ export function ResponseTable({ body, contentType }: Props) {
 
   function toggleSort(col: string) {
     setSort(s => s?.col === col ? (s.dir === 'asc' ? { col, dir: 'desc' } : null) : { col, dir: 'asc' });
+  }
+
+  // Export the view currently shown: an array (in the active sort order, ALL
+  // rows — not capped at MAX_ROWS) or, when the path points at an object, its
+  // fields. Built on demand so there's no per-render cost on large tables.
+  const hasTable = rows !== null || classify(target) === 'object';
+  function exportMatrix(): { headers: string[]; rows: string[][] } | null {
+    if (rows) return tableMatrix(sort ? sortRows(rows, sort.col, sort.dir) : rows, columns);
+    if (classify(target) === 'object') {
+      return { headers: ['field', 'value'], rows: Object.entries(target as Record<string, unknown>).map(([k, v]) => [k, exportCell(v)]) };
+    }
+    return null;
+  }
+  function copyTable() {
+    const m = exportMatrix();
+    if (m) copy(tableToTsv(m.headers, m.rows));
+  }
+  function downloadCsv() {
+    const m = exportMatrix();
+    if (!m) return;
+    const blob = new Blob([tableToCsv(m.headers, m.rows)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `response${path ? '-' + path.replace(/[^\w.-]+/g, '_') : ''}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   // Drill into a nested array/object cell (uses the ORIGINAL row index so the
@@ -145,6 +175,24 @@ export function ResponseTable({ body, contentType }: Props) {
               : classify(target) === 'object' ? t(':count field|:count fields', { count: Object.keys(target as object).length })
               : ''}
           </span>
+          {hasTable && (
+            <>
+              <button
+                onClick={copyTable}
+                title={t('Copy as tab-separated values (paste into Excel or Google Sheets)')}
+                className="shrink-0 px-2 py-0.5 rounded border border-surface-700 text-surface-300 hover:text-white hover:border-surface-500 transition-colors"
+              >
+                {copied ? t('Copied') : t('Copy')}
+              </button>
+              <button
+                onClick={downloadCsv}
+                title={t('Download as CSV')}
+                className="shrink-0 px-2 py-0.5 rounded border border-surface-700 text-surface-300 hover:text-white hover:border-surface-500 transition-colors"
+              >
+                {t('CSV')}
+              </button>
+            </>
+          )}
         </div>
       </div>
 

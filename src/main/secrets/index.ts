@@ -14,11 +14,13 @@ import { vaultProvider } from './providers/vault';
 import { awsSecretsProvider } from './providers/aws';
 import { azureKeyVaultProvider } from './providers/azure';
 import { onePasswordProvider } from './providers/onepassword';
+import { gcpSecretManagerProvider } from './providers/gcp';
 
 registerSecretProvider(vaultProvider);          // vault:secret/data/app#token
 registerSecretProvider(awsSecretsProvider);     // aws:my/secret#key
 registerSecretProvider(azureKeyVaultProvider);  // azure:my-kv/db-password
 registerSecretProvider(onePasswordProvider);    // op://vault/item/field
+registerSecretProvider(gcpSecretManagerProvider); // gcp:my-project/secret#key
 
 export {
   hasSecretScheme,

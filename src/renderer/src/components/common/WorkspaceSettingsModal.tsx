@@ -104,6 +104,7 @@ export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => vo
   const [azTenantId, setAzTenantId] = useState(sec.azure?.tenantId ?? '');
   const [azClientId, setAzClientId] = useState(sec.azure?.clientId ?? '');
   const [opConnectHost, setOpConnectHost] = useState(sec.onePassword?.connectHost ?? '');
+  const [gcpProject, setGcpProject] = useState(sec.gcp?.project ?? '');
   const [oidc, setOidc] = useState<{ status: 'idle' | 'busy' | 'ok' | 'err'; msg?: string }>({ status: 'idle' });
 
   async function vaultOidcLogin() {
@@ -208,6 +209,8 @@ export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => vo
     if (Object.keys(azure).length) secrets.azure = azure;
 
     if (opConnectHost.trim()) secrets.onePassword = { connectHost: opConnectHost.trim() };
+
+    if (gcpProject.trim()) secrets.gcp = { project: gcpProject.trim() };
 
     if (Object.keys(secrets).length) settings.secrets = secrets;
     else delete settings.secrets;
@@ -717,6 +720,11 @@ export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => vo
               <div className="flex flex-col gap-1">
                 <label className={labelCls}>{t('1Password Connect host')} <span className="text-surface-600 normal-case">{t('(token from OP_CONNECT_TOKEN)')}</span></label>
                 <input value={opConnectHost} onChange={e => setOpConnectHost(e.target.value)} placeholder="https://op.acme.internal"
+                  className={`${inputCls} placeholder-surface-600`} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className={labelCls}>{t('GCP project')} <span className="text-surface-600 normal-case">{t('(credentials from GOOGLE_APPLICATION_CREDENTIALS or GCP_ACCESS_TOKEN)')}</span></label>
+                <input value={gcpProject} onChange={e => setGcpProject(e.target.value)} placeholder="my-gcp-project"
                   className={`${inputCls} placeholder-surface-600`} />
               </div>
             </>

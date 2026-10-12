@@ -17,6 +17,7 @@ memory, and never writes it to the workspace, the results file, or the console.
 | **HashiCorp Vault** | `vault:<path>#<key>` | `VAULT_ADDR` + token / AppRole / OIDC |
 | **AWS Secrets Manager** | `aws:<secretId>#<key>` (or `aws:<secretId>`) | `AWS_REGION` + `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` |
 | **Azure Key Vault** | `azure:<vault>/<secret>` | `AZURE_TENANT_ID` / `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` |
+| **GCP Secret Manager** | `gcp:<project>/<secret>#<key>` (or `gcp:<project>/<secret>`) | `GCP_ACCESS_TOKEN`, or `GOOGLE_APPLICATION_CREDENTIALS` / `GOOGLE_APPLICATION_CREDENTIALS_JSON` (+ `GCP_PROJECT`) |
 | **1Password** | `op://<vault>/<item>/<field>` | `OP_CONNECT_HOST` / `OP_CONNECT_TOKEN` (1Password Connect) |
 
 The system is pluggable, so more backends drop in as providers without changing

@@ -12,4 +12,5 @@ export const STORAGE_KEYS = {
   gitPullRebase:      'apiSpector.git.pullRebase',
   ai:                 'apiSpector.ai',
   updateSkipped:      'apiSpectorUpdateSkipped',
+  collapsedCollections: 'apiSpector.sidebar.collapsedCollections',
 } as const;
