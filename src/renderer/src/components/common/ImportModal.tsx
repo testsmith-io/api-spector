@@ -27,6 +27,7 @@ interface ImportOption {
 
 const OPTIONS: ImportOption[] = [
   { id: 'postman',  label: 'Postman',  description: 'Collection v2.1 JSON' },
+  { id: 'postman-env', label: 'Postman Env', description: 'Environment export JSON' },
   { id: 'openapi',  label: 'OpenAPI',  description: 'JSON or YAML (v3.x)', supportsUrl: true },
   { id: 'insomnia', label: 'Insomnia', description: 'Export v4 JSON' },
   { id: 'bruno',    label: 'Bruno',    description: 'bruno.json collection file' },
@@ -122,6 +123,17 @@ export function ImportModal({ onImport, onClose }: Props) {
     setLoading(true);
     setError(null);
     try {
+      // Environments import to the workspace's environment list, not a
+      // collection — handle it and finish before the collection path below.
+      if (opt.id === 'postman-env') {
+        const env = await electron.importPostmanEnvironment();
+        if (env) {
+          await persistImportedEnvironment(env);
+          onImport(null);
+          onClose();
+        }
+        return;
+      }
       let col: Collection | null = null;
       if (opt.id === 'postman')  col = await electron.importPostman();
       if (opt.id === 'openapi')  col = await electron.importOpenApi();
@@ -284,6 +296,30 @@ export function ImportModal({ onImport, onClose }: Props) {
     } finally {
       setLoading(false);
     }
+  }
+
+  /**
+   * Save an imported environment: ensure its name is unique, write it to disk,
+   * register it in the store + workspace, and make it active if none is. Mirrors
+   * the new-environment branch of persistBaseUrlVariable.
+   */
+  async function persistImportedEnvironment(env: Environment) {
+    const state = useStore.getState();
+    const existingNames = Object.values(state.environments).map(e => e.data.name);
+    const finalName = uniqueEnvName(env.name || t('Imported Environment'), existingNames);
+    const finalEnv: Environment = { ...env, name: finalName };
+    const relPath = envRelPath(finalName, finalEnv.id);
+    await electron.saveEnvironment(relPath, finalEnv);
+    useStore.setState(s => {
+      s.environments[finalEnv.id] = { relPath, data: finalEnv };
+      if (!s.activeEnvironmentId) s.activeEnvironmentId = finalEnv.id;
+      if (s.workspace && !s.workspace.environments.includes(relPath)) {
+        s.workspace.environments = [...s.workspace.environments, relPath];
+      }
+      return s;
+    });
+    const ws = useStore.getState().workspace;
+    if (ws) await electron.saveWorkspace(ws);
   }
 
   /**

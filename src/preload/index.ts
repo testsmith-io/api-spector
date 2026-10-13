@@ -141,6 +141,8 @@ const api = {
   // ─── Import ────────────────────────────────────────────────────────────────
   importPostman: (): Promise<Collection | null> =>
     ipcRenderer.invoke(IPC.import.postman),
+  importPostmanEnvironment: (): Promise<Environment | null> =>
+    ipcRenderer.invoke(IPC.import.postmanEnvironment),
   importOpenApi: (): Promise<Collection | null> =>
     ipcRenderer.invoke(IPC.import.openapi),
   importOpenApiFromUrl: (url: string): Promise<Collection | null> =>
