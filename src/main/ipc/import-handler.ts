@@ -8,6 +8,7 @@ import type { Collection } from '../../shared/types';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
 import { importPostman }                                    from '../importers/postman';
+import { importPostmanEnvironment }                         from '../importers/postman-environment';
 import { importOpenApi, importOpenApiFromUrl,
          extractSchemasFromFile, extractSchemasFromUrl }    from '../importers/openapi';
 import { importInsomnia }                                   from '../importers/insomnia';
@@ -23,6 +24,16 @@ export function registerImportHandlers(ipc: IpcMain): void {
     });
     if (result.canceled || !result.filePaths[0]) return null;
     return importPostman(result.filePaths[0]);
+  });
+
+  handleIpc(ipc, IPC.import.postmanEnvironment, async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Import Postman Environment',
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+      properties: ['openFile'],
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    return importPostmanEnvironment(result.filePaths[0]);
   });
 
   handleIpc(ipc, IPC.import.openapi, async () => {

@@ -97,6 +97,7 @@ export const IPC = {
   // ─── Import ────────────────────────────────────────────────────────────────
   import: {
     postman:           'import:postman',
+    postmanEnvironment: 'import:postman-environment',
     openapi:           'import:openapi',
     openapiUrl:        'import:openapi-url',
     insomnia:          'import:insomnia',
