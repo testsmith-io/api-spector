@@ -59,6 +59,7 @@ export const IPC = {
   secret: {
     checkMasterKey: 'secret:checkMasterKey',
     setMasterKey:   'secret:setMasterKey',
+    encryptWithMasterKey: 'secret:encryptWithMasterKey',
     set:            'secret:set',
     has:            'secret:has',
     delete:         'secret:delete',

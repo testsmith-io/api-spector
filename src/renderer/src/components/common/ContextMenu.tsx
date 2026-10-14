@@ -75,13 +75,38 @@ export function ContextMenu ( { items, x, y, onClose }: {
   );
 }
 
-export function DotsBtn ( { items }: { readonly items: MenuItem[] } ) {
+/**
+ * The "⋯" options button. In addition to opening on click, it binds a
+ * right-click (contextmenu) handler to its enclosing row — the nearest ancestor
+ * matching `rowSelector` (default `[data-row]`) — so right-clicking anywhere on
+ * that row opens the same menu at the cursor. Mark each row's root element with
+ * `data-row` to enable it.
+ */
+export function DotsBtn ( { items, rowSelector = '[data-row]' }: {
+  readonly items: MenuItem[]
+  readonly rowSelector?: string
+} ) {
   const t = useT();
+  const btnRef = useRef<HTMLButtonElement>( null );
   const [menu, setMenu] = useState<{ x: number; y: number } | null>( null );
+
+  // Open the same menu on right-click of the enclosing row.
+  useEffect( () => {
+    const row = btnRef.current?.closest( rowSelector ) as HTMLElement | null;
+    if ( !row ) return;
+    function onContextMenu ( e: MouseEvent ) {
+      e.preventDefault();
+      e.stopPropagation();   // innermost row wins for nested rows
+      setMenu( { x: e.clientX, y: e.clientY } );
+    }
+    row.addEventListener( 'contextmenu', onContextMenu );
+    return () => row.removeEventListener( 'contextmenu', onContextMenu );
+  }, [rowSelector] );
 
   return (
     <div className="relative">
       <button
+        ref={btnRef}
         onClick={e => {
           e.stopPropagation();
           if ( menu ) { setMenu( null ); return; }

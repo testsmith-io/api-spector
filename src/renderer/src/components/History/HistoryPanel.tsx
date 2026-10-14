@@ -6,6 +6,7 @@ import { useStore } from '../../store';
 import type { HistoryEntry } from '../../../../shared/types';
 import { historyToHar } from '../../../../shared/har';
 import { MethodBadge } from '../common/MethodBadge';
+import { useConfirm } from '../common/useConfirm';
 import { useT } from '../../i18n';
 
 const { electron } = window;
@@ -41,6 +42,7 @@ export function HistoryPanel() {
   const t = useT();
   const history = useStore(s => s.history);
   const clearHistory = useStore(s => s.clearHistory);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const activeTabId = useStore(s => s.activeTabId);
   const setTabResponse = useStore(s => s.setTabResponse);
   const setActiveRequest = useStore(s => s.setActiveRequest);
@@ -110,6 +112,7 @@ export function HistoryPanel() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
+      {confirmDialog}
       {/* Search + clear */}
       <div className="px-2 py-2 border-b border-surface-800 flex gap-1.5 flex-shrink-0">
         <input
@@ -128,7 +131,7 @@ export function HistoryPanel() {
               HAR
             </button>
             <button
-              onClick={() => { clearHistory(); setSelected(null); }}
+              onClick={() => confirm(t('Clear all request history? This cannot be undone.'), () => { clearHistory(); setSelected(null); })}
               className="text-xs text-surface-400 hover:text-red-400 transition-colors px-1"
               title={t('Clear all history')}
             >

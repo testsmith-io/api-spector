@@ -13,6 +13,7 @@ import { getMethodColor, getStatusColor } from '../../../../shared/colors';
 import { cloudEnabled } from '../../lib/cloud-push';
 import { PushToCloudModal } from './PushToCloudModal';
 import { useT } from '../../i18n';
+import { useConfirm } from '../common/useConfirm';
 import {
   mockBodyCompletionExtension,
   mockScriptCompletionExtension,
@@ -406,6 +407,7 @@ function RequestLog({ serverId, routes, running }: { readonly serverId: string; 
 
 export function MockDetailPanel({ mockId }: { readonly mockId: string }) {
   const t          = useT();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const entry      = useStore(s => s.mocks[mockId]);
   const updateMock = useStore(s => s.updateMock);
   const deleteMock = useStore(s => s.deleteMock);
@@ -472,6 +474,7 @@ export function MockDetailPanel({ mockId }: { readonly mockId: string }) {
 
   return (
     <div className="flex flex-col h-full min-h-0">
+      {confirmDialog}
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-3 border-b border-surface-800 flex-shrink-0 bg-surface-950">
         {editMeta ? (
@@ -551,11 +554,11 @@ export function MockDetailPanel({ mockId }: { readonly mockId: string }) {
             )}
           </div>
           <button
-            onClick={() => {
+            onClick={() => confirm(t('Delete mock ":name"?', { name: mock.name }), () => {
               if (running) electron.mockStop(mock.id);
               deleteMock(mock.id);
               setActive(null);
-            }}
+            })}
             className="px-2 py-1.5 text-sm text-surface-600 hover:text-red-400 transition-colors"
             title={t('Delete server')}
           >
@@ -610,7 +613,7 @@ export function MockDetailPanel({ mockId }: { readonly mockId: string }) {
                       save({ ...mock, routes: routes.map(r => r.id === route.id ? updated : r) });
                       setNewRouteId(null);
                     }}
-                    onDelete={() => save({ ...mock, routes: routes.filter(r => r.id !== route.id) })}
+                    onDelete={() => confirm(t('Delete route ":method :path"?', { method: route.method, path: route.path }), () => save({ ...mock, routes: routes.filter(r => r.id !== route.id) }))}
                     onDuplicate={() => {
                       const copy = { ...route, id: uuidv4() };
                       const idx = routes.indexOf(route);

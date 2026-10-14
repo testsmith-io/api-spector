@@ -128,6 +128,7 @@ export function RequestRow({
   return (
     <div className="relative">
       <div
+        data-row
         draggable
         role="button"
         tabIndex={0}
@@ -297,6 +298,7 @@ function ExampleRow({ name, indent, isActive, onOpen, onRename, onDelete, onDupl
   const [renaming, setRenaming] = useState(false);
   return (
     <div
+      data-row
       className={`group flex items-center gap-1.5 py-1 pr-1 rounded-sm cursor-pointer transition-colors ${
         isActive ? 'bg-surface-800 text-[var(--text-primary)]' : 'text-surface-400 hover:bg-surface-800'
       }`}

@@ -6,6 +6,7 @@ import { useStore } from '../../store';
 import { cloudEnabled } from '../../lib/cloud-push';
 import { PushToCloudModal } from './PushToCloudModal';
 import { useT } from '../../i18n';
+import { useConfirm } from '../common/useConfirm';
 import type { MockServer } from '../../../../shared/types';
 
 const { electron } = window;
@@ -18,6 +19,7 @@ export function MockPanel() {
   const setActiveMock = useStore(s => s.setActiveMockId);
   const addMock    = useStore(s => s.addMock);
   const deleteMock = useStore(s => s.deleteMock);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const setRunning     = useStore(s => s.setMockRunning);
   const loadMock       = useStore(s => s.loadMock);
 
@@ -79,14 +81,16 @@ export function MockPanel() {
     }
   }
 
-  async function handleDelete(e: React.MouseEvent, mockId: string) {
+  function handleDelete(e: React.MouseEvent, mockId: string) {
     e.stopPropagation();
     const entry = useStore.getState().mocks[mockId];
     if (!entry) return;
-    if (entry.running) await electron.mockStop(mockId);
-    deleteMock(mockId);
-    const ws = useStore.getState().workspace;
-    if (ws) await electron.saveWorkspace(ws);
+    confirm(t('Delete mock ":name"?', { name: entry.data.name }), async () => {
+      if (entry.running) await electron.mockStop(mockId);
+      deleteMock(mockId);
+      const ws = useStore.getState().workspace;
+      if (ws) await electron.saveWorkspace(ws);
+    });
   }
 
   async function handleStartRecorder() {
@@ -118,6 +122,7 @@ export function MockPanel() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
+      {confirmDialog}
       {pushTarget && <PushToCloudModal mock={pushTarget} onClose={() => setPushTarget(null)} />}
 
       {/* ── Recorder section ── */}
