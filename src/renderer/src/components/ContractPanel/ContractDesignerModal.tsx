@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../../store';
 import { Modal } from '../common/Modal';
 import { useToast, Toast } from '../common/Toast';
+import { useConfirm } from '../common/useConfirm';
 import { designContractToMock } from '../../../../shared/design-mock';
 import { useT } from '../../i18n';
 import type { ConsumerContract, DesignInteraction, Workspace, MockServer, KeyValuePair } from '../../../../shared/types';
@@ -69,6 +70,7 @@ export function ContractDesignerModal({ seed, onClose }: { readonly seed?: Parti
   const updateMock    = useStore(s => s.updateMock);
   const cloudConnected = useStore(s => Boolean(s.workspace?.settings?.cloud?.enabled));
   const { toast, show } = useToast();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const t = useT();
 
   const contracts = workspace?.designContracts ?? [];
@@ -120,9 +122,13 @@ export function ContractDesignerModal({ seed, onClose }: { readonly seed?: Parti
   }
 
   function deleteContract(id: string) {
-    const next = contracts.filter(c => c.id !== id);
-    if (selectedId === id) setSelectedId(next[0]?.id ?? null);
-    persist(next);
+    const c = contracts.find(ct => ct.id === id);
+    const label = c ? `${c.consumer} → ${c.provider}` : '';
+    confirm(t('Delete contract ":name"?', { name: label }), () => {
+      const next = contracts.filter(ct => ct.id !== id);
+      if (selectedId === id) setSelectedId(next[0]?.id ?? null);
+      persist(next);
+    });
   }
 
   function patchInteraction(ix: number, patch: Partial<DesignInteraction>) {
@@ -189,6 +195,7 @@ export function ContractDesignerModal({ seed, onClose }: { readonly seed?: Parti
       subtitle={t('Design a consumer-driven contract up front - no endpoint required - then publish it to API Spector Cloud.')}
       panelClassName="bg-surface-900 border border-surface-700 rounded-xl w-[min(1000px,94vw)] h-[min(760px,90vh)] flex flex-col"
     >
+      {confirmDialog}
       <div className="flex flex-1 min-h-0">
         {/* Contract list */}
         <div className="w-56 shrink-0 border-r border-surface-800 flex flex-col">

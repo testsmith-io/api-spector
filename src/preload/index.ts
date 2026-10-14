@@ -97,6 +97,11 @@ const api = {
     ipcRenderer.invoke(IPC.secret.checkMasterKey),
   setMasterKey: (value: string): Promise<void> =>
     ipcRenderer.invoke(IPC.secret.setMasterKey, value),
+
+  /** Encrypt a secret in the main process with the master key already set there
+   *  (API_SPECTOR_MASTER_KEY) — no password prompt needed. */
+  encryptWithMasterKey: (plaintext: string): Promise<{ secretEncrypted: string; secretSalt: string; secretIv: string; secretHash: string }> =>
+    ipcRenderer.invoke(IPC.secret.encryptWithMasterKey, plaintext),
   /** Save a named secret to the OS keychain (safeStorage). */
   setSecret: (ref: string, value: string): Promise<void> =>
     ipcRenderer.invoke(IPC.secret.set, ref, value),

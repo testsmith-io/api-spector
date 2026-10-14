@@ -110,9 +110,9 @@ export function AuthEditor({
         ) : (
           <div className="flex flex-col gap-1">
             <label className="text-surface-400">{t('Token')}</label>
-            <input
+            <VarInput
               value={auth.token ?? ''}
-              onChange={e => onChange({ token: e.target.value })}
+              onChange={v => onChange({ token: v })}
               placeholder={t('Bearer token')}
               className="bg-surface-800 border border-surface-700 rounded px-2 py-1 font-mono focus:outline-none focus:border-blue-500"
             />
@@ -244,9 +244,9 @@ export function AuthEditor({
           <div className="flex gap-2">
             <div>
               <label className="text-surface-400">{t('Key name')}</label>
-              <input
+              <VarInput
                 value={auth.apiKeyName ?? 'X-API-Key'}
-                onChange={e => onChange({ apiKeyName: e.target.value })}
+                onChange={v => onChange({ apiKeyName: v })}
                 className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
               />
             </div>
@@ -280,9 +280,9 @@ export function AuthEditor({
                   </button>
                 </div>
               ) : (
-                <input
+                <VarInput
                   value={auth.apiKeyValue ?? ''}
-                  onChange={e => onChange({ apiKeyValue: e.target.value })}
+                  onChange={v => onChange({ apiKeyValue: v })}
                   placeholder={t('API key value')}
                   className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 font-mono focus:outline-none focus:border-blue-500"
                 />
@@ -311,18 +311,19 @@ function PlainCredentialsFields({
     <div className="flex gap-2">
       <div className="flex-1">
         <label className="text-surface-400">{t('Username')}</label>
-        <input
+        <VarInput
           value={auth.username ?? ''}
-          onChange={e => onChange({ username: e.target.value })}
+          onChange={v => onChange({ username: v })}
+          placeholder={t('username')}
           className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
         />
       </div>
       <div className="flex-1">
         <label className="text-surface-400">{t('Password')}</label>
-        <input
-          type="password"
+        <VarInput
           value={auth.password ?? ''}
-          onChange={e => onChange({ password: e.target.value })}
+          onChange={v => onChange({ password: v })}
+          placeholder={t('password or API token')}
           className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 font-mono focus:outline-none focus:border-blue-500"
         />
       </div>

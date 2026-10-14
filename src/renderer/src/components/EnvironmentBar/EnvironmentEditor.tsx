@@ -6,6 +6,7 @@ import { useStore } from '../../store';
 import type { EnvVariable } from '../../../../shared/types';
 import { MasterKeyModal } from './MasterKeyModal';
 import { Modal } from '../common/Modal';
+import { useConfirm } from '../common/useConfirm';
 import { envRelPath } from '../../../../shared/naming-utils';
 import { resolveEnvironmentChain } from '../../../../shared/environments';
 import { useT } from '../../i18n';
@@ -88,6 +89,7 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
 
   const deleteEnvironment    = useStore(s => s.deleteEnvironment);
   const duplicateEnvironment = useStore(s => s.duplicateEnvironment);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const envList = Object.values(environments);
   const env = selectedId ? environments[selectedId]?.data ?? null : null;
@@ -116,8 +118,11 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
   }
 
   function handleDelete(id: string) {
-    deleteEnvironment(id);
-    setSelectedId(Object.keys(environments).find(k => k !== id) ?? '');
+    const name = environments[id]?.data.name ?? '';
+    confirm(t('Delete environment ":name"?', { name }), () => {
+      deleteEnvironment(id);
+      setSelectedId(Object.keys(environments).find(k => k !== id) ?? '');
+    });
   }
 
   function handleDuplicate(id: string) {
@@ -160,15 +165,22 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
     setSecretInputs(s => { const n = { ...s }; delete n[idx]; return n; });
   }
 
-  async function doEncrypt(idx: number, password: string) {
-    const plaintext = secretInputs[idx] ?? '';
-    if (!plaintext) return;
-
-    const fields = await encryptSecret(plaintext, password);
+  // Store the encrypted fields on the row and clear the transient plaintext.
+  function applyEncrypted(idx: number, fields: {
+    secretEncrypted: string; secretSalt: string; secretIv: string; secretHash: string
+  }) {
     updateVar(idx, { ...fields, value: '' });
     setSecretInputs(s => { const n = { ...s }; delete n[idx]; return n; });
     setSavedIdx(idx);
     setTimeout(() => setSavedIdx(null), 2500);
+  }
+
+  // Path used after the password prompt (no master key in the process): encrypt
+  // in the renderer with the password the user just typed.
+  async function doEncrypt(idx: number, password: string) {
+    const plaintext = secretInputs[idx] ?? '';
+    if (!plaintext) return;
+    applyEncrypted(idx, await encryptSecret(plaintext, password));
   }
 
   async function saveEncrypted(idx: number) {
@@ -176,12 +188,13 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
     if (!plaintext) return;
 
     const { set } = await electron.checkMasterKey();
-    if (!set) {
-      setPendingEncryptIdx(idx);
+    if (set) {
+      // The master key is already in the main process (shell env var or entered
+      // earlier this session). Encrypt there with that key so we don't prompt.
+      applyEncrypted(idx, await electron.encryptWithMasterKey(plaintext));
       return;
     }
-    // Master key already set in process — but we need the value to encrypt in renderer.
-    // Prompt user since we can't read it back from main.
+    // No master key set — ask for a password, then encrypt in the renderer.
     setPendingEncryptIdx(idx);
   }
 
@@ -226,6 +239,7 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
 
   return (
     <>
+      {confirmDialog}
       {pendingEncryptIdx !== null && (
         <MasterKeyModal
           onSuccess={async (password) => {

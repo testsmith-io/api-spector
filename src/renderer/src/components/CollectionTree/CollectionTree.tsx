@@ -16,6 +16,7 @@ import { isCollectionCollapsed, setCollectionCollapsed } from '../../lib/collaps
 import { collectTagged } from '../../../../shared/request-collection';
 import { InlineEdit } from '../common/InlineEdit';
 import { ConfirmDialog } from '../common/ConfirmDialog';
+import { useConfirm } from '../common/useConfirm';
 import { DotsBtn } from '../common/ContextMenu';
 import {
   PlayIcon, PlusIcon, FolderIcon, TagIcon, PencilIcon, TrashIcon, TableIcon,
@@ -516,6 +517,7 @@ function CollectionNode ( {
   return (
     <div>
       <div
+        data-row
         className={`group flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-surface-800 transition-colors ${panelActive ? 'bg-surface-800 text-[var(--text-primary)]' : isActive ? 'text-[var(--text-primary)]' : 'text-surface-400'
           } ${col.disabled ? 'opacity-50' : ''} ${dropOver ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
         role="button"
@@ -699,6 +701,7 @@ function FolderRow ( {
   return (
     <div className="relative">
       <div
+        data-row
         draggable
         className={`group flex items-center gap-1 py-1 transition-colors cursor-pointer ${isActive ? 'bg-surface-800 text-[var(--text-primary)]' : 'text-surface-400 hover:bg-surface-800'} ${folder.disabled ? 'opacity-40' : ''} ${dropInside ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
         style={{ paddingLeft: indent }}
@@ -841,6 +844,7 @@ function FolderContents ( {
   const renameExample    = useStore( s => s.renameExample );
   const deleteExample    = useStore( s => s.deleteExample );
   const duplicateExample = useStore( s => s.duplicateExample );
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const dropIndent = ( depth + 1 ) * 12 + 8;
 
@@ -926,7 +930,10 @@ function FolderContents ( {
         onAddExample={() => { const exId = addExampleFromRequest( req.id ); if ( exId ) openExample( req.id, collectionId, exId ); }}
         onOpenExample={exId => openExample( req.id, collectionId, exId )}
         onRenameExample={( exId, name ) => renameExample( req.id, exId, name )}
-        onDeleteExample={exId => deleteExample( req.id, exId )}
+        onDeleteExample={exId => {
+          const ex = req.examples?.find( e => e.id === exId );
+          confirm( t( 'Delete example ":name"?', { name: ex?.name ?? '' } ), () => deleteExample( req.id, exId ) );
+        }}
         onDuplicateExample={exId => duplicateExample( req.id, exId )}
       />
     );
@@ -935,6 +942,7 @@ function FolderContents ( {
   const children = orderedChildren( folder );
   return (
     <>
+      {confirmDialog}
       <DropLine collectionId={collectionId} parentFolderId={folder.id} index={0} indent={dropIndent} />
       {children.map( ( child, k ) => (
         <React.Fragment key={child.type + ':' + child.id}>

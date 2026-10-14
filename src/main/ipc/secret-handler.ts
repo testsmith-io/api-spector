@@ -5,7 +5,7 @@ import { type IpcMain, type safeStorage as SafeStorageType } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
 import { hasSecretScheme, resolveExternalSecret } from '../secrets';
-import { pbkdf2Sync, createDecipheriv } from 'node:crypto';
+import { pbkdf2Sync, createDecipheriv, createCipheriv, randomBytes, createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -72,6 +72,20 @@ export function registerSecretHandlers(ipc: IpcMain): void {
   });
 
   /**
+   * Encrypt a plaintext using the master password already present in this
+   * process (API_SPECTOR_MASTER_KEY). Lets the renderer encrypt a secret
+   * WITHOUT prompting for the password when the env var is set — the renderer
+   * can't read the key back, but main can use it directly. Output matches the
+   * renderer's own encryptSecret() (PBKDF2-SHA256 100k → AES-256-GCM, ciphertext
+   * with the 16-byte tag appended), so decryptSecret round-trips either path.
+   */
+  handleIpc(ipc, IPC.secret.encryptWithMasterKey, (_e, plaintext: string) => {
+    const password = process.env[MASTER_KEY_ENV];
+    if (!password) throw new Error('Master password is not set in this process.');
+    return encryptSecret(plaintext, password);
+  });
+
+  /**
    * Save a named secret to the OS-encrypted store.
    * The renderer calls this when the user clicks "Save" on a token/credential field.
    */
@@ -97,6 +111,36 @@ export function registerSecretHandlers(ipc: IpcMain): void {
       await persistSecretStore();
     }
   });
+}
+
+// ─── Encrypt / decrypt utilities ─────────────────────────────────────────────
+
+/**
+ * Encrypt a plaintext with AES-256-GCM using a PBKDF2-derived key. Byte-for-byte
+ * compatible with the renderer's Web Crypto encryptSecret(): the returned
+ * `secretEncrypted` is base64(ciphertext + 16-byte auth tag), matching the
+ * layout decryptSecret() expects.
+ */
+export function encryptSecret(plaintext: string, password: string): {
+  secretEncrypted: string
+  secretSalt: string
+  secretIv: string
+  secretHash: string
+} {
+  const salt = randomBytes(16);
+  const iv   = randomBytes(12);
+  const key  = pbkdf2Sync(password, salt, 100_000, 32, 'sha256');
+
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+
+  return {
+    secretEncrypted: Buffer.concat([ciphertext, authTag]).toString('base64'),
+    secretSalt: salt.toString('base64'),
+    secretIv: iv.toString('base64'),
+    secretHash: createHash('sha256').update(plaintext, 'utf8').digest('hex').slice(0, 8),
+  };
 }
 
 // ─── Decrypt utility (used internally by interpolation.ts) ───────────────────

@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { useStore } from '../../store';
 import { EmptyState } from '../common/EmptyState';
+import { useConfirm } from '../common/useConfirm';
 import { useT } from '../../i18n';
 
 export function FlowsPanel() {
@@ -17,6 +18,7 @@ export function FlowsPanel() {
   const setActiveFlow = useStore(s => s.setActiveFlow);
   const renameFlow   = useStore(s => s.renameFlow);
   const deleteFlow   = useStore(s => s.deleteFlow);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
@@ -39,6 +41,7 @@ export function FlowsPanel() {
 
   return (
     <div className="flex-1 overflow-y-auto py-1">
+      {confirmDialog}
       {list.map(({ data }) => {
         const isActive = data.id === activeFlowId;
         const stepCount = data.nodes.filter(n => n.type !== 'start' && n.type !== 'end').length;
@@ -79,7 +82,7 @@ export function FlowsPanel() {
               <>
                 <span className="text-[10px] text-surface-600 tabular-nums shrink-0">{stepCount}</span>
                 <button
-                  onClick={e => { e.stopPropagation(); if (confirm(t('Delete flow ":name"?', { name: data.name }))) deleteFlow(data.id); }}
+                  onClick={e => { e.stopPropagation(); confirm(t('Delete flow ":name"?', { name: data.name }), () => deleteFlow(data.id)); }}
                   title={t('Delete flow')}
                   className="opacity-0 group-hover:opacity-100 text-surface-600 hover:text-red-400 transition-all text-sm leading-none shrink-0"
                 >

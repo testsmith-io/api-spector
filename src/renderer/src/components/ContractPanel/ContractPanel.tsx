@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useStore } from '../../store';
 import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
 import { useT } from '../../i18n';
+import { useConfirm } from '../common/useConfirm';
 import type { ContractMode } from '../../../../shared/types';
 
 const { electron } = window;
@@ -32,6 +33,7 @@ export function ContractPanel() {
   const workspace = useStore(s => s.workspace);
   const openContractDesigner = useStore(s => s.openContractDesigner);
   const t = useT();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [tab, setTab]                   = useState<PanelTab>('consumer');
   // Consumer sub-option: replay against a running provider and seed provider
@@ -158,20 +160,24 @@ export function ContractPanel() {
     }
   }
 
-  async function deleteActiveSnapshot() {
+  function deleteActiveSnapshot() {
     if (!activeSnapshotRelPath) return;
-    try {
-      await electron.deleteContractSnapshot(activeSnapshotRelPath);
-      removeContractSnapshot(activeSnapshotRelPath);
-      const ws = useStore.getState().workspace;
-      if (ws) await electron.saveWorkspace(ws);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
+    const relPath = activeSnapshotRelPath;
+    confirm(t('Delete this spec snapshot?'), async () => {
+      try {
+        await electron.deleteContractSnapshot(relPath);
+        removeContractSnapshot(relPath);
+        const ws = useStore.getState().workspace;
+        if (ws) await electron.saveWorkspace(ws);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    });
   }
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+      {confirmDialog}
       {/* Config area */}
       <div className="flex flex-col gap-3 px-3 py-3 border-b border-surface-800 flex-shrink-0">
         {/* Design-first entry: author a consumer contract before any endpoint exists */}

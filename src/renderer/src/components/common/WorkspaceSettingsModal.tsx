@@ -9,6 +9,7 @@ import { START_TOUR_EVENT } from './ProductTour';
 import { AI_OPENAI_TOKEN_REF, DEFAULT_AI_MODEL } from '../../../../shared/types';
 import { getAiConfig, setAiConfig, invalidateAiAvailable } from '../../lib/ai';
 import { labelCls, inputCls } from '../../lib/ui-classes';
+import { useConfirm } from './useConfirm';
 
 const { electron } = window;
 
@@ -29,6 +30,7 @@ export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => vo
   const setZoom  = useStore(s => s.setZoom);
   const [locale, setLocale] = useLocale();
   const t = useT();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const existing = workspace?.settings ?? {};
 
@@ -254,6 +256,7 @@ export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => vo
       panelClassName="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl w-[560px] flex flex-col max-h-[80vh]"
       title={t('Workspace Settings')}
     >
+        {confirmDialog}
         {/* Tabs */}
         <div className="flex border-b border-surface-800 flex-shrink-0 px-4">
           {tabs.map(tab => (
@@ -558,7 +561,7 @@ export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => vo
                   className={`${inputCls} placeholder-surface-600`}
                 />
                 {aiKeySet && (
-                  <button onClick={removeAiKey} className="self-start text-[11px] text-red-400 hover:text-red-300 mt-0.5">{t('Remove key')}</button>
+                  <button onClick={() => confirm(t('Remove the stored OpenAI key?'), () => { void removeAiKey(); })} className="self-start text-[11px] text-red-400 hover:text-red-300 mt-0.5">{t('Remove key')}</button>
                 )}
               </div>
               <div className="flex flex-col gap-1">
