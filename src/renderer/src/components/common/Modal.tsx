@@ -6,8 +6,9 @@ import React, { useEffect } from 'react';
 // ─── Shared modal shell ───────────────────────────────────────────────────────
 //
 // Wraps the fixed inset-0 overlay + centered panel pattern used by every modal
-// in the app. Handles Escape-to-close and (optional) click-outside-to-close;
-// clicks inside the panel never propagate to the overlay.
+// in the app. Handles Escape-to-close and (opt-in) click-outside-to-close.
+// Backdrop-close is OFF by default so a stray click next to a dialog never
+// discards it; dialogs close via the × button, a Cancel/Close button, or Escape.
 //
 // The overlay and panel classes are full replacements (not appended) so call
 // sites keep pixel-identical styling — pass the exact classes the modal had
@@ -26,7 +27,7 @@ interface ModalProps {
   readonly overlayClassName?: string
   /** Panel classes (width, layout, border). Replaces the default. */
   readonly panelClassName?: string
-  /** Close when the backdrop is clicked. Default true. */
+  /** Close when the backdrop is clicked. Default false (opt-in per dialog). */
   readonly closeOnBackdrop?: boolean
   /** Close when Escape is pressed. Default true. */
   readonly closeOnEscape?: boolean
@@ -39,7 +40,7 @@ export function Modal({
   subtitle,
   overlayClassName = DEFAULT_OVERLAY,
   panelClassName = DEFAULT_PANEL,
-  closeOnBackdrop = true,
+  closeOnBackdrop = false,
   closeOnEscape = true,
   children,
 }: ModalProps) {

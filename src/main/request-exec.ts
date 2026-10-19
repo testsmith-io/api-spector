@@ -27,8 +27,7 @@ import type {
   StreamClose,
 } from '../shared/types';
 import { detectStreamKind, readStream } from './stream/parse';
-import { interpolate, buildUrl, mergeVars, buildDynamicVars, resolveDataRow } from './interpolation';
-import { hasSecretScheme, resolveExternalSecret } from './secrets';
+import { interpolate, buildUrl, mergeVars, buildDynamicVars, resolveDataRow, resolveInlineSecretRefs } from './interpolation';
 import { runScript } from './script-runner';
 import { runMqttTest } from './mqtt-test';
 import { runWsTest, runSocketIoTest } from './realtime-test';
@@ -634,19 +633,7 @@ export async function resolveInlineSecrets(req: ApiRequest): Promise<Record<stri
     req.postRequestScript ?? '',
   ].join('\n');
 
-  const refs = new Set<string>();
-  for (const m of haystack.matchAll(/\{\{\s*([^}]+?)\s*\}\}/g)) {
-    const inner = m[1].trim();
-    if (hasSecretScheme(inner)) refs.add(inner);
-  }
-  if (refs.size === 0) return {};
-
-  const out: Record<string, string> = {};
-  await Promise.all([...refs].map(async (ref) => {
-    const value = await resolveExternalSecret(ref);
-    if (value !== null) out[ref] = value;
-  }));
-  return out;
+  return resolveInlineSecretRefs(haystack);
 }
 
 export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<RunnerExecResult> {

@@ -34,10 +34,9 @@ export function AskVarsModal({ asks, requestName, onSubmit, onCancel }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onMouseDown={onCancel}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div
         className="bg-surface-900 border border-surface-700 rounded-lg shadow-xl w-[420px] max-h-[80vh] flex flex-col"
-        onMouseDown={e => e.stopPropagation()}
         onKeyDown={onKeyDown}
       >
         <div className="px-4 py-3 border-b border-surface-800 flex-shrink-0">
