@@ -8,6 +8,7 @@ import type {
   Environment,
   Workspace,
   AuthConfig,
+  VarResolveContext,
   SendRequestPayload,
   RequestExecutionResult,
   GenerateOptions,
@@ -207,18 +208,20 @@ const api = {
     ipcRenderer.invoke(IPC.vault.oidcLogin, opts),
 
   // ─── OAuth 2.0 ────────────────────────────────────────────────────────────
+  // `ctx` is the active scope; main resolves the full {{var}} map from it
+  // (environment incl. secret-manager refs, collection vars, globals).
   oauth2StartFlow: (
     auth: AuthConfig,
-    vars: Record<string, string>,
+    ctx: VarResolveContext,
   ): Promise<{ accessToken: string; expiresAt: number; refreshToken?: string }> =>
-    ipcRenderer.invoke(IPC.oauth2.startFlow, auth, vars),
+    ipcRenderer.invoke(IPC.oauth2.startFlow, auth, ctx),
 
   oauth2RefreshToken: (
     auth: AuthConfig,
-    vars: Record<string, string>,
+    ctx: VarResolveContext,
     refreshToken: string,
   ): Promise<{ accessToken: string; expiresAt: number; refreshToken?: string }> =>
-    ipcRenderer.invoke(IPC.oauth2.refreshToken, auth, vars, refreshToken),
+    ipcRenderer.invoke(IPC.oauth2.refreshToken, auth, ctx, refreshToken),
 
   // ─── Cloud integration ────────────────────────────────────────────────────────
   cloudTest: (): Promise<{ email: string; organization: string; plan: string }> =>

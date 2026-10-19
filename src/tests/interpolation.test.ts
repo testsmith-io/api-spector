@@ -104,6 +104,30 @@ describe('buildUrl', () => {
     expect(url).toBe('https://example.com/pets/7?limit=20');
   });
 
+  it('substitutes [name] path placeholders from a path row', () => {
+    const rows: KeyValuePair[] = [
+      { key: 'id',      value: '42', enabled: true, paramType: 'path' },
+      { key: 'orderId', value: '9',  enabled: true, paramType: 'path' },
+    ];
+    const url = buildUrl('https://example.com/users/[id]/orders/[orderId]', rows, {});
+    expect(url).toBe('https://example.com/users/42/orders/9');
+  });
+
+  it('resolves a [name] path placeholder from an environment variable', () => {
+    const url = buildUrl('https://example.com/pets/[id]', [], { id: '7' });
+    expect(url).toBe('https://example.com/pets/7');
+  });
+
+  it('leaves an unresolved [name] placeholder as-is', () => {
+    const url = buildUrl('https://example.com/pets/[missing]', [], {});
+    expect(url).toBe('https://example.com/pets/[missing]');
+  });
+
+  it('does not treat an IPv6 host or :port as a path placeholder', () => {
+    const url = buildUrl('http://[::1]:8080/pets/[id]', [{ key: 'id', value: '5', enabled: true, paramType: 'path' }], {});
+    expect(url).toBe('http://[::1]:8080/pets/5');
+  });
+
   it('path parameter overrides an environment variable of the same name', () => {
     const rows: KeyValuePair[] = [
       { key: 'id', value: '99', enabled: true, paramType: 'path' },

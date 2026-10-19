@@ -42,14 +42,16 @@ import { useT } from '../../i18n';
 
 // ─── Parse {{varname}} tokens ─────────────────────────────────────────────────
 
-function parseVarTokens(str: string): string[] {
-  const found: string[] = [];
-  const re = /\{\{([^}]+)\}\}/g;
-  let m;
-  while ((m = re.exec(str)) !== null) {
-    const name = m[1].trim();
-    if (!found.includes(name)) found.push(name);
-  }
+// Tokens worth previewing: `{{name}}` variables and `[name]` path params. Each
+// carries the name to resolve and the exact text to show as the token label.
+function parseVarTokens(str: string): { name: string; display: string }[] {
+  const found: { name: string; display: string }[] = [];
+  const seen = new Set<string>();
+  const push = (name: string, display: string) => {
+    if (!seen.has(display)) { seen.add(display); found.push({ name, display }); }
+  };
+  for (const m of str.matchAll(/\{\{([^}]+)\}\}/g)) push(m[1].trim(), `{{${m[1].trim()}}}`);
+  for (const m of str.matchAll(/\[([A-Za-z_]\w*)\]/g)) push(m[1], `[${m[1]}]`);
   return found;
 }
 
@@ -111,13 +113,26 @@ interface Props extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onCha
    * The user can always ignore the list and type a custom value.
    */
   readonly staticSuggestions?: string[]
+  /**
+   * Extra `name → value` pairs resolvable as `{{name}}` in this field only, on
+   * top of the environment/collection/global vars. Used by the URL bar to
+   * resolve path/query params from the request's own Params tab, so hovering a
+   * `{{param}}` shows its assigned value and autocomplete lists it.
+   */
+  readonly extraVars?: Record<string, string>
 }
 
-export function VarInput({ value, onChange, className, wrapperClassName, staticSuggestions, ...rest }: Readonly<Props>) {
+export function VarInput({ value, onChange, className, wrapperClassName, staticSuggestions, extraVars, ...rest }: Readonly<Props>) {
   const t         = useT();
   const varNames  = useVarNames();
   const varValues = useVarValues();
   const inputRef  = useRef<HTMLInputElement>(null);
+
+  // Field-local vars (e.g. the URL bar's path/query params) take precedence over
+  // environment vars for both autocomplete and the hover preview.
+  const extraKeys   = extraVars ? Object.keys(extraVars) : [];
+  const mergedNames = extraKeys.length ? Array.from(new Set([...extraKeys, ...varNames])) : varNames;
+  const mergedValues = extraKeys.length ? { ...varValues, ...extraVars } : varValues;
 
   const [suggestions,    setSuggestions]    = useState<Suggestion[]>([]);
   const [suggestionMode, setSuggestionMode] = useState<SuggestionMode>('var');
@@ -188,7 +203,7 @@ export function VarInput({ value, onChange, className, wrapperClassName, staticS
     m = /\{\{(\$?\w*)$/.exec(before);
     if (m) {
       const q = m[1].toLowerCase();
-      const vars: Suggestion[] = varNames
+      const vars: Suggestion[] = mergedNames
         .filter(n => n.toLowerCase().includes(q))
         .map(n => ({ label: n, insert: n, type: 'variable', close: true, boost: n.startsWith('$') ? 1 : 0 }));
       const starters: Suggestion[] = [
@@ -285,9 +300,10 @@ export function VarInput({ value, onChange, className, wrapperClassName, staticS
 
   const tokens       = parseVarTokens(value);
   const hasVars      = tokens.length > 0;
-  const previewItems = tokens.map(name => ({
+  const previewItems = tokens.map(({ name, display }) => ({
     name,
-    resolved: varValues[name] ?? null,
+    display,
+    resolved: mergedValues[name] ?? null,
   }));
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -325,9 +341,9 @@ export function VarInput({ value, onChange, className, wrapperClassName, staticS
       {/* Variable hover preview */}
       {showPreview && suggestions.length === 0 && previewItems.length > 0 && (
         <div className="absolute left-0 top-full mt-0.5 z-50 bg-surface-800 border border-surface-600 rounded shadow-xl text-xs min-w-[220px] max-w-[420px]">
-          {previewItems.map(({ name, resolved }) => (
-            <div key={name} className="flex items-baseline gap-2 px-3 py-1.5 border-b border-surface-700 last:border-0">
-              <span className="font-mono text-blue-400 shrink-0">{`{{${name}}}`}</span>
+          {previewItems.map(({ display, resolved }) => (
+            <div key={display} className="flex items-baseline gap-2 px-3 py-1.5 border-b border-surface-700 last:border-0">
+              <span className="font-mono text-blue-400 shrink-0">{display}</span>
               <span className="text-surface-500 mx-0.5">→</span>
               {resolved !== null
                 ? <span className="font-mono text-emerald-400 truncate">{resolved}</span>

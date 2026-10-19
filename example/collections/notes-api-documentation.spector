@@ -375,9 +375,21 @@
       "id": "a69853de-2d55-4177-a07b-3e046f237bbb",
       "name": "Get all notes",
       "method": "GET",
-      "url": "{{baseUrl}}/notes",
+      "url": "{{baseUrl}}/notes/[dest]",
       "headers": [],
-      "params": [],
+      "params": [
+        {
+          "key": "id",
+          "value": "32",
+          "enabled": true
+        },
+        {
+          "key": "dest",
+          "value": "ddwdw",
+          "enabled": true,
+          "paramType": "path"
+        }
+      ],
       "auth": {
         "type": "none"
       },
@@ -440,7 +452,7 @@
       "params": [
         {
           "key": "id",
-          "value": "",
+          "value": "32",
           "enabled": true,
           "description": "ID of the note to retrieve",
           "paramType": "path"
@@ -577,5 +589,6 @@
         ]
       }
     }
-  }
+  },
+  "collectionVariables": {}
 }

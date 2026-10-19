@@ -251,6 +251,19 @@ export interface Environment {
   extends?: string
 }
 
+/**
+ * Resolution context for interactive flows (e.g. the OAuth 2.0 "Get Token"
+ * button). The renderer passes the active scope; the main process resolves the
+ * full variable map from it - including secret-manager refs and encrypted
+ * values, which only main can read - so {{vars}} in any field resolve the same
+ * way they do on the send path.
+ */
+export interface VarResolveContext {
+  environment?: Environment | null
+  collectionVars?: Record<string, string>
+  globals?: Record<string, string>
+}
+
 // ─── Workspace ────────────────────────────────────────────────────────────────
 
 export interface Workspace {

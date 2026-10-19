@@ -8,9 +8,11 @@
 // down to requests, and the send path uses it regardless of where it was set.
 
 import React, { useState } from 'react';
-import type { Oauth2Auth } from '../../../../shared/types';
+import type { Oauth2Auth, VarResolveContext } from '../../../../shared/types';
 import type { AuthEditorPatch } from './AuthEditor';
 import { VarInput } from './VarInput';
+import { useStore } from '../../store';
+import { useActiveEnvironment } from '../../hooks/useActiveEnvironment';
 import { useT } from '../../i18n';
 
 const { electron } = window;
@@ -20,6 +22,19 @@ export function Oauth2Form({ auth, onChange }: {
   readonly onChange: (p: AuthEditorPatch) => void
 }) {
   const t = useT();
+  // Active scope for token fetch/refresh: main resolves the full {{var}} map
+  // from this (environment incl. secret-manager refs, collection vars, globals),
+  // so any {{var}} in the fields below resolves exactly like on the send path.
+  const activeEnv          = useActiveEnvironment();
+  const globals            = useStore(s => s.globals);
+  const activeCollectionId = useStore(s => s.activeCollectionId);
+  const collections        = useStore(s => s.collections);
+  function resolveCtx(): VarResolveContext {
+    const collectionVars = activeCollectionId
+      ? collections[activeCollectionId]?.data.collectionVariables ?? {}
+      : {};
+    return { environment: activeEnv, collectionVars, globals };
+  }
   const [secretValue, setSecretValue] = useState('');
   const [saved, setSaved] = useState(false);
   const [status, setStatus] = useState<'idle' | 'fetching' | 'ok' | 'error'>('idle');
@@ -40,7 +55,7 @@ export function Oauth2Form({ auth, onChange }: {
   async function fetchToken() {
     setStatus('fetching'); setError('');
     try {
-      const result = await electron.oauth2StartFlow(auth, {});
+      const result = await electron.oauth2StartFlow(auth, resolveCtx());
       onChange({ oauth2CachedToken: result.accessToken, oauth2TokenExpiry: result.expiresAt });
       if (result.refreshToken) setRefreshToken(result.refreshToken);
       setStatus('ok');
@@ -53,7 +68,7 @@ export function Oauth2Form({ auth, onChange }: {
     if (!refreshToken) return;
     setStatus('fetching'); setError('');
     try {
-      const result = await electron.oauth2RefreshToken(auth, {}, refreshToken);
+      const result = await electron.oauth2RefreshToken(auth, resolveCtx(), refreshToken);
       onChange({ oauth2CachedToken: result.accessToken, oauth2TokenExpiry: result.expiresAt });
       if (result.refreshToken) setRefreshToken(result.refreshToken);
       setStatus('ok');
@@ -99,9 +114,9 @@ export function Oauth2Form({ auth, onChange }: {
       {flow !== 'implicit' && (
         <div>
           <label className="text-surface-400">{t('Token URL')}</label>
-          <input
+          <VarInput
             value={auth.oauth2TokenUrl ?? ''}
-            onChange={e => onChange({ oauth2TokenUrl: e.target.value })}
+            onChange={v => onChange({ oauth2TokenUrl: v })}
             placeholder="https://auth.example.com/oauth/token"
             className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
           />
@@ -112,9 +127,9 @@ export function Oauth2Form({ auth, onChange }: {
         <div className="flex gap-2">
           <div className="flex-1">
             <label className="text-surface-400">{t('Auth URL')}</label>
-            <input
+            <VarInput
               value={auth.oauth2AuthUrl ?? ''}
-              onChange={e => onChange({ oauth2AuthUrl: e.target.value })}
+              onChange={v => onChange({ oauth2AuthUrl: v })}
               placeholder="https://auth.example.com/oauth/authorize"
               className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
             />
@@ -134,9 +149,9 @@ export function Oauth2Form({ auth, onChange }: {
       <div className="flex gap-2">
         <div className="flex-1">
           <label className="text-surface-400">{t('Client ID')}</label>
-          <input
+          <VarInput
             value={auth.oauth2ClientId ?? ''}
-            onChange={e => onChange({ oauth2ClientId: e.target.value })}
+            onChange={v => onChange({ oauth2ClientId: v })}
             className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
           />
         </div>
@@ -200,18 +215,17 @@ export function Oauth2Form({ auth, onChange }: {
         <div className="flex gap-2">
           <div className="flex-1">
             <label className="text-surface-400">{t('Username')}</label>
-            <input
+            <VarInput
               value={auth.username ?? ''}
-              onChange={e => onChange({ username: e.target.value })}
+              onChange={v => onChange({ username: v })}
               className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
             />
           </div>
           <div className="flex-1">
             <label className="text-surface-400">{t('Password')}</label>
-            <input
-              type="password"
+            <VarInput
               value={auth.password ?? ''}
-              onChange={e => onChange({ password: e.target.value })}
+              onChange={v => onChange({ password: v })}
               className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
             />
           </div>
@@ -220,9 +234,9 @@ export function Oauth2Form({ auth, onChange }: {
 
       <div>
         <label className="text-surface-400">{t('Scopes')} <span className="text-surface-600">{t('(space-separated)')}</span></label>
-        <input
+        <VarInput
           value={auth.oauth2Scopes ?? ''}
-          onChange={e => onChange({ oauth2Scopes: e.target.value })}
+          onChange={v => onChange({ oauth2Scopes: v })}
           placeholder={t('read write')}
           className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
         />
