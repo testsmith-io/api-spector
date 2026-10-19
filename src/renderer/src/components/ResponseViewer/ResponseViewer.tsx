@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useStore } from '../../store';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
@@ -11,6 +11,7 @@ import { getStatusColor, getMethodColor } from '../../../../shared/colors';
 import type { HistoryEntry, DesignInteraction, KeyValuePair } from '../../../../shared/types';
 import { InteractiveBody } from './InteractiveBody';
 import { ResponseTable, bodyHasArray } from './ResponseTable';
+import { GraphQlSubscription, isSubscriptionQuery } from '../RequestBuilder/GraphQlSubscription';
 import { StreamView } from './StreamView';
 import { HookResultsPanel } from './HookResultsPanel';
 import { SaveAsMockModal } from './SaveAsMockModal';
@@ -163,6 +164,25 @@ export function ResponseViewer() {
   const upsertEnvVar = useStore(s => s.upsertEnvVar);
   const [tab, setTab] = useState<RespTab>('body');
 
+  // Keyboard sub-tab navigation (Cmd/Ctrl+Alt+Up/Down). App bumps subTabCycle;
+  // when it targets the response pane we step through the currently visible
+  // response tabs (kept in a ref since the list depends on the response).
+  const subTabCycle = useStore(s => s.subTabCycle);
+  const lastSubTabCycle = useRef(subTabCycle.nonce);
+  const respTabIdsRef = useRef<RespTab[]>([]);
+  const respTabRef = useRef<RespTab>(tab);
+  respTabRef.current = tab;
+  useEffect(() => {
+    if (subTabCycle.nonce === lastSubTabCycle.current) return;
+    lastSubTabCycle.current = subTabCycle.nonce;
+    if (subTabCycle.pane !== 'response') return;
+    const ids = respTabIdsRef.current;
+    if (ids.length === 0) return;
+    const i = ids.indexOf(respTabRef.current);
+    const next = (i + subTabCycle.dir + ids.length) % ids.length;
+    setTab(ids[next]);
+  }, [subTabCycle]);
+
   // Past responses for THIS request (Bruno-style per-request history).
   const requestHistory = useMemo(
     () => requestId ? history.filter(e => e.request.id === requestId) : [],
@@ -228,6 +248,23 @@ export function ResponseViewer() {
   const [diffMode, setDiffMode] = useState(false);
   const [showMockModal, setShowMockModal] = useState(false);
   const [bodyView, setBodyView] = useState<'tree' | 'raw' | 'table'>('raw');
+
+  // jq filter over a JSON response body. Runs the real jq (wasm) in main,
+  // debounced; an empty expression shows the normal body views.
+  const [jqExpr, setJqExpr] = useState('');
+  const [jqResult, setJqResult] = useState<string | null>(null);
+  const [jqError, setJqError] = useState<string | null>(null);
+  useEffect(() => {
+    const expr = jqExpr.trim();
+    if (!expr || !response) { setJqResult(null); setJqError(null); return; }
+    let cancelled = false;
+    const id = setTimeout(() => {
+      window.electron.jqFilter(response.body, expr)
+        .then(out => { if (!cancelled) { setJqResult(out); setJqError(null); } })
+        .catch((e: unknown) => { if (!cancelled) { setJqError(e instanceof Error ? e.message : String(e)); setJqResult(null); } });
+    }, 250);
+    return () => { cancelled = true; clearTimeout(id); };
+  }, [jqExpr, response]);
   const assertToast = useToast(2500);
   const schemaToast = useToast(2500);
 
@@ -302,6 +339,25 @@ export function ResponseViewer() {
     assertToast.show(t('✓ Assertion added'), true);
   }
 
+  // GraphQL subscription: the Response pane is where the live stream + tests
+  // render, exactly where a query's response would appear. This takes over the
+  // whole pane (it has its own Subscribe/Stop control) and is independent of the
+  // HTTP response state, so it shows whether or not anything was "sent".
+  const gqlSub = currentRequest?.body?.mode === 'graphql' && currentRequest.body.graphql
+    && isSubscriptionQuery(currentRequest.body.graphql.query)
+    ? currentRequest.body.graphql
+    : null;
+  if (currentRequest && gqlSub && requestId) {
+    const body = currentRequest.body!;
+    return (
+      <GraphQlSubscription
+        request={currentRequest}
+        gql={gqlSub}
+        onPatch={patch => updateRequest(requestId, { body: { ...body, graphql: { ...gqlSub, ...patch } } })}
+      />
+    );
+  }
+
   if (isSending) {
     // A streaming response renders live while the request is still open; a plain
     // request just shows the spinner until it resolves.
@@ -355,6 +411,7 @@ export function ResponseViewer() {
         { id: 'history', label: t('History'), badge: historyBadge },
         { id: 'http', label: t('HTTP'), badge: httpFindings.length > 0 ? (httpErrors > 0 ? '!' : httpFindings.length) : undefined, error: httpErrors > 0 },
       ];
+  respTabIdsRef.current = tabList.map(x => x.id);
 
   // Shared by the normal History tab and the error view's History tab.
   const historyContent = requestHistory.length === 0 ? (
@@ -487,6 +544,17 @@ export function ResponseViewer() {
               >
                 {schemaCheck.status === 'valid' ? t('Schema ✓') : t('Schema ✗')}
               </span>
+            )}
+
+            {tab === 'body' && isJson && !response.streamed && (
+              <input
+                value={jqExpr}
+                onChange={e => setJqExpr(e.target.value)}
+                spellCheck={false}
+                placeholder={t('jq filter, e.g. .data | map(.id)')}
+                title={t('Filter this JSON response with a jq expression')}
+                className={`flex-1 min-w-[110px] max-w-[460px] bg-surface-900 border rounded px-2 py-0.5 text-[11px] font-mono focus:outline-none placeholder-surface-600 ${jqError ? 'border-red-600/60 focus:border-red-500' : 'border-surface-700 focus:border-blue-500'}`}
+              />
             )}
 
             <div className="ml-auto flex items-center gap-1 shrink-0">
@@ -632,6 +700,21 @@ export function ResponseViewer() {
           )
         ) : diffMode && pinnedResponse ? (
           <DiffView pinned={pinnedResponse} current={response} />
+        ) : tab === 'body' && isJson && jqExpr.trim() ? (
+          jqError ? (
+            <div className="p-4">
+              <div className="text-[11px] uppercase tracking-wider text-red-400 mb-1">{t('jq error')}</div>
+              <pre className="text-xs text-red-300 whitespace-pre-wrap break-words">{jqError}</pre>
+            </div>
+          ) : (
+            <CodeMirror
+              value={jqResult ?? ''}
+              theme={oneDark}
+              extensions={[json()]}
+              readOnly
+              basicSetup={{ lineNumbers: true, foldGutter: true }}
+            />
+          )
         ) : tab === 'body' && response.streamed ? (
           <StreamView
             events={response.events ?? []}

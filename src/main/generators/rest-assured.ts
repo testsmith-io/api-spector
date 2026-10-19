@@ -3,11 +3,25 @@
 
 import type { Collection, Environment, Folder, GeneratedFile } from '../../shared/types';
 import { resolveInheritedAuthAndHeaders, getAllApplicableHooks } from '../../shared/request-collection';
+import type { JsonPathQuery } from './script-parser';
 import { parsePostScript, accessorToJsonPath } from './script-parser';
 import {
   javaClass, toEnvVar as toEnvConst,
   resolveEffectiveAuth, mergeHeaders, hasBody, getEnvBaseUrl, renderTree, restAssuredCall,
+  collectionUsesJsonPath,
 } from './generator-utils';
+
+/** Java escape for a string placed inside double quotes. */
+function javaStr(s: string): string {
+  return s.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+}
+
+/** Render a Jayway JSONPath extraction call: jsonPath(body, "query", index, "fallback"). */
+function restAssuredJsonPath(q: JsonPathQuery): string {
+  const index = q.index ?? -1;
+  const fallback = q.fallback ?? '';
+  return `jsonPath(hookResponse.asString(), "${javaStr(q.query)}", ${index}, "${javaStr(fallback)}")`;
+}
 
 // ─── REST Assured (Java + JUnit 5 + Maven) generator ─────────────────────────
 
@@ -43,8 +57,17 @@ function interpolateJava(value: string, sharedVars: Set<string> = new Set()): st
 
 // ─── pom.xml ──────────────────────────────────────────────────────────────────
 
-function buildPom(collectionName: string): string {
+function buildPom(collectionName: string, usesJsonPath: boolean): string {
   const artifact = collectionName.replaceAll(/\W+/g, '-').toLowerCase();
+  const jsonPathDep = usesJsonPath ? `
+    <!-- Jayway JSONPath (for sp.jsonPath extractions) -->
+    <dependency>
+      <groupId>com.jayway.jsonpath</groupId>
+      <artifactId>json-path</artifactId>
+      <version>2.9.0</version>
+      <scope>test</scope>
+    </dependency>
+` : '';
   return `<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -96,7 +119,7 @@ function buildPom(collectionName: string): string {
       <version>2.2</version>
       <scope>test</scope>
     </dependency>
-  </dependencies>
+${jsonPathDep}  </dependencies>
 
   <build>
     <plugins>
@@ -113,13 +136,33 @@ function buildPom(collectionName: string): string {
 
 // ─── BaseTest.java ────────────────────────────────────────────────────────────
 
-function buildBaseTest(environment: Environment | null): string {
+function buildBaseTest(environment: Environment | null, usesJsonPath: boolean): string {
   const baseUrl = getEnvBaseUrl(environment, 'http://localhost:8080');
 
   const secretVars = environment?.variables.filter(v => v.secret && v.secretRef) ?? [];
   const secretComments = secretVars.map(v =>
     `     * - ${toEnvConst(v.key)}=<value from keychain>`
   ).join('\n');
+
+  // Jayway JSONPath helper for sp.jsonPath(...) extractions. Suppresses missing-path
+  // exceptions so an absent match yields the fallback instead of failing the run.
+  const jsonPathHelper = usesJsonPath ? `
+    private static final com.jayway.jsonpath.Configuration JSONPATH_CFG =
+        com.jayway.jsonpath.Configuration.defaultConfiguration()
+            .addOptions(com.jayway.jsonpath.Option.SUPPRESS_EXCEPTIONS);
+
+    /** Resolve a JSONPath query; pick element \`index\` (or -1 for the whole result); fall back when absent. */
+    protected static String jsonPath(String body, String query, int index, String fallback) {
+        Object value = com.jayway.jsonpath.JsonPath.using(JSONPATH_CFG).parse(body).read(query);
+        Object out = value;
+        if (index >= 0) {
+            out = (value instanceof java.util.List && index < ((java.util.List<?>) value).size())
+                ? ((java.util.List<?>) value).get(index)
+                : null;
+        }
+        return out == null ? fallback : String.valueOf(out);
+    }
+` : '';
 
   return `package com.example.api;
 
@@ -138,7 +181,7 @@ ${secretComments ? secretComments + '\n' : ''} * - BASE_URL (optional, default: 
 public class BaseTest {
 
     protected static RequestSpecification requestSpec;
-
+${jsonPathHelper}
     @BeforeAll
     static void setupRestAssured() {
         String baseUrl = System.getenv("BASE_URL") != null
@@ -183,10 +226,13 @@ function buildTestClass(folderName: string, folder: Folder, collection: Collecti
       }
       lines.push(`            .when()${restAssuredCall(method, `"${path}"`)};`);
       for (const e of parsed.extractions) {
-        const jp = accessorToJsonPath(e.accessor);
         const varName = toEnvConst(e.varName);
         sharedVars.add(varName);
-        lines.push(`        ${varName} = hookResponse.jsonPath().getString("${jp}");`);
+        if (e.jsonPath) {
+          lines.push(`        ${varName} = ${restAssuredJsonPath(e.jsonPath)};`);
+        } else {
+          lines.push(`        ${varName} = hookResponse.jsonPath().getString("${accessorToJsonPath(e.accessor)}");`);
+        }
       }
     } else {
       lines.push(`        given().spec(requestSpec).when()${restAssuredCall(method, `"${path}"`)};`);
@@ -362,9 +408,10 @@ export function generateRestAssured(
   collection: Collection,
   environment: Environment | null
 ): GeneratedFile[] {
+  const usesJsonPath = collectionUsesJsonPath(collection);
   const files: GeneratedFile[] = [
-    { path: 'pom.xml',                                        content: buildPom(collection.name) },
-    { path: 'src/test/java/com/example/api/BaseTest.java',   content: buildBaseTest(environment) },
+    { path: 'pom.xml',                                        content: buildPom(collection.name, usesJsonPath) },
+    { path: 'src/test/java/com/example/api/BaseTest.java',   content: buildBaseTest(environment, usesJsonPath) },
   ];
 
   function processFolder(folder: Folder, name: string) {
@@ -380,12 +427,8 @@ export function generateRestAssured(
     }
   }
 
-  if (collection.rootFolder.requestIds.length > 0) {
-    processFolder(collection.rootFolder, collection.name);
-  }
-  for (const sub of collection.rootFolder.folders) {
-    processFolder(sub, sub.name);
-  }
+  // Walk from the root once (processFolder guards emission and recurses).
+  processFolder(collection.rootFolder, collection.name);
 
   files.unshift({ path: 'README.md', content: buildReadme(collection.name, files.map(f => f.path)) });
 

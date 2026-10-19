@@ -16,6 +16,8 @@ export default defineConfig( {
       rollupOptions: {
         input: {
           index: resolve( __dirname, 'src/main/index.ts' ),
+          // Load-generation worker (Electron utilityProcess) for performance runs.
+          'perf-worker': resolve( __dirname, 'src/main/perf-worker.ts' ),
           runner:   resolve( __dirname, 'src/cli/runner.ts' ),
           flow:     resolve( __dirname, 'src/cli/flow.ts' ),
           mock:     resolve( __dirname, 'src/cli/mock.ts' ),
@@ -25,7 +27,9 @@ export default defineConfig( {
           coverage: resolve( __dirname, 'src/cli/coverage.ts' ),
           'generate-tests': resolve( __dirname, 'src/cli/generate-tests.ts' ),
           compare:  resolve( __dirname, 'src/cli/compare.ts' ),
+          perf:     resolve( __dirname, 'src/cli/perf.ts' ),
           wsdl:     resolve( __dirname, 'src/cli/wsdl.ts' ),
+          socketio: resolve( __dirname, 'src/cli/socketio.ts' ),
           // Node-only engine library, importable as '@testsmith/api-spector/engine'.
           lib:      resolve( __dirname, 'src/lib/index.ts' ),
         }

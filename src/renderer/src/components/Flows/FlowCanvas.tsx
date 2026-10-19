@@ -17,6 +17,7 @@ import '@xyflow/react/dist/style.css';
 import { v4 as uuidv4 } from 'uuid';
 import { useStore } from '../../store';
 import { BLOCK_SPECS, BLOCKS_BY_CATEGORY } from '../../../../shared/flow-blocks';
+import { validateFlow, type FlowProblem } from '../../../../shared/flow-validate';
 import { flowNodeTypes } from './flowNodes';
 import { buildFlowHtmlReport } from '../../../../shared/flow-report';
 import { cloudEnabled, pushFlowToCloud, runFlowInCloud, openCloudFlow } from '../../lib/cloud-push';
@@ -207,7 +208,16 @@ function formatLogText(log: ReturnType<typeof useFlowRunner>['log']): string {
   return lines.join('\n') + '\n';
 }
 
-function BottomPanel({ runner, flowName }: { readonly runner: ReturnType<typeof useFlowRunner>; readonly flowName: string }) {
+type BottomTab = 'problems' | 'log' | 'output' | 'variables'
+
+function BottomPanel({ runner, flowName, problems, onFocusBlock, tab, setTab }: {
+  readonly runner: ReturnType<typeof useFlowRunner>
+  readonly flowName: string
+  readonly problems: FlowProblem[]
+  readonly onFocusBlock: (blockId: string) => void
+  readonly tab: BottomTab
+  readonly setTab: (t: BottomTab) => void
+}) {
   const t = useT();
   const { outputs, variables, data, log, summary } = runner;
   const varEntries = Object.entries(variables);
@@ -215,14 +225,18 @@ function BottomPanel({ runner, flowName }: { readonly runner: ReturnType<typeof 
   const dataEntries = Object.entries(data).filter(([k, v]) => typeof v === 'object' && v !== null || !(k in variables));
   const hasVars = varEntries.length > 0 || dataEntries.length > 0;
   const hasLog = log.length > 0;
-  const [tab, setTab] = useState<'log' | 'output' | 'variables'>('log');
+  const hasProblems = problems.length > 0;
+  const errorCount = problems.filter(p => p.severity === 'error').length;
 
-  if (!hasLog && outputs.length === 0 && !hasVars) return null;
-  const active = (tab === 'log' && hasLog) || (tab === 'output' && outputs.length > 0) || (tab === 'variables' && hasVars)
-    ? tab
-    : hasLog ? 'log' : outputs.length > 0 ? 'output' : 'variables';
+  if (!hasLog && outputs.length === 0 && !hasVars && !hasProblems) return null;
+  // Resolve the active tab: honor the requested one when it has content, else
+  // fall back to the first tab that does.
+  const avail = (id: BottomTab) =>
+    id === 'log' ? hasLog : id === 'output' ? outputs.length > 0 : id === 'variables' ? hasVars : hasProblems;
+  const active: BottomTab = avail(tab) ? tab
+    : hasLog ? 'log' : outputs.length > 0 ? 'output' : hasVars ? 'variables' : 'problems';
 
-  const Tab = ({ id, label }: { id: 'log' | 'output' | 'variables'; label: string }) => (
+  const Tab = ({ id, label }: { id: BottomTab; label: React.ReactNode }) => (
     <button
       onClick={() => setTab(id)}
       className={`px-3 py-1.5 text-[10px] uppercase tracking-widest transition-colors ${active === id ? 'text-[var(--text-primary)] border-b-2 border-blue-500' : 'text-surface-600 hover:text-surface-400'}`}
@@ -232,6 +246,7 @@ function BottomPanel({ runner, flowName }: { readonly runner: ReturnType<typeof 
   return (
     <div className="h-44 flex-shrink-0 border-t border-surface-800 bg-surface-950 flex flex-col">
       <div className="flex items-center gap-1 border-b border-surface-800 flex-shrink-0 sticky top-0">
+        {hasProblems && <Tab id="problems" label={<span className={errorCount > 0 ? 'text-red-400' : 'text-amber-400'}>{t('Problems')} ({problems.length})</span>} />}
         {hasLog && <Tab id="log" label={t('Run log')} />}
         {outputs.length > 0 && <Tab id="output" label={t('Output')} />}
         {hasVars && <Tab id="variables" label={t('Variables')} />}
@@ -251,7 +266,24 @@ function BottomPanel({ runner, flowName }: { readonly runner: ReturnType<typeof 
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-2">
-        {active === 'log' ? (
+        {active === 'problems' ? (
+          <div className="flex flex-col gap-1 text-xs">
+            {problems.map((p, i) => (
+              <button
+                key={i}
+                onClick={() => p.blockId && onFocusBlock(p.blockId)}
+                disabled={!p.blockId}
+                className={`flex items-start gap-2 text-left px-2 py-1 rounded transition-colors ${p.blockId ? 'hover:bg-surface-800 cursor-pointer' : 'cursor-default'}`}
+                title={p.blockId ? t('Show this block') : undefined}
+              >
+                <span className={`shrink-0 mt-px font-bold ${p.severity === 'error' ? 'text-red-400' : 'text-amber-400'}`}>
+                  {p.severity === 'error' ? '✗' : '⚠'}
+                </span>
+                <span className="text-surface-300 break-words">{p.message}</span>
+              </button>
+            ))}
+          </div>
+        ) : active === 'log' ? (
           <div className="flex flex-col gap-0.5 font-mono text-[11px]">
             {log.map((e, i) => {
               const at = e.atMs != null ? `+${e.atMs}ms` : '';
@@ -321,6 +353,8 @@ function FlowEditor({ flow }: { readonly flow: Flow }) {
   const environments = useStore(s => s.environments);
   const activeEnvId  = useStore(s => s.activeEnvironmentId);
   const theme        = useStore(s => s.theme);
+  const collections  = useStore(s => s.collections);
+  const storeFlows   = useStore(s => s.flows);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(useMemo(() => toRfNodes(flow), [flow]));
   const [edges, setEdges, onEdgesChange] = useEdgesState(useMemo(() => toRfEdges(flow), [flow]));
@@ -329,8 +363,9 @@ function FlowEditor({ flow }: { readonly flow: Flow }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(flow.name);
+  const [bottomTab, setBottomTab] = useState<BottomTab>('log');
 
-  const { screenToFlowPosition, fitView, getNodes } = useReactFlow();
+  const { screenToFlowPosition, fitView, getNodes, setCenter } = useReactFlow();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const runner = useFlowRunner();
 
@@ -429,6 +464,9 @@ function FlowEditor({ flow }: { readonly flow: Flow }) {
     if (!seeded.current) { seeded.current = true; return; }
     setFlowGraph(flow.id, toFlowNodes(nodes), toFlowEdges(edges));
   }, [nodes, edges, flow.id, setFlowGraph]);
+
+  // Starting a run surfaces the Run log (the badge/Problems tab is opt-in).
+  useEffect(() => { if (runner.running) setBottomTab('log'); }, [runner.running]);
 
   const onConnect = useCallback(
     (c: Connection) => setEdges(eds => addEdge({ ...c, id: uuidv4() }, eds)),
@@ -537,9 +575,37 @@ function FlowEditor({ flow }: { readonly flow: Flow }) {
     return m;
   }, [runner.outputs]);
 
+  // Static pre-run validation of the live graph — recomputed on every edit so
+  // problems (no request selected, dangling edge, recursive sub-flow, …) show
+  // immediately, before the user hits Run.
+  const problems = useMemo<FlowProblem[]>(() => {
+    const current: Flow = { ...flow, nodes: toFlowNodes(nodes), edges: toFlowEdges(edges) };
+    const others = Object.values(storeFlows).map(f => f.data).filter(f => f.id !== flow.id);
+    return validateFlow(current, {
+      flows: [current, ...others],
+      requestExists: ref => !!collections[ref.collectionId]?.data.requests?.[ref.requestId],
+    });
+  }, [flow, nodes, edges, storeFlows, collections]);
+
+  const problemById = useMemo(() => {
+    const m = new Map<string, 'error' | 'warning'>();
+    for (const p of problems) {
+      if (!p.blockId) continue;
+      if (p.severity === 'error' || !m.has(p.blockId)) m.set(p.blockId, p.severity);
+    }
+    return m;
+  }, [problems]);
+  const errorCount = problems.filter(p => p.severity === 'error').length;
+
+  const focusBlock = useCallback((blockId: string) => {
+    setSelectedId(blockId);
+    const n = nodes.find(x => x.id === blockId);
+    if (n) setCenter(n.position.x + 110, n.position.y + 50, { zoom: 1.2, duration: 400 });
+  }, [nodes, setCenter]);
+
   const displayNodes = useMemo(
-    () => nodes.map(n => ({ ...n, data: { ...n.data, status: runner.nodeStatus[n.id], output: displayOutputs.get(n.id) } })),
-    [nodes, runner.nodeStatus, displayOutputs],
+    () => nodes.map(n => ({ ...n, data: { ...n.data, status: runner.nodeStatus[n.id], output: displayOutputs.get(n.id), problem: problemById.get(n.id) } })),
+    [nodes, runner.nodeStatus, displayOutputs, problemById],
   );
 
   // After a run, highlight the edges that were actually traversed (colored by
@@ -634,6 +700,19 @@ function FlowEditor({ flow }: { readonly flow: Flow }) {
           <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path d="M3 4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 12a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1v-4zM12 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1h-4z"/></svg>
           {t('Tidy')}
         </button>
+        {problems.length > 0 && (
+          <button
+            onClick={() => setBottomTab('problems')}
+            title={errorCount > 0
+              ? t('This flow has problems that will stop the run. Click to review.')
+              : t('This flow has warnings. Click to review.')}
+            className={`px-2.5 py-1.5 text-xs rounded font-medium transition-colors flex items-center gap-1.5 border ${errorCount > 0
+              ? 'text-red-200 bg-red-900/30 hover:bg-red-900/50 border-red-800/50'
+              : 'text-amber-200 bg-amber-900/30 hover:bg-amber-900/50 border-amber-800/40'}`}
+          >
+            {errorCount > 0 ? '✗' : '⚠'} {t(':count problem|:count problems', { count: problems.length })}
+          </button>
+        )}
         {extractableCount > 0 && (
           <button
             onClick={extractSubflow}
@@ -756,7 +835,14 @@ function FlowEditor({ flow }: { readonly flow: Flow }) {
         )}
       </div>
 
-      <BottomPanel runner={runner} flowName={flow.name} />
+      <BottomPanel
+        runner={runner}
+        flowName={flow.name}
+        problems={problems}
+        onFocusBlock={focusBlock}
+        tab={bottomTab}
+        setTab={setBottomTab}
+      />
     </div>
   );
 }

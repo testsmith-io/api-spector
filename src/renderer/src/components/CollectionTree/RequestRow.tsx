@@ -184,6 +184,20 @@ export function RequestRow({
           >
             WS
           </span>
+        ) : protocol === 'socketio' ? (
+          <span
+            className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-fuchsia-700/80 text-fuchsia-50"
+            title={t('Socket.IO')}
+          >
+            IO
+          </span>
+        ) : protocol === 'mqtt' ? (
+          <span
+            className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-700/80 text-teal-50"
+            title={t('MQTT')}
+          >
+            MQTT
+          </span>
         ) : (
           <MethodBadge method={method} size="xs" />
         )}

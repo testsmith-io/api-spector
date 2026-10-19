@@ -1,0 +1,581 @@
+{
+  "version": "1.0",
+  "id": "3e873fe2-fd34-4d20-bbcd-2005892ca365",
+  "name": "Notes API Documentation",
+  "description": "\nWelcome to the Notes API Documentation. \n\nThis API allows you to manage notes and organize them according to different categories. \n\n## Features\n- Create notes with title and content.\n- Categorize notes into different categories.\n- Update and delete notes.\n- Search notes by title or category.\n\nThis API is also utilized as a backend for the [Notes App available here](https://practice.expandtesting.com/notes/app/).\n\n\n\n## API Authorization Guide\n\nTo use this API, you must first have a valid account on the system and know your email and password. Once you have that information:\n\nLog in to the API using the **login endpoint**. This will provide you with an authentication token that you can use to access the protected resources.\n\nKeep the token safe, as you will need it for subsequent requests.\n\nTo authorize your requests, click the \"**Authorize**\" button on the top right corner of the Swagger UI interface. A dialog box will appear asking you to enter the authentication token.\nEnter the token you obtained from the login endpoint and click \"**Authorize**\".\n\nYou are now authorized to use all the protected API endpoints.\n\n\n\nIf you need help using this API, check out our **video guide and demo**, which are available [here](https://www.youtube.com/watch?v=bQYvS6EEBZc?sub_confirmation=1)\n\n## Contact Information\n\nIf you have any questions or feedback, please do not hesitate to contact us via [email](mailto:expand.testing@gmail.com)\n\n\n\n\n",
+  "rootFolder": {
+    "id": "9167b243-c4b4-4237-9aa2-b9b5d9960c83",
+    "name": "root",
+    "description": "",
+    "folders": [
+      {
+        "id": "4ed91158-68e4-41bc-94bf-9b6fe278d30a",
+        "name": "Health",
+        "description": "",
+        "folders": [],
+        "requestIds": [
+          "c14a81c8-7c4e-47ca-821d-fbfb760ab302"
+        ]
+      },
+      {
+        "id": "d527a5f7-bef8-4f44-abb8-9b938e233091",
+        "name": "Users",
+        "description": "",
+        "folders": [],
+        "requestIds": [
+          "8bbe02e0-dbc7-434f-b1b6-a92eb269bed7",
+          "a8203e1e-0979-40bc-8386-62028eb01f5b",
+          "21e5b476-9591-4106-8ce3-28fa69e53121",
+          "afb8151f-2cf2-4d77-869a-67a5b5a2018f",
+          "213a000f-ea28-4874-878f-2c190b188032",
+          "a8a6c51e-3804-4b47-9c25-80449917b96b",
+          "7f900b5d-9139-419c-a3e2-68fb6f033267",
+          "0e3903ae-4a1b-4773-ae35-52b3419d2031",
+          "2e8f7c8d-61ea-4235-9642-dabdbcd5976f",
+          "70b2273f-6c5b-4d72-aa48-b545938b1223"
+        ]
+      },
+      {
+        "id": "7f1d0c78-4545-4659-ab20-14476c688983",
+        "name": "Notes",
+        "description": "",
+        "folders": [],
+        "requestIds": [
+          "a69853de-2d55-4177-a07b-3e046f237bbb",
+          "4cd0c0e1-e227-4359-8183-4cf0b6f983a0",
+          "3ad8f215-f246-45dc-b1c2-d4ec4a8651aa",
+          "a23a1b53-cd30-498a-8fe2-835970a90b8a",
+          "5fbd4737-27a6-4501-b67c-f5ffc42b1e37",
+          "93483547-1556-45b5-a92b-645c01a283e1"
+        ]
+      }
+    ],
+    "requestIds": []
+  },
+  "requests": {
+    "c14a81c8-7c4e-47ca-821d-fbfb760ab302": {
+      "id": "c14a81c8-7c4e-47ca-821d-fbfb760ab302",
+      "name": "Check the health of the API Notes service",
+      "method": "GET",
+      "url": "{{baseUrl}}/health-check",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Use this API endpoint to check if the server is running and healthy",
+      "meta": {
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "8bbe02e0-dbc7-434f-b1b6-a92eb269bed7": {
+      "id": "8bbe02e0-dbc7-434f-b1b6-a92eb269bed7",
+      "name": "Creates a new user account",
+      "method": "POST",
+      "url": "{{baseUrl}}/users/register",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "form",
+        "form": [
+          {
+            "key": "name",
+            "value": "string",
+            "enabled": true,
+            "description": "User's name"
+          },
+          {
+            "key": "email",
+            "value": "string",
+            "enabled": true,
+            "description": "User's email address"
+          },
+          {
+            "key": "password",
+            "value": "string",
+            "enabled": true,
+            "description": "User's password"
+          }
+        ]
+      },
+      "description": "Returns the newly created user object",
+      "meta": {
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "a8203e1e-0979-40bc-8386-62028eb01f5b": {
+      "id": "a8203e1e-0979-40bc-8386-62028eb01f5b",
+      "name": "Log in as an existing user",
+      "method": "POST",
+      "url": "{{baseUrl}}/users/login",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "form",
+        "form": [
+          {
+            "key": "email",
+            "value": "string",
+            "enabled": true,
+            "description": "User email"
+          },
+          {
+            "key": "password",
+            "value": "string",
+            "enabled": true,
+            "description": "User password"
+          }
+        ]
+      },
+      "description": "Authenticate a user and return access token",
+      "meta": {
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "21e5b476-9591-4106-8ce3-28fa69e53121": {
+      "id": "21e5b476-9591-4106-8ce3-28fa69e53121",
+      "name": "Retrieve user profile information",
+      "method": "GET",
+      "url": "{{baseUrl}}/users/profile",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Returns the profile information for the logged-in current user.",
+      "meta": {
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "afb8151f-2cf2-4d77-869a-67a5b5a2018f": {
+      "id": "afb8151f-2cf2-4d77-869a-67a5b5a2018f",
+      "name": "Update the user profile information",
+      "method": "PATCH",
+      "url": "{{baseUrl}}/users/profile",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "form",
+        "form": [
+          {
+            "key": "name",
+            "value": "string",
+            "enabled": true,
+            "description": "User's name"
+          },
+          {
+            "key": "phone",
+            "value": "string",
+            "enabled": false,
+            "description": "User's phone number"
+          },
+          {
+            "key": "company",
+            "value": "string",
+            "enabled": false,
+            "description": "User's company name"
+          }
+        ]
+      },
+      "description": "Update the user profile information for the logged-in user",
+      "meta": {
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "213a000f-ea28-4874-878f-2c190b188032": {
+      "id": "213a000f-ea28-4874-878f-2c190b188032",
+      "name": "Send password reset link to user's email",
+      "method": "POST",
+      "url": "{{baseUrl}}/users/forgot-password",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "form",
+        "form": [
+          {
+            "key": "email",
+            "value": "string",
+            "enabled": true,
+            "description": "User email"
+          }
+        ]
+      },
+      "description": "Sends a password reset link to the user's email address, allowing them to reset their password",
+      "meta": {
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "a8a6c51e-3804-4b47-9c25-80449917b96b": {
+      "id": "a8a6c51e-3804-4b47-9c25-80449917b96b",
+      "name": "Verify a password reset token",
+      "method": "POST",
+      "url": "{{baseUrl}}/users/verify-reset-password-token",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "form",
+        "form": [
+          {
+            "key": "token",
+            "value": "string",
+            "enabled": true,
+            "description": "The password reset token received via email"
+          }
+        ]
+      },
+      "description": "Verify that the provided password reset token",
+      "meta": {
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "7f900b5d-9139-419c-a3e2-68fb6f033267": {
+      "id": "7f900b5d-9139-419c-a3e2-68fb6f033267",
+      "name": "Reset a user's password",
+      "method": "POST",
+      "url": "{{baseUrl}}/users/reset-password",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "form",
+        "form": [
+          {
+            "key": "token",
+            "value": "string",
+            "enabled": true,
+            "description": "The password reset token received via email"
+          },
+          {
+            "key": "newPassword",
+            "value": "string",
+            "enabled": true,
+            "description": "The new password for the user's account"
+          }
+        ]
+      },
+      "description": "Reset a user's password with a valid password reset token and a new password",
+      "meta": {
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "0e3903ae-4a1b-4773-ae35-52b3419d2031": {
+      "id": "0e3903ae-4a1b-4773-ae35-52b3419d2031",
+      "name": "Change a user's password",
+      "method": "POST",
+      "url": "{{baseUrl}}/users/change-password",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "form",
+        "form": [
+          {
+            "key": "currentPassword",
+            "value": "string",
+            "enabled": true,
+            "description": "The current password"
+          },
+          {
+            "key": "newPassword",
+            "value": "string",
+            "enabled": true,
+            "description": "The new password"
+          }
+        ]
+      },
+      "description": "Change a user's password by providing the user's current password and the new password.",
+      "meta": {
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "2e8f7c8d-61ea-4235-9642-dabdbcd5976f": {
+      "id": "2e8f7c8d-61ea-4235-9642-dabdbcd5976f",
+      "name": "Log out a user",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/users/logout",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Log out the currently authenticated user by invalidating their token.",
+      "meta": {
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "70b2273f-6c5b-4d72-aa48-b545938b1223": {
+      "id": "70b2273f-6c5b-4d72-aa48-b545938b1223",
+      "name": "Delete user account",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/users/delete-account",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Deletes the authenticated user account",
+      "meta": {
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "a69853de-2d55-4177-a07b-3e046f237bbb": {
+      "id": "a69853de-2d55-4177-a07b-3e046f237bbb",
+      "name": "Get all notes",
+      "method": "GET",
+      "url": "{{baseUrl}}/notes",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Retrieve a list of notes for the authenticated user",
+      "meta": {
+        "tags": [
+          "Notes"
+        ]
+      }
+    },
+    "4cd0c0e1-e227-4359-8183-4cf0b6f983a0": {
+      "id": "4cd0c0e1-e227-4359-8183-4cf0b6f983a0",
+      "name": "Create a new note",
+      "method": "POST",
+      "url": "{{baseUrl}}/notes",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "form",
+        "form": [
+          {
+            "key": "title",
+            "value": "string",
+            "enabled": true,
+            "description": "Title of the note"
+          },
+          {
+            "key": "description",
+            "value": "string",
+            "enabled": true,
+            "description": "Description of the note"
+          },
+          {
+            "key": "category",
+            "value": "string",
+            "enabled": true,
+            "description": "Note category"
+          }
+        ]
+      },
+      "description": "Creates a new note with the given title, description, category and user id.",
+      "meta": {
+        "tags": [
+          "Notes"
+        ]
+      }
+    },
+    "3ad8f215-f246-45dc-b1c2-d4ec4a8651aa": {
+      "id": "3ad8f215-f246-45dc-b1c2-d4ec4a8651aa",
+      "name": "Get a note by ID",
+      "method": "GET",
+      "url": "{{baseUrl}}/notes/{{id}}",
+      "headers": [],
+      "params": [
+        {
+          "key": "id",
+          "value": "",
+          "enabled": true,
+          "description": "ID of the note to retrieve",
+          "paramType": "path"
+        }
+      ],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Retrieve a note by its ID",
+      "meta": {
+        "tags": [
+          "Notes"
+        ]
+      }
+    },
+    "a23a1b53-cd30-498a-8fe2-835970a90b8a": {
+      "id": "a23a1b53-cd30-498a-8fe2-835970a90b8a",
+      "name": "Update an existing  note",
+      "method": "PUT",
+      "url": "{{baseUrl}}/notes/{{id}}",
+      "headers": [],
+      "params": [
+        {
+          "key": "id",
+          "value": "",
+          "enabled": true,
+          "description": "",
+          "paramType": "path"
+        }
+      ],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "form",
+        "form": [
+          {
+            "key": "title",
+            "value": "string",
+            "enabled": true,
+            "description": "Title of the note"
+          },
+          {
+            "key": "description",
+            "value": "string",
+            "enabled": true,
+            "description": "Description of the note"
+          },
+          {
+            "key": "completed",
+            "value": "true",
+            "enabled": true,
+            "description": "Status of the note (completed or not completed)"
+          },
+          {
+            "key": "category",
+            "value": "string",
+            "enabled": true,
+            "description": "Category of the note (\"Home\", \"Work\" or \"Personal\")"
+          }
+        ]
+      },
+      "description": "Creates a new note with the given title, description, category and user id.",
+      "meta": {
+        "tags": [
+          "Notes"
+        ]
+      }
+    },
+    "5fbd4737-27a6-4501-b67c-f5ffc42b1e37": {
+      "id": "5fbd4737-27a6-4501-b67c-f5ffc42b1e37",
+      "name": "Update the completed status of a note",
+      "method": "PATCH",
+      "url": "{{baseUrl}}/notes/{{id}}",
+      "headers": [],
+      "params": [
+        {
+          "key": "id",
+          "value": "",
+          "enabled": true,
+          "description": "ID of the note to update",
+          "paramType": "path"
+        }
+      ],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "form",
+        "form": [
+          {
+            "key": "completed",
+            "value": "true",
+            "enabled": true,
+            "description": "New value for the `completed` attribute"
+          }
+        ]
+      },
+      "description": "Update the `completed` attribute of the note with the specified `id`",
+      "meta": {
+        "tags": [
+          "Notes"
+        ]
+      }
+    },
+    "93483547-1556-45b5-a92b-645c01a283e1": {
+      "id": "93483547-1556-45b5-a92b-645c01a283e1",
+      "name": "Delete a note by ID",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/notes/{{id}}",
+      "headers": [],
+      "params": [
+        {
+          "key": "id",
+          "value": "",
+          "enabled": true,
+          "description": "ID of the note to delete",
+          "paramType": "path"
+        }
+      ],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "description": "Deletes a note with the specified ID.",
+      "meta": {
+        "tags": [
+          "Notes"
+        ]
+      }
+    }
+  }
+}

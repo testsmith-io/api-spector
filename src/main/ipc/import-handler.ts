@@ -14,6 +14,8 @@ import { importOpenApi, importOpenApiFromUrl,
 import { importInsomnia }                                   from '../importers/insomnia';
 import { importBruno }                                      from '../importers/bruno';
 import { importHttpFile }                                   from '../importers/http-file';
+import { importHar }                                        from '../importers/har';
+import { importArazzoFiles }                                from '../importers/arazzo';
 
 export function registerImportHandlers(ipc: IpcMain): void {
   handleIpc(ipc, IPC.import.postman, async () => {
@@ -78,6 +80,26 @@ export function registerImportHandlers(ipc: IpcMain): void {
     });
     if (result.canceled || !result.filePaths[0]) return null;
     return importHttpFile(result.filePaths[0]);
+  });
+
+  handleIpc(ipc, IPC.import.har, async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Import HTTP Archive (.har)',
+      filters: [{ name: 'HTTP Archive', extensions: ['har', 'json'] }],
+      properties: ['openFile'],
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    return importHar(result.filePaths[0]);
+  });
+
+  handleIpc(ipc, IPC.import.arazzo, async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Import Arazzo workflow — select the .arazzo file and its OpenAPI spec file(s)',
+      filters: [{ name: 'Arazzo + OpenAPI', extensions: ['arazzo', 'yaml', 'yml', 'json'] }],
+      properties: ['openFile', 'multiSelections'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return importArazzoFiles(result.filePaths);
   });
 
   // Import an existing API Spector collection file (as saved in a workspace's

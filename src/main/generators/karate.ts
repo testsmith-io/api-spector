@@ -4,7 +4,7 @@
 import type { Collection, Environment, Folder, GeneratedFile, RequestBody } from '../../shared/types';
 import { resolveInheritedAuthAndHeaders, getAllApplicableHooks } from '../../shared/request-collection';
 import { parsePostScript, accessorToJsonPath } from './script-parser';
-import { javaClass, resolveEffectiveAuth, mergeHeaders, hasBody, getEnvBaseUrl, renderTree } from './generator-utils';
+import { javaClass, resolveEffectiveAuth, mergeHeaders, hasBody, getEnvBaseUrl, renderTree, karateJsonPathExpr } from './generator-utils';
 
 // ─── Karate (Java + JUnit 5 + Maven) generator ───────────────────────────────
 //
@@ -248,7 +248,7 @@ function buildBackground(folderId: string, collection: Collection): BackgroundBl
     const parsed = parsePostScript(h.postRequestScript);
     for (const e of parsed.extractions) {
       const jp = accessorToJsonPath(e.accessor).replace(/^json\.?/, '');
-      const expr = jp ? `response.${jp}` : 'response';
+      const expr = e.jsonPath ? karateJsonPathExpr(e.jsonPath) : (jp ? `response.${jp}` : 'response');
       const name = configKey(e.varName);
       defined.add(name);
       lines.push(`  * def ${name} = ${expr}`);
@@ -548,10 +548,8 @@ export function generateKarate(
     for (const sub of folder.folders) processFolder(sub, sub.name);
   }
 
-  if (collection.rootFolder.requestIds.length > 0) {
-    processFolder(collection.rootFolder, collection.name);
-  }
-  for (const sub of collection.rootFolder.folders) processFolder(sub, sub.name);
+  // Walk from the root once (processFolder guards emission and recurses).
+  processFolder(collection.rootFolder, collection.name);
 
   files.unshift({ path: 'README.md', content: buildReadme(collection.name, files.map(f => f.path)) });
   return files;

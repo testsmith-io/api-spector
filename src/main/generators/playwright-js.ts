@@ -7,6 +7,7 @@ import { parsePostScript } from './script-parser';
 import {
   slug, toEnvVar, interpolateEnvVars as interpolatePath, renderJsValue, buildNameMap,
   resolveEffectiveAuth, mergeHeaders, hasBody, getEnvBaseUrl, renderTree, PLAYWRIGHT_VERBS,
+  jsJsonPathExpr, folderUsesJsonPath, collectionUsesJsonPath,
 } from './generator-utils';
 
 // ─── Playwright JavaScript generator ─────────────────────────────────────────
@@ -72,7 +73,7 @@ function buildHookLines(req: ApiRequest, sharedVars: Set<string>): string[] {
     lines.push(`    const hookResponse = await ${hookCall};`, `    const hookJson = await hookResponse.json();`);
     for (const e of parsed.extractions) {
       const jp = e.accessor.replace(/^json\.?/, '');
-      const expr = jp ? `hookJson.${jp}` : 'hookJson';
+      const expr = e.jsonPath ? jsJsonPathExpr(e.jsonPath, 'hookJson') : (jp ? `hookJson.${jp}` : 'hookJson');
       const varName = toEnvVar(e.varName);
       sharedVars.add(varName);
       lines.push(`    ${varName} = String(${expr});`);
@@ -225,7 +226,7 @@ function buildSpec(folderName: string, folder: Folder, collection: Collection, n
 
     for (const e of parsed.extractions) {
       const path = e.accessor.replace(/^json\.?/, '');
-      const expr = path ? `json.${path}` : 'json';
+      const expr = e.jsonPath ? jsJsonPathExpr(e.jsonPath, 'json') : (path ? `json.${path}` : 'json');
       lines.push(`    process.env.${toEnvVar(e.varName)} = String(${expr});`);
     }
 
@@ -233,8 +234,12 @@ function buildSpec(folderName: string, folder: Folder, collection: Collection, n
     tests.push(lines.join('\n'));
   }
 
-  return `const { test, expect } = require('@playwright/test');
+  const jsonPathImport = folderUsesJsonPath(folder, collection)
+    ? "const { JSONPath } = require('jsonpath-plus');\n"
+    : '';
 
+  return `const { test, expect } = require('@playwright/test');
+${jsonPathImport}
 test.describe('${folderName}', () => {
 
 ${tests.join('\n\n')}
@@ -245,7 +250,7 @@ ${tests.join('\n\n')}
 
 // ─── Project scaffolding ──────────────────────────────────────────────────────
 
-function buildPackageJson(collectionName: string): string {
+function buildPackageJson(collectionName: string, usesJsonPath: boolean): string {
   const name = collectionName.replaceAll(/\W+/g, '-').toLowerCase();
   return JSON.stringify({
     name: `${name}-api-tests`,
@@ -258,6 +263,7 @@ function buildPackageJson(collectionName: string): string {
     devDependencies: {
       '@playwright/test': '^1.44.0',
       dotenv:            '^16.4.0',
+      ...(usesJsonPath ? { 'jsonpath-plus': '^10.4.0' } : {}),
     },
   }, null, 2) + '\n';
 }
@@ -300,12 +306,12 @@ export function generatePlaywrightJs(
     for (const sub of folder.folders) processFolder(sub, sub.name);
   }
 
-  if (collection.rootFolder.requestIds.length > 0) processFolder(collection.rootFolder, collection.name);
-  for (const sub of collection.rootFolder.folders) processFolder(sub, sub.name);
+  // Walk from the root once (processFolder guards emission and recurses).
+  processFolder(collection.rootFolder, collection.name);
 
   const scaffoldPaths = ['package.json', 'playwright.config.js', ...files.map(f => f.path)];
   files.unshift(
-    { path: 'package.json',          content: buildPackageJson(collection.name) },
+    { path: 'package.json',          content: buildPackageJson(collection.name, collectionUsesJsonPath(collection)) },
     { path: 'playwright.config.js',  content: buildPlaywrightConfig(environment) },
     { path: 'README.md',             content: buildReadme(collection.name, scaffoldPaths) },
   );

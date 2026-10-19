@@ -25,6 +25,14 @@ function b64(buf: ArrayBuffer | Uint8Array): string {
   return btoa(String.fromCharCode(...new Uint8Array(buf instanceof ArrayBuffer ? buf : buf.buffer)));
 }
 
+/** Read-only display of a variable's value: encrypted secrets show dots, OS-env
+ *  references show $NAME, everything else shows the plain value. */
+function envVarDisplay(v: EnvVariable): string {
+  if (v.secret && v.secretEncrypted) return '••••••••';
+  if (v.envRef) return `$${v.envRef}`;
+  return v.value ?? '';
+}
+
 /**
  * Encrypt plaintext with AES-256-GCM using PBKDF2-derived key.
  * Returns base64 fields suitable for storing in the env file.
@@ -114,6 +122,37 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
       const resolved = resolveEnvironmentChain(env, allEnvDatas);
       const inheritedCount = resolved.variables.filter(v => !ownKeys.has(v.key)).length;
       inheritSummary = t('Inherits :count variable from :names|Inherits :count variables from :names', { count: inheritedCount, names: parentNames.join(', ') });
+    }
+  }
+
+  // Variables inherited from the extends chain (not defined on this env), each
+  // tagged with the nearest parent that provides it. `ancestorSource` maps every
+  // inherited key to that parent, so an own variable with the same key can be
+  // badged as an override.
+  const ancestorSource = new Map<string, string>();
+  const inheritedVars: { v: EnvVariable; from: string }[] = [];
+  if (env) {
+    const chain: typeof allEnvDatas = [];
+    const seenNames = new Set<string>([env.name]);
+    let parentName: string | undefined = env.extends;
+    while (parentName && !seenNames.has(parentName)) {
+      const parent = allEnvDatas.find(e => e.name === parentName);
+      if (!parent) break;
+      chain.push(parent);
+      seenNames.add(parent.name);
+      parentName = parent.extends;
+    }
+    for (const anc of chain) {
+      for (const v of anc.variables) {
+        if (!v.enabled || !v.key || ancestorSource.has(v.key)) continue;
+        ancestorSource.set(v.key, anc.name);  // nearest parent wins
+      }
+    }
+    const ownKeys = new Set(env.variables.map(v => v.key));
+    for (const [key, from] of ancestorSource) {
+      if (ownKeys.has(key)) continue;
+      const v = chain.find(a => a.name === from)?.variables.find(x => x.key === key);
+      if (v) inheritedVars.push({ v, from });
     }
   }
 
@@ -382,6 +421,14 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
                               placeholder={t('variable_name')}
                               className="w-full bg-surface-800 rounded px-2 py-1 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
                             />
+                            {v.key && ancestorSource.has(v.key) && (
+                              <span
+                                className="mt-1 inline-block text-[9px] uppercase tracking-wider text-amber-400/90"
+                                title={t('This replaces the value inherited from :name.', { name: ancestorSource.get(v.key) })}
+                              >
+                                {t('overrides :name', { name: ancestorSource.get(v.key) })}
+                              </span>
+                            )}
                           </td>
 
                           {/* Value cell */}
@@ -496,6 +543,39 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
                 >
                   {t('+ Add variable')}
                 </button>
+
+                {/* Inherited variables — read-only, from the extends chain. Each
+                    row shows the nearest parent it comes from; add a variable
+                    with the same name above to override it. */}
+                {inheritedVars.length > 0 && (
+                  <div className="px-3 pb-3">
+                    <div className="text-[10px] uppercase tracking-wider text-surface-500 font-medium mt-1 mb-1.5 flex items-center gap-1.5">
+                      <span>{t('Inherited from parents')}</span>
+                      <span className="text-surface-600 normal-case tracking-normal">({inheritedVars.length})</span>
+                    </div>
+                    <table className="w-full text-xs">
+                      <tbody>
+                        {inheritedVars.map(({ v, from }) => (
+                          <tr key={'inh:' + v.key} className="border-b border-surface-800/40">
+                            <td className="px-2 py-1 w-56 font-mono text-surface-400 align-top">{v.key}</td>
+                            <td className="px-2 py-1 font-mono text-surface-500 break-all align-top">{envVarDisplay(v)}</td>
+                            <td className="px-2 py-1 w-36 text-right align-top">
+                              <span
+                                className="text-[9px] uppercase tracking-wider text-sky-300/90 border border-sky-500/30 rounded px-1 py-px whitespace-nowrap"
+                                title={t('Defined in the parent environment :name', { name: from })}
+                              >
+                                {t('from :name', { name: from })}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <p className="text-[10px] text-surface-600 mt-1.5">
+                      {t('These come from the parent environment. Add a variable with the same name above to override it here.')}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Usage hint */}

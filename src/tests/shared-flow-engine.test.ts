@@ -277,4 +277,48 @@ describe('runFlow', () => {
     const f = flow([s, a, b], [edge(s.id, a.id), edge(a.id, b.id), edge(b.id, a.id)]);
     await expect(runFlow(f, h.deps)).rejects.toThrow(/step limit/);
   });
+
+  it('parallel fires all branch requests, then continues on done', async () => {
+    const h = harness();
+    const s = block('start');
+    const p = block('parallel');
+    const a = block('request', { ref: req('a') });
+    const b = block('request', { ref: req('b') });
+    const c = block('request', { ref: req('c') });
+    const e = block('end');
+    const f = flow([s, p, a, b, c, e], [
+      edge(s.id, p.id),
+      edge(p.id, a.id, 'branch'),
+      edge(p.id, b.id, 'branch'),
+      edge(p.id, c.id, 'done'),
+      edge(c.id, e.id),
+    ]);
+    await runFlow(f, h.deps);
+    // Both branches run exactly once; the done path runs after they settle.
+    expect(h.requests).toContain('a');
+    expect(h.requests).toContain('b');
+    expect(h.requests.filter(r => r === 'a' || r === 'b')).toHaveLength(2);
+    expect(h.requests[h.requests.length - 1]).toBe('c');
+  });
+
+  it('parallel copies fires the same request several times at once', async () => {
+    const h = harness();
+    const s = block('start');
+    const p = block('parallel', { copies: 3 });
+    const a = block('request', { ref: req('a') });
+    const f = flow([s, p, a], [edge(s.id, p.id), edge(p.id, a.id, 'branch')]);
+    await runFlow(f, h.deps);
+    expect(h.requests).toEqual(['a', 'a', 'a']);
+  });
+
+  it('parallel marks the block failed when a branch fails', async () => {
+    const h = harness({ status: 500 });
+    const s = block('start');
+    const p = block('parallel');
+    const a = block('request', { ref: req('a') });
+    const f = flow([s, p, a], [edge(s.id, p.id), edge(p.id, a.id, 'branch')]);
+    const summary = await runFlow(f, h.deps);
+    const pRec = summary.blocks.find(bk => bk.blockId === p.id);
+    expect(pRec?.status).toBe('failed');
+  });
 });

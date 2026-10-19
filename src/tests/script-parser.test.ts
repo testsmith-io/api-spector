@@ -95,6 +95,35 @@ sp.variables.set("id", String(sp.response.json().id));`;
     expect(result.assertions.length).toBeGreaterThan(0);
     expect(result.extractions).toHaveLength(1);
   });
+
+  it('captures a sp.jsonPath() query bound to a local, with index and fallback', () => {
+    const script = `const json = sp.response.json();
+const matches = sp.jsonPath(json, '$.data[?(@.name=="Widget")].id');
+sp.variables.set("productId", String(matches[0] ?? ''));`;
+    const { extractions } = parsePostScript(script);
+    expect(extractions).toHaveLength(1);
+    expect(extractions[0]).toEqual({
+      varName: 'productId',
+      accessor: '',
+      target: 'variables',
+      jsonPath: { query: '$.data[?(@.name=="Widget")].id', index: 0, fallback: '' },
+    });
+  });
+
+  it('captures an inline sp.jsonPath() query without an index', () => {
+    const script = `const json = sp.response.json();
+sp.environment.set("ids", sp.jsonPath(json, '$.items[*].id'));`;
+    const { extractions } = parsePostScript(script);
+    expect(extractions).toHaveLength(1);
+    expect(extractions[0].jsonPath).toEqual({ query: '$.items[*].id', index: null, fallback: null });
+  });
+
+  it('drops untranslatable accessors that are not a plain path or a jsonPath query', () => {
+    const script = `const json = sp.response.json();
+sp.variables.set("x", String(json.items.map(i => i.id)));`;
+    const { extractions } = parsePostScript(script);
+    expect(extractions).toHaveLength(0);
+  });
 });
 
 describe('accessorToJsonPath', () => {

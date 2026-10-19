@@ -3,6 +3,7 @@
 
 import type { ApiRequest, AuthConfig, Collection, Environment, Folder, KeyValuePair } from '../../shared/types';
 import { authIsConfigured } from '../../shared/request-collection';
+import { parsePostScript } from './script-parser';
 
 // ─── Shared helpers for the code generators ──────────────────────────────────
 //
@@ -159,3 +160,52 @@ export function restAssuredCall(method: string, pathArg: string): string {
 /** Keywords provided by robotframework-requests. QUERY is not among them —
  *  callers should emit a WARN + skip for those requests. */
 export const ROBOT_REQUESTS_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+
+// ─── JSONPath extraction rendering ────────────────────────────────────────────
+//
+// `sp.jsonPath(json, '<query>')` uses jsonpath-plus (Jayway) syntax. The JS
+// targets use the same library, Karate's `karate.jsonPath` and REST Assured via
+// Jayway share the syntax, so the query string passes through verbatim.
+
+/**
+ * A JS expression resolving a JSONPath query against `jsonVar`, applying the
+ * optional element index and `?? fallback`. Uses `jsonpath-plus`' `JSONPath`,
+ * which the generated project must import and depend on.
+ */
+export function jsJsonPathExpr(
+  q: { query: string; index: number | null; fallback: string | null },
+  jsonVar: string
+): string {
+  const base = `JSONPath({ path: ${JSON.stringify(q.query)}, json: ${jsonVar} })`;
+  const picked = q.index !== null ? `${base}[${q.index}]` : base;
+  if (q.fallback !== null) return `(${picked} ?? ${JSON.stringify(q.fallback)})`;
+  return picked;
+}
+
+/**
+ * A Karate expression resolving a JSONPath query via `karate.jsonPath`, applying
+ * the optional index and `||` fallback (Karate's JS engine).
+ */
+export function karateJsonPathExpr(
+  q: { query: string; index: number | null; fallback: string | null }
+): string {
+  const base = `karate.jsonPath(response, '${q.query.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}')`;
+  const picked = q.index !== null ? `${base}[${q.index}]` : base;
+  if (q.fallback !== null) return `(${picked} || '${q.fallback.replaceAll("'", "\\'")}')`;
+  return picked;
+}
+
+/** True when any request's post-script extracts a value via `sp.jsonPath(...)`. */
+export function collectionUsesJsonPath(collection: Collection): boolean {
+  return Object.values(collection.requests).some(req =>
+    parsePostScript(req.postRequestScript).extractions.some(e => e.jsonPath)
+  );
+}
+
+/** True when any request in this folder (non-recursive) uses a `sp.jsonPath(...)` extraction. */
+export function folderUsesJsonPath(folder: Folder, collection: Collection): boolean {
+  return folder.requestIds.some(id => {
+    const req = collection.requests[id];
+    return !!req && parsePostScript(req.postRequestScript).extractions.some(e => e.jsonPath);
+  });
+}

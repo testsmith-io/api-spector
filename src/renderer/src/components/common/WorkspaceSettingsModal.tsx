@@ -39,6 +39,7 @@ export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => vo
   // General state
   const [defaultEnvironment, setDefaultEnvironment] = useState(existing.defaultEnvironment ?? '');
   const [persistHistory, setPersistHistory] = useState(existing.persistHistory ?? false);
+  const [performanceTesting, setPerformanceTesting] = useState(existing.performanceTesting ?? false);
 
   // Proxy state
   const [proxyUrl,      setProxyUrl]      = useState(existing.proxy?.url ?? '');
@@ -188,6 +189,9 @@ export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => vo
     if (persistHistory) settings.persistHistory = true;
     else delete settings.persistHistory;
 
+    if (performanceTesting) settings.performanceTesting = true;
+    else delete settings.performanceTesting;
+
     // External secret managers — non-secret connection config only. Each block is
     // omitted when empty; the whole `secrets` block is dropped when all are empty.
     const secrets: NonNullable<typeof settings.secrets> = {};
@@ -309,6 +313,22 @@ export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => vo
                   <span className="text-surface-200">{t('Persist request history')}</span>
                   <span className="text-surface-600 text-[11px]">
                     {t('Save history to history.json in the workspace folder so it survives restarts. The file is gitignored. Off by default; history stays in memory otherwise.')}
+                  </span>
+                </span>
+              </label>
+
+              <label className="flex items-start gap-2 mt-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  aria-label={t('Enable performance testing')}
+                  checked={performanceTesting}
+                  onChange={e => setPerformanceTesting(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-surface-200">{t('Enable performance testing')}</span>
+                  <span className="text-surface-600 text-[11px]">
+                    {t('Show the Performance (load) testing view and its left-nav icon. Off by default so it stays out of the way of functional testing.')}
                   </span>
                 </span>
               </label>

@@ -3,7 +3,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import type { Collection, ApiRequest, Folder, Environment, EnvVariable } from '../../../../shared/types';
+import type { Collection, ApiRequest, Folder, Environment, EnvVariable, Flow } from '../../../../shared/types';
 import { useStore } from '../../store';
 import { envRelPath } from '../../../../shared/naming-utils';
 import { parseCurl } from '../../../../shared/curl-import';
@@ -14,7 +14,7 @@ import { btnSecondaryCls, btnPrimaryCls } from '../../lib/ui-classes';
 const { electron } = window;
 
 interface Props {
-  readonly onImport: (col: Collection | null) => void
+  readonly onImport: (col: Collection | null, extras?: { flows?: Flow[] }) => void
   readonly onClose: () => void
 }
 
@@ -32,6 +32,8 @@ const OPTIONS: ImportOption[] = [
   { id: 'insomnia', label: 'Insomnia', description: 'Export v4 JSON' },
   { id: 'bruno',    label: 'Bruno',    description: 'bruno.json collection file' },
   { id: 'http',     label: 'HTTP file', description: '.http / .rest (REST Client)' },
+  { id: 'har',      label: 'HAR',      description: 'HTTP Archive (.har) from devtools or a proxy' },
+  { id: 'arazzo',   label: 'Arazzo',   description: 'Workflow spec -> Flows. Select the .arazzo file AND its OpenAPI spec file(s)' },
   { id: 'spector',  label: 'API Spector', description: 'An existing .spector / .json collection' },
   { id: 'curl',     label: 'cURL',     description: 'Paste a curl command' },
 ];
@@ -72,6 +74,7 @@ export function ImportModal({ onImport, onClose }: Props) {
   const [curlText, setCurlText]   = useState('');
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState<string | null>(null);
+  const [importWarnings, setImportWarnings] = useState<string[] | null>(null);
   const urlInputRef               = useRef<HTMLInputElement>(null);
 
   // ── OpenAPI preview state ──────────────────────────────────────────────────
@@ -134,15 +137,31 @@ export function ImportModal({ onImport, onClose }: Props) {
         }
         return;
       }
+      // Arazzo builds a collection AND one or more flows; register both, then
+      // show any translation warnings instead of closing silently.
+      if (opt.id === 'arazzo') {
+        const res = await electron.importArazzo();
+        if (!res) return;
+        onImport(res.collection, { flows: res.flows });
+        if (res.warnings.length > 0) {
+          setImportWarnings(res.warnings);
+        } else {
+          onClose();
+        }
+        return;
+      }
       let col: Collection | null = null;
       if (opt.id === 'postman')  col = await electron.importPostman();
       if (opt.id === 'openapi')  col = await electron.importOpenApi();
       if (opt.id === 'insomnia') col = await electron.importInsomnia();
       if (opt.id === 'bruno')    col = await electron.importBruno();
       if (opt.id === 'http')     col = await electron.importHttpFile();
+      if (opt.id === 'har')      col = await electron.importHar();
       if (opt.id === 'spector')  col = await electron.importSpectorCollection();
       if (!col) { setLoading(false); return; }
-      if (opt.id === 'openapi') {
+      // OpenAPI and HAR can carry many endpoints/captures, so route them
+      // through the endpoint picker (pick what to keep, extract a base URL).
+      if (opt.id === 'openapi' || opt.id === 'har') {
         enterPreview(col);
       } else {
         onImport(col);
@@ -627,6 +646,18 @@ export function ImportModal({ onImport, onClose }: Props) {
 
         {/* Error */}
         {error && <p className="text-[11px] text-red-400">{error}</p>}
+
+        {/* Arazzo import warnings (import still succeeded) */}
+        {importWarnings && (
+          <div className="rounded border border-amber-700/50 bg-amber-900/20 px-3 py-2">
+            <p className="text-[11px] font-medium text-amber-300 mb-1">
+              {t('Imported with :count note|Imported with :count notes', { count: importWarnings.length })}
+            </p>
+            <ul className="text-[11px] text-amber-200/80 list-disc pl-4 space-y-0.5 max-h-40 overflow-y-auto">
+              {importWarnings.map((w, i) => <li key={i}>{w}</li>)}
+            </ul>
+          </div>
+        )}
 
         {/* Action row */}
         <div className="flex justify-end gap-2 pt-1">

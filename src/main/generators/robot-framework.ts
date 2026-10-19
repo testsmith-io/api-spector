@@ -76,6 +76,57 @@ function buildVariablesFile(environment: Environment | null): string {
 }
 
 /**
+ * Collapse a (pretty-printed) JSON body onto a single line so it occupies one
+ * Robot Framework cell. Multi-line JSON written straight after `VAR ${body}` has
+ * no `...` continuation, so Robot parses each line as a keyword call. Compact
+ * JSON stays valid as one cell (Robot splits cells on 2+ spaces or tabs, which
+ * compact JSON does not contain).
+ */
+function compactJsonBody(json: string): string {
+  try { return JSON.stringify(JSON.parse(json)); } catch { return json.replace(/\s*\r?\n\s*/g, ' ').trim(); }
+}
+
+/** A JSONPath accessor is nested (not a single top-level key) when it contains `.` or `[`. */
+function isNestedPath(jp: string): boolean {
+  return /[.[]/.test(jp);
+}
+
+/**
+ * Convert a JSONPath accessor (`address.street`, `matches[0]`, `users[0].name`,
+ * `['my key'].v`) into Python subscripts on the parsed body, e.g.
+ * `['address']['street']`, `['matches'][0]`. Used with `Evaluate    $response...`
+ * so nested paths work (Robot's `Get From Dictionary` only takes a flat key).
+ */
+function pyIndex(jp: string): string {
+  return jp
+    .replaceAll(/\.([A-Za-z_$][\w$]*)/g, "['$1']")
+    .replace(/^([A-Za-z_$][\w$]*)/, "['$1']");
+}
+
+/**
+ * JSONPath extractions use Jayway/jsonpath-plus syntax, which Robot's available
+ * JSONPath libraries (jsonpath-ng) do not parse the same way (filters especially).
+ * Rather than emit a query that silently resolves wrong, define the variable as
+ * empty and point the user at the manual step, keeping the suite runnable.
+ */
+function jsonPathPlaceholder(name: string, query: string): string[] {
+  return [
+    `    # JSONPath not auto-translated to Robot: ${query}`,
+    `    # Set \${${name}} manually, or use a JSONPath library and adapt the query to jsonpath-ng syntax.`,
+    `    VAR    \${${name}}    \${EMPTY}`,
+    `    Set Suite Variable    \${${name}}`,
+  ];
+}
+
+/** Emit `${name}=` read of accessor `jp` out of `${response}` as a string. */
+function readJsonValue(name: string, jp: string): string[] {
+  if (isNestedPath(jp)) {
+    return [`    \${${name}}=    Evaluate    str($response.json()${pyIndex(jp)})`];
+  }
+  return [`    \${${name}}=    Get From Dictionary    \${response.json()}    ${jp}`];
+}
+
+/**
  * Try to render a JSON object body as RF VAR dict pairs (`k=v    k=v`).
  * Returns null for arrays or nested objects — those fall back to a scalar ${body}.
  */
@@ -134,7 +185,7 @@ function buildKeywordsFile(
         if (bodyPairs !== null) {
           lines.push(`    VAR    &{body}    ${bodyPairs}`);
         } else {
-          lines.push(`    VAR    \${body}    ${interpolate(body.json, varMap)}`);
+          lines.push(`    VAR    \${body}    ${interpolate(compactJsonBody(body.json), varMap)}`);
         }
       }
 
@@ -147,10 +198,13 @@ function buildKeywordsFile(
       // Extract variables from post-script
       const parsed = parsePostScript(req.postRequestScript);
       for (const e of parsed.extractions) {
-        const jp = accessorToJsonPath(e.accessor);
         const rfVar = e.varName.replaceAll(/\W+/g, '_').toUpperCase();
         hookExtractedVars.add(rfVar);
-        lines.push(`    \${${rfVar}}=    Evaluate    str($response.json().get('${jp}', ''))`, `    Set Suite Variable    \${${rfVar}}`);
+        if (e.jsonPath) {
+          lines.push(...jsonPathPlaceholder(rfVar, e.jsonPath.query));
+        } else {
+          lines.push(...readJsonValue(rfVar, accessorToJsonPath(e.accessor)), `    Set Suite Variable    \${${rfVar}}`);
+        }
       }
 
       lines.push(`    RETURN    \${response}`, '');
@@ -232,7 +286,7 @@ function buildKeywordsFile(
         if (bodyPairs !== null) {
           lines.push(`    VAR    &{body}    ${bodyPairs}`);
         } else {
-          lines.push(`    VAR    \${body}    ${interpolate(body.json, varMap)}`);
+          lines.push(`    VAR    \${body}    ${interpolate(compactJsonBody(body.json), varMap)}`);
         }
       }
 
@@ -265,6 +319,9 @@ function buildTestSuite(
 ): string {
   const colName = safeName(collection.name);
   const envName = environment?.name ?? 'default';
+  const varMap  = new Map<string, EnvVariable>(
+    (environment?.variables ?? []).map(v => [v.key, v])
+  );
 
   // Collect beforeAll/afterAll hooks from every folder in the collection
   // (root + nested) so they fire as Suite Setup/Teardown.
@@ -314,17 +371,21 @@ function buildTestSuite(
               lines.push(`    Status Should Be    ${a.expected ?? 200}    \${response}`);
               break;
             case 'equals': {
-              const expected = a.expected?.replaceAll(/^"|"$/g, '') ?? '';
-              lines.push(`    \${value}=    Get From Dictionary    \${response.json()}    ${jp}`, `    Should Be Equal As Strings    \${value}    ${expected}`);
+              const expected = interpolate(a.expected?.replaceAll(/^"|"$/g, '') ?? '', varMap);
+              lines.push(...readJsonValue('value', jp), `    Should Be Equal As Strings    \${value}    ${expected}`);
               break;
             }
             case 'contains': {
-              const expected = a.expected?.replaceAll(/^"|"$/g, '') ?? '';
-              lines.push(`    \${value}=    Get From Dictionary    \${response.json()}    ${jp}`, `    Should Contain    \${value}    ${expected}`);
+              const expected = interpolate(a.expected?.replaceAll(/^"|"$/g, '') ?? '', varMap);
+              lines.push(...readJsonValue('value', jp), `    Should Contain    \${value}    ${expected}`);
               break;
             }
             case 'exists':
-              lines.push(`    Dictionary Should Contain Key    \${response.json()}    ${jp}`);
+              if (isNestedPath(jp)) {
+                lines.push(`    \${value}=    Evaluate    $response.json()${pyIndex(jp)}`, `    Should Not Be Equal    \${value}    \${None}`);
+              } else {
+                lines.push(`    Dictionary Should Contain Key    \${response.json()}    ${jp}`);
+              }
               break;
             default:
               lines.push(`    Status Should Be    200    \${response}`);
@@ -335,8 +396,11 @@ function buildTestSuite(
       }
 
       for (const e of parsed.extractions) {
-        const jp = accessorToJsonPath(e.accessor);
-        lines.push(`    \${${e.varName}}=    Get From Dictionary    \${response.json()}    ${jp}`, `    Set Suite Variable    \${${e.varName}}`);
+        if (e.jsonPath) {
+          lines.push(...jsonPathPlaceholder(e.varName, e.jsonPath.query));
+        } else {
+          lines.push(...readJsonValue(e.varName, accessorToJsonPath(e.accessor)), `    Set Suite Variable    \${${e.varName}}`);
+        }
       }
 
       lines.push('');

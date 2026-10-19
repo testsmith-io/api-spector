@@ -1,0 +1,35 @@
+{
+  "openapi": "3.0.0",
+  "info": { "title": "Ref Body API", "version": "1.0" },
+  "servers": [{ "url": "https://api.example.com" }],
+  "components": {
+    "schemas": {
+      "Login": {
+        "type": "object",
+        "properties": { "email": { "type": "string" }, "password": { "type": "string" } }
+      }
+    },
+    "requestBodies": {
+      "LoginBody": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Login" } } }
+      }
+    }
+  },
+  "paths": {
+    "/login": {
+      "post": {
+        "summary": "Login",
+        "requestBody": { "$ref": "#/components/requestBodies/LoginBody" },
+        "responses": { "200": { "description": "ok" } }
+      }
+    },
+    "/login-again": {
+      "post": {
+        "summary": "Login again",
+        "requestBody": { "$ref": "#/components/requestBodies/LoginBody" },
+        "responses": { "200": { "description": "ok" } }
+      }
+    }
+  }
+}

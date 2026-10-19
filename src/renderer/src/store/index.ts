@@ -5,6 +5,9 @@ import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type { Workspace, ScriptExecutionMeta } from '../../../shared/types';
 import { createWsSlice, type WsSlice } from './slices/ws-slice';
+import { createSocketIoSlice, type SocketIoSlice } from './slices/socketio-slice';
+import { createGraphqlWsSlice, type GraphqlWsSlice } from './slices/graphqlws-slice';
+import { createMqttSlice, type MqttSlice } from './slices/mqtt-slice';
 import { createGrpcSlice, type GrpcSlice } from './slices/grpc-slice';
 import { createStreamSlice, type StreamSlice } from './slices/stream-slice';
 import { createHistorySlice, type HistorySlice } from './slices/history-slice';
@@ -68,12 +71,15 @@ interface WorkspaceActions {
 export type FullState =
   WorkspaceState & WorkspaceActions &
   TabsSlice & CollectionsSlice & EnvironmentsSlice & MocksSlice & FlowsSlice & UiSlice &
-  WsSlice & GrpcSlice & StreamSlice & HistorySlice & RunnerSlice & RecorderSlice & ContractSlice
+  WsSlice & SocketIoSlice & GraphqlWsSlice & MqttSlice & GrpcSlice & StreamSlice & HistorySlice & RunnerSlice & RecorderSlice & ContractSlice
 
 export const useStore: UseBoundStore<StoreApi<FullState>> = create<FullState>()(
   immer((set, get, api) => ({
     // ── Slice composition ─────────────────────────────────────────────────────
     ...createWsSlice(set, get, api),
+    ...createSocketIoSlice(set, get, api),
+    ...createGraphqlWsSlice(set, get, api),
+    ...createMqttSlice(set, get, api),
     ...createGrpcSlice(set, get, api),
     ...createStreamSlice(set, get, api),
     ...createHistorySlice(set, get, api),
@@ -115,6 +121,9 @@ export const useStore: UseBoundStore<StoreApi<FullState>> = create<FullState>()(
       s.history             = [];
       s.mockLogs            = {};
       s.wsConnections       = {};
+      s.socketIoConnections = {};
+      s.graphqlWsConnections = {};
+      s.mqttConnections = {};
       s.pinnedResponse      = null;
       s.lastContractReport  = null;
       s.contractSnapshots   = {};

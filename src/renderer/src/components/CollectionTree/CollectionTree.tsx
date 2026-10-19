@@ -21,6 +21,7 @@ import { DotsBtn } from '../common/ContextMenu';
 import {
   PlayIcon, PlusIcon, FolderIcon, TagIcon, PencilIcon, TrashIcon, TableIcon,
   CopyIcon, ExpandAllIcon, CollapseAllIcon, SyncIcon, GearIcon, BanIcon,
+  SortAzIcon,
 } from '../common/icons';
 import { useT } from '../../i18n';
 
@@ -505,6 +506,7 @@ function CollectionNode ( {
   // The collection panel is showing THIS collection (clicked, not just owning
   // the active request) — highlight the row like a request/folder.
   const panelActive = useStore( s => s.collectionPanelOpen && s.activeCollectionId === col.id );
+  const sortChildren = useStore( s => s.sortChildren );
   const [expandCtrl, setExpandCtrl] = useState<ExpandCtrl>( { value: true, seq: 0 } );
   const [dropOver, setDropOver] = useState( false );
   const dragCtx = useContext( DragCtx );
@@ -558,6 +560,7 @@ function CollectionNode ( {
             { type: 'separator' },
             { type: 'item', label: t( 'Add request' ), icon: <PlusIcon />, onClick: () => onAddRequest( col.rootFolder.id ) },
             { type: 'item', label: t( 'Add folder' ), icon: <FolderIcon />, onClick: () => onAddFolder( col.rootFolder.id, 'New Folder' ) },
+            { type: 'item', label: t( 'Sort A to Z' ), icon: <SortAzIcon />, onClick: () => sortChildren( col.id, col.rootFolder.id ) },
             { type: 'separator' },
             { type: 'item', label: t( 'Expand all' ), icon: <ExpandAllIcon />, onClick: expandAll },
             { type: 'item', label: t( 'Collapse all' ), icon: <CollapseAllIcon />, onClick: collapseAll },
@@ -665,6 +668,7 @@ function FolderRow ( {
   const [addingTag, setAddingTag] = useState( false );
   const folderCollection = useStore( s => s.collections[collectionId]?.data );
   const setFolderHookType = useStore( s => s.setFolderHookType );
+  const sortChildren = useStore( s => s.sortChildren );
   const openFolderPanel = useStore( s => s.openFolderPanel );
   const isActive = useStore( s => s.folderPanel?.folderId === folder.id && s.folderPanel?.collectionId === collectionId );
   // "Hook type" submenu: run the whole folder as a lifecycle hook (or clear it).
@@ -754,6 +758,7 @@ function FolderRow ( {
             { type: 'separator' },
             { type: 'item', label: t( 'Add request' ), icon: <PlusIcon />, onClick: onAddRequest },
             { type: 'item', label: t( 'Add sub-folder' ), icon: <FolderIcon />, onClick: onAddFolder },
+            { type: 'item', label: t( 'Sort A to Z' ), icon: <SortAzIcon />, onClick: () => sortChildren( collectionId, folder.id ) },
             { type: 'separator' },
             { type: 'item', label: t( 'Expand all' ), icon: <ExpandAllIcon />, onClick: () => { setExpanded( true ); onRequestExpand( collectFolderIds( folder ), true ); } },
             { type: 'item', label: t( 'Collapse all' ), icon: <CollapseAllIcon />, onClick: () => { const ids = collectFolderIds( folder ); ids.delete( folder.id ); onRequestExpand( ids, false ); } },

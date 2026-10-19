@@ -23,6 +23,8 @@ export interface BlockNodeData {
   status?: FlowNodeStatus
   /** Latest value produced by a display block in the last run (preview). */
   output?: unknown
+  /** Static validation marker from the flow linter (worst severity on this block). */
+  problem?: 'error' | 'warning'
   [key: string]: unknown
 }
 
@@ -92,13 +94,24 @@ function Frame({
   const spec = BLOCK_SPECS[type];
   const hasInput = inputsFor({ type }).length > 0;
   const statusRing = data.status ? STATUS_RING[data.status.status] ?? '' : '';
+  // A validation problem rings the block when it isn't currently showing a run
+  // status (so a live run still wins). The corner badge below always shows.
+  const problemRing = !data.status && data.problem
+    ? (data.problem === 'error' ? '!border-red-500/70' : '!border-amber-500/70')
+    : '';
   // A custom color overrides the category border (inline style beats the
   // tailwind class); a run status still wins via its !important border.
   return (
     <div
-      className={`rounded-md border bg-surface-900 shadow-lg ${CATEGORY_RING[spec.category]} ${statusRing}`}
+      className={`relative rounded-md border bg-surface-900 shadow-lg ${CATEGORY_RING[spec.category]} ${statusRing} ${problemRing}`}
       style={{ minWidth: minW, maxWidth: 280, ...(data.color ? { borderColor: data.color } : {}) }}
     >
+      {data.problem && (
+        <span
+          className={`absolute -top-1.5 -right-1.5 z-10 w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold leading-none shadow ${data.problem === 'error' ? 'bg-red-500 text-white' : 'bg-amber-500 text-surface-950'}`}
+          title={data.problem === 'error' ? 'This block has a problem that will stop the run' : 'This block has a warning'}
+        >!</span>
+      )}
       {hasInput && <Handle id="in" type="target" position={Position.Left} className={handleCls('in')} />}
       <div className="px-3 py-1.5 flex items-center gap-2 border-b border-surface-800/70">
         {data.status && <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[data.status.status] ?? 'bg-surface-600'}`} />}
@@ -222,6 +235,7 @@ export function BlockNode({ id, type, data }: NodeProps) {
     case 'setVar': body = <Line>{cfg?.scope ?? 'local'}:{cfg?.varName || 'var'} ← {summary(cfg?.valueExpression, 'value')}</Line>; break;
     case 'delay': body = <Line>{cfg?.delayMs ?? 0} ms</Line>; break;
     case 'merge': body = <Line>any branch</Line>; break;
+    case 'parallel': body = <Line>at once{(cfg?.copies ?? 1) > 1 ? ` ×${cfg?.copies}` : ''}</Line>; break;
     case 'forEach': body = <Line>{cfg?.itemVar || 'item'} ← {summary(cfg?.expression, 'list')}</Line>; break;
     case 'repeat': body = <Line>× {cfg?.count ?? 0}</Line>; break;
     case 'collect': body = <Line>→ {cfg?.intoVar || 'results'}</Line>; break;

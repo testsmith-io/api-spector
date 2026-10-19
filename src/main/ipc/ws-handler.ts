@@ -7,6 +7,7 @@ import { handleIpc } from './handle';
 import WebSocket from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import type { WsMessage } from '../../shared/types';
+import { runWsTest, type WsTestConfig, type RealtimeTestResult } from '../realtime-test';
 
 // ─── Connection registry ──────────────────────────────────────────────────────
 
@@ -31,18 +32,29 @@ export function registerWsHandlers(ipc: IpcMain): void {
       connections.delete(requestId);
     }
 
+    // The renderer may be destroyed (tab/window closed or reloaded) while the
+    // socket is still open and firing message/close callbacks, so guard every
+    // send — calling WebContents.send on a destroyed sender throws.
+    const alive = () => !event.sender.isDestroyed();
+    const status = (s: string, error?: string) => { if (alive()) event.sender.send(IPC.ws.status, { requestId, status: s, error }); };
+
     // Notify renderer: connecting
-    event.sender.send(IPC.ws.status, { requestId, status: 'connecting' });
+    status('connecting');
 
     const ws = new WebSocket(url, { headers });
 
     connections.set(requestId, ws);
 
+    // If the renderer goes away (tab/window closed or reloaded), close the
+    // socket so it doesn't stream into a destroyed sender indefinitely.
+    event.sender.once('destroyed', () => { try { ws.close(); } catch { /* ignore */ } connections.delete(requestId); });
+
     ws.on('open', () => {
-      event.sender.send(IPC.ws.status, { requestId, status: 'connected' });
+      status('connected');
     });
 
     ws.on('message', (data: WebSocket.RawData) => {
+      if (!alive()) return;
       const message: WsMessage = {
         id: uuidv4(),
         direction: 'received',
@@ -53,12 +65,12 @@ export function registerWsHandlers(ipc: IpcMain): void {
     });
 
     ws.on('error', (err: Error) => {
-      event.sender.send(IPC.ws.status, { requestId, status: 'error', error: err.message });
+      status('error', err.message);
       connections.delete(requestId);
     });
 
     ws.on('close', () => {
-      event.sender.send(IPC.ws.status, { requestId, status: 'disconnected' });
+      status('disconnected');
       connections.delete(requestId);
     });
   });
@@ -70,6 +82,14 @@ export function registerWsHandlers(ipc: IpcMain): void {
       throw new Error('WebSocket is not connected');
     }
     ws.send(data);
+  });
+
+  // ws:test — run a one-shot WebSocket test (its own connection) and assert.
+  handleIpc(ipc, IPC.ws.test, async (_event: IpcMainInvokeEvent, cfg: WsTestConfig): Promise<RealtimeTestResult> => {
+    const t0 = Date.now();
+    const res = await runWsTest(cfg);
+    console.log(`[ws:test] url=${cfg.url} collectMs=${cfg.collectMs} ran=${Date.now() - t0}ms messages=${res.messages.length}${res.error ? ` error=${res.error}` : ''}`);
+    return res;
   });
 
   // ws:disconnect — close a connection

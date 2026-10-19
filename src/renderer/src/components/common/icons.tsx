@@ -113,6 +113,14 @@ export function SyncIcon () {
   );
 }
 
+export function SortAzIcon () {
+  return (
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h10M3 12h7M3 18h4M17 4v14m0 0l-3-3m3 3l3-3" />
+    </svg>
+  );
+}
+
 export function GearIcon () {
   return (
     <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">

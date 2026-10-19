@@ -19,8 +19,14 @@ import { DocsTab } from './DocsTab';
 import { StreamTab } from './StreamTab';
 import { VariablesTab } from './VariablesTab';
 import { WebSocketPanel } from '../WebSocket/WebSocketPanel';
+import { SocketIoPanel } from '../SocketIO/SocketIoPanel';
+import { MqttPanel } from '../MQTT/MqttPanel';
 import { GrpcPanel } from '../Grpc/GrpcPanel';
+import { isSubscriptionQuery, deriveWsUrl } from './GraphQlSubscription';
+import { useVarValues } from '../../hooks/useVarValues';
 import { FuzzModal } from './FuzzModal';
+import { AskVarsModal } from './AskVarsModal';
+import { askVarsInRequest, resolveAskValues, type AskVar } from '../../../../shared/ask-vars';
 import { STORAGE_KEYS } from '../../lib/storage-keys';
 import { useT } from '../../i18n';
 
@@ -68,6 +74,7 @@ const TAB_HINTS: Record<string, string> = {
 export function RequestBuilder({ request }: Props) {
   const t = useT();
   const updateRequest       = useStore(s => s.updateRequest);
+  const subVars             = useVarValues();
   const updateExampleRequest  = useStore(s => s.updateExampleRequest);
   const activeEnvironmentId = useStore(s => s.activeEnvironmentId);
   const activeCollectionId  = useStore(s => s.activeCollectionId);
@@ -97,6 +104,16 @@ export function RequestBuilder({ request }: Props) {
 
   const [editingName, setEditingName] = useState(false);
   const [showFuzz, setShowFuzz] = useState(false);
+  // Realtime panels (WS/IO/MQTT/gRPC) have no tab bar of their own, so they get
+  // a tiny Protocol | Docs switch here so their requests can be documented too.
+  const [rtTab, setRtTab] = useState<'panel' | 'docs'>('panel');
+  const [askPrompt, setAskPrompt] = useState<{ asks: AskVar[]; resolve: (answers: Record<string, string> | null) => void } | null>(null);
+
+  // Open the ask-variable modal and resolve with the entered answers, or null if
+  // the user cancels (which aborts the send).
+  function promptAskVars(asks: AskVar[]): Promise<Record<string, string> | null> {
+    return new Promise(resolve => setAskPrompt({ asks, resolve }));
+  }
   const [customVerb, setCustomVerb] = useState(false);
   const [runHooks, setRunHooks] = useState(() => localStorage.getItem(STORAGE_KEYS.runHooks) !== 'false');
 
@@ -162,15 +179,59 @@ export function RequestBuilder({ request }: Props) {
   useEffect(() => {
     if (sendSignal !== lastSendSignal.current) {
       lastSendSignal.current = sendSignal;
-      // WebSocket / gRPC drive their own panels; the HTTP send pipeline does not
-      // apply, so the Cmd/Ctrl+Enter shortcut is a no-op for them.
-      if (request.protocol !== 'websocket' && request.protocol !== 'grpc') void sendRequest();
+      // WebSocket / Socket.IO / gRPC drive their own panels; the HTTP send
+      // pipeline does not apply, so the Cmd/Ctrl+Enter shortcut is a no-op there.
+      if (request.protocol !== 'websocket' && request.protocol !== 'grpc' && request.protocol !== 'socketio' && request.protocol !== 'mqtt') void sendRequest();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sendSignal]);
 
+  // Keyboard sub-tab navigation (Cmd/Ctrl+Alt+Up/Down). App bumps subTabCycle;
+  // when it targets the request pane we step through THIS tab's own visible tab
+  // list (kept in a ref, since the list depends on the request type).
+  const subTabCycle = useStore(s => s.subTabCycle);
+  const lastSubTabCycle = useRef(subTabCycle.nonce);
+  const subTabIdsRef = useRef<string[]>([]);
+  const activeSubTabRef = useRef<string>(activeTab);
+  useEffect(() => {
+    if (subTabCycle.nonce === lastSubTabCycle.current) return;
+    lastSubTabCycle.current = subTabCycle.nonce;
+    if (subTabCycle.pane !== 'request') return;
+    const ids = subTabIdsRef.current;
+    if (ids.length === 0) return;
+    const i = ids.indexOf(activeSubTabRef.current);
+    const next = (i + subTabCycle.dir + ids.length) % ids.length;
+    setActiveTab(ids[next] as typeof activeTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subTabCycle]);
+
   async function sendRequest() {
     if (!activeTabId) return;
+
+    // A GraphQL subscription is not an HTTP exchange: start the graphql-ws
+    // stream (the Response pane shows the live messages + tests) instead of
+    // POSTing. The stream and its Stop control live in the Response pane.
+    if (request.body.mode === 'graphql' && request.body.graphql && isSubscriptionQuery(request.body.graphql.query)) {
+      const gql = request.body.graphql;
+      const interp = (s: string) => (s ?? '').replace(/\{\{([^}]+)\}\}/g, (_m, k) => subVars[String(k).trim()] ?? '');
+      const url = deriveWsUrl(interp(gql.subscriptionUrl?.trim() || request.url));
+      if (!url) { useStore.getState().setGraphqlWsStatus(request.id, 'error', t('No subscription URL')); return; }
+      const headers: Record<string, string> = {};
+      for (const h of request.headers) if (h.enabled && h.key) headers[interp(h.key)] = interp(h.value);
+      try {
+        await electron.graphqlWsSubscribe(request.id, {
+          url, headers,
+          query: gql.query,
+          variables: interp(gql.variables),
+          operationName: gql.operationName,
+          connectionParams: gql.connectionParams ? interp(gql.connectionParams) : undefined,
+        });
+      } catch (err) {
+        useStore.getState().setGraphqlWsStatus(request.id, 'error', err instanceof Error ? err.message : String(err));
+      }
+      return;
+    }
+
     setTabSending(activeTabId, true);
     setTabResponse(activeTabId, null, null);
     setTabHookResults(activeTabId, null);
@@ -207,6 +268,15 @@ export function RequestBuilder({ request }: Props) {
         ...request.headers,
       ];
       const mergedRequest = { ...request, auth: mergedAuth, headers: mergedHeaders };
+
+      // ── Ask variables ({{@Message}}) — prompt before anything is sent ───────
+      const asks = askVarsInRequest(mergedRequest);
+      if (asks.length > 0) {
+        const answers = await promptAskVars(asks);
+        if (!answers) { setTabSending(activeTabId, false); return; }  // cancelled
+        const askValues = resolveAskValues(asks, answers);
+        collectionVars = { ...collectionVars, ...askValues };
+      }
 
       // ── Resolve applicable hooks ────────────────────────────────────────────
       const collection = activeCollectionId ? collections[activeCollectionId]?.data : null;
@@ -355,6 +425,8 @@ export function RequestBuilder({ request }: Props) {
   const isWs   = request.protocol === 'websocket';
   const isSoap = request.protocol === 'soap';
   const isGrpc = request.protocol === 'grpc';
+  const isSocketIo = request.protocol === 'socketio';
+  const isMqtt = request.protocol === 'mqtt';
 
   // An example is a request specimen (a saved payload), not a test — so it has
   // no Scripts / Schema / Contract, only what it sends.
@@ -365,7 +437,7 @@ export function RequestBuilder({ request }: Props) {
     ...(!isExample ? [{ id: 'docs', label: 'Docs', count: request.description?.trim() ? 1 : 0 }] : []),
     ...(!isSoap ? [{ id: 'params', label: 'Params', count: request.params.filter(p => p.enabled && p.key).length }] : []),
     { id: 'headers', label: 'Headers', count: request.headers.filter(h => h.enabled && h.key).length },
-    ...(!isWs ? [
+    ...((!isWs && !isSocketIo) ? [
       { id: 'body',    label: isSoap ? 'SOAP' : 'Body', count: request.body.mode !== 'none' ? 1 : 0 },
       { id: 'auth',    label: 'Auth',    count: request.auth.type !== 'none' ? 1 : 0 },
       { id: 'variables', label: 'Variables', count: 0 },
@@ -376,6 +448,10 @@ export function RequestBuilder({ request }: Props) {
       ] : []),
     ] : []),
   ] as const;
+
+  // Keep the keyboard sub-tab navigator in sync with the (type-dependent) list.
+  subTabIdsRef.current = tabs.map(tb => tb.id);
+  activeSubTabRef.current = activeTab;
 
   return (
     <div className="flex flex-col h-full">
@@ -415,7 +491,7 @@ export function RequestBuilder({ request }: Props) {
         <div className="flex bg-surface-800 border border-surface-700 rounded overflow-hidden text-xs font-bold flex-shrink-0">
           <button
             onClick={() => update({ protocol: 'http' })}
-            className={`px-2 py-1.5 transition-colors ${!isWs && !isSoap && !isGrpc ? 'bg-blue-600 text-white' : 'text-surface-500 hover:text-white'}`}
+            className={`px-2 py-1.5 transition-colors ${!isWs && !isSoap && !isGrpc && !isSocketIo && !isMqtt ? 'bg-blue-600 text-white' : 'text-surface-500 hover:text-white'}`}
             title={t('HTTP request')}
           >
             HTTP
@@ -454,11 +530,25 @@ export function RequestBuilder({ request }: Props) {
           >
             gRPC
           </button>
+          <button
+            onClick={() => update({ protocol: 'socketio' })}
+            className={`px-2 py-1.5 transition-colors ${isSocketIo ? 'bg-fuchsia-700 text-fuchsia-100' : 'text-surface-500 hover:text-white'}`}
+            title={t('Socket.IO - event-based messaging over Engine.IO')}
+          >
+            IO
+          </button>
+          <button
+            onClick={() => update({ protocol: 'mqtt' })}
+            className={`px-2 py-1.5 transition-colors ${isMqtt ? 'bg-teal-700 text-teal-100' : 'text-surface-500 hover:text-white'}`}
+            title={t('MQTT - publish/subscribe messaging for IoT')}
+          >
+            MQTT
+          </button>
         </div>
 
         {/* Method selector — only meaningful for HTTP. SOAP is always POST,
             shown as a static badge so the user sees what's on the wire. */}
-        {!isWs && !isSoap && !isGrpc && (customVerb ? (
+        {!isWs && !isSoap && !isGrpc && !isSocketIo && !isMqtt && (customVerb ? (
           <input
             autoFocus
             value={request.method}
@@ -505,7 +595,9 @@ export function RequestBuilder({ request }: Props) {
         )}
         </div>
 
-        {/* Row 2: endpoint + hooks + Send */}
+        {/* Row 2: endpoint + hooks + Send (HTTP/SOAP only; WS/IO/MQTT/gRPC put
+            the endpoint + Connect in their own panel header below). */}
+        {!isWs && !isGrpc && !isSocketIo && !isMqtt && (
         <div className="flex items-center gap-2">
         <VarInput
           value={request.url}
@@ -515,6 +607,7 @@ export function RequestBuilder({ request }: Props) {
             isWs   ? 'ws://example.com/socket'
             : isSoap ? t('Endpoint (auto-filled from WSDL <soap:address>)')
             : isGrpc ? 'localhost:50051'
+            : isMqtt ? 'mqtt://broker.example.com:1883'
             : 'https://api.example.com/endpoint'
           }
           wrapperClassName="flex-1"
@@ -526,7 +619,7 @@ export function RequestBuilder({ request }: Props) {
         />
 
         {/* Data-row picker — run this request against one specific data table row */}
-        {!isWs && !isGrpc && applicableDataSet && (
+        {!isWs && !isGrpc && !isMqtt && applicableDataSet && (
           <select
             value={dataRowIdx}
             onChange={e => setDataRowIdx(Number(e.target.value))}
@@ -544,7 +637,7 @@ export function RequestBuilder({ request }: Props) {
         )}
 
         {/* Hooks toggle + Send button (HTTP only) */}
-        {!isWs && !isGrpc && (
+        {!isWs && !isGrpc && !isMqtt && (
           <>
             <button
               onClick={toggleRunHooks}
@@ -568,18 +661,51 @@ export function RequestBuilder({ request }: Props) {
           </>
         )}
         </div>
+        )}
       </div>
 
       {showFuzz && <FuzzModal request={request} onClose={() => setShowFuzz(false)} />}
+      {askPrompt && (
+        <AskVarsModal
+          asks={askPrompt.asks}
+          requestName={request.name}
+          onSubmit={answers => { askPrompt.resolve(answers); setAskPrompt(null); }}
+          onCancel={() => { askPrompt.resolve(null); setAskPrompt(null); }}
+        />
+      )}
 
-      {/* WS / gRPC panels take over the full remaining area */}
-      {isWs ? (
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <WebSocketPanel request={request} />
-        </div>
-      ) : isGrpc ? (
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <GrpcPanel request={request} onChange={update} />
+      {/* WS / Socket.IO / MQTT / gRPC panels take over the full remaining area,
+          with a small Protocol | Docs switch so their requests can be documented. */}
+      {(isWs || isSocketIo || isMqtt || isGrpc) ? (
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex border-b border-surface-800 px-4 gap-0 flex-shrink-0">
+            <button
+              onClick={() => setRtTab('panel')}
+              className={`px-3 py-1.5 text-xs transition-colors border-b-2 -mb-px ${rtTab === 'panel' ? 'border-blue-500 text-white' : 'border-transparent text-surface-400 hover:text-white'}`}
+            >
+              {isWs ? t('WebSocket') : isSocketIo ? t('Socket.IO') : isMqtt ? t('MQTT') : t('gRPC')}
+            </button>
+            <button
+              onClick={() => setRtTab('docs')}
+              className={`px-3 py-1.5 text-xs transition-colors border-b-2 -mb-px ${rtTab === 'docs' ? 'border-blue-500 text-white' : 'border-transparent text-surface-400 hover:text-white'}`}
+            >
+              {t('Docs')}
+              {request.description?.trim() ? <span className="ml-1 text-[10px] bg-surface-600 text-white rounded px-1 font-medium">1</span> : null}
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {rtTab === 'docs' ? (
+              <div className="px-4 py-3 h-full overflow-y-auto"><DocsTab request={request} onChange={update} /></div>
+            ) : isWs ? (
+              <WebSocketPanel request={request} onChange={update} />
+            ) : isSocketIo ? (
+              <SocketIoPanel request={request} onChange={update} />
+            ) : isMqtt ? (
+              <MqttPanel request={request} onChange={update} />
+            ) : (
+              <GrpcPanel request={request} onChange={update} />
+            )}
+          </div>
         </div>
       ) : (
         <>

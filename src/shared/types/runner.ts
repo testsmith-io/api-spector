@@ -11,6 +11,12 @@ export interface RunnerItem {
   /** Name of the collection this item belongs to (top level of the run tree). */
   collection?: string
   collectionVars: Record<string, string>
+  /** Variables from this request's folder chain (root→leaf, innermost wins),
+   *  readable and writable in scripts as `sp.folder`. */
+  folderVars?: Record<string, string>
+  /** Id of the folder that directly owns this request — where `sp.folder.set`
+   *  writes land so sibling requests in the same folder see them. */
+  folderId?: string
   /** Per-iteration variable values (from data-driven dataset). */
   dataRow?: Record<string, string>
   /** Human-readable label, e.g. "2/5" when data-driven. */
@@ -53,8 +59,13 @@ export interface RunnerPayload {
     rejectUnauthorized?: boolean
   }
   piiMaskPatterns?: string[]
-  /** Milliseconds to wait between requests (0 = no delay) */
+  /** Milliseconds to wait between requests (0 = no delay). Sequential runs only. */
   requestDelay?: number
+  /** How many requests may run at the same time (1 = sequential, the default).
+   *  Lifecycle hooks (beforeAll/before/after/afterAll) act as barriers, and
+   *  concurrent requests start from the same variable snapshot, so a parallel
+   *  run suits independent requests rather than chained workflows. */
+  concurrency?: number
 }
 
 /**
@@ -86,6 +97,9 @@ export interface RunRequestResult {
   postScriptError?: string
   /** Set when this result belongs to a data-driven iteration, e.g. "2/5". */
   iterationLabel?: string
+  /** The item's position in the run plan. Set on progress events so a parallel
+   *  run (whose results arrive out of order) can be matched to the right row. */
+  index?: number
   isHook?: boolean
   hookType?: 'beforeAll' | 'before' | 'afterAll' | 'after'
   scopeId?: string

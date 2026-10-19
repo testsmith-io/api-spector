@@ -17,7 +17,9 @@ export interface UiSliceState {
   showGeneratorPanel: boolean
   theme: Theme
   zoom: number
-  sidebarTab: 'collections' | 'history' | 'mocks' | 'contracts' | 'git' | 'flows'
+  sidebarTab: 'collections' | 'history' | 'mocks' | 'contracts' | 'git' | 'flows' | 'perf'
+  /** The selected performance test plan (perfPlans live inline in the workspace). */
+  activePerfPlanId: string | null
 
   workspaceSettingsOpen: boolean
 
@@ -53,6 +55,14 @@ export interface UiSliceState {
    *  rows (and anything else) can replay the current request without
    *  duplicating the scripts/hooks/interpolation logic. */
   sendSignal: number
+
+  /** Which editor pane keyboard sub-tab navigation targets. Set by clicking
+   *  into a pane or by the focus-pane shortcuts; drives the focus ring too. */
+  focusedPane: 'request' | 'response'
+  /** Bumped by cycleSubTab(): the focused pane's RequestBuilder / ResponseViewer
+   *  watches `nonce` and moves to the previous/next of ITS own visible sub-tabs
+   *  (so the dynamic, type-dependent tab list stays authoritative). */
+  subTabCycle: { nonce: number; pane: 'request' | 'response'; dir: -1 | 1 }
 }
 
 export interface UiSliceActions {
@@ -60,6 +70,7 @@ export interface UiSliceActions {
   setTheme: (t: Theme) => void
   setZoom: (z: number) => void
   setSidebarTab: (tab: UiSliceState['sidebarTab']) => void
+  setActivePerfPlanId: (id: string | null) => void
   setWorkspaceSettingsOpen: (open: boolean) => void
   setCommandPaletteOpen: (open: boolean) => void
   setPinnedResponse: (r: ResponsePayload | null) => void
@@ -67,6 +78,10 @@ export interface UiSliceActions {
   setQuickInsertsOpen: (open: boolean) => void
   /** Ask the active request builder to (re)send the current request. */
   requestSend: () => void
+  /** Move keyboard focus to a pane (request / response) for sub-tab navigation. */
+  setFocusedPane: (pane: 'request' | 'response') => void
+  /** Ask the focused pane to move to its previous (-1) or next (1) sub-tab. */
+  cycleSubTab: (dir: -1 | 1) => void
   /** Show or hide the collection/folder data panel over an open request. */
   setCollectionPanelOpen: (open: boolean) => void
   /** Bring the folder panel (docs/data/variables) to the front for a folder. */
@@ -88,12 +103,15 @@ export const createUiSlice: StateCreator<
   theme: (localStorage.getItem(STORAGE_KEYS.theme) as Theme) ?? 'dark',
   zoom: Number(localStorage.getItem(STORAGE_KEYS.zoom) ?? '1.1'),
   sidebarTab: 'collections' as UiSliceState['sidebarTab'],
+  activePerfPlanId: null,
   workspaceSettingsOpen: false,
   commandPaletteOpen: false,
   pinnedResponse: null,
   activeGitDiff: null,
   quickInsertsOpen: true,
   sendSignal: 0,
+  focusedPane: 'request',
+  subTabCycle: { nonce: 0, pane: 'request', dir: 1 },
   collectionPanelOpen: false,
   folderPanel: null,
   coverageOpen: false,
@@ -133,6 +151,7 @@ export const createUiSlice: StateCreator<
   }),
 
   setSidebarTab: (tab) => set(s => { s.sidebarTab = tab; }),
+  setActivePerfPlanId: (id) => set(s => { s.activePerfPlanId = id; }),
 
   setWorkspaceSettingsOpen: (open) => set(s => { s.workspaceSettingsOpen = open; }),
 
@@ -145,6 +164,8 @@ export const createUiSlice: StateCreator<
   setQuickInsertsOpen: (open) => set(s => { s.quickInsertsOpen = open; }),
 
   requestSend: () => set(s => { s.sendSignal += 1; }),
+  setFocusedPane: pane => set(s => { s.focusedPane = pane; }),
+  cycleSubTab: dir => set(s => { s.subTabCycle = { nonce: s.subTabCycle.nonce + 1, pane: s.focusedPane, dir }; }),
 
   setCollectionPanelOpen: (open) => set(s => { s.collectionPanelOpen = open; if (open) s.folderPanel = null; }),
   openFolderPanel: (collectionId, folderId) => set(s => {

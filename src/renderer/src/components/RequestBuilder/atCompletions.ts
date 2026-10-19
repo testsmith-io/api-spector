@@ -56,6 +56,7 @@ const AT_TOP: Completion[] = [
   { label: 'variables',           type: 'property',                         info: 'Local (per-request) variable scope' },
   { label: 'environment',         type: 'property',                         info: 'Environment variable scope' },
   { label: 'collectionVariables', type: 'property',                         info: 'Collection variable scope' },
+  { label: 'folder',              type: 'property',                         info: 'Folder variable scope (shared by requests in the same folder during a run)' },
   { label: 'globals',             type: 'property',                         info: 'Global variable scope' },
 ];
 
@@ -341,7 +342,7 @@ export function makeAtCompletionSource(varNames: string[]) {
     }
 
     // at.variables.xxx | at.environment.xxx | at.collectionVariables.xxx | at.globals.xxx
-    const scopeMatch = /\bsp\.(variables|environment|collectionVariables|globals)\.(\w*)$/.exec(textBefore);
+    const scopeMatch = /\bsp\.(variables|environment|collectionVariables|folder|globals)\.(\w*)$/.exec(textBefore);
     if (scopeMatch) {
       return { from: context.pos - scopeMatch[2].length, options: SCOPE_METHODS, validFor: /^\w*$/ };
     }

@@ -12,6 +12,7 @@ import type {
   Oauth2Auth,
 } from '../../../../shared/types';
 import { VarInput } from './VarInput';
+import { Oauth2Form } from './Oauth2Form';
 import { useT } from '../../i18n';
 
 // ─── Shared auth field editor ─────────────────────────────────────────────────
@@ -25,8 +26,8 @@ import { useT } from '../../i18n';
 //  - with `secrets` (request AuthTab): keychain-backed secret inputs with a
 //    Save button, VarInput bearer token, and NTLM/digest usage notes.
 //
-// OAuth 2.0 fields are not rendered here — the AuthTab owns that flow (token
-// fetch state, electron calls) and renders it via `children`.
+// OAuth 2.0 (token fetch/refresh + fields) is rendered here via the shared
+// Oauth2Form, so every level (request / folder / collection) offers it.
 
 /** Flat patch shape covering every auth type's fields. Unlike `AuthPatch`
  *  (whose discriminant intersection collapses to `never`), this is a real
@@ -48,7 +49,7 @@ export interface SecretFieldSupport {
   saveSecret: (ref: string) => Promise<void>
 }
 
-const DEFAULT_AUTH_TYPES: AuthConfig['type'][] = ['none', 'bearer', 'basic', 'digest', 'ntlm', 'apikey'];
+const DEFAULT_AUTH_TYPES: AuthConfig['type'][] = ['none', 'bearer', 'basic', 'digest', 'ntlm', 'apikey', 'oauth2'];
 
 interface AuthEditorProps {
   readonly auth: AuthConfig
@@ -262,14 +263,23 @@ export function AuthEditor({
               </select>
             </div>
             <div className="flex-1">
-              <label className="text-surface-400">{t('Value')}</label>
-              {secrets ? (
+              <label className="text-surface-400">
+                {t('Value')}{' '}
+                <span className="text-surface-500 text-[10px]">{t('- supports :variables', { variables: '{{variables}}' })}</span>
+              </label>
+              <VarInput
+                value={auth.apiKeyValue ?? ''}
+                onChange={v => onChange({ apiKeyValue: v })}
+                placeholder={t('API key value')}
+                className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 font-mono focus:outline-none focus:border-blue-500"
+              />
+              {secrets && (
                 <div className="flex gap-1 mt-1">
                   <input
                     type="password"
                     value={secrets.secretValue}
                     onChange={e => secrets.setSecretValue(e.target.value)}
-                    placeholder={auth.apiKeySecretRef ? t('Stored as ":ref"', { ref: auth.apiKeySecretRef }) : t('API key value')}
+                    placeholder={auth.apiKeySecretRef ? t('Stored as ":ref"', { ref: auth.apiKeySecretRef }) : t('or store in the OS keychain')}
                     className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
                   />
                   <button
@@ -279,18 +289,14 @@ export function AuthEditor({
                     {secrets.saved ? '✓' : t('Save')}
                   </button>
                 </div>
-              ) : (
-                <VarInput
-                  value={auth.apiKeyValue ?? ''}
-                  onChange={v => onChange({ apiKeyValue: v })}
-                  placeholder={t('API key value')}
-                  className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 font-mono focus:outline-none focus:border-blue-500"
-                />
               )}
             </div>
           </div>
         </div>
       )}
+
+      {/* ── OAuth 2.0 ── */}
+      {auth.type === 'oauth2' && <Oauth2Form auth={auth} onChange={onChange} />}
 
       {children}
     </div>

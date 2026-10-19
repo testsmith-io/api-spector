@@ -25,6 +25,13 @@ export interface KeyValuePair {
    * (appended as `?key=value`). Undefined defaults to `'query'`.
    */
   paramType?: 'query' | 'path'
+  /**
+   * Allowed values for this entry. When set and non-empty, the value cell is
+   * edited as a dropdown of these choices instead of a free-text field. Captured
+   * from an OpenAPI `enum` on import, or defined by hand. Empty/undefined means
+   * free text.
+   */
+  enum?: string[]
 }
 
 export type AuthType = 'none' | 'basic' | 'bearer' | 'apikey' | 'digest' | 'ntlm' | 'oauth2'
@@ -72,6 +79,29 @@ export interface GraphQLBody {
   query: string
   variables: string       // JSON string (kept as text for {{var}} interpolation)
   operationName?: string
+  /** Subscription (graphql-ws) WebSocket endpoint. Defaults to the request URL
+   *  with a ws/wss scheme when empty. */
+  subscriptionUrl?: string
+  /** connection_init payload for the graphql-ws handshake (JSON text), used for
+   *  auth tokens etc. */
+  connectionParams?: string
+  /** Assertion script (sp.* sandbox) run over the subscription payloads when
+   *  running the subscription as a test. Each collected payload is exposed as
+   *  an `sp.messages` entry with `.data` and `.json()`. */
+  subscriptionTestScript?: string
+  /** How long to collect subscription payloads before running the test (ms). */
+  subscriptionCollectMs?: number
+}
+
+/** One entry in a GraphQL subscription (graphql-ws) stream. */
+export interface GraphQlWsMessage {
+  id: string
+  /** 'next' = a subscription payload, 'error' = a GraphQL error payload,
+   *  'complete' = the stream ended, 'system' = a connection note. */
+  kind: 'next' | 'error' | 'complete' | 'system'
+  /** JSON-serialized payload (next/error) or a short message (system). */
+  data: string
+  timestamp: number
 }
 
 export interface SoapBody {
@@ -146,5 +176,37 @@ export interface GrpcMessage {
   id: string
   direction: 'sent' | 'received'
   data: string
+  timestamp: number
+}
+
+/** One entry in a Socket.IO session log: an emitted event, a received event,
+ *  an acknowledgement payload, or a system note (connect / disconnect / error). */
+export interface SocketIoMessage {
+  id: string
+  direction: 'sent' | 'received'
+  /** 'event' = a named Socket.IO event, 'ack' = an acknowledgement callback
+   *  payload, 'system' = a connection status note. */
+  kind: 'event' | 'ack' | 'system'
+  /** Event name for events/acks; a short label for system notes. */
+  event: string
+  /** JSON-serialized argument array (events/acks) or message text (system). */
+  data: string
+  timestamp: number
+}
+
+/** One entry in an MQTT session log: a published message, a received message on
+ *  a subscribed topic, or a system note (connect / subscribe / disconnect /
+ *  error). */
+export interface MqttMessage {
+  id: string
+  direction: 'sent' | 'received'
+  /** 'message' = a publish/receive on a topic, 'system' = a connection note. */
+  kind: 'message' | 'system'
+  /** The topic for messages; a short label for system notes. */
+  topic: string
+  /** The payload (messages) or message text (system notes). */
+  data: string
+  qos?: 0 | 1 | 2
+  retain?: boolean
   timestamp: number
 }

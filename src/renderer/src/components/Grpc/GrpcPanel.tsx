@@ -3,6 +3,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../../store';
+import { VarInput } from '../common/VarInput';
 import { useT } from '../../i18n';
 import type { GrpcCallState } from '../../store/slices/grpc-slice';
 import type { ApiRequest, GrpcBody, GrpcMessage, GrpcServiceInfo, KeyValuePair } from '../../../../shared/types';
@@ -127,10 +128,16 @@ export function GrpcPanel({ request, onChange }: Props) {
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="px-4 pt-2 pb-1 flex-shrink-0 flex items-center gap-2">
-        <span className="text-xs font-bold text-violet-400 bg-surface-800 border border-surface-700 rounded px-2 py-1">gRPC</span>
-        <span className="text-[10px] text-surface-600">{t('Set the target (host:port) in the URL field above.')}</span>
-        <span className={`ml-auto w-2 h-2 rounded-full ${statusColors[call.status] ?? 'bg-surface-600'}`} title={call.status} />
-        {call.codeName && <span className="text-[10px] font-mono text-surface-400">{call.codeName}</span>}
+        <span className="text-xs font-bold text-violet-100 bg-violet-700 rounded px-2 py-1 flex-shrink-0">gRPC</span>
+        <VarInput
+          value={request.url}
+          onChange={url => onChange({ url })}
+          placeholder="localhost:50051"
+          wrapperClassName="flex-1"
+          className="bg-surface-800 border border-surface-700 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 font-mono placeholder-surface-700"
+        />
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusColors[call.status] ?? 'bg-surface-600'}`} title={call.status} />
+        {call.codeName && <span className="text-[10px] font-mono text-surface-400 flex-shrink-0">{call.codeName}</span>}
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-2 flex flex-col gap-3">

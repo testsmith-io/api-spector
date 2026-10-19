@@ -77,6 +77,9 @@ export interface ScriptContext {
   collectionVars: Record<string, string>
   globals: Record<string, string>
   localVars: Record<string, string>
+  /** Variables scoped to the request's folder chain (innermost wins). Exposed
+   *  as `sp.folder` and persisted back to the innermost folder. */
+  folderVars?: Record<string, string>
   response?: ResponsePayload
   /** Substring patterns matched (case-insensitive) against variable names
    *  when emitting `[set]` console lines. Matched values are redacted so
@@ -87,6 +90,14 @@ export interface ScriptContext {
    *  lists. Exposed in the sandbox as the global `data` (and `sp.data`), so a
    *  flow condition can read `data.item.id` without JSON round-tripping. */
   data?: Record<string, unknown>
+  /** Messages collected during an MQTT test, exposed as `sp.messages`. Each
+   *  gains `.json()` / `.text()` helpers in the sandbox. */
+  mqttMessages?: { topic: string; payload: string; qos?: number; retain?: boolean; timestamp: number }[]
+  /** Messages collected during a realtime test (WebSocket / Socket.IO / GraphQL
+   *  subscription), exposed as `sp.messages`. Each entry must have a `payload`
+   *  string (behind `.json()` / `.text()`); any other fields are passed through
+   *  (e.g. `data`, `event`, `args`). Takes precedence over `mqttMessages`. */
+  messages?: ({ payload: string; timestamp: number } & Record<string, unknown>)[]
 }
 
 export interface ScriptOutput {
@@ -96,6 +107,7 @@ export interface ScriptOutput {
   updatedCollectionVars: Record<string, string>
   updatedGlobals: Record<string, string>
   updatedLocalVars: Record<string, string>
+  updatedFolderVars: Record<string, string>
   error?: string
 }
 
@@ -257,6 +269,7 @@ function buildAt(
   consoleOutput: string[],
 ) {
   const { envVars, collectionVars, globals, localVars, piiMaskPatterns = [] } = ctx;
+  const folderVars = ctx.folderVars ?? {};
 
   const isSensitiveKey = (key: string) =>
     piiMaskPatterns.some(p => key.toLowerCase().includes(p.toLowerCase()));
@@ -283,11 +296,12 @@ function buildAt(
     variables:           makeVarScope(localVars,      'variables'),
     environment:         makeVarScope(envVars,         'environment'),
     collectionVariables: makeVarScope(collectionVars,  'collectionVariables'),
+    folder:              makeVarScope(folderVars,       'folder'),
     globals:             makeVarScope(globals,          'globals'),
 
     // Convenience: get/set across all scopes (local wins)
     variables_get: (key: string) =>
-      localVars[key] ?? envVars[key] ?? collectionVars[key] ?? globals[key] ?? null,
+      localVars[key] ?? envVars[key] ?? folderVars[key] ?? collectionVars[key] ?? globals[key] ?? null,
     variables_set: (key: string, value: string) => { localVars[key] = String(value); },
 
     // Test runner
@@ -361,6 +375,18 @@ function buildAt(
       return String(binCode % 10 ** digits).padStart(digits, '0');
     },
   };
+
+  // Realtime test messages (MQTT / WebSocket / Socket.IO / GraphQL subscription)
+  // — exposed as sp.messages with per-message .json()/.text() helpers. The
+  // generic `messages` channel wins; `mqttMessages` is the original MQTT shape.
+  const collected = ctx.messages ?? ctx.mqttMessages;
+  if (collected) {
+    sp.messages = collected.map(m => ({
+      ...m,
+      json: () => JSON.parse(m.payload),
+      text: () => m.payload,
+    }));
+  }
 
   // Attach response helpers if available
   if (ctx.response) {
@@ -459,13 +485,18 @@ export async function runScript(
   const collectionCopy   = { ...ctx.collectionVars };
   const globalsCopy      = { ...ctx.globals };
   const localVarsCopy    = { ...ctx.localVars };
+  const folderCopy       = { ...(ctx.folderVars ?? {}) };
 
   const scriptCtx: ScriptContext = {
     envVars:        envVarsCopy,
     collectionVars: collectionCopy,
     globals:        globalsCopy,
     localVars:      localVarsCopy,
+    folderVars:     folderCopy,
     response:       ctx.response,
+    data:           ctx.data,
+    mqttMessages:   ctx.mqttMessages,
+    messages:       ctx.messages,
     piiMaskPatterns: ctx.piiMaskPatterns,
   };
 
@@ -482,6 +513,7 @@ export async function runScript(
       updatedCollectionVars: collectionCopy,
       updatedGlobals:        globalsCopy,
       updatedLocalVars:      localVarsCopy,
+      updatedFolderVars:     folderCopy,
       error: message,
     };
   }
@@ -493,6 +525,7 @@ export async function runScript(
     updatedCollectionVars: collectionCopy,
     updatedGlobals:        globalsCopy,
     updatedLocalVars:      localVarsCopy,
+    updatedFolderVars:     folderCopy,
   };
 }
 

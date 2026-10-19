@@ -1,0 +1,46 @@
+{
+  "arazzo": "1.0.0",
+  "info": { "title": "Login then get pet", "version": "1.0.0" },
+  "sourceDescriptions": [
+    { "name": "petsApi", "url": "arazzo-petstore-openapi.json", "type": "openapi" }
+  ],
+  "workflows": [
+    {
+      "workflowId": "loginAndGetPet",
+      "summary": "Log in, then fetch a pet",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "username": { "type": "string" },
+          "petId": { "type": "string", "default": "42" }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "login",
+          "operationId": "loginUser",
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": { "username": "{$inputs.username}" }
+          },
+          "successCriteria": [{ "condition": "$statusCode == 200" }],
+          "outputs": { "token": "$response.body#/token" },
+          "onSuccess": [{ "name": "goGet", "type": "goto", "stepId": "getPet" }]
+        },
+        {
+          "stepId": "getPet",
+          "operationId": "getPet",
+          "parameters": [
+            { "name": "id", "in": "path", "value": "{$inputs.petId}" },
+            { "name": "Authorization", "in": "header", "value": "Bearer {$steps.login.outputs.token}" }
+          ],
+          "successCriteria": [
+            { "condition": "$statusCode == 200" },
+            { "context": "$response.body", "condition": "$.id", "type": "jsonpath" }
+          ],
+          "outputs": { "petName": "$response.body#/name" }
+        }
+      ]
+    }
+  ]
+}
