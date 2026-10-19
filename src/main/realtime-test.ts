@@ -160,8 +160,6 @@ export async function runSocketIoTest(cfg: SocketIoTestConfig): Promise<Realtime
 
   return new Promise<RealtimeTestResult>((resolve) => {
     let settled = false;
-    let connected = false;
-    let lastError = '';
     let socket: Socket;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -189,12 +187,11 @@ export async function runSocketIoTest(cfg: SocketIoTestConfig): Promise<Realtime
     }
 
     socket.on('connect', () => {
-      connected = true;
       const ev = cfg.emitEvent?.trim();
       if (ev) setTimeout(() => { try { socket.emit(ev, ...emitArgs); } catch { /* ignore */ } }, 100);
       timer = setTimeout(() => void finish(), collectMs);
     });
-    socket.on('connect_error', (err: Error) => { lastError = err.message; void finish(`Could not connect to the server${err.message ? ` [${err.message}]` : ''}`); });
+    socket.on('connect_error', (err: Error) => { void finish(`Could not connect to the server${err.message ? ` [${err.message}]` : ''}`); });
     socket.onAny((event: string, ...args: unknown[]) => {
       const payload = JSON.stringify(args.length <= 1 ? (args[0] ?? null) : args);
       messages.push({ payload, event, args, timestamp: Date.now() });
