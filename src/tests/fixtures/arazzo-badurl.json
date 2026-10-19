@@ -1,0 +1,15 @@
+{
+  "arazzo": "1.0.0",
+  "info": { "title": "Bad url workflow", "version": "1.0.0" },
+  "sourceDescriptions": [
+    { "name": "petsApi", "url": "does-not-exist/petstore.yaml", "type": "openapi" }
+  ],
+  "workflows": [
+    {
+      "workflowId": "getPet",
+      "steps": [
+        { "stepId": "getPet", "operationId": "getPet", "successCriteria": [{ "condition": "$statusCode == 200" }] }
+      ]
+    }
+  ]
+}

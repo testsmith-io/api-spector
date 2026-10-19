@@ -9,7 +9,7 @@ import { execSync } from 'node:child_process';
 
 const CLI = join(__dirname, '..', 'cli', 'agents.ts');
 const run = (args: string, cwd: string) =>
-  execSync(`npx tsx "${CLI}" ${args}`, { cwd, encoding: 'utf8', timeout: 15000 });
+  execSync(`npx tsx "${CLI}" ${args}`, { cwd, encoding: 'utf8', timeout: 30000 });
 
 function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), 'agents-test-'));

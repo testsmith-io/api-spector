@@ -38,9 +38,12 @@ import {
   HookSkipTracker,
   maskHeaders,
   maskPii,
+  type RunnerExecResult,
 } from '../main/request-exec';
 import { buildJsonReport, buildJUnitReport, buildHtmlReport, buildSarifReport } from '../shared/report';
 import { buildRunPlan, expandFolderDataSets, expandRunPlanWithData, resolveInheritedAuthAndHeaders, authIsConfigured } from '../shared/request-collection';
+import { askVarsInRequest, resolveAskValues, missingAskMessages } from '../shared/ask-vars';
+import { runPlanConcurrent } from '../shared/run-concurrent';
 import { selectEnvironment } from '../shared/environments';
 import {
   C, color, parseArgs,
@@ -83,7 +86,12 @@ async function main() {
     console.log(
       '\nUsage:\n  api-spector run --workspace <path> [--environment <name>] [--tags <a,b>]\n' +
       '                  [--collection <name>] [--output <path>] [--format json|junit|html|sarif]\n' +
-      '                  [--verbose] [--bail]\n'
+      '                  [--ask "Message=value"] [--concurrency <n>] [--verbose] [--bail]\n\n' +
+      '  --ask "Message=value"  Supply an ask variable ({{@Message}}) for this run\n' +
+      '                         (repeatable). Requests whose ask variables are not\n' +
+      '                         supplied are skipped.\n' +
+      '  --concurrency <n>      Run n requests at a time (default 1 = sequential).\n' +
+      '                         Hooks run as barriers; best for independent requests.\n'
     );
     process.exit(0);
   }
@@ -152,6 +160,21 @@ async function main() {
   console.log(color(`  Environment: ${env?.name ?? '(none)'}`, C.gray));
   if (filterTags.length) console.log(color(`  Tags:        ${filterTags.join(', ')}`, C.gray));
   console.log('');
+
+  // Ask-variable answers for a non-interactive run: --ask "Message=value"
+  // (repeatable). A request whose ask variables are not all supplied is skipped.
+  const askAnswers: Record<string, string> = {};
+  const askArgRaw = args['ask'];
+  for (const entry of Array.isArray(askArgRaw) ? askArgRaw : askArgRaw ? [askArgRaw] : []) {
+    if (typeof entry !== 'string') continue;
+    const eq = entry.indexOf('=');
+    if (eq > 0) askAnswers[entry.slice(0, eq).trim()] = entry.slice(eq + 1);
+  }
+
+  // Concurrency: run this many requests at once (1 = sequential). Hooks are
+  // barriers and concurrent requests share the pre-batch variable snapshot, so
+  // a parallel run suits independent requests.
+  const concurrency = Math.max(1, Math.min(20, Math.floor(Number(args['concurrency'] ?? 1) || 1)));
 
   // Collect resolved secret values so we can redact them from reports
   const envVarsSnapshot    = await buildEnvVars(env);
@@ -232,6 +255,10 @@ async function main() {
     let runGlobals        = getGlobals();
     let runCollectionVars: Record<string, string> = { ...col.collectionVariables };
     let runLocalVars:     Record<string, string> = {};
+    // Folder-scoped variables accumulated during the run, keyed by folder id, so
+    // sp.folder.set in one request is visible to later requests in the same
+    // folder (mirrors the GUI runner).
+    const runFolderVars: Record<string, Record<string, string>> = {};
 
     console.log(color(`  ┌ ${col.name}`, C.bold, C.white));
 
@@ -276,10 +303,15 @@ async function main() {
       if (phase === 'pre' && error) console.error(color(`    [pre-script error] ${error}`, C.red));
     };
 
-    for (const item of items) {
+    if (concurrency <= 1) for (const item of items) {
       const { isHook, hookType, scopeId } = item;
 
       const skipReason = skipTracker.shouldSkip(item);
+
+      // Ask variables ({{@Message}}) that were not supplied via --ask: skip this
+      // request in the non-interactive run rather than send a blank value.
+      const itemAsks = askVarsInRequest(item.request);
+      const missingAsks = itemAsks.length ? missingAskMessages(itemAsks, askAnswers) : [];
 
       let result: RunRequestResult;
       if (skipReason) {
@@ -297,13 +329,32 @@ async function main() {
           scopePath:  item.scopePath,
           iterationLabel: item.iterationLabel,
         };
+      } else if (missingAsks.length) {
+        result = {
+          requestId:  item.request.id,
+          name:       item.request.name,
+          method:     item.request.method,
+          resolvedUrl: item.request.url,
+          status:     'skipped',
+          error:      `Ask variable(s) not provided: ${missingAsks.join(', ')} (use --ask "${missingAsks[0]}=value")`,
+          isHook,
+          hookType,
+          scopeId,
+          collection: item.collection,
+          scopePath:  item.scopePath,
+          iterationLabel: item.iterationLabel,
+        };
       } else {
         const out = await executeRunnerRequest({
           req: item.request,
-          collectionVars: { ...item.collectionVars, ...runCollectionVars },
+          collectionVars: { ...item.collectionVars, ...runCollectionVars, ...resolveAskValues(itemAsks, askAnswers) },
           envVars: runEnvVars,
           globals: runGlobals,
           localVars: { ...runLocalVars, ...item.dataRow },
+          folderVars: {
+            ...(item.folderVars ?? {}),
+            ...(item.folderId ? runFolderVars[item.folderId] ?? {} : {}),
+          },
           dispatcher,
           piiMaskPatterns: piiPatterns,
           tls: effectiveTls,
@@ -316,6 +367,9 @@ async function main() {
         runCollectionVars = out.updatedCollectionVars;
         runGlobals        = out.updatedGlobals;
         runLocalVars      = out.updatedLocalVars;
+        if (item.folderId) {
+          runFolderVars[item.folderId] = { ...(runFolderVars[item.folderId] ?? {}), ...out.updatedFolderVars };
+        }
 
         result.isHook    = isHook;
         result.hookType  = hookType;
@@ -347,6 +401,64 @@ async function main() {
         console.log(color('\n  Bailing after first failure.', C.yellow));
         bailed = true;
         break;
+      }
+    }
+    else {
+      // ── Parallel: run requests concurrently with hooks as barriers, then
+      // print the collected results in plan order. ─────────────────────────────
+      const resultsByIndex: (RunRequestResult | undefined)[] = new Array(items.length);
+      const preResult = (item: typeof items[number], status: RunRequestResult['status'], error?: string): RunRequestResult => ({
+        requestId: item.request.id, name: item.request.name, method: item.request.method,
+        resolvedUrl: item.request.url, status, error,
+        isHook: item.isHook, hookType: item.hookType, scopeId: item.scopeId,
+        collection: item.collection, scopePath: item.scopePath, iterationLabel: item.iterationLabel,
+      });
+      const runItem = async (item: typeof items[number], i: number): Promise<void> => {
+        const skipReason = skipTracker.shouldSkip(item);
+        const itemAsks = askVarsInRequest(item.request);
+        const missingAsks = itemAsks.length ? missingAskMessages(itemAsks, askAnswers) : [];
+        if (skipReason) { resultsByIndex[i] = preResult(item, 'failed', skipReason); return; }
+        if (missingAsks.length) { resultsByIndex[i] = preResult(item, 'skipped', `Ask variable(s) not provided: ${missingAsks.join(', ')}`); return; }
+        try {
+          const out: RunnerExecResult = await executeRunnerRequest({
+            req: item.request,
+            collectionVars: { ...item.collectionVars, ...runCollectionVars, ...resolveAskValues(itemAsks, askAnswers) },
+            envVars: runEnvVars, globals: runGlobals, localVars: { ...runLocalVars, ...item.dataRow },
+            folderVars: { ...(item.folderVars ?? {}), ...(item.folderId ? runFolderVars[item.folderId] ?? {} : {}) },
+            dispatcher, piiMaskPatterns: piiPatterns, tls: effectiveTls,
+            expectStatus: item.expectStatus, owaspTag: item.owaspTag,
+          });
+          runEnvVars = { ...runEnvVars, ...out.updatedEnvVars };
+          runCollectionVars = { ...runCollectionVars, ...out.updatedCollectionVars };
+          runGlobals = { ...runGlobals, ...out.updatedGlobals };
+          runLocalVars = { ...runLocalVars, ...out.updatedLocalVars };
+          if (item.folderId) runFolderVars[item.folderId] = { ...(runFolderVars[item.folderId] ?? {}), ...out.updatedFolderVars };
+          const result = out.result;
+          result.isHook = item.isHook; result.hookType = item.hookType; result.scopeId = item.scopeId;
+          result.collection = item.collection; result.scopePath = item.scopePath; result.iterationLabel = item.iterationLabel;
+          skipTracker.recordResult(item, result.status);
+          resultsByIndex[i] = result;
+        } catch (e) {
+          resultsByIndex[i] = preResult(item, 'error', e instanceof Error ? e.message : String(e));
+          skipTracker.recordResult(item, 'error');
+        }
+      };
+      await runPlanConcurrent(concurrency, items, it => Boolean(it.isHook), runItem);
+
+      for (let i = 0; i < items.length; i++) {
+        const result = resultsByIndex[i];
+        if (!result) continue;
+        const item = items[i];
+        const scopeKey = (item.scopePath ?? []).join(' / ');
+        if (scopeKey !== lastPrintedScope) { if (scopeKey) console.log(color(`    ${scopeKey}`, C.gray, C.bold)); lastPrintedScope = scopeKey; }
+        printResult(result, verbose);
+        allResults.push(result);
+        summary.total++;
+        if (result.status === 'passed') summary.passed++;
+        else if (result.status === 'failed') summary.failed++;
+        else if (result.status === 'skipped') summary.skipped++;
+        else summary.errors++;
+        if (bail && (result.status === 'failed' || result.status === 'error')) { console.log(color('\n  Bailing after first failure.', C.yellow)); bailed = true; break; }
       }
     }
 

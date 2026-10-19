@@ -30,6 +30,20 @@ export function orderedChildren(folder: Folder): ChildRef[] {
   return out;
 }
 
+/** Child order for a folder sorted alphabetically by display name (case
+ *  insensitive), interleaving requests and sub-folders at the same level.
+ *  `requestName` resolves a request id to its name (requests live in
+ *  Collection.requests, not on the folder). Returns a fresh ChildRef[] to
+ *  store as the folder's `childOrder`. */
+export function sortChildOrder(folder: Folder, requestName: (id: string) => string): ChildRef[] {
+  const nameOf = (ref: ChildRef): string =>
+    ref.type === 'folder'
+      ? (folder.folders.find(f => f.id === ref.id)?.name ?? '')
+      : requestName(ref.id);
+  return [...orderedChildren(folder)].sort((a, b) =>
+    nameOf(a).localeCompare(nameOf(b), undefined, { sensitivity: 'base', numeric: true }));
+}
+
 export function findFolder(root: Folder, id: string): Folder | null {
   if (root.id === id) return root;
   for (const sub of root.folders) {

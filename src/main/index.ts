@@ -30,6 +30,11 @@ import { registerMockHandlers } from './ipc/mock-handler';
 import { registerOAuth2Handlers } from './ipc/oauth2-handler';
 import { registerVaultHandlers } from './ipc/vault-handler';
 import { registerWsHandlers, closeAllWsConnections } from './ipc/ws-handler';
+import { registerSocketIoHandlers, closeAllSocketIoConnections } from './ipc/socketio-handler';
+import { registerJqHandlers } from './ipc/jq-handler';
+import { registerGraphqlWsHandlers, closeAllGraphqlWsConnections } from './ipc/graphqlws-handler';
+import { registerMqttHandlers, closeAllMqttConnections } from './ipc/mqtt-handler';
+import { registerPerfHandlers } from './ipc/perf-handler';
 import { registerGrpcHandlers, closeAllGrpcConnections } from './ipc/grpc-handler';
 import { registerSoapHandlers } from './ipc/soap-handler';
 import { registerDocsHandlers }     from './ipc/docs-handler';
@@ -266,6 +271,11 @@ app.whenReady().then(async () => {
   registerOAuth2Handlers(ipcMain);
   registerVaultHandlers(ipcMain);
   registerWsHandlers(ipcMain);
+  registerSocketIoHandlers(ipcMain);
+  registerJqHandlers(ipcMain);
+  registerGraphqlWsHandlers(ipcMain);
+  registerMqttHandlers(ipcMain);
+  registerPerfHandlers(ipcMain);
   registerGrpcHandlers(ipcMain);
   registerSoapHandlers(ipcMain);
   registerDocsHandlers(ipcMain);
@@ -302,6 +312,9 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', async () => {
   closeAllWsConnections();
+  closeAllSocketIoConnections();
+  closeAllGraphqlWsConnections();
+  closeAllMqttConnections();
   closeAllGrpcConnections();
   await stopAll();
 });

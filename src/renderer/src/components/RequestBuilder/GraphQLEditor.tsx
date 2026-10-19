@@ -22,6 +22,7 @@ import {
   fetchSchemaFromUrl,
 } from '../../lib/graphql-introspection';
 import { insertField, validateQuery, type OperationType } from '../../lib/graphql-query-builder';
+import { isSubscriptionQuery } from './GraphQlSubscription';
 import { useT } from '../../i18n';
 
 type InsertHandler = (field: GqlField, path: string[], opType: OperationType, allFields?: boolean) => void;
@@ -507,6 +508,17 @@ export function GraphQLEditor({ request, onChange }: Props) {
               </div>
             )}
           </div>
+
+          {/* Subscription (graphql-ws) — the live stream + tests now render in
+              the Response pane (like a query's response). Just a hint here. */}
+          {isSubscriptionQuery(gql.query) && (
+            <div className="flex-shrink-0 border-t border-surface-800 pt-2 mt-1">
+              <p className="text-[10px] text-surface-600">
+                <span className="text-fuchsia-300 uppercase tracking-wider font-medium">{t('Subscription')}</span>
+                {' — '}{t('run it to stream the results and tests in the Response pane.')}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

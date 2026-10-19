@@ -13,6 +13,10 @@ export default defineConfig({
           environment: 'node',
           setupFiles: ['src/tests/setup.ts'],
           include: ['src/tests/**/*.test.ts'],
+          // Some node tests shell out to the CLI (npx tsx) or spin up local
+          // servers; under parallel load those are slow, so give them headroom.
+          testTimeout: 30000,
+          hookTimeout: 30000,
         },
       },
       {

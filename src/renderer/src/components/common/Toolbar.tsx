@@ -3,7 +3,7 @@
 
 import { useRef, useState } from 'react';
 import { useStore, colRelPath } from '../../store';
-import type { Collection } from '../../../../shared/types';
+import type { Collection, Flow } from '../../../../shared/types';
 import { EnvironmentBar } from '../EnvironmentBar/EnvironmentBar';
 import { WorkspaceSettingsModal } from './WorkspaceSettingsModal';
 import { DocsGeneratorModal } from './DocsGeneratorModal';
@@ -53,7 +53,7 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { readonly onOpenDocs?: () 
     }
   }
 
-  async function afterImport(col: Collection | null) {
+  async function afterImport(col: Collection | null, extras?: { flows?: Flow[] }) {
     if (!col) return;
     const relPath = colRelPath(col.name, col.id);
     await electron.saveCollection(relPath, col);
@@ -64,6 +64,15 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { readonly onOpenDocs?: () 
       const updated = { ...ws, collections: [...ws.collections, relPath] };
       useStore.setState({ workspace: updated });
       await electron.saveWorkspace(updated);
+    }
+    // Arazzo import also brings flows — register each, open the last, and switch
+    // the sidebar to the Flows view so the imported workflow is visible.
+    if (extras?.flows?.length) {
+      const store = useStore.getState();
+      let lastId = '';
+      for (const flow of extras.flows) lastId = store.addFlowObject(flow);
+      if (lastId) store.setActiveFlow(lastId);
+      store.setSidebarTab('flows');
     }
   }
 

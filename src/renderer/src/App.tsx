@@ -9,6 +9,8 @@ import { useWorkspaceLoader } from './hooks/useWorkspaceLoader';
 import { CollectionTree } from './components/CollectionTree/CollectionTree';
 import { RequestBuilder } from './components/RequestBuilder/RequestBuilder';
 import { ResponseViewer } from './components/ResponseViewer/ResponseViewer';
+import { PerformancePanel } from './components/Performance/PerformancePanel';
+import { PerfPlansPanel } from './components/Performance/PerfPlansPanel';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { GeneratorPanel } from './components/GeneratorPanel/GeneratorPanel';
 import { HistoryPanel } from './components/History/HistoryPanel';
@@ -95,6 +97,17 @@ function IconFlows () {
       <rect x="13" y="2.5" width="5" height="5" rx="1" />
       <rect x="13" y="12.5" width="5" height="5" rx="1" />
       <path d="M7 10h3a2 2 0 002-2V6.5M7 10h3a2 2 0 012 2v3" />
+    </svg>
+  );
+}
+
+function IconPerf () {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+      <path d="M2.8 13.3a7.2 7.2 0 0 1 14.4 0" />
+      <path d="M3.4 15.4h13.2" />
+      <path d="M10 13.3l3.8-3.6" />
+      <circle cx="10" cy="13.3" r="1.3" fill="currentColor" stroke="none" />
     </svg>
   );
 }
@@ -210,10 +223,16 @@ export default function App () {
   useAutoSave();
   const { applyWorkspace } = useWorkspaceLoader();
   const workspace = useStore( s => s.workspace );
+  // Performance testing is opt-in (Workspace Settings) so it stays out of the
+  // way of plain functional testing.
+  const perfEnabled = Boolean( workspace?.settings?.performanceTesting );
   const collections = useStore( s => s.collections );
   const tabs = useStore( s => s.tabs );
   const activeTabId = useStore( s => s.activeTabId );
   const setActiveTabId = useStore( s => s.setActiveTabId );
+  const focusedPane = useStore( s => s.focusedPane );
+  const setFocusedPane = useStore( s => s.setFocusedPane );
+  const cycleSubTab = useStore( s => s.cycleSubTab );
   const closeTab = useStore( s => s.closeTab );
   const closeAllTabs = useStore( s => s.closeAllTabs );
   const closeOtherTabs = useStore( s => s.closeOtherTabs );
@@ -223,6 +242,10 @@ export default function App () {
   const collectionPanelOpen = useStore( s => s.collectionPanelOpen );
   const folderPanel = useStore( s => s.folderPanel );
   const setSidebarTab = useStore( s => s.setSidebarTab );
+  // If performance testing is turned off while its view is open, leave it.
+  useEffect( () => {
+    if ( !perfEnabled && sidebarTab === 'perf' ) setSidebarTab( 'collections' );
+  }, [perfEnabled, sidebarTab, setSidebarTab] );
   const contractDesignerOpen = useStore( s => s.contractDesignerOpen );
   const contractDesignerSeed = useStore( s => s.contractDesignerSeed );
   const closeContractDesigner = useStore( s => s.closeContractDesigner );
@@ -242,6 +265,12 @@ export default function App () {
   const requestSend = useStore( s => s.requestSend );
   const setWsStatus = useStore( s => s.setWsStatus );
   const addWsMessage = useStore( s => s.addWsMessage );
+  const setSocketIoStatus = useStore( s => s.setSocketIoStatus );
+  const addSocketIoMessage = useStore( s => s.addSocketIoMessage );
+  const setGraphqlWsStatus = useStore( s => s.setGraphqlWsStatus );
+  const addGraphqlWsMessage = useStore( s => s.addGraphqlWsMessage );
+  const setMqttStatus = useStore( s => s.setMqttStatus );
+  const addMqttMessage = useStore( s => s.addMqttMessage );
   const pushLiveStreamEvents = useStore( s => s.pushLiveStreamEvents );
 
   const [sidebarOpen, setSidebarOpen] = useState( true );
@@ -252,6 +281,7 @@ export default function App () {
   const dragging = useRef<'sidebar' | 'request' | null>( null );
   const dragStart = useRef( { x: 0, w: 0 } );
   const leftPaneRef = useRef<HTMLDivElement>( null );
+  const rightPaneRef = useRef<HTMLDivElement>( null );
 
   useEffect( () => {
     function onMouseMove ( e: MouseEvent ) {
@@ -307,6 +337,36 @@ export default function App () {
   }, [addWsMessage, setWsStatus] );
 
   useEffect( () => {
+    electron.onSocketIoMessage( ( { requestId, message }: { requestId: string; message: Parameters<typeof addSocketIoMessage>[1] } ) => {
+      addSocketIoMessage( requestId, message );
+    } );
+    electron.onSocketIoStatus( ( { requestId, status, error }: { requestId: string; status: Parameters<typeof setSocketIoStatus>[1]; error?: string } ) => {
+      setSocketIoStatus( requestId, status, error );
+    } );
+    return () => electron.offSocketIoEvents();
+  }, [addSocketIoMessage, setSocketIoStatus] );
+
+  useEffect( () => {
+    electron.onGraphqlWsMessage( ( { requestId, message }: { requestId: string; message: Parameters<typeof addGraphqlWsMessage>[1] } ) => {
+      addGraphqlWsMessage( requestId, message );
+    } );
+    electron.onGraphqlWsStatus( ( { requestId, status, error }: { requestId: string; status: Parameters<typeof setGraphqlWsStatus>[1]; error?: string } ) => {
+      setGraphqlWsStatus( requestId, status, error );
+    } );
+    return () => electron.offGraphqlWsEvents();
+  }, [addGraphqlWsMessage, setGraphqlWsStatus] );
+
+  useEffect( () => {
+    electron.onMqttMessage( ( { requestId, message }: { requestId: string; message: Parameters<typeof addMqttMessage>[1] } ) => {
+      addMqttMessage( requestId, message );
+    } );
+    electron.onMqttStatus( ( { requestId, status, error }: { requestId: string; status: Parameters<typeof setMqttStatus>[1]; error?: string } ) => {
+      setMqttStatus( requestId, status, error );
+    } );
+    return () => electron.offMqttEvents();
+  }, [addMqttMessage, setMqttStatus] );
+
+  useEffect( () => {
     electron.onRequestStreamEvent( ( { streamId, events } ) => {
       pushLiveStreamEvents( streamId, events );
     } );
@@ -324,11 +384,55 @@ export default function App () {
       if ( e.key === 'Enter' && ( e.metaKey || e.ctrlKey ) ) {
         e.preventDefault();
         requestSend();
+        return;
+      }
+
+      const mod = e.metaKey || e.ctrlKey;
+
+      // ── Switch between OPEN request tabs ──
+      // Ctrl+Tab / Ctrl+Shift+Tab cycle; Cmd/Ctrl+1..9 jump (9 = last).
+      if ( tabs.length > 0 ) {
+        if ( e.key === 'Tab' && e.ctrlKey ) {
+          e.preventDefault();
+          const i = tabs.findIndex( tb => tb.id === activeTabId );
+          const n = tabs.length;
+          const next = e.shiftKey ? ( i - 1 + n ) % n : ( i + 1 ) % n;
+          setActiveTabId( tabs[next].id );
+          return;
+        }
+        if ( mod && !e.altKey && !e.shiftKey && e.key >= '1' && e.key <= '9' ) {
+          e.preventDefault();
+          const idx = e.key === '9' ? tabs.length - 1 : Number( e.key ) - 1;
+          if ( tabs[idx] ) setActiveTabId( tabs[idx].id );
+          return;
+        }
+      }
+
+      // ── Navigate within the request/response area (only when a request is open) ──
+      // Cmd/Ctrl+Alt+Left/Right moves focus between the two panes;
+      // Cmd/Ctrl+Alt+Up/Down moves through the focused pane's sub-tabs.
+      if ( activeTabId && mod && e.altKey ) {
+        if ( e.key === 'ArrowLeft' ) {
+          e.preventDefault();
+          setFocusedPane( 'request' );
+          leftPaneRef.current?.focus();
+          return;
+        }
+        if ( e.key === 'ArrowRight' ) {
+          e.preventDefault();
+          setResponseOpen( true );
+          setFocusedPane( 'response' );
+          // Focus after the pane has a chance to mount.
+          setTimeout( () => rightPaneRef.current?.focus(), 0 );
+          return;
+        }
+        if ( e.key === 'ArrowUp' ) { e.preventDefault(); cycleSubTab( -1 ); return; }
+        if ( e.key === 'ArrowDown' ) { e.preventDefault(); cycleSubTab( 1 ); return; }
       }
     }
     window.addEventListener( 'keydown', handleKeyDown );
     return () => window.removeEventListener( 'keydown', handleKeyDown );
-  }, [setCommandPaletteOpen, requestSend] );
+  }, [setCommandPaletteOpen, requestSend, tabs, activeTabId, setActiveTabId, setFocusedPane, cycleSubTab, setResponseOpen] );
 
   // Keep light class in sync when OS preference changes (system theme)
   useEffect( () => {
@@ -389,7 +493,7 @@ export default function App () {
     setResponseOpen( Boolean( activeTab?.lastResponse ) );
   }, [activeTabId, activeTab?.lastResponse] );
 
-  function selectPanel ( tab: 'collections' | 'history' | 'mocks' | 'contracts' | 'git' | 'flows' ) {
+  function selectPanel ( tab: 'collections' | 'history' | 'mocks' | 'contracts' | 'git' | 'flows' | 'perf' ) {
     if ( sidebarTab === tab && sidebarOpen ) {
       setSidebarOpen( false );
     } else {
@@ -450,13 +554,23 @@ export default function App () {
               <IconHistory />
             </ActivityBarBtn>
             <ActivityBarBtn
-              active={sidebarOpen && sidebarTab === 'mocks'}
-              onClick={() => selectPanel( 'mocks' )}
-              title={t( 'Mock servers' )}
-              dataTour="mocks"
+              active={sidebarOpen && sidebarTab === 'flows'}
+              onClick={() => selectPanel( 'flows' )}
+              title={t( 'Flows' )}
+              dataTour="flows"
             >
-              <IconMock />
+              <IconFlows />
             </ActivityBarBtn>
+            {perfEnabled && (
+              <ActivityBarBtn
+                active={sidebarOpen && sidebarTab === 'perf'}
+                onClick={() => selectPanel( 'perf' )}
+                title={t( 'Performance testing' )}
+                dataTour="perf"
+              >
+                <IconPerf />
+              </ActivityBarBtn>
+            )}
             <ActivityBarBtn
               active={sidebarOpen && sidebarTab === 'contracts'}
               onClick={() => selectPanel( 'contracts' )}
@@ -466,20 +580,20 @@ export default function App () {
               <IconContract />
             </ActivityBarBtn>
             <ActivityBarBtn
+              active={sidebarOpen && sidebarTab === 'mocks'}
+              onClick={() => selectPanel( 'mocks' )}
+              title={t( 'Mock servers' )}
+              dataTour="mocks"
+            >
+              <IconMock />
+            </ActivityBarBtn>
+            <ActivityBarBtn
               active={sidebarOpen && sidebarTab === 'git'}
               onClick={() => selectPanel( 'git' )}
               title={t( 'Git' )}
               dataTour="git"
             >
               <IconGit />
-            </ActivityBarBtn>
-            <ActivityBarBtn
-              active={sidebarOpen && sidebarTab === 'flows'}
-              onClick={() => selectPanel( 'flows' )}
-              title={t( 'Flows' )}
-              dataTour="flows"
-            >
-              <IconFlows />
             </ActivityBarBtn>
           </div>
 
@@ -489,7 +603,7 @@ export default function App () {
               <aside data-tour="collections-panel" style={{ width: sidebarWidth }} className="flex-shrink-0 flex flex-col overflow-hidden">
                 <div className="px-3 py-2 flex items-center justify-between border-b border-surface-800 flex-shrink-0">
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-600">
-                    {sidebarTab === 'collections' ? t( 'Collections' ) : sidebarTab === 'history' ? t( 'History' ) : sidebarTab === 'mocks' ? t( 'Mocks' ) : sidebarTab === 'git' ? t( 'Git' ) : sidebarTab === 'flows' ? t( 'Flows' ) : t( 'Contracts' )}
+                    {sidebarTab === 'collections' ? t( 'Collections' ) : sidebarTab === 'history' ? t( 'History' ) : sidebarTab === 'mocks' ? t( 'Mocks' ) : sidebarTab === 'git' ? t( 'Git' ) : sidebarTab === 'flows' ? t( 'Flows' ) : sidebarTab === 'perf' ? t( 'Performance' ) : t( 'Contracts' )}
                   </span>
                   <div className="flex items-center gap-1.5">
                     {sidebarTab === 'history' && historyCount > 0 && (
@@ -524,6 +638,7 @@ export default function App () {
                     sidebarTab === 'mocks' ? <MockPanel /> :
                       sidebarTab === 'git' ? <GitPanel /> :
                         sidebarTab === 'flows' ? <FlowsPanel /> :
+                          sidebarTab === 'perf' ? <PerfPlansPanel /> :
                           <ContractPanel />}
               </aside>
               {/* Sidebar resize handle */}
@@ -639,6 +754,10 @@ export default function App () {
               <div className="flex-1 min-h-0 flex flex-col">
                 <FlowCanvas />
               </div>
+            ) : sidebarTab === 'perf' ? (
+              <div className="flex-1 min-h-0 flex flex-col">
+                <PerformancePanel />
+              </div>
             ) : sidebarTab === 'git' ? (
               <div className="flex-1 min-h-0 flex flex-col">
                 <GitDiffPane />
@@ -702,7 +821,10 @@ export default function App () {
                 {/* Left pane: request builder */}
                 <div
                   ref={leftPaneRef}
-                  className="min-w-0 flex flex-col overflow-hidden"
+                  tabIndex={-1}
+                  onMouseDownCapture={() => setFocusedPane( 'request' )}
+                  aria-label={t( 'Request pane' )}
+                  className={`min-w-0 flex flex-col overflow-hidden outline-none ${responseOpen && focusedPane === 'request' ? 'ring-1 ring-inset ring-blue-500/30' : ''}`}
                   style={!responseOpen || requestPaneWidth === null ? { flex: '1 1 0%' } : { width: requestPaneWidth, flexShrink: 0 }}
                 >
                   <RequestBuilder request={activeRequest} />
@@ -742,7 +864,13 @@ export default function App () {
                 </div>
                 {/* Right pane: response viewer */}
                 {responseOpen && (
-                  <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+                  <div
+                    ref={rightPaneRef}
+                    tabIndex={-1}
+                    onMouseDownCapture={() => setFocusedPane( 'response' )}
+                    aria-label={t( 'Response pane' )}
+                    className={`flex-1 min-w-0 flex flex-col overflow-hidden outline-none ${focusedPane === 'response' ? 'ring-1 ring-inset ring-blue-500/30' : ''}`}
+                  >
                     <ErrorBoundary
                       resetKey={activeTabId}
                       fallback={(error, reset) => (

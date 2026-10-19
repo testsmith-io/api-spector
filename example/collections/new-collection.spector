@@ -8,7 +8,265 @@
     "name": "root",
     "description": "",
     "folders": [],
-    "requestIds": []
+    "requestIds": [
+      "193fd94a-12a9-4037-ba87-23b247c96631",
+      "804fc7a3-728d-479c-a37c-8f16a74ccf01",
+      "f6ffff85-83df-419a-8d0b-f512f476f659",
+      "808182be-8587-49fd-a3a0-1cd907f1ae38",
+      "d66f3487-662e-4186-baeb-7a0404c61b01",
+      "f17de46a-ca85-47ab-ad99-6efce4507420",
+      "bff087dd-e62e-4374-a862-3b8a2a9feb12",
+      "528dfbdf-27ff-4195-b354-a185a8e7aada"
+    ],
+    "childOrder": [
+      {
+        "type": "request",
+        "id": "804fc7a3-728d-479c-a37c-8f16a74ccf01"
+      },
+      {
+        "type": "request",
+        "id": "193fd94a-12a9-4037-ba87-23b247c96631"
+      }
+    ]
   },
-  "requests": {}
+  "requests": {
+    "193fd94a-12a9-4037-ba87-23b247c96631": {
+      "id": "193fd94a-12a9-4037-ba87-23b247c96631",
+      "name": "status",
+      "method": "GET",
+      "url": "https://api.practicesoftwaretesting.com/status",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "graphql"
+      },
+      "postRequestScript": "const json = sp.response.json();\n\nsp.test('version equals \"5.0\"', function() {\n  sp.expect(json.version).to.equal(\"5.0\");\n});"
+    },
+    "804fc7a3-728d-479c-a37c-8f16a74ccf01": {
+      "id": "804fc7a3-728d-479c-a37c-8f16a74ccf01",
+      "name": "products",
+      "method": "GET",
+      "url": "https://api.practicesoftwaretesting.com/products",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "postRequestScript": "const json = sp.response.json();\n\nsp.test('version equals \"5.0\"', function() {\n  sp.expect(json.version).to.equal(\"5.0\");\n});\n\nsp.test('$.data[?(@.name==\"Combination Pliers\")].id equals \"01M522FSP1WG8CB2A7PYX0H1EY\"', function() {\n  const matches = sp.jsonPath(json, '$.data[?(@.name==\"Combination Pliers\")].id');\n  sp.expect(matches.length).to.be.above(0);\n  sp.expect(matches[0]).to.equal(\"01M522FSP1WG8CB2A7PYX0H1EY\");\n});"
+    },
+    "f6ffff85-83df-419a-8d0b-f512f476f659": {
+      "id": "f6ffff85-83df-419a-8d0b-f512f476f659",
+      "name": "New Request",
+      "method": "POST",
+      "url": "mqtt://localhost:11883",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "soap",
+        "soap": {
+          "wsdlUrl": "",
+          "envelope": ""
+        },
+        "grpc": {
+          "message": "{}",
+          "metadata": [],
+          "plaintext": false
+        }
+      },
+      "protocol": "mqtt",
+      "mqtt": {
+        "subscribeTopic": "sensors/temp",
+        "publishTopic": "sensors/#",
+        "retain": false,
+        "testScript": "sp.test('a temp reading arrives', () => {\n  const m = sp.messages.find(m => m.topic === 'sensors/temp');\n  sp.expect(m).to.exist;\n  sp.expect(m.json().c).to.be.a('number');\n});",
+        "collectMs": 60000,
+        "qos": 2
+      }
+    },
+    "808182be-8587-49fd-a3a0-1cd907f1ae38": {
+      "id": "808182be-8587-49fd-a3a0-1cd907f1ae38",
+      "name": "New Request (copy)",
+      "method": "POST",
+      "url": "ws://localhost:18080",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "grpc",
+        "soap": {
+          "wsdlUrl": "",
+          "envelope": ""
+        },
+        "grpc": {
+          "message": "{}",
+          "metadata": [],
+          "plaintext": false
+        }
+      },
+      "protocol": "grpc",
+      "mqtt": {
+        "subscribeTopic": "sensors/temp",
+        "publishTopic": "sensors/#",
+        "retain": false,
+        "testScript": "sp.test('a temp reading arrives', () => {\n  const m = sp.messages.find(m => m.topic === 'sensors/temp');\n  sp.expect(m).to.exist;\n  sp.expect(m.json().c).to.be.a('number');\n});",
+        "collectMs": 60000,
+        "qos": 2
+      }
+    },
+    "d66f3487-662e-4186-baeb-7a0404c61b01": {
+      "id": "d66f3487-662e-4186-baeb-7a0404c61b01",
+      "name": "New Request (copy) (copy)",
+      "method": "POST",
+      "url": "http://localhost:14000/graphql",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "graphql",
+        "soap": {
+          "wsdlUrl": "",
+          "envelope": ""
+        },
+        "grpc": {
+          "message": "{}",
+          "metadata": [],
+          "plaintext": false
+        },
+        "graphql": {
+          "query": "subscription {\n  randomNumber\n}",
+          "variables": ""
+        }
+      },
+      "protocol": "http",
+      "mqtt": {
+        "subscribeTopic": "sensors/temp",
+        "publishTopic": "sensors/#",
+        "retain": false,
+        "testScript": "sp.test('a temp reading arrives', () => {\n  const m = sp.messages.find(m => m.topic === 'sensors/temp');\n  sp.expect(m).to.exist;\n  sp.expect(m.json().c).to.be.a('number');\n});",
+        "collectMs": 60000,
+        "qos": 2
+      },
+      "graphqlIntrospectionCache": "{\"__schema\":{\"queryType\":{\"name\":\"Query\"},\"mutationType\":null,\"subscriptionType\":{\"name\":\"Subscription\"},\"types\":[{\"name\":\"Query\",\"kind\":\"OBJECT\",\"description\":null,\"fields\":[{\"name\":\"hello\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"time\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]}]},{\"name\":\"String\",\"kind\":\"SCALAR\",\"description\":\"The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.\",\"fields\":null},{\"name\":\"Subscription\",\"kind\":\"OBJECT\",\"description\":null,\"fields\":[{\"name\":\"randomNumber\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"Int\",\"ofType\":null},\"args\":[]},{\"name\":\"countdown\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"Int\",\"ofType\":null},\"args\":[{\"name\":\"from\",\"description\":null,\"defaultValue\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"Int\",\"ofType\":null}}]},{\"name\":\"sensorReading\",\"description\":null,\"type\":{\"kind\":\"OBJECT\",\"name\":\"SensorReading\",\"ofType\":null},\"args\":[]},{\"name\":\"greetings\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]}]},{\"name\":\"Int\",\"kind\":\"SCALAR\",\"description\":\"The `Int` scalar type represents non-fractional signed whole numeric values. Int can represent values between -(2^31) and 2^31 - 1.\",\"fields\":null},{\"name\":\"SensorReading\",\"kind\":\"OBJECT\",\"description\":null,\"fields\":[{\"name\":\"celsius\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"Float\",\"ofType\":null},\"args\":[]},{\"name\":\"humidity\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"Float\",\"ofType\":null},\"args\":[]},{\"name\":\"n\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"Int\",\"ofType\":null},\"args\":[]}]},{\"name\":\"Float\",\"kind\":\"SCALAR\",\"description\":\"The `Float` scalar type represents signed double-precision fractional values as specified by [IEEE 754](https://en.wikipedia.org/wiki/IEEE_floating_point).\",\"fields\":null},{\"name\":\"Boolean\",\"kind\":\"SCALAR\",\"description\":\"The `Boolean` scalar type represents `true` or `false`.\",\"fields\":null},{\"name\":\"__Schema\",\"kind\":\"OBJECT\",\"description\":\"A GraphQL Schema defines the capabilities of a GraphQL server. It exposes all available types and directives on the server, as well as the entry points for query, mutation, and subscription operations.\",\"fields\":[{\"name\":\"description\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"types\",\"description\":\"A list of all types supported by this server.\",\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__Type\",\"ofType\":null}}}},\"args\":[]},{\"name\":\"queryType\",\"description\":\"The type that query operations will be rooted at.\",\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__Type\",\"ofType\":null}},\"args\":[]},{\"name\":\"mutationType\",\"description\":\"If this server supports mutation, the type that mutation operations will be rooted at.\",\"type\":{\"kind\":\"OBJECT\",\"name\":\"__Type\",\"ofType\":null},\"args\":[]},{\"name\":\"subscriptionType\",\"description\":\"If this server support subscription, the type that subscription operations will be rooted at.\",\"type\":{\"kind\":\"OBJECT\",\"name\":\"__Type\",\"ofType\":null},\"args\":[]},{\"name\":\"directives\",\"description\":\"A list of all directives supported by this server.\",\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__Directive\",\"ofType\":null}}}},\"args\":[{\"name\":\"includeDeprecated\",\"description\":null,\"defaultValue\":\"false\",\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}}}]}]},{\"name\":\"__Type\",\"kind\":\"OBJECT\",\"description\":\"The fundamental unit of any GraphQL Schema is the type. There are many kinds of types in GraphQL as represented by the `__TypeKind` enum.\\n\\nDepending on the kind of a type, certain fields describe information about that type. Scalar types provide no information beyond a name, description and optional `specifiedByURL`, while Enum types provide their values. Object and Interface types provide the fields they describe. Abstract types, Union and Interface, provide the Object types possible at runtime. List and NonNull types compose other types.\",\"fields\":[{\"name\":\"kind\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"ENUM\",\"name\":\"__TypeKind\",\"ofType\":null}},\"args\":[]},{\"name\":\"name\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"description\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"specifiedByURL\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"fields\",\"description\":null,\"type\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__Field\",\"ofType\":null}}},\"args\":[{\"name\":\"includeDeprecated\",\"description\":null,\"defaultValue\":\"false\",\"type\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}}]},{\"name\":\"interfaces\",\"description\":null,\"type\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__Type\",\"ofType\":null}}},\"args\":[]},{\"name\":\"possibleTypes\",\"description\":null,\"type\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__Type\",\"ofType\":null}}},\"args\":[]},{\"name\":\"enumValues\",\"description\":null,\"type\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__EnumValue\",\"ofType\":null}}},\"args\":[{\"name\":\"includeDeprecated\",\"description\":null,\"defaultValue\":\"false\",\"type\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}}]},{\"name\":\"inputFields\",\"description\":null,\"type\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__InputValue\",\"ofType\":null}}},\"args\":[{\"name\":\"includeDeprecated\",\"description\":null,\"defaultValue\":\"false\",\"type\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}}]},{\"name\":\"ofType\",\"description\":null,\"type\":{\"kind\":\"OBJECT\",\"name\":\"__Type\",\"ofType\":null},\"args\":[]},{\"name\":\"isOneOf\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null},\"args\":[]}]},{\"name\":\"__TypeKind\",\"kind\":\"ENUM\",\"description\":\"An enum describing what kind of type a given `__Type` is.\",\"fields\":null},{\"name\":\"__Field\",\"kind\":\"OBJECT\",\"description\":\"Object and Interface types are described by a list of Fields, each of which has a name, potentially a list of arguments, and a return type.\",\"fields\":[{\"name\":\"name\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null}},\"args\":[]},{\"name\":\"description\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"args\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__InputValue\",\"ofType\":null}}}},\"args\":[{\"name\":\"includeDeprecated\",\"description\":null,\"defaultValue\":\"false\",\"type\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}}]},{\"name\":\"type\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__Type\",\"ofType\":null}},\"args\":[]},{\"name\":\"isDeprecated\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}},\"args\":[]},{\"name\":\"deprecationReason\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]}]},{\"name\":\"__InputValue\",\"kind\":\"OBJECT\",\"description\":\"Arguments provided to Fields or Directives and the input fields of an InputObject are represented as Input Values which describe their type and optionally a default value.\",\"fields\":[{\"name\":\"name\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null}},\"args\":[]},{\"name\":\"description\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"type\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__Type\",\"ofType\":null}},\"args\":[]},{\"name\":\"defaultValue\",\"description\":\"A GraphQL-formatted string representing the default value for this input value.\",\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"isDeprecated\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}},\"args\":[]},{\"name\":\"deprecationReason\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]}]},{\"name\":\"__EnumValue\",\"kind\":\"OBJECT\",\"description\":\"One possible value for a given Enum. Enum values are unique values, not a placeholder for a string or numeric value. However an Enum value is returned in a JSON response as a string.\",\"fields\":[{\"name\":\"name\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null}},\"args\":[]},{\"name\":\"description\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"isDeprecated\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}},\"args\":[]},{\"name\":\"deprecationReason\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]}]},{\"name\":\"__Directive\",\"kind\":\"OBJECT\",\"description\":\"A Directive provides a way to describe alternate runtime execution and type validation behavior in a GraphQL document.\\n\\nIn some cases, you need to provide options to alter GraphQL's execution behavior in ways field arguments will not suffice, such as conditionally including or skipping a field. Directives provide this by describing additional information to the executor.\",\"fields\":[{\"name\":\"name\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null}},\"args\":[]},{\"name\":\"description\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"isRepeatable\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}},\"args\":[]},{\"name\":\"locations\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"ENUM\",\"name\":\"__DirectiveLocation\",\"ofType\":null}}}},\"args\":[]},{\"name\":\"args\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__InputValue\",\"ofType\":null}}}},\"args\":[{\"name\":\"includeDeprecated\",\"description\":null,\"defaultValue\":\"false\",\"type\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}}]},{\"name\":\"isDeprecated\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}},\"args\":[]},{\"name\":\"deprecationReason\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]}]},{\"name\":\"__DirectiveLocation\",\"kind\":\"ENUM\",\"description\":\"A Directive can be adjacent to many parts of the GraphQL language, a __DirectiveLocation describes one such possible adjacencies.\",\"fields\":null}]}}"
+    },
+    "f17de46a-ca85-47ab-ad99-6efce4507420": {
+      "id": "f17de46a-ca85-47ab-ad99-6efce4507420",
+      "name": "New Request (copy) (copy) (copy)",
+      "method": "POST",
+      "url": "http://localhost:13000",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "grpc",
+        "soap": {
+          "wsdlUrl": "",
+          "envelope": ""
+        },
+        "grpc": {
+          "message": "{}",
+          "metadata": [],
+          "plaintext": false
+        },
+        "graphql": {
+          "query": "subscription {\n  randomNumber\n}",
+          "variables": ""
+        }
+      },
+      "protocol": "grpc",
+      "mqtt": {
+        "subscribeTopic": "sensors/temp",
+        "publishTopic": "sensors/#",
+        "retain": false,
+        "testScript": "sp.test('a temp reading arrives', () => {\n  const m = sp.messages.find(m => m.topic === 'sensors/temp');\n  sp.expect(m).to.exist;\n  sp.expect(m.json().c).to.be.a('number');\n});",
+        "collectMs": 60000,
+        "qos": 2
+      },
+      "graphqlIntrospectionCache": "{\"__schema\":{\"queryType\":{\"name\":\"Query\"},\"mutationType\":null,\"subscriptionType\":{\"name\":\"Subscription\"},\"types\":[{\"name\":\"Query\",\"kind\":\"OBJECT\",\"description\":null,\"fields\":[{\"name\":\"hello\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"time\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]}]},{\"name\":\"String\",\"kind\":\"SCALAR\",\"description\":\"The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.\",\"fields\":null},{\"name\":\"Subscription\",\"kind\":\"OBJECT\",\"description\":null,\"fields\":[{\"name\":\"randomNumber\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"Int\",\"ofType\":null},\"args\":[]},{\"name\":\"countdown\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"Int\",\"ofType\":null},\"args\":[{\"name\":\"from\",\"description\":null,\"defaultValue\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"Int\",\"ofType\":null}}]},{\"name\":\"sensorReading\",\"description\":null,\"type\":{\"kind\":\"OBJECT\",\"name\":\"SensorReading\",\"ofType\":null},\"args\":[]},{\"name\":\"greetings\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]}]},{\"name\":\"Int\",\"kind\":\"SCALAR\",\"description\":\"The `Int` scalar type represents non-fractional signed whole numeric values. Int can represent values between -(2^31) and 2^31 - 1.\",\"fields\":null},{\"name\":\"SensorReading\",\"kind\":\"OBJECT\",\"description\":null,\"fields\":[{\"name\":\"celsius\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"Float\",\"ofType\":null},\"args\":[]},{\"name\":\"humidity\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"Float\",\"ofType\":null},\"args\":[]},{\"name\":\"n\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"Int\",\"ofType\":null},\"args\":[]}]},{\"name\":\"Float\",\"kind\":\"SCALAR\",\"description\":\"The `Float` scalar type represents signed double-precision fractional values as specified by [IEEE 754](https://en.wikipedia.org/wiki/IEEE_floating_point).\",\"fields\":null},{\"name\":\"Boolean\",\"kind\":\"SCALAR\",\"description\":\"The `Boolean` scalar type represents `true` or `false`.\",\"fields\":null},{\"name\":\"__Schema\",\"kind\":\"OBJECT\",\"description\":\"A GraphQL Schema defines the capabilities of a GraphQL server. It exposes all available types and directives on the server, as well as the entry points for query, mutation, and subscription operations.\",\"fields\":[{\"name\":\"description\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"types\",\"description\":\"A list of all types supported by this server.\",\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__Type\",\"ofType\":null}}}},\"args\":[]},{\"name\":\"queryType\",\"description\":\"The type that query operations will be rooted at.\",\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__Type\",\"ofType\":null}},\"args\":[]},{\"name\":\"mutationType\",\"description\":\"If this server supports mutation, the type that mutation operations will be rooted at.\",\"type\":{\"kind\":\"OBJECT\",\"name\":\"__Type\",\"ofType\":null},\"args\":[]},{\"name\":\"subscriptionType\",\"description\":\"If this server support subscription, the type that subscription operations will be rooted at.\",\"type\":{\"kind\":\"OBJECT\",\"name\":\"__Type\",\"ofType\":null},\"args\":[]},{\"name\":\"directives\",\"description\":\"A list of all directives supported by this server.\",\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__Directive\",\"ofType\":null}}}},\"args\":[{\"name\":\"includeDeprecated\",\"description\":null,\"defaultValue\":\"false\",\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}}}]}]},{\"name\":\"__Type\",\"kind\":\"OBJECT\",\"description\":\"The fundamental unit of any GraphQL Schema is the type. There are many kinds of types in GraphQL as represented by the `__TypeKind` enum.\\n\\nDepending on the kind of a type, certain fields describe information about that type. Scalar types provide no information beyond a name, description and optional `specifiedByURL`, while Enum types provide their values. Object and Interface types provide the fields they describe. Abstract types, Union and Interface, provide the Object types possible at runtime. List and NonNull types compose other types.\",\"fields\":[{\"name\":\"kind\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"ENUM\",\"name\":\"__TypeKind\",\"ofType\":null}},\"args\":[]},{\"name\":\"name\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"description\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"specifiedByURL\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"fields\",\"description\":null,\"type\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__Field\",\"ofType\":null}}},\"args\":[{\"name\":\"includeDeprecated\",\"description\":null,\"defaultValue\":\"false\",\"type\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}}]},{\"name\":\"interfaces\",\"description\":null,\"type\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__Type\",\"ofType\":null}}},\"args\":[]},{\"name\":\"possibleTypes\",\"description\":null,\"type\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__Type\",\"ofType\":null}}},\"args\":[]},{\"name\":\"enumValues\",\"description\":null,\"type\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__EnumValue\",\"ofType\":null}}},\"args\":[{\"name\":\"includeDeprecated\",\"description\":null,\"defaultValue\":\"false\",\"type\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}}]},{\"name\":\"inputFields\",\"description\":null,\"type\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__InputValue\",\"ofType\":null}}},\"args\":[{\"name\":\"includeDeprecated\",\"description\":null,\"defaultValue\":\"false\",\"type\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}}]},{\"name\":\"ofType\",\"description\":null,\"type\":{\"kind\":\"OBJECT\",\"name\":\"__Type\",\"ofType\":null},\"args\":[]},{\"name\":\"isOneOf\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null},\"args\":[]}]},{\"name\":\"__TypeKind\",\"kind\":\"ENUM\",\"description\":\"An enum describing what kind of type a given `__Type` is.\",\"fields\":null},{\"name\":\"__Field\",\"kind\":\"OBJECT\",\"description\":\"Object and Interface types are described by a list of Fields, each of which has a name, potentially a list of arguments, and a return type.\",\"fields\":[{\"name\":\"name\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null}},\"args\":[]},{\"name\":\"description\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"args\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__InputValue\",\"ofType\":null}}}},\"args\":[{\"name\":\"includeDeprecated\",\"description\":null,\"defaultValue\":\"false\",\"type\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}}]},{\"name\":\"type\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__Type\",\"ofType\":null}},\"args\":[]},{\"name\":\"isDeprecated\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}},\"args\":[]},{\"name\":\"deprecationReason\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]}]},{\"name\":\"__InputValue\",\"kind\":\"OBJECT\",\"description\":\"Arguments provided to Fields or Directives and the input fields of an InputObject are represented as Input Values which describe their type and optionally a default value.\",\"fields\":[{\"name\":\"name\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null}},\"args\":[]},{\"name\":\"description\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"type\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__Type\",\"ofType\":null}},\"args\":[]},{\"name\":\"defaultValue\",\"description\":\"A GraphQL-formatted string representing the default value for this input value.\",\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"isDeprecated\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}},\"args\":[]},{\"name\":\"deprecationReason\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]}]},{\"name\":\"__EnumValue\",\"kind\":\"OBJECT\",\"description\":\"One possible value for a given Enum. Enum values are unique values, not a placeholder for a string or numeric value. However an Enum value is returned in a JSON response as a string.\",\"fields\":[{\"name\":\"name\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null}},\"args\":[]},{\"name\":\"description\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"isDeprecated\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}},\"args\":[]},{\"name\":\"deprecationReason\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]}]},{\"name\":\"__Directive\",\"kind\":\"OBJECT\",\"description\":\"A Directive provides a way to describe alternate runtime execution and type validation behavior in a GraphQL document.\\n\\nIn some cases, you need to provide options to alter GraphQL's execution behavior in ways field arguments will not suffice, such as conditionally including or skipping a field. Directives provide this by describing additional information to the executor.\",\"fields\":[{\"name\":\"name\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null}},\"args\":[]},{\"name\":\"description\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]},{\"name\":\"isRepeatable\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}},\"args\":[]},{\"name\":\"locations\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"ENUM\",\"name\":\"__DirectiveLocation\",\"ofType\":null}}}},\"args\":[]},{\"name\":\"args\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"__InputValue\",\"ofType\":null}}}},\"args\":[{\"name\":\"includeDeprecated\",\"description\":null,\"defaultValue\":\"false\",\"type\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}}]},{\"name\":\"isDeprecated\",\"description\":null,\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"Boolean\",\"ofType\":null}},\"args\":[]},{\"name\":\"deprecationReason\",\"description\":null,\"type\":{\"kind\":\"SCALAR\",\"name\":\"String\",\"ofType\":null},\"args\":[]}]},{\"name\":\"__DirectiveLocation\",\"kind\":\"ENUM\",\"description\":\"A Directive can be adjacent to many parts of the GraphQL language, a __DirectiveLocation describes one such possible adjacencies.\",\"fields\":null}]}}"
+    },
+    "bff087dd-e62e-4374-a862-3b8a2a9feb12": {
+      "id": "bff087dd-e62e-4374-a862-3b8a2a9feb12",
+      "name": "New Request",
+      "method": "POST",
+      "url": "https://parabank.parasoft.com/parabank/services/ParaBank;jsessionid=2DD8FB137633568A073CEB7FF33F45D0",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/xml; charset=utf-8",
+          "enabled": true
+        }
+      ],
+      "params": [
+        {
+          "key": "wsdl",
+          "value": "",
+          "enabled": true
+        }
+      ],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "soap",
+        "soap": {
+          "wsdlUrl": "https://parabank.parasoft.com/parabank/services/ParaBank;jsessionid=2DD8FB137633568A073CEB7FF33F45D0?wsdl",
+          "envelope": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope\n  xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\"\n  xmlns:tns=\"http://service.parabank.parasoft.com/\">\n  <soap:Header/>\n  <soap:Body>\n    <tns:startupJmsListener>\n      <!-- Add parameters here -->\n    </tns:startupJmsListener>\n  </soap:Body>\n</soap:Envelope>",
+          "operationName": "startupJmsListener",
+          "soapVersion": "1.1",
+          "binding": "ParaBankSoapBinding",
+          "soapAction": ""
+        }
+      },
+      "protocol": "soap"
+    },
+    "528dfbdf-27ff-4195-b354-a185a8e7aada": {
+      "id": "528dfbdf-27ff-4195-b354-a185a8e7aada",
+      "name": "grpc",
+      "method": "GET",
+      "url": "localhost:50051",
+      "headers": [],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "grpc",
+        "grpc": {
+          "message": "{\"name\":\"Roy\"}",
+          "metadata": [],
+          "plaintext": true,
+          "protoSource": "",
+          "protoPath": "/Users/roy/tmp/realtime-local-servers/demo.proto",
+          "serviceName": "demo.Demo",
+          "methodName": "SayHello"
+        }
+      },
+      "protocol": "grpc"
+    }
+  },
+  "collectionVariables": {},
+  "auth": {
+    "type": "none"
+  },
+  "headers": [
+    {
+      "key": "Content-Type",
+      "value": "application/json",
+      "enabled": true
+    }
+  ]
 }

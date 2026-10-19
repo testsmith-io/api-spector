@@ -112,6 +112,13 @@ export const BLOCK_SPECS: Record<FlowBlockType, BlockSpec> = {
     description: 'Continue as soon as any one incoming branch arrives.',
     inputs: IN, outputs: OUT,
   },
+  parallel: {
+    type: 'parallel', category: 'logic', label: 'Parallel',
+    description: 'Send the connected requests at the same time; continues on done once all finish. Set copies to hit one request several times at once.',
+    inputs: IN,
+    outputs: () => [{ id: 'branch', label: 'branch' }, { id: 'done', label: 'done' }],
+    defaultConfig: { copies: 1 },
+  },
 
   // ── Looping ─────────────────────────────────────────────────────────────
   forEach: {
@@ -174,7 +181,7 @@ export function inputsFor(block: Pick<FlowBlock, 'type'>): PortSpec[] {
 /** Blocks grouped by category, in menu order — used by the Add-block menu. */
 export const BLOCKS_BY_CATEGORY: { category: FlowBlockCategory; blocks: BlockSpec[] }[] = [
   { category: 'action', blocks: [BLOCK_SPECS.request, BLOCK_SPECS.subflow] },
-  { category: 'logic', blocks: [BLOCK_SPECS.if, BLOCK_SPECS.condition, BLOCK_SPECS.validate, BLOCK_SPECS.evaluate, BLOCK_SPECS.setVar, BLOCK_SPECS.delay, BLOCK_SPECS.merge] },
+  { category: 'logic', blocks: [BLOCK_SPECS.if, BLOCK_SPECS.condition, BLOCK_SPECS.validate, BLOCK_SPECS.evaluate, BLOCK_SPECS.setVar, BLOCK_SPECS.delay, BLOCK_SPECS.merge, BLOCK_SPECS.parallel] },
   { category: 'looping', blocks: [BLOCK_SPECS.forEach, BLOCK_SPECS.repeat, BLOCK_SPECS.collect] },
   { category: 'visualize', blocks: [BLOCK_SPECS.display, BLOCK_SPECS.log] },
 ];

@@ -397,6 +397,68 @@ export async function runFlow(
           return [ok ? 'success' : 'fail'];
         }
 
+        case 'parallel': {
+          // Fire every connected request at the same time, then continue on
+          // `done` once they all settle. Each dispatch shares the same input
+          // snapshot (taken now), and scope updates are merged in afterwards, so
+          // there is no mid-flight race on the shared context. `copies` fires the
+          // same request several times at once (to reproduce a server-side race).
+          const branchEdges = outEdges(block, 'branch');
+          const targets = branchEdges
+            .map(e => nodeById.get(e.target))
+            .filter((n): n is FlowBlock => !!n && n.type === 'request' && !!n.config?.ref);
+          emitEdges(block.id, block.type, branchEdges.map(e => e.id));
+          deps.onEvent?.({ kind: 'block-start', blockId: block.id, blockType: block.type, status: 'running', iteration });
+
+          const copies = Math.max(1, Math.min(50, Math.floor(cfg.copies ?? 1)));
+          const input = scriptInput();
+          const dispatches: { node: FlowBlock; ref: NonNullable<FlowBlockConfig['ref']> }[] = [];
+          for (const node of targets) {
+            for (let i = 0; i < copies; i++) dispatches.push({ node, ref: node.config!.ref! });
+          }
+          for (const node of targets) {
+            deps.onEvent?.({ kind: 'block-start', blockId: node.id, blockType: 'request', status: 'running', iteration });
+          }
+
+          const results = await Promise.all(dispatches.map(async ({ node, ref }) => {
+            const r = await deps.runRequest(ref, input);
+            if (!r) { record(node, 'error', { iteration, error: 'Linked request not found' }); return null; }
+            const reqStatus: FlowBlockStatus = r.status === 'skipped' ? 'done' : r.status === 'pending' ? 'running' : r.status;
+            const reqBody = clipBody(r.sentRequest?.body);
+            const resBody = clipBody(r.response?.body);
+            record(node, reqStatus, {
+              iteration, httpStatus: r.httpStatus, durationMs: r.durationMs,
+              error: r.error, testResults: r.testResults, method: r.method, resolvedUrl: r.resolvedUrl,
+              http: {
+                reqHeaders: r.sentRequest?.headers,
+                reqBody: reqBody.text,
+                statusText: r.response?.statusText,
+                resHeaders: r.response?.headers,
+                resBody: resBody.text,
+                bodySize: r.response?.bodySize,
+                truncated: reqBody.clipped || resBody.clipped,
+              },
+            });
+            return r;
+          }));
+
+          // Merge each dispatch's scope updates into the shared context (all
+          // started from the same snapshot, so later writes win on conflict).
+          for (const r of results) {
+            if (!r) continue;
+            ctx.envVars = { ...ctx.envVars, ...r.envVars };
+            ctx.collectionVars = { ...ctx.collectionVars, ...r.collectionVars };
+            ctx.globals = { ...ctx.globals, ...r.globals };
+            ctx.localVars = { ...ctx.localVars, ...r.localVars };
+          }
+          const last = [...results].reverse().find(r => r?.response);
+          if (last?.response) ctx.response = last.response;
+
+          const anyFailed = results.some(r => r && r.status !== 'passed' && r.status !== 'skipped');
+          record(block, anyFailed ? 'failed' : 'done', { iteration });
+          return ['done'];
+        }
+
         case 'subflow': {
           const sub = cfg.flowId ? deps.resolveFlow(cfg.flowId) : null;
           if (!sub) { record(block, 'error', { iteration, error: 'Linked flow not found' }); return ['out']; }

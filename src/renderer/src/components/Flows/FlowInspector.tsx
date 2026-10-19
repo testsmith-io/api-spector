@@ -266,6 +266,12 @@ export function FlowInspector({
           </>
         )}
 
+        {block.type === 'parallel' && (
+          <Field label={t('Copies (per request)')}>
+            <input type="number" min={1} max={50} className={INPUT} value={cfg.copies ?? 1} onChange={e => onPatchConfig({ copies: Math.max(1, Math.min(50, Math.floor(Number(e.target.value)))) })} />
+          </Field>
+        )}
+
         {block.type === 'collect' && (
           <>
             <Field label={t('Into variable')} hint={t('List to append each iteration into; read it after the loop.')}>

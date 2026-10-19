@@ -8,6 +8,8 @@ import { buildJsonReport, buildJUnitReport, buildHtmlReport, buildSarifReport } 
 import { collectAllTags, buildRunPlan, expandRunPlanWithData, expandFolderDataSets, resolveInheritedAuthAndHeaders, authIsConfigured } from '../../../../shared/request-collection';
 import { buildCliArgs, generateGitHub, generateAzure, generateGitLab } from '../../../../shared/ci-generators';
 import { getMethodColor, getStatusColor } from '../../../../shared/colors';
+import { askVarsInRequest, resolveAskValues, type AskVar } from '../../../../shared/ask-vars';
+import { AskVarsModal } from '../RequestBuilder/AskVarsModal';
 import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
 import { useCopyFeedback } from '../../hooks/useCopyFeedback';
 import { EmptyState } from '../common/EmptyState';
@@ -177,7 +179,12 @@ export function RunnerModal() {
   const { copied: copiedKey, copy: copyCI } = useCopyFeedback<string>();
   const [exportFormat,  setExportFormat]  = useState<'json' | 'junit' | 'html' | 'sarif'>('json');
   const [requestDelay,  setRequestDelay]  = useState<number>(0);
+  const [concurrency,   setConcurrency]   = useState<number>(1);
   const [expandedRows,  setExpandedRows]  = useState<Set<number>>(new Set());
+  const [askPrompt,     setAskPrompt]     = useState<{ asks: AskVar[]; resolve: (a: Record<string, string> | null) => void } | null>(null);
+  function promptAskVars(asks: AskVar[]): Promise<Record<string, string> | null> {
+    return new Promise(resolve => setAskPrompt({ asks, resolve }));
+  }
 
   const toggleRow = (idx: number) =>
     setExpandedRows(prev => {
@@ -259,6 +266,18 @@ export function RunnerModal() {
 
     const env = resolveEnvironmentById(environments, selectedEnvId || null);
 
+    // Ask variables ({{@Message}}) used anywhere in the run — prompt once up
+    // front, then inject the answers into every item so the run stays unattended.
+    const askByKey = new Map<string, AskVar>();
+    for (const it of items) for (const a of askVarsInRequest(it.request)) if (!askByKey.has(a.key)) askByKey.set(a.key, a);
+    const unionAsks = [...askByKey.values()];
+    if (unionAsks.length) {
+      const answers = await promptAskVars(unionAsks);
+      if (!answers) return;  // cancelled — do not run
+      const askValues = resolveAskValues(unionAsks, answers);
+      items = items.map(it => ({ ...it, collectionVars: { ...it.collectionVars, ...askValues } }));
+    }
+
     setExpandedRows(new Set());
     setRunnerResults(items.map(item => ({
       requestId:      item.request.id,
@@ -277,9 +296,11 @@ export function RunnerModal() {
     progressIdxRef.current = 0;
 
     electron.onRunProgress((result: RunRequestResult) => {
-      const idx = progressIdxRef.current;
+      // A parallel run reports results out of order, so prefer the item index
+      // the runner stamps on each event; fall back to the running counter.
+      const idx = result.index ?? progressIdxRef.current;
       patchRunnerResult(idx, result);
-      if (result.status !== 'running') progressIdxRef.current++;
+      if (result.index === undefined && result.status !== 'running') progressIdxRef.current++;
     });
 
     try {
@@ -291,6 +312,7 @@ export function RunnerModal() {
         tls:             workspaceSettings?.tls,
         piiMaskPatterns: workspaceSettings?.piiMaskPatterns,
         requestDelay,
+        concurrency,
       });
       setSummary(s);
     } finally {
@@ -298,7 +320,7 @@ export function RunnerModal() {
       setRunnerRunning(false);
     }
    
-  }, [collectionId, folderId, filterTags, selectedEnvId, environments, globals, colEntry, requestDelay, workspaceSettings, setRunnerResults, patchRunnerResult, setRunnerRunning]);
+  }, [collectionId, folderId, filterTags, selectedEnvId, environments, globals, colEntry, requestDelay, concurrency, workspaceSettings, setRunnerResults, patchRunnerResult, setRunnerRunning]);
 
   if (!runnerModal.open) return null;
 
@@ -344,6 +366,17 @@ export function RunnerModal() {
                 value={requestDelay}
                 onChange={e => setRequestDelay(Math.max(0, Number(e.target.value)))}
                 className="text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 w-24"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-surface-400 font-medium uppercase tracking-wider" title={t('Run this many requests at the same time. 1 is sequential. Best for independent requests; hooks run as barriers.')}>{t('Parallel')}</label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={concurrency}
+                onChange={e => setConcurrency(Math.max(1, Math.min(20, Math.floor(Number(e.target.value) || 1))))}
+                className="text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 w-20"
               />
             </div>
             <button
@@ -559,6 +592,14 @@ export function RunnerModal() {
             </div>
           </div>
         )}
+      {askPrompt && (
+        <AskVarsModal
+          asks={askPrompt.asks}
+          requestName={folderName ? folderName : colName}
+          onSubmit={answers => { askPrompt.resolve(answers); setAskPrompt(null); }}
+          onCancel={() => { askPrompt.resolve(null); setAskPrompt(null); }}
+        />
+      )}
     </Modal>
   );
 }

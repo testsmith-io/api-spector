@@ -1,0 +1,25 @@
+{
+  "openapi": "3.0.0",
+  "info": { "title": "Pets", "version": "1.0.0" },
+  "servers": [{ "url": "https://api.example.com" }],
+  "paths": {
+    "/login": {
+      "post": {
+        "operationId": "loginUser",
+        "summary": "Log in",
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "username": { "type": "string" } } } } }
+        },
+        "responses": { "200": { "description": "ok" } }
+      }
+    },
+    "/pets/{id}": {
+      "get": {
+        "operationId": "getPet",
+        "summary": "Get a pet",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "ok" } }
+      }
+    }
+  }
+}

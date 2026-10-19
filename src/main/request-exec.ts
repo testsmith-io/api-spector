@@ -30,6 +30,8 @@ import { detectStreamKind, readStream } from './stream/parse';
 import { interpolate, buildUrl, mergeVars, buildDynamicVars, resolveDataRow } from './interpolation';
 import { hasSecretScheme, resolveExternalSecret } from './secrets';
 import { runScript } from './script-runner';
+import { runMqttTest } from './mqtt-test';
+import { runWsTest, runSocketIoTest } from './realtime-test';
 import { patchGlobals, persistGlobals } from './globals-store';
 import {
   buildAuthHeaders,
@@ -585,6 +587,9 @@ export interface RunnerExecOptions {
   envVars: Record<string, string>
   globals: Record<string, string>
   localVars: Record<string, string>
+  /** Variables from the request's folder chain (innermost wins). Readable and
+   *  writable in scripts as `sp.folder`. */
+  folderVars?: Record<string, string>
   dispatcher: ProxyAgent | Agent | undefined
   piiMaskPatterns: string[]
   proxy?: ProxyConfig
@@ -603,6 +608,7 @@ export interface RunnerExecResult {
   updatedCollectionVars: Record<string, string>
   updatedGlobals: Record<string, string>
   updatedLocalVars: Record<string, string>
+  updatedFolderVars: Record<string, string>
 }
 
 /**
@@ -646,6 +652,7 @@ export async function resolveInlineSecrets(req: ApiRequest): Promise<Record<stri
 export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<RunnerExecResult> {
   const { req, collectionVars, envVars, globals, dispatcher, piiMaskPatterns, proxy, tls, onScriptOutput } = opts;
   let { localVars } = opts;
+  const folderVars = opts.folderVars ?? {};
 
   applyRequestDefaults(req);
 
@@ -667,14 +674,97 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
   // {{faker.person.firstName()}}, etc. Resolved against the surrounding scopes
   // and freshly-generated dynamic vars, so faker yields a new value per row.
   if (localVars && Object.keys(localVars).length > 0) {
-    localVars = resolveDataRow(localVars, mergeVars(envVars, collectionVars, globals, {}, dynamicVars));
+    localVars = resolveDataRow(localVars, mergeVars(envVars, collectionVars, globals, {}, dynamicVars, folderVars));
   }
 
-  let vars = mergeVars(envVars, collectionVars, globals, localVars, dynamicVars);
+  let vars = mergeVars(envVars, collectionVars, globals, localVars, dynamicVars, folderVars);
   let updatedEnvVars = { ...envVars };
   let updatedCollectionVars = { ...collectionVars };
   let updatedGlobals = { ...globals };
+  let updatedFolderVars = { ...folderVars };
   let preScriptError: string | undefined;
+
+  // ── MQTT request: run it as a test (connect → subscribe → [publish] →
+  // collect → assert) instead of an HTTP exchange. ──────────────────────────
+  if (req.protocol === 'mqtt') {
+    const m = req.mqtt ?? {};
+    const istr = (s?: string) => (s ? interpolate(s, vars) : undefined);
+    const mqttStart = Date.now();
+    const testRes = await runMqttTest({
+      url: interpolate(req.url, vars),
+      clientId: istr(m.clientId),
+      username: istr(m.username),
+      password: m.password ? interpolate(m.password, vars) : undefined,
+      cleanSession: m.cleanSession !== false,
+      subscribeTopic: istr(m.subscribeTopic),
+      qos: m.qos,
+      publishTopic: istr(m.publishTopic),
+      publishPayload: istr(m.publishPayload),
+      retain: m.retain,
+      collectMs: m.collectMs ?? 2000,
+      script: m.testScript ?? '',
+      envVars, collectionVars, globals, localVars,
+    });
+    const status: RunRequestResult['status'] = testRes.error
+      ? 'error'
+      : testRes.testResults.length === 0 ? 'skipped'
+      : testRes.testResults.every(t => t.passed) ? 'passed' : 'failed';
+    return {
+      result: {
+        ...base,
+        status,
+        durationMs: Date.now() - mqttStart,
+        testResults: testRes.testResults,
+        consoleOutput: testRes.consoleOutput,
+        error: testRes.error,
+      },
+      updatedEnvVars, updatedCollectionVars, updatedGlobals, updatedLocalVars: localVars, updatedFolderVars,
+    };
+  }
+
+  // ── WebSocket / Socket.IO request: run it as a test (connect → [send] →
+  // collect → assert) instead of an HTTP exchange. ──────────────────────────
+  if (req.protocol === 'websocket' || req.protocol === 'socketio') {
+    const rtHeaders: Record<string, string> = {};
+    for (const h of req.headers ?? []) if (h.enabled && h.key) rtHeaders[interpolate(h.key, vars)] = interpolate(h.value, vars);
+    const istr = (s?: string) => (s ? interpolate(s, vars) : undefined);
+    const rtStart = Date.now();
+    const testRes = req.protocol === 'websocket'
+      ? await runWsTest({
+          url: interpolate(req.url, vars),
+          headers: rtHeaders,
+          sendMessage: istr(req.websocket?.sendMessage),
+          collectMs: req.websocket?.collectMs ?? 3000,
+          script: req.websocket?.testScript ?? '',
+          envVars, collectionVars, globals, localVars,
+        })
+      : await runSocketIoTest({
+          url: interpolate(req.url, vars),
+          namespace: req.socketio?.namespace,
+          auth: istr(req.socketio?.auth),
+          headers: rtHeaders,
+          emitEvent: istr(req.socketio?.emitEvent),
+          emitArgs: istr(req.socketio?.emitArgs),
+          collectMs: req.socketio?.collectMs ?? 3000,
+          script: req.socketio?.testScript ?? '',
+          envVars, collectionVars, globals, localVars,
+        });
+    const status: RunRequestResult['status'] = testRes.error
+      ? 'error'
+      : testRes.testResults.length === 0 ? 'skipped'
+      : testRes.testResults.every(t => t.passed) ? 'passed' : 'failed';
+    return {
+      result: {
+        ...base,
+        status,
+        durationMs: Date.now() - rtStart,
+        testResults: testRes.testResults,
+        consoleOutput: testRes.consoleOutput,
+        error: testRes.error,
+      },
+      updatedEnvVars, updatedCollectionVars, updatedGlobals, updatedLocalVars: localVars, updatedFolderVars,
+    };
+  }
 
   // Inline external-secret references ({{vault:...}} etc.) anywhere in the
   // request/scripts — resolved once (async) and merged into the scope so the
@@ -691,6 +781,7 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
         error: err instanceof Error ? err.message : String(err),
       },
       updatedEnvVars, updatedCollectionVars, updatedGlobals, updatedLocalVars: localVars,
+      updatedFolderVars,
     };
   }
   if (Object.keys(inlineSecrets).length) vars = { ...vars, ...inlineSecrets };
@@ -700,6 +791,7 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
     const r = await runScript(interpolate(req.preRequestScript, vars), {
       envVars: { ...envVars }, collectionVars: { ...collectionVars },
       globals: { ...globals }, localVars: { ...localVars },
+      folderVars: { ...updatedFolderVars },
       piiMaskPatterns,
     });
     preScriptError = r.error;
@@ -707,10 +799,11 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
     updatedEnvVars = r.updatedEnvVars;
     updatedCollectionVars = r.updatedCollectionVars;
     updatedGlobals = r.updatedGlobals;
+    updatedFolderVars = r.updatedFolderVars;
     patchGlobals(r.updatedGlobals);
     await persistGlobals();
     onScriptOutput?.('pre', r.consoleOutput, r.error);
-    vars = mergeVars(updatedEnvVars, updatedCollectionVars, updatedGlobals, localVars, dynamicVars);
+    vars = mergeVars(updatedEnvVars, updatedCollectionVars, updatedGlobals, localVars, dynamicVars, updatedFolderVars);
     if (Object.keys(inlineSecrets).length) vars = { ...vars, ...inlineSecrets };
   }
 
@@ -748,7 +841,8 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
     if (req.postRequestScript?.trim()) {
       const r = await runScript(interpolate(req.postRequestScript, vars), {
         envVars: updatedEnvVars, collectionVars: updatedCollectionVars,
-        globals: updatedGlobals, localVars, response: scriptResponse,
+        globals: updatedGlobals, localVars, folderVars: updatedFolderVars,
+        response: scriptResponse,
         piiMaskPatterns,
       });
       testResults = [...schemaTestResults, ...protocolFaultTests, ...r.testResults];
@@ -757,6 +851,7 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
       updatedEnvVars = r.updatedEnvVars;
       updatedCollectionVars = r.updatedCollectionVars;
       updatedGlobals = r.updatedGlobals;
+      updatedFolderVars = r.updatedFolderVars;
       localVars = r.updatedLocalVars;
       patchGlobals(r.updatedGlobals);
       await persistGlobals();
@@ -806,6 +901,7 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
       updatedCollectionVars,
       updatedGlobals,
       updatedLocalVars: localVars,
+      updatedFolderVars,
     };
   } catch (err) {
     return {
@@ -822,6 +918,7 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
       updatedCollectionVars,
       updatedGlobals,
       updatedLocalVars: localVars,
+      updatedFolderVars,
     };
   }
 }

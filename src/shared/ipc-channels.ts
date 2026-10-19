@@ -104,6 +104,8 @@ export const IPC = {
     insomnia:          'import:insomnia',
     bruno:             'import:bruno',
     http:              'import:http',
+    har:               'import:har',
+    arazzo:            'import:arazzo',
     spector:           'import:spector',
     openapiSchemas:    'import:openapi-schemas',
     openapiSchemasUrl: 'import:openapi-schemas-url',
@@ -143,10 +145,73 @@ export const IPC = {
     connect:    'ws:connect',
     send:       'ws:send',
     disconnect: 'ws:disconnect',
+    /** Run a WebSocket request as a test: connect, optionally send, collect for
+     *  a window, then assert over the received frames. */
+    test:       'ws:test',
     /** Event: inbound/outbound WS message. */
     message:    'ws:message',
     /** Event: connection status change. */
     status:     'ws:status',
+  },
+
+  // ─── jq (JSON response filtering) ───────────────────────────────────────────
+  jq: {
+    filter: 'jq:filter',
+  },
+
+  // ─── GraphQL subscriptions (graphql-ws) ─────────────────────────────────────
+  graphqlws: {
+    subscribe:  'graphqlws:subscribe',
+    stop:       'graphqlws:stop',
+    /** Run a GraphQL subscription as a test: subscribe, collect the emitted
+     *  payloads for a window, then assert over them. */
+    test:       'graphqlws:test',
+    /** Event: a next / error / complete / system message. */
+    message:    'graphqlws:message',
+    /** Event: connection status change. */
+    status:     'graphqlws:status',
+  },
+
+  // ─── Socket.IO ─────────────────────────────────────────────────────────────
+  socketio: {
+    connect:    'socketio:connect',
+    emit:       'socketio:emit',
+    disconnect: 'socketio:disconnect',
+    /** Run a Socket.IO request as a test: connect, optionally emit, collect the
+     *  received events for a window, then assert over them. */
+    test:       'socketio:test',
+    /** Event: inbound/outbound Socket.IO event, ack, or system note. */
+    message:    'socketio:message',
+    /** Event: connection status change. */
+    status:     'socketio:status',
+  },
+
+  // ─── MQTT ──────────────────────────────────────────────────────────────────
+  mqtt: {
+    connect:     'mqtt:connect',
+    publish:     'mqtt:publish',
+    subscribe:   'mqtt:subscribe',
+    unsubscribe: 'mqtt:unsubscribe',
+    disconnect:  'mqtt:disconnect',
+    /** Run an MQTT request as a test: connect, subscribe, optionally publish,
+     *  collect for a window, then assert over the messages. */
+    test:        'mqtt:test',
+    /** Event: a published / received message, or a system note. */
+    message:     'mqtt:message',
+    /** Event: connection status change. */
+    status:      'mqtt:status',
+  },
+
+  // ─── Performance (load) testing ─────────────────────────────────────────────
+  perf: {
+    /** Run a load test for a request; resolves with the aggregate result. */
+    run:      'perf:run',
+    /** Abort the active run early. */
+    stop:     'perf:stop',
+    /** Export a finished run as a self-contained HTML report (save dialog). */
+    exportHtml: 'perf:exportHtml',
+    /** Event: live progress while a run is in flight. */
+    progress: 'perf:progress',
   },
 
   // ─── SOAP / WSDL ───────────────────────────────────────────────────────────

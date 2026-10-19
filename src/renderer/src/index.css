@@ -126,11 +126,16 @@ body {
 :root.light .bg-red-700,
 :root.light .hover\:bg-red-600:hover,
 :root.light .bg-amber-600,
+:root.light .bg-amber-700,
 :root.light .bg-orange-600,
 :root.light .bg-cyan-700,
 :root.light .bg-cyan-800,
 :root.light .bg-violet-600,
-:root.light .bg-violet-700 {
+:root.light .bg-violet-700,
+:root.light .bg-fuchsia-600,
+:root.light .bg-fuchsia-700,
+:root.light .bg-teal-600,
+:root.light .bg-teal-700 {
   color: #ffffff !important;
 }
 
@@ -212,3 +217,32 @@ body {
 :root.light .bg-blue-950\/50 { background-color: #dbeafe !important; }  /* blue-100 */
 :root.light .border-blue-700  { border-color: #93c5fd !important; }     /* blue-300 */
 :root.light .border-blue-800\/50 { border-color: #93c5fd !important; }  /* blue-300 */
+
+/* ─── Light mode: Performance / realtime accents ───────────────────────────── */
+/* These hues (and their opacity variants) are bright on dark surfaces but wash
+   out on a light background, so re-map them to readable, darker equivalents. */
+
+/* Fuchsia — p95 series, GraphQL subscription accent, Socket.IO/graphql dots */
+:root.light .text-fuchsia-300    { color: #a21caf !important; }  /* fuchsia-700 */
+:root.light .text-fuchsia-400    { color: #c026d3 !important; }  /* fuchsia-600 */
+:root.light .text-fuchsia-400\/70 { color: #c026d3 !important; }
+
+/* Amber — Performance accent + warnings (opacity variants the base remap misses) */
+:root.light .text-amber-500      { color: #b45309 !important; }  /* amber-700 */
+:root.light .text-amber-500\/80  { color: #b45309 !important; }
+:root.light .text-amber-500\/70  { color: #b45309 !important; }
+:root.light .text-amber-400\/70  { color: #d97706 !important; }  /* amber-500 */
+
+/* Cyan / emerald dots (opacity variants) */
+:root.light .text-cyan-500\/70    { color: #0e7490 !important; } /* cyan-700  */
+:root.light .text-emerald-500\/70 { color: #16a34a !important; } /* green-600 */
+
+/* Sky — 3xx status chips */
+:root.light .text-sky-400 { color: #0369a1 !important; }  /* sky-700 */
+
+/* Chart strokes / fills (inline SVG) — darken so the lines and bars read on the
+   light chart background. */
+:root.light .stroke-amber-400     { stroke: #d97706 !important; }
+:root.light .stroke-fuchsia-400   { stroke: #c026d3 !important; }
+:root.light .fill-amber-500\/50   { fill: #f59e0b !important; }
+:root.light .fill-amber-500\/25   { fill: rgba(245, 158, 11, 0.3) !important; }

@@ -1,0 +1,43 @@
+{
+  "openapi": "3.0.0",
+  "info": { "title": "Enum API", "version": "1.0.0" },
+  "servers": [{ "url": "https://api.example.com" }],
+  "paths": {
+    "/items": {
+      "get": {
+        "operationId": "listItems",
+        "summary": "List items",
+        "parameters": [
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["asc", "desc"] }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "ok" } }
+      }
+    },
+    "/items/{status}": {
+      "get": {
+        "operationId": "itemsByStatus",
+        "summary": "Items by status",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "enum": ["open", "closed", "archived"] }
+          }
+        ],
+        "responses": { "200": { "description": "ok" } }
+      }
+    }
+  }
+}

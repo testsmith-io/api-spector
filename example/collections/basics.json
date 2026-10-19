@@ -42,7 +42,7 @@
       },
       "postRequestScript": "sp.test('status is 200', function () { sp.expect(sp.response.code).to.equal(200); });\nsp.test('returns the requested id', function () { sp.expect(sp.response.json().id).to.equal(42); });",
       "description": "A simple GET with a path parameter.",
-      "protocol": "http"
+      "protocol": "websocket"
     },
     "get-query": {
       "id": "get-query",
@@ -88,7 +88,7 @@
       },
       "postRequestScript": "sp.test('status is 201', function () { sp.expect(sp.response.code).to.equal(201); });\nsp.test('echoes the posted name', function () { sp.expect(sp.response.json().name).to.equal('Keyboard'); });\nsp.test('assigns a numeric id', function () { sp.expect(sp.response.json().id).to.be.a('number'); });",
       "description": "Send a JSON body and assert on the created resource.",
-      "protocol": "http"
+      "protocol": "socketio"
     },
     "put-replace": {
       "id": "put-replace",

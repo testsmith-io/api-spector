@@ -33,6 +33,8 @@ type ScopeWrapper = {
   scopePath: string[]
   before: ApiRequest[]
   after: ApiRequest[]
+  folderVars: Record<string, string>
+  folderId: string
 }
 
 /** All non-disabled requests in a folder subtree, in visible (childOrder)
@@ -60,8 +62,10 @@ function makeHook(
   scopeAncestors: string[],
   scopePath: string[],
   mainRequestId?: string,
+  folderVars?: Record<string, string>,
+  folderId?: string,
 ): RunnerItem {
-  return { request: req, collectionVars, isHook: true, hookType, scopeId, scopeAncestors, scopePath, mainRequestId };
+  return { request: req, collectionVars, isHook: true, hookType, scopeId, scopeAncestors, scopePath, mainRequestId, folderVars, folderId };
 }
 
 /**
@@ -87,8 +91,15 @@ function buildFolderPlan(
   wrappers: ScopeWrapper[],
   /** True if this is the collection's top-level root scope — root name is omitted. */
   isRoot: boolean,
+  /** Folder variables inherited from ancestor folders (root→leaf). */
+  inheritedFolderVars: Record<string, string> = {},
 ): RunnerItem[] {
   const result: RunnerItem[] = [];
+  // Folder vars visible to requests owned by this folder: the inherited chain
+  // plus this folder's own `variables` (inner wins). Attached to each item so
+  // a script reads them as `sp.folder` and writes land on this folder.
+  const myFolderVars = { ...inheritedFolderVars, ...(folder.variables ?? {}) };
+  const myFolderId = folder.id;
   // scopePath is the path *for requests owned by this folder*. For the root
   // scope, that's [] (direct collection children have no folder). For any
   // other scope, it's the parent path + this folder's name.
@@ -131,12 +142,12 @@ function buildFolderPlan(
   const regularReqs = folderReqs.filter(r => !r.hookType);
 
   // Build wrapper chain for this scope
-  const myWrapper: ScopeWrapper = { scopeId, ancestors: ancestorIds, scopePath, before: beforeHooks, after: afterHooks };
+  const myWrapper: ScopeWrapper = { scopeId, ancestors: ancestorIds, scopePath, before: beforeHooks, after: afterHooks, folderVars: myFolderVars, folderId: myFolderId };
   const allWrappers = [...wrappers, myWrapper];
 
   // 1. beforeAll hooks for this scope
   for (const req of beforeAllHooks) {
-    result.push(makeHook(req, collectionVars, 'beforeAll', scopeId, ancestorIds, scopePath));
+    result.push(makeHook(req, collectionVars, 'beforeAll', scopeId, ancestorIds, scopePath, undefined, myFolderVars, myFolderId));
   }
 
   // 2 + 3. Regular requests and sub-folders, interleaved in the folder's own
@@ -154,15 +165,15 @@ function buildFolderPlan(
       // before hooks: outer → inner
       for (const w of allWrappers) {
         for (const hookReq of w.before) {
-          result.push(makeHook(hookReq, collectionVars, 'before', w.scopeId, w.ancestors, w.scopePath, req.id));
+          result.push(makeHook(hookReq, collectionVars, 'before', w.scopeId, w.ancestors, w.scopePath, req.id, w.folderVars, w.folderId));
         }
       }
       // main request
-      result.push({ request: req, collectionVars, scopeId, scopeAncestors: ancestorIds, scopePath });
+      result.push({ request: req, collectionVars, scopeId, scopeAncestors: ancestorIds, scopePath, folderVars: myFolderVars, folderId: myFolderId });
       // after hooks: inner → outer
       for (const w of [...allWrappers].reverse()) {
         for (const hookReq of w.after) {
-          result.push(makeHook(hookReq, collectionVars, 'after', w.scopeId, w.ancestors, w.scopePath, req.id));
+          result.push(makeHook(hookReq, collectionVars, 'after', w.scopeId, w.ancestors, w.scopePath, req.id, w.folderVars, w.folderId));
         }
       }
     } else {
@@ -175,14 +186,14 @@ function buildFolderPlan(
         : folderTags.some(t => filterTags.includes(t)) ? [] : filterTags;
       result.push(...buildFolderPlan(
         sub, requests, collectionVars, effectiveFilter,
-        sub.id, [...ancestorIds, scopeId], scopePath, allWrappers, false,
+        sub.id, [...ancestorIds, scopeId], scopePath, allWrappers, false, myFolderVars,
       ));
     }
   }
 
   // 4. afterAll hooks for this scope (always runs)
   for (const req of afterAllHooks) {
-    result.push(makeHook(req, collectionVars, 'afterAll', scopeId, ancestorIds, scopePath));
+    result.push(makeHook(req, collectionVars, 'afterAll', scopeId, ancestorIds, scopePath, undefined, myFolderVars, myFolderId));
   }
 
   return result;
@@ -385,6 +396,33 @@ export function resolveInheritedAuthAndHeaders(
     }
   }
   return { auth: inheritedAuth, headers: inheritedHeaders };
+}
+
+/** One header a request inherits, tagged with the level it comes from. */
+export interface InheritedHeader {
+  key: string
+  value: string
+  /** The collection or folder name the header is defined on. */
+  source: string
+}
+
+/**
+ * The enabled headers a request inherits from its collection and the folders on
+ * its path, each tagged with its source level. Ordered the same way they are
+ * applied at send time (collection first, then root → leaf folders), so the
+ * Headers tab can show exactly what gets sent and where each one is defined.
+ */
+export function inheritedHeadersWithSource(requestId: string, collection: Collection): InheritedHeader[] {
+  const out: InheritedHeader[] = [];
+  for (const h of collection.headers ?? []) {
+    if (h.enabled && h.key) out.push({ key: h.key, value: h.value ?? '', source: collection.name });
+  }
+  for (const folder of folderPathTo(collection.rootFolder, requestId)) {
+    for (const h of folder.headers ?? []) {
+      if (h.enabled && h.key) out.push({ key: h.key, value: h.value ?? '', source: folder.name });
+    }
+  }
+  return out;
 }
 
 /**

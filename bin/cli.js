@@ -26,7 +26,9 @@ const COMMANDS = {
   coverage: { entrypoint: 'coverage.js',runner: 'node' },
   'generate-tests': { entrypoint: 'generate-tests.js', runner: 'node' },
   compare:  { entrypoint: 'compare.js', runner: 'node' },
+  perf:     { entrypoint: 'perf.js',    runner: 'node' },
   wsdl:     { entrypoint: 'wsdl.js',    runner: 'node' },
+  socketio: { entrypoint: 'socketio.js',runner: 'node' },
 }
 
 function printHelp() {
@@ -43,7 +45,9 @@ function printHelp() {
   console.log('    api-spector coverage --spec <file>        Measure OpenAPI test coverage')
   console.log('    api-spector generate-tests --spec <file>  Generate tests from an OpenAPI spec')
   console.log('    api-spector compare <old> <new>           Diff specs; find breaking changes + impact')
+  console.log('    api-spector perf     list|run <plan>       Load test a plan from CLI (CI-friendly)')
   console.log('    api-spector wsdl     describe|import-*    Inspect a WSDL or import as collection/mock')
+  console.log('    api-spector socketio --url <url>          Connect to Socket.IO, emit events, observe')
   console.log('')
   console.log('  Options:')
   console.log('    api-spector agents init <name>            Initialize AI agent files')

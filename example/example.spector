@@ -6,10 +6,15 @@
     "collections/auth-mechanisms.json",
     "collections/contract-testing.json",
     "collections/api-from-hell.spector",
-    "collections/new-collection.spector"
+    "collections/new-collection.spector",
+    "collections/serverest.spector",
+    "collections/notes-api-documentation.spector"
   ],
   "environments": [
-    "environments/api-from-hell-env.env.json"
+    "environments/api-from-hell-env.env.json",
+    "environments/acc.env.json",
+    "environments/serverest-env.env.json",
+    "environments/notes-api-documentation-env.env.json"
   ],
   "activeEnvironmentId": null,
   "mocks": [
@@ -21,7 +26,7 @@
     "contracts/toolshop-api-v4-4-0-0-2ba215dd.contract.json"
   ],
   "settings": {
-    "theme": "dark",
+    "theme": "light",
     "tls": {
       "rejectUnauthorized": true
     },
@@ -36,7 +41,9 @@
     "cloud": {
       "enabled": true,
       "tokenSet": true
-    }
+    },
+    "zoom": 1,
+    "performanceTesting": true
   },
   "designContracts": [
     {
@@ -72,6 +79,114 @@
         }
       ],
       "updatedAt": "2026-08-22T20:02:31.822Z"
+    }
+  ],
+  "flows": [
+    "flows/new-flow.flow.json",
+    "flows/new-flow-2.flow.json"
+  ],
+  "perfPlans": [
+    {
+      "id": "710cf0f0-8a65-476b-90da-a98d79ef8090",
+      "name": "New plan 2",
+      "target": {
+        "kind": "flow",
+        "flowId": ""
+      },
+      "pattern": "custom",
+      "basic": {
+        "vus": 10,
+        "rampUpSec": 0,
+        "durationSec": 30,
+        "rampDownSec": 0
+      },
+      "stepping": {
+        "startUsers": 5,
+        "stepUsers": 5,
+        "stepDurationSec": 30,
+        "maxUsers": 50,
+        "rampStepSec": 0,
+        "holdFinalSec": 0
+      },
+      "arrivals": {
+        "rate": 20,
+        "durationSec": 60,
+        "maxVus": 200
+      },
+      "custom": {
+        "stages": [
+          {
+            "durationSec": 30,
+            "target": 20,
+            "ramp": true
+          },
+          {
+            "durationSec": 60,
+            "target": 20,
+            "ramp": false
+          },
+          {
+            "durationSec": 15,
+            "target": 0,
+            "ramp": true
+          }
+        ]
+      },
+      "timeoutSec": 0,
+      "thresholds": []
+    },
+    {
+      "id": "c549d464-93eb-4d48-9a6d-c81a9d600d53",
+      "name": "New plan 3",
+      "target": {
+        "kind": "request",
+        "requestId": "193fd94a-12a9-4037-ba87-23b247c96631"
+      },
+      "pattern": "stepping",
+      "basic": {
+        "vus": 10,
+        "rampUpSec": 0,
+        "durationSec": 30,
+        "rampDownSec": 0
+      },
+      "stepping": {
+        "startUsers": 5,
+        "stepUsers": 5,
+        "stepDurationSec": 30,
+        "maxUsers": 50,
+        "rampStepSec": 0,
+        "holdFinalSec": 0
+      },
+      "arrivals": {
+        "rate": 20,
+        "durationSec": 60,
+        "maxVus": 200
+      },
+      "custom": {
+        "stages": [
+          {
+            "durationSec": 30,
+            "target": 20,
+            "ramp": true
+          },
+          {
+            "durationSec": 60,
+            "target": 20,
+            "ramp": false
+          },
+          {
+            "durationSec": 15,
+            "target": 0,
+            "ramp": true
+          }
+        ]
+      },
+      "timeoutSec": 0,
+      "thresholds": [],
+      "thinkTime": {
+        "minSec": 1,
+        "maxSec": 1
+      }
     }
   ]
 }

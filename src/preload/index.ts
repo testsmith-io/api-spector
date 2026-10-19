@@ -22,6 +22,9 @@ import type {
   MockRoute,
   MockHit,
   WsMessage,
+  SocketIoMessage,
+  GraphQlWsMessage,
+  MqttMessage,
   GrpcMessage,
   GrpcServiceInfo,
   StreamEvent,
@@ -40,8 +43,22 @@ import type {
   RecorderConfig,
   RecordedEntry,
   RecordingSession,
+  PerfResult,
+  PerfProgress,
+  PerfPlan,
+  SecretsSettings,
 } from '../shared/types';
 import type { FlowRunEvent, FlowRunSummary } from '../shared/flow-engine';
+
+/** Result of a realtime test (WebSocket / Socket.IO / GraphQL subscription):
+ *  assertion outcomes, console output, an optional error, and the collected
+ *  messages (each has a `payload` plus protocol-specific fields). */
+type RealtimeTestResult = {
+  testResults: { name: string; passed: boolean; error?: string }[]
+  consoleOutput: string[]
+  error?: string
+  messages: ({ payload: string; timestamp: number } & Record<string, unknown>)[]
+}
 
 
 // Expose a typed API to the renderer. Note: getSecret is intentionally absent —
@@ -158,6 +175,12 @@ const api = {
     ipcRenderer.invoke(IPC.import.bruno),
   importHttpFile: (): Promise<Collection | null> =>
     ipcRenderer.invoke(IPC.import.http),
+  importHar: (): Promise<Collection | null> =>
+    ipcRenderer.invoke(IPC.import.har),
+  /** Import an Arazzo workflow doc: builds a collection (from its OpenAPI
+   *  sources) plus one Flow per workflow, with any translation warnings. */
+  importArazzo: (): Promise<{ collection: Collection; flows: Flow[]; warnings: string[] } | null> =>
+    ipcRenderer.invoke(IPC.import.arazzo),
   importSpectorCollection: (): Promise<Collection | null> =>
     ipcRenderer.invoke(IPC.import.spector),
   /** Extract response-body schemas from an OpenAPI spec file (no full import). */
@@ -277,6 +300,115 @@ const api = {
   offWsEvents: (): void => {
     ipcRenderer.removeAllListeners(IPC.ws.message);
     ipcRenderer.removeAllListeners(IPC.ws.status);
+  },
+
+  wsTest: (cfg: {
+    url: string; headers?: Record<string, string>; sendMessage?: string; collectMs: number; script: string
+    envVars?: Record<string, string>; collectionVars?: Record<string, string>; globals?: Record<string, string>; localVars?: Record<string, string>
+  }): Promise<RealtimeTestResult> =>
+    ipcRenderer.invoke(IPC.ws.test, cfg),
+
+  // ─── Socket.IO ────────────────────────────────────────────────────────────
+  socketIoConnect: (requestId: string, opts: { url: string; namespace?: string; auth?: string; headers?: Record<string, string>; path?: string }): Promise<void> =>
+    ipcRenderer.invoke(IPC.socketio.connect, requestId, opts),
+
+  socketIoEmit: (requestId: string, opts: { event: string; args?: string; withAck?: boolean; ackTimeoutMs?: number }): Promise<void> =>
+    ipcRenderer.invoke(IPC.socketio.emit, requestId, opts),
+
+  socketIoDisconnect: (requestId: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.socketio.disconnect, requestId),
+
+  onSocketIoMessage: (cb: (event: { requestId: string; message: SocketIoMessage }) => void): void => {
+    ipcRenderer.on(IPC.socketio.message, (_e, payload) => cb(payload));
+  },
+
+  onSocketIoStatus: (cb: (event: { requestId: string; status: string; error?: string }) => void): void => {
+    ipcRenderer.on(IPC.socketio.status, (_e, payload) => cb(payload));
+  },
+
+  offSocketIoEvents: (): void => {
+    ipcRenderer.removeAllListeners(IPC.socketio.message);
+    ipcRenderer.removeAllListeners(IPC.socketio.status);
+  },
+
+  socketIoTest: (cfg: {
+    url: string; namespace?: string; auth?: string; headers?: Record<string, string>; path?: string
+    emitEvent?: string; emitArgs?: string; collectMs: number; script: string
+    envVars?: Record<string, string>; collectionVars?: Record<string, string>; globals?: Record<string, string>; localVars?: Record<string, string>
+  }): Promise<RealtimeTestResult> =>
+    ipcRenderer.invoke(IPC.socketio.test, cfg),
+
+  // ─── jq (JSON response filtering) ─────────────────────────────────────────
+  jqFilter: (json: string, filter: string): Promise<string> =>
+    ipcRenderer.invoke(IPC.jq.filter, json, filter),
+
+  // ─── GraphQL subscriptions (graphql-ws) ───────────────────────────────────
+  graphqlWsSubscribe: (requestId: string, opts: { url: string; headers?: Record<string, string>; query: string; variables?: string; operationName?: string; connectionParams?: string }): Promise<void> =>
+    ipcRenderer.invoke(IPC.graphqlws.subscribe, requestId, opts),
+  graphqlWsStop: (requestId: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.graphqlws.stop, requestId),
+  onGraphqlWsMessage: (cb: (event: { requestId: string; message: GraphQlWsMessage }) => void): void => {
+    ipcRenderer.on(IPC.graphqlws.message, (_e, payload) => cb(payload));
+  },
+  onGraphqlWsStatus: (cb: (event: { requestId: string; status: string; error?: string }) => void): void => {
+    ipcRenderer.on(IPC.graphqlws.status, (_e, payload) => cb(payload));
+  },
+  offGraphqlWsEvents: (): void => {
+    ipcRenderer.removeAllListeners(IPC.graphqlws.message);
+    ipcRenderer.removeAllListeners(IPC.graphqlws.status);
+  },
+  graphqlWsTest: (cfg: {
+    url: string; headers?: Record<string, string>; query: string; variables?: string; operationName?: string; connectionParams?: string
+    collectMs: number; script: string
+    envVars?: Record<string, string>; collectionVars?: Record<string, string>; globals?: Record<string, string>; localVars?: Record<string, string>
+  }): Promise<RealtimeTestResult> =>
+    ipcRenderer.invoke(IPC.graphqlws.test, cfg),
+
+  // ─── MQTT ──────────────────────────────────────────────────────────────────
+  mqttConnect: (requestId: string, opts: { url: string; clientId?: string; username?: string; password?: string; cleanSession?: boolean; subscribeTopic?: string; qos?: 0 | 1 | 2 }): Promise<void> =>
+    ipcRenderer.invoke(IPC.mqtt.connect, requestId, opts),
+  mqttPublish: (requestId: string, opts: { topic: string; payload: string; qos?: 0 | 1 | 2; retain?: boolean }): Promise<void> =>
+    ipcRenderer.invoke(IPC.mqtt.publish, requestId, opts),
+  mqttSubscribe: (requestId: string, opts: { topic: string; qos?: 0 | 1 | 2 }): Promise<void> =>
+    ipcRenderer.invoke(IPC.mqtt.subscribe, requestId, opts),
+  mqttUnsubscribe: (requestId: string, opts: { topic: string }): Promise<void> =>
+    ipcRenderer.invoke(IPC.mqtt.unsubscribe, requestId, opts),
+  mqttDisconnect: (requestId: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.mqtt.disconnect, requestId),
+  mqttTest: (cfg: {
+    url: string; clientId?: string; username?: string; password?: string; cleanSession?: boolean
+    subscribeTopic?: string; qos?: 0 | 1 | 2; publishTopic?: string; publishPayload?: string; retain?: boolean
+    collectMs: number; script: string
+    envVars?: Record<string, string>; collectionVars?: Record<string, string>; globals?: Record<string, string>; localVars?: Record<string, string>
+  }): Promise<{ testResults: { name: string; passed: boolean; error?: string }[]; consoleOutput: string[]; error?: string; messages: { topic: string; payload: string; qos?: number; retain?: boolean; timestamp: number }[]; clientId: string }> =>
+    ipcRenderer.invoke(IPC.mqtt.test, cfg),
+  onMqttMessage: (cb: (event: { requestId: string; message: MqttMessage }) => void): void => {
+    ipcRenderer.on(IPC.mqtt.message, (_e, payload) => cb(payload));
+  },
+  onMqttStatus: (cb: (event: { requestId: string; status: string; error?: string }) => void): void => {
+    ipcRenderer.on(IPC.mqtt.status, (_e, payload) => cb(payload));
+  },
+  offMqttEvents: (): void => {
+    ipcRenderer.removeAllListeners(IPC.mqtt.message);
+    ipcRenderer.removeAllListeners(IPC.mqtt.status);
+  },
+
+  // ─── Performance (load) testing ─────────────────────────────────────────────
+  perfRun: (payload: {
+    plan: PerfPlan
+    request?: ApiRequest; vars?: Record<string, string>
+    collection?: Collection
+    flow?: Flow; flows?: Flow[]; collections?: Collection[]; environment?: Environment | null; globals?: Record<string, string>
+    proxy?: RunFlowPayload['proxy']; tls?: RunFlowPayload['tls']; secretsConfig?: SecretsSettings
+  }): Promise<PerfResult> => ipcRenderer.invoke(IPC.perf.run, payload),
+  perfStop: (): Promise<void> => ipcRenderer.invoke(IPC.perf.stop),
+  perfExportHtml: (result: PerfResult, meta: { planName?: string; target?: string }): Promise<boolean> =>
+    ipcRenderer.invoke(IPC.perf.exportHtml, result, meta),
+  onPerfProgress: (cb: (p: PerfProgress) => void): void => {
+    ipcRenderer.on(IPC.perf.progress, (_e, payload) => cb(payload));
+  },
+  offPerfEvents: (): void => {
+    ipcRenderer.removeAllListeners(IPC.perf.progress);
   },
 
   // ─── gRPC ─────────────────────────────────────────────────────────────────

@@ -26,7 +26,7 @@ export type FlowBlockType =
   // action
   | 'request' | 'subflow'
   // logic
-  | 'if' | 'condition' | 'validate' | 'evaluate' | 'setVar' | 'delay' | 'merge'
+  | 'if' | 'condition' | 'validate' | 'evaluate' | 'setVar' | 'delay' | 'merge' | 'parallel'
   // looping
   | 'forEach' | 'repeat' | 'collect'
   // visualize
@@ -67,6 +67,9 @@ export interface FlowBlockConfig {
   indexVar?: string
   /** repeat: number of iterations */
   count?: number
+  /** parallel: how many times to fire each connected request concurrently
+   *  (default 1). Set higher to hit the same endpoint several times at once. */
+  copies?: number
   /** collect: variable (data channel) to append each iteration's value into */
   intoVar?: string
   /** collect / setVar: JS expression for the value (collect defaults to last response body) */

@@ -31,10 +31,42 @@
           "71f8c426-7ed4-4988-8abd-d0a30a206c4b",
           "list-products",
           "category-tree"
+        ],
+        "childOrder": [
+          {
+            "type": "request",
+            "id": "category-tree"
+          },
+          {
+            "type": "request",
+            "id": "71f8c426-7ed4-4988-8abd-d0a30a206c4b"
+          },
+          {
+            "type": "request",
+            "id": "list-brands"
+          },
+          {
+            "type": "request",
+            "id": "list-products"
+          },
+          {
+            "type": "folder",
+            "id": "485ebe7b-db5c-4c58-9185-1a0a710c4552"
+          },
+          {
+            "type": "request",
+            "id": "1a7dfd21-971d-4362-87dc-64aa2e60fdea"
+          }
         ]
       }
     ],
-    "requestIds": []
+    "requestIds": [],
+    "childOrder": [
+      {
+        "type": "folder",
+        "id": "folder-contracts"
+      }
+    ]
   },
   "requests": {
     "list-brands": {

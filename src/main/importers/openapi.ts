@@ -133,13 +133,38 @@ function buildResponseSchema(operation: any, spec: any): string | undefined {
   return undefined;
 }
 
-function buildBody(operation: any, spec: any): RequestBody {
-  const content = resolve(spec, operation.requestBody?.content ?? {});
-  if ('application/json' in content) {
-    const schema = resolve(spec, content['application/json'].schema ?? {});
-    const example = schemaToExample(schema);
-    return { mode: 'json', json: JSON.stringify(example, null, 2) };
+function buildBody(rawOperation: any, params: any[], spec: any): RequestBody {
+  // OpenAPI 3: requestBody (which may itself be a $ref to
+  // #/components/requestBodies/X) → content. Resolve the whole requestBody fresh
+  // so a $ref body and repeated schema $refs aren't collapsed to {}.
+  const requestBody = resolve(spec, rawOperation?.requestBody ?? {}, new Set());
+  const content = requestBody?.content ?? {};
+  const jsonKey = Object.keys(content).find(k => k.includes('json'));
+  if (jsonKey) {
+    return { mode: 'json', json: JSON.stringify(schemaToExample(content[jsonKey].schema ?? {}), null, 2) };
   }
+
+  // Swagger 2.0: a single `in: body` parameter carries the schema.
+  const bodyParam = params.find(p => p?.in === 'body');
+  if (bodyParam) {
+    const schema = resolve(spec, bodyParam.schema ?? {}, new Set());
+    return { mode: 'json', json: JSON.stringify(schemaToExample(schema), null, 2) };
+  }
+
+  // Swagger 2.0 / OpenAPI formData → a form body (one row per field).
+  const formParams = params.filter(p => p?.in === 'formData');
+  if (formParams.length) {
+    return {
+      mode: 'form',
+      form: formParams.map(p => ({
+        key: String(p.name ?? ''),
+        value: String(schemaToExample(p.schema ?? p) ?? ''),
+        enabled: p.required ?? false,
+        description: p.description ?? '',
+      })),
+    };
+  }
+
   return { mode: 'none' };
 }
 
@@ -208,15 +233,32 @@ function buildExamples(operation: any, spec: any, baseParams: KeyValuePair[], ba
   return examples.length ? examples : undefined;
 }
 
+/** Capture an OpenAPI `enum` as a list of allowed values for the params table's
+ *  dropdown. Values are stringified; returns undefined when there is no enum. */
+function enumChoices(schema: any): string[] | undefined {
+  if (!schema || !Array.isArray(schema.enum) || !schema.enum.length) return undefined;
+  return schema.enum
+    .filter((v: unknown) => v !== null && v !== undefined)
+    .map((v: unknown) => String(v));
+}
+
 function buildParams(operation: any): KeyValuePair[] {
   return (operation.parameters ?? [])
     .filter((p: any) => p.in === 'query')
-    .map((p: any) => ({
-      key: p.name,
-      value: String(schemaToExample(p.schema ?? {}) ?? ''),
-      enabled: p.required ?? false,
-      description: p.description ?? '',
-    }));
+    .map((p: any) => {
+      // OpenAPI 3 nests the schema; Swagger 2.0 puts type/enum on the parameter.
+      const schema = p.schema ?? p;
+      const choices = enumChoices(schema);
+      return {
+        key: p.name,
+        // When the schema is an enum, default to its first value so the dropdown
+        // starts on a valid choice; otherwise use the usual example.
+        value: choices ? choices[0] : String(schemaToExample(schema) ?? ''),
+        enabled: p.required ?? false,
+        description: p.description ?? '',
+        ...(choices ? { enum: choices } : {}),
+      };
+    });
 }
 
 /**
@@ -234,7 +276,7 @@ function buildPathParamRows(operation: any): KeyValuePair[] {
   return (operation.parameters ?? [])
     .filter((p: any) => p.in === 'path' && p.name)
     .map((p: any): KeyValuePair => {
-      const schema = p.schema ?? {};
+      const schema = p.schema ?? p;
       let value: unknown;
       if (p.example !== undefined)        value = p.example;
       else if (schema.example !== undefined) value = schema.example;
@@ -248,12 +290,14 @@ function buildPathParamRows(operation: any): KeyValuePair[] {
           default:        value = '';
         }
       }
+      const choices = enumChoices(schema);
       return {
         key:         String(p.name),
         value:       value === null || value === undefined ? '' : String(value),
         enabled:     true,
         description: p.description ?? '',
         paramType:   'path',
+        ...(choices ? { enum: choices } : {}),
       };
     });
 }
@@ -303,10 +347,21 @@ function buildAuth(security: any[], securitySchemes: any): AuthConfig {
 // 'query' is an OpenAPI 3.2+ operation (HTTP QUERY, RFC 10008)
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'query'] as const;
 
+/** The API's base URL, from OpenAPI 3 `servers` or Swagger 2.0
+ *  `schemes`/`host`/`basePath`. Inlined into each request URL so the import
+ *  preview can detect it and offer to extract it into an environment variable. */
+function resolveBaseUrl(spec: any): string {
+  if (Array.isArray(spec.servers) && spec.servers[0]?.url) return String(spec.servers[0].url).replace(/\/$/, '');
+  if (spec.host) {
+    const scheme = (Array.isArray(spec.schemes) && spec.schemes[0]) || 'https';
+    return `${scheme}://${spec.host}${spec.basePath ?? ''}`.replace(/\/$/, '');
+  }
+  return '';
+}
+
 function buildCollection(spec: any): Collection {
   const info = spec.info ?? {};
-  const servers: any[] = spec.servers ?? [{}];
-  const baseUrl: string = servers[0]?.url ?? '';
+  const baseUrl: string = resolveBaseUrl(spec);
   const securitySchemes = resolve(spec, spec.components?.securitySchemes ?? {});
   const globalSecurity = spec.security ?? [];
 
@@ -320,7 +375,6 @@ function buildCollection(spec: any): Collection {
 
   for (const [pathStr, pathItem] of Object.entries<any>(spec.paths ?? {})) {
     const resolved = resolve(spec, pathItem);
-    const pathLevelParams = resolved.parameters ?? [];
 
     for (const method of HTTP_METHODS) {
       const operation = resolved[method];
@@ -329,7 +383,14 @@ function buildCollection(spec: any): Collection {
       const tags: string[] = operation.tags?.length ? operation.tags : ['default'];
       const tag = tags[0];
 
-      const allParams = [...pathLevelParams, ...(operation.parameters ?? [])];
+      // Resolve each parameter with its OWN fresh seen set: the shared seen set
+      // on `resolved` collapses a $ref used by more than one operation in this
+      // pathItem to `{}`, which would silently drop repeated parameters. Swagger
+      // 2.0 parameters carry type/enum/default on the parameter itself (no
+      // nested `schema`), so the builders fall back to the parameter.
+      const rawOperation = pathItem[method] ?? {};
+      const rawParams = [...(pathItem.parameters ?? []), ...(rawOperation.parameters ?? [])];
+      const allParams = rawParams.map(p => resolve(spec, p, new Set()));
       const opWithParams = { ...operation, parameters: allParams };
 
       const security = operation.security ?? globalSecurity;
@@ -339,13 +400,11 @@ function buildCollection(spec: any): Collection {
         ...buildPathParamRows(opWithParams),
         ...buildParams(opWithParams),
       ];
-      // Pass the *unresolved* operation so buildResponseSchema can resolve
-      // refs with its own fresh seen set (the resolved tree above shares one
-      // seen set per pathItem, which collapses repeat $refs to {}).
-      const rawOperation = pathItem[method];
+      // buildResponseSchema / buildBody re-resolve from the raw operation with a
+      // fresh seen set (the resolved tree above collapses repeat $refs to {}).
       const responseSchema = buildResponseSchema(rawOperation, spec);
       const headers = buildHeaders(opWithParams);
-      const body = buildBody(opWithParams, spec);
+      const body = buildBody(rawOperation, allParams, spec);
       const examples = buildExamples(opWithParams, spec, params, headers, body);
       const req: ApiRequest = {
         id: uuidv4(),
@@ -357,7 +416,7 @@ function buildCollection(spec: any): Collection {
         auth: buildAuth(security, securitySchemes),
         body,
         description: operation.description || operation.summary || '',
-        meta: { tags },
+        meta: { tags, ...(operation.operationId ? { operationId: String(operation.operationId) } : {}) },
         ...(responseSchema ? { schema: responseSchema } : {}),
         ...(examples ? { examples } : {}),
       };

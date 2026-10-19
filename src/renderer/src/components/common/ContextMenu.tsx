@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { DotsHorizontalIcon } from './icons';
 import { useT } from '../../i18n';
@@ -29,14 +29,25 @@ export function ContextMenu ( { items, x, y, onClose }: {
     return () => document.removeEventListener( 'mousedown', handle, true );
   }, [onClose] );
 
-  const [pos, setPos] = useState( { top: y, left: x } );
-  useEffect( () => {
+  // Keep the menu fully inside the window even when it is small or the menu is
+  // opened near an edge: flip past the anchor on right/bottom overflow, then
+  // clamp both axes into the viewport with a margin. Measured before paint so
+  // the menu never flashes partly off-screen. `pos` is null until measured, and
+  // the first (hidden) render is placed at the raw coords only so it can be
+  // measured.
+  const MARGIN = 8;
+  const [pos, setPos] = useState<{ top: number; left: number } | null>( null );
+  useLayoutEffect( () => {
     if ( !ref.current ) return;
     const rect = ref.current.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
     let left = x;
     let top = y;
-    if ( left + rect.width > window.innerWidth ) left = x - rect.width;
-    if ( top + rect.height > window.innerHeight ) top = y - rect.height;
+    if ( left + rect.width > vw ) left = x - rect.width;
+    if ( top + rect.height > vh ) top = y - rect.height;
+    left = Math.max( MARGIN, Math.min( left, vw - rect.width - MARGIN ) );
+    top = Math.max( MARGIN, Math.min( top, vh - rect.height - MARGIN ) );
     setPos( { top, left } );
   }, [x, y] );
 
@@ -45,7 +56,15 @@ export function ContextMenu ( { items, x, y, onClose }: {
       ref={ref}
       role="menu"
       tabIndex={-1}
-      style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
+      style={{
+        position: 'fixed',
+        top: pos ? pos.top : y,
+        left: pos ? pos.left : x,
+        zIndex: 9999,
+        visibility: pos ? 'visible' : 'hidden',
+        maxHeight: `calc(100vh - ${MARGIN * 2}px)`,
+        overflowY: 'auto',
+      }}
       className="bg-surface-900 border border-surface-700 rounded-lg shadow-2xl py-1 min-w-[170px]"
       onMouseDown={e => e.stopPropagation()}
     >

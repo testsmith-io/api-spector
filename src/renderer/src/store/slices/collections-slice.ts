@@ -27,6 +27,7 @@ import {
   reIdFolderTree,
   removeFolderById,
   removeFromFolder,
+  sortChildOrder,
 } from '../../../../shared/folder-tree';
 import { makeTab, protocolFor } from './tabs-slice';
 import { generateSecurityTests } from '../../../../shared/security-tests';
@@ -115,6 +116,10 @@ export interface CollectionsSliceActions {
   /** Move a request or sub-folder to a unified position among a folder's
    *  children (interleaving requests and folders). Same-collection only. */
   reorderChild: (collectionId: string, ref: ChildRef, destParentFolderId: string, destIndex: number) => void
+  /** Sort a folder's direct children (requests + sub-folders, interleaved)
+   *  alphabetically by name. Pass the collection's rootFolder id to sort the
+   *  collection's top level. */
+  sortChildren: (collectionId: string, folderId: string) => void
 
   // Request examples (Postman/Bruno-style saved request/response snapshots)
   addExample: (requestId: string, snapshot: { name?: string; request?: Partial<ApiRequest>; response?: ResponsePayload | null }) => string | null
@@ -720,6 +725,15 @@ export const createCollectionsSlice: StateCreator<
     others.splice(idx, 0, { type: ref.type, id: ref.id });
     destParent.childOrder = others;
 
+    s.collections[collectionId].dirty = true;
+  }),
+
+  sortChildren: (collectionId, folderId) => set(s => {
+    const col = s.collections[collectionId]?.data;
+    if (!col) return;
+    const folder = findFolder(col.rootFolder, folderId);
+    if (!folder) return;
+    folder.childOrder = sortChildOrder(folder, id => col.requests[id]?.name ?? '');
     s.collections[collectionId].dirty = true;
   }),
 

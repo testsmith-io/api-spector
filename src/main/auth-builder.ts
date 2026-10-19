@@ -32,7 +32,9 @@ export async function buildAuthHeaders(
     headers['Authorization'] = `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`;
   }
 
-  if (auth.type === 'apikey' && auth.apiKeyIn === 'header') {
+  // apiKeyIn defaults to 'header' when unset, matching the editor's default and
+  // the code generators (which treat only 'query' specially).
+  if (auth.type === 'apikey' && (auth.apiKeyIn ?? 'header') === 'header') {
     let value = auth.apiKeyValue ?? '';
     if (!value && auth.apiKeySecretRef) value = (await getSecret(auth.apiKeySecretRef)) ?? '';
     value = interpolate(value, vars);

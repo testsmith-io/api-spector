@@ -8,6 +8,65 @@ import { importPostman } from '../main/importers/postman';
 
 const FIXTURES = join(import.meta.dirname, 'fixtures');
 
+// ─── Swagger 2.0 importer ─────────────────────────────────────────────────────
+
+describe('importOpenApi (Swagger 2.0)', () => {
+  const all = (col: Awaited<ReturnType<typeof importOpenApi>>) => Object.values(col.requests);
+  const byName = (col: Awaited<ReturnType<typeof importOpenApi>>, n: string) => all(col).find(r => r.name === n)!;
+
+  it('derives the base URL from schemes/host/basePath', async () => {
+    const col = await importOpenApi(join(FIXTURES, 'swagger2.json'));
+    for (const r of all(col)) expect(r.url.startsWith('https://api.example.com/v2')).toBe(true);
+  });
+
+  it('pre-sets a JSON body from an in:body parameter (resolving $ref definitions)', async () => {
+    const col = await importOpenApi(join(FIXTURES, 'swagger2.json'));
+    const post = byName(col, 'Add a pet');
+    expect(post.body?.mode).toBe('json');
+    const json = JSON.parse(post.body!.json!);
+    expect(json).toHaveProperty('name');
+    expect(json).toHaveProperty('status');
+  });
+
+  it('does not collapse a $ref body reused by another operation', async () => {
+    const col = await importOpenApi(join(FIXTURES, 'swagger2.json'));
+    const put = byName(col, 'Update a pet');
+    const json = JSON.parse(put.body!.json!);
+    expect(Object.keys(json).length).toBeGreaterThan(0);
+    expect(json).toHaveProperty('name');
+  });
+
+  it('imports formData parameters as a form body', async () => {
+    const col = await importOpenApi(join(FIXTURES, 'swagger2.json'));
+    const reg = byName(col, 'Register');
+    expect(reg.body?.mode).toBe('form');
+    expect(reg.body!.form!.map(f => f.key)).toEqual(['name', 'email']);
+  });
+
+  it('imports query params with enum choices from the parameter itself', async () => {
+    const col = await importOpenApi(join(FIXTURES, 'swagger2.json'));
+    const find = byName(col, 'Find by status');
+    const status = find.params.find(p => p.key === 'status');
+    expect(status).toBeTruthy();
+    expect(status!.enum).toEqual(['available', 'pending', 'sold']);
+    expect(status!.value).toBe('available');
+  });
+});
+
+describe('importOpenApi (OpenAPI 3 $ref requestBody)', () => {
+  it('pre-sets a JSON body when requestBody is a $ref to components.requestBodies', async () => {
+    const col = await importOpenApi(join(FIXTURES, 'openapi3-refbody.json'));
+    const reqs = Object.values(col.requests);
+    // Both operations reuse the same $ref body; neither should be empty.
+    for (const r of reqs) {
+      expect(r.body?.mode).toBe('json');
+      const json = JSON.parse(r.body!.json!);
+      expect(json).toHaveProperty('email');
+      expect(json).toHaveProperty('password');
+    }
+  });
+});
+
 // ─── OpenAPI importer ─────────────────────────────────────────────────────────
 
 describe('importOpenApi', () => {

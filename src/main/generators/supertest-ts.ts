@@ -7,6 +7,7 @@ import { parsePostScript } from './script-parser';
 import {
   slug, toEnvVar, interpolateEnvVars as interpolateValue,
   resolveEffectiveAuth, mergeHeaders, hasBody, getEnvBaseUrl, renderTree, SUPERTEST_VERBS,
+  jsJsonPathExpr, folderUsesJsonPath, collectionUsesJsonPath,
 } from './generator-utils';
 
 // ─── Supertest + Jest TypeScript generator ────────────────────────────────────
@@ -91,7 +92,7 @@ function buildTestFile(folderName: string, folder: Folder, collection: Collectio
       lines.push(`    const hookRes = await api.${method}('${path}');`);
       for (const e of parsed.extractions) {
         const jp = e.accessor.replace(/^json\.?/, '');
-        const expr = jp ? `hookRes.body.${jp}` : 'hookRes.body';
+        const expr = e.jsonPath ? jsJsonPathExpr(e.jsonPath, 'hookRes.body') : (jp ? `hookRes.body.${jp}` : 'hookRes.body');
         const varName = toEnvVar(e.varName);
         sharedVars.add(varName);
         lines.push(`    ${varName} = String(${expr});`);
@@ -198,7 +199,7 @@ function buildTestFile(folderName: string, folder: Folder, collection: Collectio
 
     for (const e of parsed.extractions) {
       const path = e.accessor.replace(/^json\.?/, '');
-      const expr = path ? `res.body.${path}` : 'res.body';
+      const expr = e.jsonPath ? jsJsonPathExpr(e.jsonPath, 'res.body') : (path ? `res.body.${path}` : 'res.body');
       lines.push(`    process.env.${toEnvVar(e.varName)} = String(${expr});`);
     }
 
@@ -207,9 +208,13 @@ function buildTestFile(folderName: string, folder: Folder, collection: Collectio
     tests.push(lines.join('\n'));
   }
 
+  const jsonPathImport = folderUsesJsonPath(folder, collection)
+    ? "import { JSONPath } from 'jsonpath-plus'\n"
+    : '';
+
   return `\
 import { api } from '../helpers/api-client'
-
+${jsonPathImport}
 describe('${folderName}', () => {
 ${tests.join('\n\n')}
 })
@@ -218,7 +223,7 @@ ${tests.join('\n\n')}
 
 // ─── Project scaffolding files ────────────────────────────────────────────────
 
-function buildPackageJson(collectionName: string): string {
+function buildPackageJson(collectionName: string, usesJsonPath: boolean): string {
   const name = collectionName.replaceAll(/\W+/g, '-').toLowerCase();
   return JSON.stringify({
     name: `${name}-api-tests`,
@@ -230,6 +235,7 @@ function buildPackageJson(collectionName: string): string {
       '@types/supertest': '^6.0.0',
       dotenv:             '^16.4.0',
       jest:               '^29.7.0',
+      ...(usesJsonPath ? { 'jsonpath-plus': '^10.4.0' } : {}),
       supertest:          '^7.0.0',
       'ts-jest':          '^29.1.0',
       'ts-node':          '^10.9.2',
@@ -296,16 +302,12 @@ export function generateSupertestTs(
     }
   }
 
-  if (collection.rootFolder.requestIds.length > 0) {
-    processFolder(collection.rootFolder, collection.name);
-  }
-  for (const sub of collection.rootFolder.folders) {
-    processFolder(sub, sub.name);
-  }
+  // Walk from the root once (processFolder guards emission and recurses).
+  processFolder(collection.rootFolder, collection.name);
 
   const scaffoldPaths = ['package.json', 'tsconfig.json', ...files.map(f => f.path)];
   files.unshift(
-    { path: 'package.json',   content: buildPackageJson(collection.name) },
+    { path: 'package.json',   content: buildPackageJson(collection.name, collectionUsesJsonPath(collection)) },
     { path: 'tsconfig.json',  content: buildTsConfig() },
     { path: 'README.md',      content: buildReadme(collection.name, scaffoldPaths) },
   );

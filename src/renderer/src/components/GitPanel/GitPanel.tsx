@@ -928,7 +928,7 @@ export function GitPanel() {
               tab === item ? 'border-blue-500 text-white' : 'border-transparent text-surface-400 hover:text-white'
             }`}
           >
-            {item}
+            {item === 'ci' ? 'CI' : item}
             {item === 'changes' && totalChanges > 0 && (
               <span className="ml-1 bg-surface-700 text-surface-300 rounded px-1 text-[9px]">{totalChanges}</span>
             )}

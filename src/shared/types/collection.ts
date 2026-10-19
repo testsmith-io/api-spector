@@ -7,6 +7,7 @@ import type { AuthConfig, HttpMethod, KeyValuePair, RequestBody } from './http';
 import type { ContractExpectation } from './contract';
 import type { ResponsePayload } from './execution';
 import type { ConsumerContract } from './consumer-contract';
+import type { PerfPlan } from './perf';
 
 /**
  * A saved request/response snapshot attached to a request (like Postman/Bruno
@@ -59,8 +60,63 @@ export interface ApiRequest {
   /** Transport / wire protocol. Drives which UI shell is rendered:
    *  - 'http' (default) → method picker, URL bar, body modes
    *  - 'websocket'      → ws:// URL, message panel
-   *  - 'soap'           → WSDL-driven endpoint, single SOAP editor (POST + xml) */
-  protocol?: 'http' | 'websocket' | 'soap' | 'grpc'  // default 'http'
+   *  - 'soap'           → WSDL-driven endpoint, single SOAP editor (POST + xml)
+   *  - 'socketio'       → Socket.IO endpoint, event emit/receive panel
+   *  - 'mqtt'           → MQTT broker URL, publish/subscribe panel */
+  protocol?: 'http' | 'websocket' | 'soap' | 'grpc' | 'socketio' | 'mqtt'  // default 'http'
+  /** WebSocket test config, persisted so a WebSocket request can be a pass/fail
+   *  step. The URL + headers come from the shared fields. Received frames are
+   *  exposed to the script as `sp.messages` (each has `.data` / `.json()`). */
+  websocket?: {
+    /** Optional message sent once, shortly after the connection opens. */
+    sendMessage?: string
+    /** Assertion script (sp.* sandbox) run over the collected frames. */
+    testScript?: string
+    /** How long to collect frames before running the test script (ms). */
+    collectMs?: number
+  }
+  /** Socket.IO connection config (namespace + handshake auth), persisted so a
+   *  Socket.IO request is reusable. The URL + headers come from the shared
+   *  fields, as with WebSocket. */
+  socketio?: {
+    namespace?: string
+    auth?: string
+    /** Optional event emitted once after connect, when running a test. */
+    emitEvent?: string
+    /** Emit arguments as JSON text (an array is spread, else sent as one arg). */
+    emitArgs?: string
+    /** Assertion script (sp.* sandbox) run over the collected events. The
+     *  received events are exposed as `sp.messages` (each has `.event`/`.args`). */
+    testScript?: string
+    /** How long to collect events before running the test script (ms). */
+    collectMs?: number
+  }
+  /** MQTT connection + default publish/subscribe config, persisted so an MQTT
+   *  request is reusable. The broker URL comes from the shared url field
+   *  (mqtt://, mqtts://, ws://, wss://). username/password support {{var}}
+   *  interpolation, so a secret can be referenced without storing it on disk. */
+  mqtt?: {
+    clientId?: string
+    username?: string
+    password?: string
+    /** Default topic to subscribe to on connect. */
+    subscribeTopic?: string
+    /** Default topic to publish to. */
+    publishTopic?: string
+    /** Quality of Service for publish + subscribe. */
+    qos?: 0 | 1 | 2
+    /** Retain flag for published messages. */
+    retain?: boolean
+    /** MQTT clean-session / clean-start flag. Defaults to true. */
+    cleanSession?: boolean
+    /** Payload published when running a test (so the test is repeatable). */
+    publishPayload?: string
+    /** Assertion script (sp.* sandbox) run over the collected messages. The
+     *  received messages are exposed as `sp.messages`. */
+    testScript?: string
+    /** How long to collect messages before running the test script (ms). */
+    collectMs?: number
+  }
   /** When set, this request acts as a lifecycle hook within its folder/collection scope. */
   hookType?: 'beforeAll' | 'before' | 'after' | 'afterAll'
   /** When true, the request is excluded from collection/folder runs. */
@@ -209,6 +265,8 @@ export interface Workspace {
   flows?: string[]
   /** Design-first consumer contracts authored in-app, stored inline. */
   designContracts?: ConsumerContract[]
+  /** Performance (load) test plans, authored in-app and stored inline. */
+  perfPlans?: PerfPlan[]
   settings?: {
     proxy?: {
       url: string
@@ -222,6 +280,9 @@ export interface Workspace {
     /** Persist request/response history to `history.json` in the workspace dir
      *  (gitignored) so it survives restarts. Off by default. */
     persistHistory?: boolean
+    /** Show the Performance (load) testing view and its left-nav icon. Off by
+     *  default so it stays out of the way of plain functional testing. */
+    performanceTesting?: boolean
     /** UI appearance — previously in localStorage, now travels with the workspace */
     theme?: 'dark' | 'light' | 'system'
     zoom?: number

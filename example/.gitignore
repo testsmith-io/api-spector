@@ -1,0 +1,31 @@
+# API Spector - never commit secrets
+*.secrets
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+
+# Generated API docs
+api-docs.html
+api-docs.md
+docs/
+
+# Run reports (api-spector run --output)
+reports/
+*-report.json
+*-report.xml
+*-report.html
+results.json
+results.xml
+results.html
+coverage/
+
+# Local session history (opt-in persistence)
+history.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
