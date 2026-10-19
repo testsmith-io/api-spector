@@ -160,54 +160,17 @@ export function AuthEditor({
       {auth.type === 'ntlm' && (
         secrets ? (
           <div className="flex flex-col gap-2">
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className="text-surface-400">{t('Username')}</label>
-                <input
-                  value={auth.username ?? ''}
-                  onChange={e => onChange({ username: e.target.value })}
-                  className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="text-surface-400">{t('Password')}</label>
-                <div className="flex gap-1 mt-1">
-                  <input
-                    type="password"
-                    value={secrets.secretValue}
-                    onChange={e => secrets.setSecretValue(e.target.value)}
-                    placeholder={auth.passwordSecretRef ? t('Stored as ":ref"', { ref: auth.passwordSecretRef }) : t('Password')}
-                    className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
-                  />
-                  <button
-                    onClick={() => { const ref = auth.passwordSecretRef ?? 'NTLM_PASSWORD'; onChange({ passwordSecretRef: ref }); void secrets.saveSecret(ref); }}
-                    className="px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded transition-colors"
-                  >
-                    {secrets.saved ? '✓' : t('Save')}
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className="text-surface-400">{t('Domain')} <span className="text-surface-600">{t('(optional)')}</span></label>
-                <input
-                  value={auth.ntlmDomain ?? ''}
-                  onChange={e => onChange({ ntlmDomain: e.target.value })}
-                  placeholder="WORKGROUP"
-                  className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="text-surface-400">{t('Workstation')} <span className="text-surface-600">{t('(optional)')}</span></label>
-                <input
-                  value={auth.ntlmWorkstation ?? ''}
-                  onChange={e => onChange({ ntlmWorkstation: e.target.value })}
-                  placeholder="MACHINE"
-                  className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-            </div>
+            <BasicCredentialsFields
+              auth={auth}
+              secretValue={secrets.secretValue}
+              setSecretValue={secrets.setSecretValue}
+              saved={secrets.saved}
+              setAuth={onChange}
+              saveSecret={secrets.saveSecret}
+              label={t('NTLM Auth')}
+              secretRefDefault="NTLM_PASSWORD"
+            />
+            <NtlmDomainFields auth={auth} onChange={onChange} />
             <p className="text-surface-400 text-[10px] bg-surface-800 border border-surface-700 rounded px-2 py-1">
               {t('Uses NTLMv2 over a single keep-alive connection. Not supported through a proxy.')}
             </p>
@@ -215,26 +178,7 @@ export function AuthEditor({
         ) : (
           <div className="flex flex-col gap-2">
             <PlainCredentialsFields auth={auth} onChange={onChange} />
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className="text-surface-400">{t('Domain')}</label>
-                <input
-                  value={auth.ntlmDomain ?? ''}
-                  onChange={e => onChange({ ntlmDomain: e.target.value })}
-                  placeholder="WORKGROUP"
-                  className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="text-surface-400">{t('Workstation')}</label>
-                <input
-                  value={auth.ntlmWorkstation ?? ''}
-                  onChange={e => onChange({ ntlmWorkstation: e.target.value })}
-                  placeholder="MACHINE"
-                  className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-            </div>
+            <NtlmDomainFields auth={auth} onChange={onChange} />
           </div>
         )
       )}
@@ -337,6 +281,40 @@ function PlainCredentialsFields({
   );
 }
 
+// ─── NTLM domain / workstation pair (variable-capable) ───────────────────────
+
+function NtlmDomainFields({
+  auth,
+  onChange,
+}: {
+  readonly auth: { ntlmDomain?: string; ntlmWorkstation?: string }
+  readonly onChange: (p: AuthEditorPatch) => void
+}) {
+  const t = useT();
+  return (
+    <div className="flex gap-2">
+      <div className="flex-1">
+        <label className="text-surface-400">{t('Domain')} <span className="text-surface-600">{t('(optional)')}</span></label>
+        <VarInput
+          value={auth.ntlmDomain ?? ''}
+          onChange={v => onChange({ ntlmDomain: v })}
+          placeholder="WORKGROUP"
+          className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
+        />
+      </div>
+      <div className="flex-1">
+        <label className="text-surface-400">{t('Workstation')} <span className="text-surface-600">{t('(optional)')}</span></label>
+        <VarInput
+          value={auth.ntlmWorkstation ?? ''}
+          onChange={v => onChange({ ntlmWorkstation: v })}
+          placeholder="MACHINE"
+          className="mt-1 w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
+        />
+      </div>
+    </div>
+  );
+}
+
 // ─── Shared username/password sub-component (keychain flavour) ────────────────
 
 function BasicCredentialsFields({
@@ -348,6 +326,7 @@ function BasicCredentialsFields({
   saveSecret,
   label,
   note,
+  secretRefDefault = 'API_PASSWORD',
 }: {
   readonly auth: { username?: string; password?: string; passwordSecretRef?: string }
   readonly secretValue: string
@@ -357,6 +336,8 @@ function BasicCredentialsFields({
   readonly saveSecret: (ref: string) => Promise<void>
   readonly label: string
   readonly note?: string
+  /** Keychain ref used when none is set yet (e.g. "NTLM_PASSWORD"). */
+  readonly secretRefDefault?: string
 }) {
   const t = useT();
   const [keychainOpen, setKeychainOpen] = useState(!!auth.passwordSecretRef);
@@ -409,7 +390,7 @@ function BasicCredentialsFields({
               className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-mono"
             />
             <input
-              value={auth.passwordSecretRef ?? 'API_PASSWORD'}
+              value={auth.passwordSecretRef ?? secretRefDefault}
               onChange={e => setAuth({ passwordSecretRef: e.target.value })}
               placeholder={t('Keychain key')}
               className="w-32 bg-surface-800 border border-surface-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
@@ -418,7 +399,7 @@ function BasicCredentialsFields({
               onClick={() => {
                 // Commit the ref onto the auth so the request actually resolves
                 // it at send time, then store the value under that ref.
-                const ref = auth.passwordSecretRef ?? 'API_PASSWORD';
+                const ref = auth.passwordSecretRef ?? secretRefDefault;
                 setAuth({ passwordSecretRef: ref });
                 void saveSecret(ref);
               }}

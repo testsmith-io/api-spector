@@ -94,6 +94,11 @@ export function buildUrl(
     templateTokens.add(String(name).trim());
     return '';
   });
+  // `[name]` path placeholders (API Spector style) route their row to the path.
+  baseUrl.replaceAll(/\[([A-Za-z_]\w*)\]/g, (_m, name) => {
+    templateTokens.add(String(name));
+    return '';
+  });
 
   const enabled = (params ?? []).filter(p => p.enabled && p.key);
   const pathRows: KeyValuePair[] = [];
@@ -114,7 +119,11 @@ export function buildUrl(
     }
     : vars;
 
-  const url = interpolate(baseUrl, mergedVars);
+  // Substitute `{{name}}` (via interpolate) then `[name]` path placeholders.
+  // A `[name]` with no resolvable value is left as-is rather than blanked.
+  let url = interpolate(baseUrl, mergedVars);
+  url = url.replaceAll(/\[([A-Za-z_]\w*)\]/g, (m, name) =>
+    name in mergedVars ? mergedVars[name] : m);
 
   if (!queryRows.length) return url;
   const sep = url.includes('?') ? '&' : '?';

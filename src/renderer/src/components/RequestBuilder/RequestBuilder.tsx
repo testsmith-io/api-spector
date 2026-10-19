@@ -6,7 +6,7 @@ import { useStore } from '../../store';
 import type { ApiRequest, HttpMethod, KeyValuePair, RunRequestResult } from '../../../../shared/types';
 import { getHooksForRequest, authIsConfigured } from '../../../../shared/request-collection';
 import { findFolderContaining } from '../../../../shared/folder-tree';
-import { extractQueryParams } from '../../../../shared/url-params';
+import { syncParamsFromUrl } from '../../../../shared/url-params';
 import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
 import { ParamsTab } from './ParamsTab';
 import { VarInput } from '../common/VarInput';
@@ -154,21 +154,29 @@ export function RequestBuilder({ request }: Props) {
     else updateRequest(request.id, patch);
   }
 
-  // Pasting a URL with a query string moves those params into the Params tab
-  // instead of leaving them in the address bar (the send path re-appends them,
-  // so the request on the wire is unchanged). Typing a URL is left untouched.
+  // Pasting a URL syncs its params into the Params tab: a `?a=1` query string is
+  // moved out of the address bar (the send path re-appends it, so the wire
+  // request is unchanged), and each `[name]` path placeholder gets a path-param
+  // row. The `[name]` text stays in the URL.
   function handleUrlPaste(e: React.ClipboardEvent<HTMLInputElement>) {
     const pasted = e.clipboardData.getData('text');
-    if (!pasted.includes('?')) return;
     const input = e.currentTarget;
     const start = input.selectionStart ?? request.url.length;
     const end   = input.selectionEnd ?? request.url.length;
     const resulting = request.url.slice(0, start) + pasted + request.url.slice(end);
-    const split = extractQueryParams(resulting, request.params ?? []);
-    if (split.changed) {
+    const synced = syncParamsFromUrl(resulting, request.params ?? []);
+    if (synced.changed) {
       e.preventDefault();
-      update({ url: split.url, params: split.params });
+      update({ url: synced.url, params: synced.params });
     }
+  }
+
+  // On blur, reconcile the Params tab with whatever the user typed: new `[name]`
+  // path params and any `?query` get rows; empty, now-unreferenced path rows are
+  // pruned. Done on blur (not per keystroke) so half-typed tokens are ignored.
+  function handleUrlBlur() {
+    const synced = syncParamsFromUrl(request.url, request.params ?? []);
+    if (synced.changed) update({ url: synced.url, params: synced.params });
   }
 
   // Replay support: history rows (and anywhere else) call requestSend() to
@@ -603,6 +611,12 @@ export function RequestBuilder({ request }: Props) {
           value={request.url}
           onChange={url => update({ url })}
           onPaste={handleUrlPaste}
+          onBlur={handleUrlBlur}
+          extraVars={Object.fromEntries(
+            (request.params ?? [])
+              .filter(p => p.enabled && p.key)
+              .map(p => [p.key, p.value]),
+          )}
           placeholder={
             isWs   ? 'ws://example.com/socket'
             : isSoap ? t('Endpoint (auto-filled from WSDL <soap:address>)')

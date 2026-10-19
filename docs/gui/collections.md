@@ -47,7 +47,27 @@ https://api.example.com/users/{{userId}}
 
 ### Params
 
-Key/value query parameters. Enabled parameters are appended to the URL automatically. Disable a row without deleting it by unchecking the checkbox.
+The **Params** tab holds key/value parameters. Each row has a type selector — **query** (the default) or **path** — and a checkbox to enable or disable it without deleting it.
+
+**Query parameters** are appended to the URL as `?key=value` (URL-encoded). Add them here or type them straight into the URL; the two stay in sync.
+
+**Path parameters** are substituted into the URL. Put a `{{name}}` token where the value goes, then add a row keyed `name` with its type set to **path**:
+
+```
+https://api.example.com/users/{{userId}}
+```
+
+| Param | Type | Value |
+|---|---|---|
+| `userId` | path | `42` |
+
+sends `https://api.example.com/users/42`.
+
+Path parameters are also detected automatically: a row counts as a path substitution if its type is **path** *or* its key already appears as a `{{token}}` in the URL — so if the URL contains `{{userId}}` and you add a `userId` row, you do not have to change the dropdown.
+
+Both the key and value of any row accept `{{variables}}`, resolved from [environments, collections and globals](../reference/variables.md) or from path rows. A path value can also come from a plain variable instead of a Params row.
+
+> **Note:** the colon form `/users/:id` is only for [mock server](../gui/mock-servers.md) route patterns, not request URLs. In a request, always use `{{name}}`.
 
 ### Headers
 

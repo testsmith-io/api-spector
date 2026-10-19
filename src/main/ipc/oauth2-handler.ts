@@ -5,12 +5,22 @@ import { type IpcMain, shell } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import type { AuthConfig, Oauth2Auth } from '../../shared/types';
+import type { AuthConfig, Oauth2Auth, VarResolveContext } from '../../shared/types';
 import { getSecret } from './secret-handler';
-import { interpolate } from '../interpolation';
+import { interpolate, buildEnvVars, buildDynamicVars, mergeVars } from '../interpolation';
 import { fetchOAuth2Token } from '../auth-builder';
 
 interface OAuth2TokenResult { accessToken: string; expiresAt: number; refreshToken?: string }
+
+// Resolve the full {{var}} map from the renderer-supplied scope, the same way
+// the send path does: environment variables (incl. secret-manager refs and
+// encrypted values, resolved here in main), collection variables, globals and
+// dynamic ($timestamp etc.) vars.
+async function resolveVars(ctx: VarResolveContext | undefined): Promise<Record<string, string>> {
+  const envVars = await buildEnvVars(ctx?.environment ?? null);
+  const dynamic = await buildDynamicVars();
+  return mergeVars(envVars, ctx?.collectionVars ?? {}, ctx?.globals ?? {}, {}, dynamic);
+}
 
 // Resolve the client secret from either the inline value or the keychain ref,
 // then interpolate {{vars}}.
@@ -46,7 +56,8 @@ async function browserFlow(
   authUrlFull.searchParams.set('client_id', clientId);
   authUrlFull.searchParams.set('redirect_uri', redirectUri);
   authUrlFull.searchParams.set('state', state);
-  if (auth.oauth2Scopes) authUrlFull.searchParams.set('scope', auth.oauth2Scopes);
+  const scopes = interpolate(auth.oauth2Scopes ?? '', vars);
+  if (scopes) authUrlFull.searchParams.set('scope', scopes);
 
   const captured = await new Promise<Record<string, string>>((resolve, reject) => {
     const server = createServer((req: IncomingMessage, res: ServerResponse) => {
@@ -148,10 +159,11 @@ export function registerOAuth2Handlers(ipc: IpcMain): void {
   handleIpc(ipc, IPC.oauth2.startFlow, async (
     _e,
     auth: AuthConfig,
-    vars: Record<string, string>,
+    ctx: VarResolveContext,
   ): Promise<OAuth2TokenResult> => {
     if (auth.type !== 'oauth2') throw new Error('OAuth 2.0: auth is not an oauth2 config.');
 
+    const vars = await resolveVars(ctx);
     const flow = auth.oauth2Flow ?? 'client_credentials';
     if (flow === 'authorization_code' || flow === 'implicit') {
       return browserFlow(auth, vars, flow);
@@ -164,9 +176,10 @@ export function registerOAuth2Handlers(ipc: IpcMain): void {
   handleIpc(ipc, IPC.oauth2.refreshToken, async (
     _e,
     auth: AuthConfig,
-    vars: Record<string, string>,
+    ctx: VarResolveContext,
     refreshToken: string,
   ): Promise<{ accessToken: string; expiresAt: number; refreshToken?: string }> => {
+    const vars       = await resolveVars(ctx);
     const tokenUrl   = interpolate(auth.oauth2TokenUrl ?? '', vars);
     const clientId   = interpolate(auth.oauth2ClientId ?? '', vars);
     let clientSecret = auth.oauth2ClientSecret ?? '';
