@@ -199,6 +199,30 @@ export async function buildEnvVars(environment: Environment | null): Promise<Rec
 }
 
 /** Merge all variable scopes. Local vars win everything; dynamic vars are the base layer. */
+/**
+ * Scan arbitrary text for inline secret-manager tokens (`{{vault:path#key}}`,
+ * `{{op://...}}`, `{{azure:...}}`, etc.) and resolve each once. The result is
+ * keyed by the full reference so a later {{...}} substitution picks it up
+ * (e.g. out['vault:secret/data/app#k'] = 'v'). interpolate() is synchronous, so
+ * these async lookups must run up-front. Throws if a referenced secret cannot
+ * be resolved.
+ */
+export async function resolveInlineSecretRefs(text: string): Promise<Record<string, string>> {
+  const refs = new Set<string>();
+  for (const m of text.matchAll(/\{\{\s*([^}]+?)\s*\}\}/g)) {
+    const inner = m[1].trim();
+    if (hasSecretScheme(inner)) refs.add(inner);
+  }
+  if (refs.size === 0) return {};
+
+  const out: Record<string, string> = {};
+  await Promise.all([...refs].map(async (ref) => {
+    const value = await resolveExternalSecret(ref);
+    if (value !== null) out[ref] = value;
+  }));
+  return out;
+}
+
 export function mergeVars(
   envVars: Record<string, string>,
   collectionVars: Record<string, string>,
