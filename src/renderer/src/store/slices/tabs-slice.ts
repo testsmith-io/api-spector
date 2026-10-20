@@ -31,7 +31,7 @@ export interface AppTab {
   requestTab: 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'schema' | 'contract' | 'stream' | 'docs' | 'variables'
 }
 
-export function makeTab(requestId: string, collectionId: string, opts: { protocol?: ApiRequest['protocol']; exampleId?: string | null } = {}): AppTab {
+export function makeTab(requestId: string, collectionId: string, opts: { protocol?: ApiRequest['protocol']; exampleId?: string | null; defaultTab?: AppTab['requestTab'] } = {}): AppTab {
   return {
     id: uuidv4(),
     requestId,
@@ -42,9 +42,10 @@ export function makeTab(requestId: string, collectionId: string, opts: { protoco
     lastSentRequest: null,
     lastHookResults: null,
     isSending: false,
-    // Documentation leads and opens active, so a request presents its docs
-    // first. Examples have no Docs tab and fall back to Body (see RequestBuilder).
-    requestTab: opts.exampleId ? 'body' : 'docs',
+    // Examples have no Docs tab and fall back to Body (see RequestBuilder).
+    // Otherwise open on the workspace's configured default sub-tab (Docs unless
+    // the workspace overrides it).
+    requestTab: opts.exampleId ? 'body' : (opts.defaultTab ?? 'docs'),
     // Default to the post-response tab — that's where the typical workflow
     // (assertions, extracting tokens, saving variables) lives.
     scriptTab: 'post',
@@ -120,7 +121,7 @@ export const createTabsSlice: StateCreator<
       s.activeTabId = existing.id;
       s.activeCollectionId = collectionId;
     } else {
-      const tab = makeTab(requestId, collectionId, { protocol: protocolFor(s, requestId) });
+      const tab = makeTab(requestId, collectionId, { protocol: protocolFor(s, requestId), defaultTab: s.workspace?.settings?.defaultRequestTab });
       s.tabs.push(tab);
       s.activeTabId = tab.id;
       s.activeCollectionId = collectionId;

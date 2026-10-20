@@ -106,15 +106,29 @@ const INSOMNIA_RULES: Rule[] = [
   [/\bcontext\.response\.getHeader\(/g,            'sp.response.headers.get('],
 ];
 
+// ─── Common (JS-level, any source) ────────────────────────────────────────────
+//
+// Applied after the format-specific rules, to every imported script. Postman,
+// Bruno and Insomnia all run in sandboxes that expose a `require` for a few
+// bundled libraries; API Spector's sandbox has no `require`. For `moment` there
+// is a drop-in: dayjs is a global with a compatible add()/subtract()/format()
+// API, so rewrite `require('moment')` to `dayjs` (turning
+// `var moment = require('moment')` into the alias `var moment = dayjs`, leaving
+// the rest of the script untouched).
+const COMMON_RULES: Rule[] = [
+  [/\brequire\(\s*['"]moment['"]\s*\)/g,           'dayjs'],
+];
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export type ScriptFormat = 'postman' | 'bruno' | 'insomnia'
 
 export function translateScript(source: string, format: ScriptFormat): string {
-  const rules =
+  const formatRules =
     format === 'postman'  ? POSTMAN_RULES  :
     format === 'bruno'    ? BRUNO_RULES    :
                             INSOMNIA_RULES;
 
-  return rules.reduce((src, [pattern, replacement]) => src.replace(pattern, replacement), source);
+  return [...formatRules, ...COMMON_RULES]
+    .reduce((src, [pattern, replacement]) => src.replace(pattern, replacement), source);
 }

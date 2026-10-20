@@ -40,6 +40,7 @@ export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => vo
   const [defaultEnvironment, setDefaultEnvironment] = useState(existing.defaultEnvironment ?? '');
   const [persistHistory, setPersistHistory] = useState(existing.persistHistory ?? false);
   const [performanceTesting, setPerformanceTesting] = useState(existing.performanceTesting ?? false);
+  const [defaultRequestTab, setDefaultRequestTab] = useState<NonNullable<typeof existing.defaultRequestTab>>(existing.defaultRequestTab ?? 'docs');
 
   // Proxy state
   const [proxyUrl,      setProxyUrl]      = useState(existing.proxy?.url ?? '');
@@ -192,6 +193,10 @@ export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => vo
     if (performanceTesting) settings.performanceTesting = true;
     else delete settings.performanceTesting;
 
+    // Only store a non-default value, so workspaces that keep Docs stay clean.
+    if (defaultRequestTab && defaultRequestTab !== 'docs') settings.defaultRequestTab = defaultRequestTab;
+    else delete settings.defaultRequestTab;
+
     // External secret managers — non-secret connection config only. Each block is
     // omitted when empty; the whole `secrets` block is dropped when all are empty.
     const secrets: NonNullable<typeof settings.secrets> = {};
@@ -299,6 +304,25 @@ export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => vo
               </div>
               <p className="text-surface-600 text-[11px]">
                 {t('CLI runs without --environment use this environment, and the app selects it when no environment is active.')}
+              </p>
+
+              <div className="flex flex-col gap-1 mt-2">
+                <label className={labelCls}>{t('Default request tab')}</label>
+                <select
+                  value={defaultRequestTab}
+                  onChange={e => setDefaultRequestTab(e.target.value as typeof defaultRequestTab)}
+                  className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="docs">{t('Docs')}</option>
+                  <option value="params">{t('Params')}</option>
+                  <option value="headers">{t('Headers')}</option>
+                  <option value="body">{t('Body')}</option>
+                  <option value="auth">{t('Auth')}</option>
+                  <option value="scripts">{t('Scripts')}</option>
+                </select>
+              </div>
+              <p className="text-surface-600 text-[11px]">
+                {t('Which tab a request opens on. Examples always open on Body.')}
               </p>
 
               <label className="flex items-start gap-2 mt-2 cursor-pointer">

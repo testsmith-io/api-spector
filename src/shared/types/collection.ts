@@ -290,6 +290,10 @@ export interface Workspace {
     /** Name of the environment CLI runs use when no --environment flag is
      *  given, and the app activates when no environment is selected yet. */
     defaultEnvironment?: string
+    /** Which sub-tab a request opens on. Defaults to 'docs'. Per-workspace so a
+     *  team can standardise on seeing e.g. Params first. Examples ignore this
+     *  and open on Body. */
+    defaultRequestTab?: 'docs' | 'params' | 'headers' | 'body' | 'auth' | 'scripts'
     /** Persist request/response history to `history.json` in the workspace dir
      *  (gitignored) so it survives restarts. Off by default. */
     persistHistory?: boolean
