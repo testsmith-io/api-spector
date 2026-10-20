@@ -32,7 +32,16 @@ function parseParams(urlObj: any): KeyValuePair[] {
 function parseUrl(urlObj: any): string {
   if (!urlObj) return '';
   if (typeof urlObj === 'string') return urlObj;
-  return urlObj.raw ?? '';
+  const raw = urlObj.raw ?? '';
+  // Postman's `raw` URL includes the query string, but those params are also
+  // captured separately by parseParams into the Params panel. Strip the query
+  // here so they are not sent twice (the runner re-appends the Params). Only
+  // strip when there is a structured query to avoid dropping a lone `?`.
+  if (Array.isArray(urlObj.query) && urlObj.query.length) {
+    const q = raw.indexOf('?');
+    if (q !== -1) return raw.slice(0, q);
+  }
+  return raw;
 }
 
 function parseBody(body: any): RequestBody {

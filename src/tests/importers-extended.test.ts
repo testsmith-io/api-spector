@@ -99,7 +99,7 @@ meta {
 }
 
 get {
-  url: https://api.petstore.com/v1/pets
+  url: https://api.petstore.com/v1/pets?limit=10
   body: none
   auth: none
 }
@@ -172,9 +172,10 @@ auth:basic {
     expect(req.method).toBe('POST');
   });
 
-  it('parses the URL', () => {
+  it('parses the URL and strips the query string (kept in params, not duplicated)', () => {
     const req = parseBruFile(GET_BRU, 'list-pets.bru');
     expect(req.url).toBe('https://api.petstore.com/v1/pets');
+    expect(req.url).not.toContain('?');
   });
 
   it('parses headers', () => {

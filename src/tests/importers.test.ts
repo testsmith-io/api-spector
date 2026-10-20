@@ -390,6 +390,16 @@ describe('importPostman', () => {
     expect(listPets?.headers.some(h => h.key === 'Accept')).toBe(true);
   });
 
+  it('strips the query string from the URL so params are not duplicated at run time', async () => {
+    const col = await importPostman(join(FIXTURES, 'postman-collection.json'));
+    const listPets = Object.values(col.requests).find(r => r.name === 'List pets');
+    // The query is captured in the Params panel...
+    expect(listPets?.params.some(p => p.key === 'limit' && p.value === '10')).toBe(true);
+    // ...and removed from the URL, so the runner does not append it a second time.
+    expect(listPets?.url).toBe('https://api.petstore.com/v1/pets');
+    expect(listPets?.url).not.toContain('?');
+  });
+
   it('imports saved examples (item.response[]) as request examples', async () => {
     const col = await importPostman(join(FIXTURES, 'postman-collection.json'));
     const listPets = Object.values(col.requests).find(r => r.name === 'List pets');

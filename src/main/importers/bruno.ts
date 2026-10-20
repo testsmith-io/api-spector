@@ -78,7 +78,7 @@ export function parseBruFile(content: string, fileName: string): ApiRequest {
     }
   }
 
-  const url       = methodAttrs['url']  ?? '';
+  let url         = methodAttrs['url']  ?? '';
   const bodyMode  = methodAttrs['body'] ?? 'none';
   const authMode  = methodAttrs['auth'] ?? 'none';
 
@@ -91,6 +91,14 @@ export function parseBruFile(content: string, fileName: string): ApiRequest {
   const params: KeyValuePair[] = Object.entries(parseKv(extractBlock(content, 'params:query'))).map(([k, v]) => ({
     key: k, value: v, enabled: true,
   }));
+
+  // Bruno keeps the full URL (with its query string) in `url` and also lists the
+  // query under `params:query`. Strip the query from the URL so those params are
+  // not sent twice when the request runs (the runner re-appends the Params).
+  if (params.length) {
+    const q = url.indexOf('?');
+    if (q !== -1) url = url.slice(0, q);
+  }
 
   // ── body ──
   let body: RequestBody = { mode: 'none' };
