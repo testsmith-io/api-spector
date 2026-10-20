@@ -434,7 +434,7 @@ export const createCollectionsSlice: StateCreator<
       folder.requestIds.push(req.id);
       s.activeCollectionId = collectionId;
       s.collections[collectionId].dirty = true;
-      const tab = makeTab(req.id, collectionId);
+      const tab = makeTab(req.id, collectionId, { defaultTab: s.workspace?.settings?.defaultRequestTab });
       s.tabs.push(tab);
       s.activeTabId = tab.id;
     });
@@ -604,7 +604,7 @@ export const createCollectionsSlice: StateCreator<
     s.collections[collectionId].dirty = true;
     // Open copy in a new tab — preserves protocol so SOAP duplicates land
     // on the SOAP panel directly.
-    const tab = makeTab(copy.id, collectionId, { protocol: copy.protocol });
+    const tab = makeTab(copy.id, collectionId, { protocol: copy.protocol, defaultTab: s.workspace?.settings?.defaultRequestTab });
     s.tabs.push(tab);
     s.activeTabId = tab.id;
   }),

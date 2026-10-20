@@ -59,6 +59,52 @@ export function extractQueryParams(rawUrl: string, existing: KeyValuePair[]): Sp
 // letter or underscore, so an IPv6 host literal like `[::1]` never matches.
 const PATH_PARAM_RE = /\[([A-Za-z_]\w*)\]/g;
 
+// Resolve `{{name}}` tokens from a value map, leaving unknown tokens as-is.
+// A display-only interpolation: unlike the send path's interpolate(), it does
+// not evaluate faker()/dayjs() expressions, so it stays pure and renderer-safe.
+function interpTokens(str: string, vars: Record<string, string>): string {
+  return str.replaceAll(/\{\{([^}]+)\}\}/g, (m, key) => {
+    const k = String(key).trim();
+    return k in vars ? vars[k] : m;
+  });
+}
+
+/**
+ * Best-effort preview of the final request URL, mirroring the send path's
+ * buildUrl (src/main/interpolation.ts): enabled query rows are appended as
+ * `?k=v` (URL-encoded), and path rows / `{{name}}` / `[name]` placeholders are
+ * substituted from `varValues` (and from the path rows themselves). Unresolved
+ * tokens are left visible. Pure and renderer-safe — used for the live "Sends:"
+ * line under the URL bar. Query/path routing matches buildUrl exactly; the only
+ * difference is that expressions are not evaluated.
+ */
+export function buildPreviewUrl(
+  baseUrl: string,
+  params: KeyValuePair[],
+  varValues: Record<string, string> = {},
+): string {
+  const templateTokens = new Set<string>();
+  for (const m of baseUrl.matchAll(/\{\{([^}]+)\}\}/g)) templateTokens.add(m[1].trim());
+  for (const m of baseUrl.matchAll(PATH_PARAM_RE)) templateTokens.add(m[1]);
+
+  const enabled = (params ?? []).filter(p => p.enabled && p.key);
+  const pathRows  = enabled.filter(p => p.paramType === 'path' || templateTokens.has(p.key));
+  const queryRows = enabled.filter(p => !(p.paramType === 'path' || templateTokens.has(p.key)));
+
+  const scope: Record<string, string> = { ...varValues };
+  for (const p of pathRows) scope[p.key] = interpTokens(p.value, varValues);
+
+  let url = interpTokens(baseUrl, scope);
+  url = url.replaceAll(PATH_PARAM_RE, (m, name) => (name in scope ? scope[name] : m));
+
+  if (!queryRows.length) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  const qs = queryRows
+    .map(p => `${encodeURIComponent(interpTokens(p.key, varValues))}=${encodeURIComponent(interpTokens(p.value, varValues))}`)
+    .join('&');
+  return url + sep + qs;
+}
+
 /** Names of the `[name]` path placeholders in a URL, in order, de-duplicated. */
 export function extractPathParamNames(url: string): string[] {
   const names: string[] = [];

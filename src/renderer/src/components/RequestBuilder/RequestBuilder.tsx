@@ -6,8 +6,9 @@ import { useStore } from '../../store';
 import type { ApiRequest, HttpMethod, KeyValuePair, RunRequestResult } from '../../../../shared/types';
 import { getHooksForRequest, authIsConfigured } from '../../../../shared/request-collection';
 import { findFolderContaining } from '../../../../shared/folder-tree';
-import { syncParamsFromUrl } from '../../../../shared/url-params';
+import { syncParamsFromUrl, buildPreviewUrl } from '../../../../shared/url-params';
 import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
+import { useVarValues } from '../../hooks/useVarValues';
 import { ParamsTab } from './ParamsTab';
 import { VarInput } from '../common/VarInput';
 import { HeadersTab } from './HeadersTab';
@@ -97,6 +98,15 @@ export function RequestBuilder({ request }: Props) {
   const activeAppTab = useStore(s => s.tabs.find(t => t.id === s.activeTabId));
   const isSending    = activeAppTab?.isSending ?? false;
   const activeTab    = activeAppTab?.requestTab ?? 'params';
+
+  // Live preview of the final URL that will actually be sent: enabled query
+  // params appended, path params / {{vars}} / [name] substituted. Shown under
+  // the URL bar so the composed request is visible at a glance before sending.
+  const varValues = useVarValues();
+  const previewUrl = useMemo(
+    () => buildPreviewUrl(request.url, request.params ?? [], varValues),
+    [request.url, request.params, varValues],
+  );
 
   function setActiveTab(t: typeof activeTab) {
     if (activeTabId) setTabRequestTab(activeTabId, t);
@@ -675,6 +685,22 @@ export function RequestBuilder({ request }: Props) {
           </>
         )}
         </div>
+        )}
+
+        {/* Live preview of the composed request (HTTP/SOAP): the final URL with
+            enabled query params appended and path params/variables resolved, so
+            it's clear what gets sent before clicking Send. */}
+        {!isWs && !isGrpc && !isSocketIo && !isMqtt && previewUrl && previewUrl !== request.url && (
+          <div
+            className="flex items-start gap-2 text-[11px] font-mono -mt-0.5 px-0.5"
+            title={t('The full request that will be sent, with the enabled params applied')}
+          >
+            <span className="text-surface-500 shrink-0">{t('Sends')}</span>
+            <span className="break-all">
+              <span className="font-bold text-blue-400">{request.method}</span>{' '}
+              <span className="text-surface-300">{previewUrl}</span>
+            </span>
+          </div>
         )}
       </div>
 

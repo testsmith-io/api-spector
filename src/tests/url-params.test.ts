@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, it, expect } from 'vitest';
-import { extractQueryParams, extractPathParamNames, syncParamsFromUrl } from '../shared/url-params';
+import { extractQueryParams, extractPathParamNames, syncParamsFromUrl, buildPreviewUrl } from '../shared/url-params';
 import type { KeyValuePair } from '../shared/types';
 
 const kv = (key: string, value: string, enabled = true): KeyValuePair => ({ key, value, enabled });
@@ -106,3 +106,49 @@ describe('syncParamsFromUrl', () => {
     expect(r.changed).toBe(false);
   });
 });
+
+describe('buildPreviewUrl', () => {
+  it('appends enabled query params', () => {
+    expect(buildPreviewUrl('https://api.example.com/pets', [kv('limit', '10')]))
+      .toBe('https://api.example.com/pets?limit=10');
+  });
+
+  it('skips disabled params and URL-encodes values', () => {
+    const params = [kv('q', 'a b'), kv('x', '1', false)];
+    expect(buildPreviewUrl('https://api.example.com/s', params))
+      .toBe('https://api.example.com/s?q=a%20b');
+  });
+
+  it('substitutes a {{name}} path token from a path row', () => {
+    expect(buildPreviewUrl('https://api.example.com/pets/{{id}}', [pathKv('id', '42')]))
+      .toBe('https://api.example.com/pets/42');
+  });
+
+  it('substitutes a [name] path placeholder', () => {
+    expect(buildPreviewUrl('https://api.example.com/users/[userId]', [pathKv('userId', '7')]))
+      .toBe('https://api.example.com/users/7');
+  });
+
+  it('treats a row whose key appears as {{token}} as a path substitution, not a query', () => {
+    expect(buildPreviewUrl('https://api.example.com/pets/{{id}}', [kv('id', '42')]))
+      .toBe('https://api.example.com/pets/42');
+  });
+
+  it('resolves {{vars}} from the value map and appends remaining query params', () => {
+    const url = buildPreviewUrl(
+      'https://api.example.com/pets/[id]',
+      [pathKv('id', '{{petId}}'), kv('status', 'active')],
+      { petId: '99' },
+    );
+    expect(url).toBe('https://api.example.com/pets/99?status=active');
+  });
+
+  it('leaves unresolved tokens visible', () => {
+    expect(buildPreviewUrl('https://api.example.com/pets/{{missing}}', []))
+      .toBe('https://api.example.com/pets/{{missing}}');
+  });
+
+  it('returns the URL unchanged when there is nothing to add', () => {
+    expect(buildPreviewUrl('https://api.example.com/pets', [])).toBe('https://api.example.com/pets');
+  });
+})
