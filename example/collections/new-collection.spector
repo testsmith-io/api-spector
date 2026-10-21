@@ -90,7 +90,65 @@
         "testScript": "sp.test('a temp reading arrives', () => {\n  const m = sp.messages.find(m => m.topic === 'sensors/temp');\n  sp.expect(m).to.exist;\n  sp.expect(m.json().c).to.be.a('number');\n});",
         "collectMs": 60000,
         "qos": 2
-      }
+      },
+      "examples": [
+        {
+          "id": "e6fc0a2a-88ef-435f-886c-3f7f055922d0",
+          "name": "Example",
+          "request": {
+            "method": "POST",
+            "url": "mqtt://localhost:11883",
+            "headers": [],
+            "params": [],
+            "auth": {
+              "type": "none"
+            },
+            "body": {
+              "mode": "soap",
+              "soap": {
+                "wsdlUrl": "",
+                "envelope": ""
+              },
+              "grpc": {
+                "message": "{}",
+                "metadata": [],
+                "plaintext": false
+              }
+            }
+          },
+          "response": null,
+          "createdAt": "2026-10-21T20:55:58.560Z",
+          "source": "saved"
+        },
+        {
+          "id": "32008d12-51ab-4c38-95a7-500d7ef10861",
+          "name": "Example (2)",
+          "request": {
+            "method": "POST",
+            "url": "mqtt://localhost:11883",
+            "headers": [],
+            "params": [],
+            "auth": {
+              "type": "none"
+            },
+            "body": {
+              "mode": "soap",
+              "soap": {
+                "wsdlUrl": "",
+                "envelope": ""
+              },
+              "grpc": {
+                "message": "{}",
+                "metadata": [],
+                "plaintext": false
+              }
+            }
+          },
+          "response": null,
+          "createdAt": "2026-10-21T20:56:02.391Z",
+          "source": "saved"
+        }
+      ]
     },
     "808182be-8587-49fd-a3a0-1cd907f1ae38": {
       "id": "808182be-8587-49fd-a3a0-1cd907f1ae38",
@@ -231,7 +289,48 @@
           "soapAction": ""
         }
       },
-      "protocol": "soap"
+      "protocol": "soap",
+      "examples": [
+        {
+          "id": "2890745f-5471-4cbc-b13f-3eae334c9fd4",
+          "name": "Example",
+          "request": {
+            "method": "POST",
+            "url": "https://parabank.parasoft.com/parabank/services/ParaBank;jsessionid=2DD8FB137633568A073CEB7FF33F45D0",
+            "headers": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              }
+            ],
+            "params": [
+              {
+                "key": "wsdl",
+                "value": "",
+                "enabled": true
+              }
+            ],
+            "auth": {
+              "type": "none"
+            },
+            "body": {
+              "mode": "soap",
+              "soap": {
+                "wsdlUrl": "https://parabank.parasoft.com/parabank/services/ParaBank;jsessionid=2DD8FB137633568A073CEB7FF33F45D0?wsdl",
+                "envelope": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope\n  xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\"\n  xmlns:tns=\"http://service.parabank.parasoft.com/\">\n  <soap:Header/>\n  <soap:Body>\n    <tns:startupJmsListener>\n      <!-- Add parameters here -->\n    </tns:startupJmsListener>\n  </soap:Body>\n</soap:Envelope>",
+                "operationName": "startupJmsListener",
+                "soapVersion": "1.1",
+                "binding": "ParaBankSoapBinding",
+                "soapAction": ""
+              }
+            }
+          },
+          "response": null,
+          "createdAt": "2026-10-21T20:56:09.187Z",
+          "source": "saved"
+        }
+      ]
     },
     "528dfbdf-27ff-4195-b354-a185a8e7aada": {
       "id": "528dfbdf-27ff-4195-b354-a185a8e7aada",

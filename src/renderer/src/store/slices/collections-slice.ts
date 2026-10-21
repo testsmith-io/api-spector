@@ -538,19 +538,28 @@ export const createCollectionsSlice: StateCreator<
     }
   }),
 
-  duplicateExample: (requestId, exampleId) => set(s => {
-    const entry = Object.values(s.collections).find(c => c.data.requests[requestId]);
-    const list = entry?.data.requests[requestId].examples;
-    const ex = list?.find(e => e.id === exampleId);
-    if (!entry || !list || !ex) return;
-    list.push({
-      ...structuredClone(ex),
+  duplicateExample: (requestId, exampleId) => {
+    // Snapshot the source from committed state (get), not a draft: structuredClone
+    // throws on an Immer draft proxy -- the same trap addExampleFromRequest guards
+    // against. Cloning the draft here is what made "Duplicate" silently do nothing.
+    const srcEntry = Object.values(get().collections).find(c => c.data.requests[requestId]);
+    const list = srcEntry?.data.requests[requestId].examples;
+    const src = list?.find(e => e.id === exampleId);
+    if (!src || !list) return;
+    const copy: RequestExample = {
+      ...structuredClone(src),
       id: uuidv4(),
-      name: uniqueName(ex.name, list.map(e => e.name)),
+      name: uniqueName(src.name, list.map(e => e.name)),
       createdAt: new Date().toISOString(),
+    };
+    set(s => {
+      const entry = Object.values(s.collections).find(c => c.data.requests[requestId]);
+      if (!entry) return;
+      const req = entry.data.requests[requestId];
+      (req.examples ?? (req.examples = [])).push(copy);
+      entry.dirty = true;
     });
-    entry.dirty = true;
-  }),
+  },
 
   openExample: (requestId, collectionId, exampleId) => set(s => {
     const existing = s.tabs.find(t => t.requestId === requestId && t.exampleId === exampleId);
