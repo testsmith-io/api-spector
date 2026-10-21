@@ -850,6 +850,7 @@ function FolderContents ( {
   const deleteExample    = useStore( s => s.deleteExample );
   const duplicateExample = useStore( s => s.duplicateExample );
   const { confirm, dialog: confirmDialog } = useConfirm();
+  const t = useT();
 
   const dropIndent = ( depth + 1 ) * 12 + 8;
 

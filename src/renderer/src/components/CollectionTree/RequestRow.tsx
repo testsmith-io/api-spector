@@ -90,6 +90,10 @@ export function RequestRow({
   onAddExample, onOpenExample, onRenameExample, onDeleteExample, onDuplicateExample,
 }: RequestRowProps) {
   const t = useT();
+  // An example is a saved request + single response snapshot, which only fits
+  // request/response protocols. Realtime ones (WebSocket, Socket.IO, MQTT) have
+  // no single response, so they do not offer "Add Example".
+  const canAddExample = !protocol || protocol === 'http' || protocol === 'soap' || protocol === 'grpc';
   const [renaming, setRenaming] = useState(autoRename);
   const [examplesOpen, setExamplesOpen] = useState(true);
   const [addingTag, setAddingTag] = useState(false);
@@ -247,7 +251,7 @@ export function RequestRow({
 
         <div className="shrink-0">
           <DotsBtn items={[
-            ...(onAddExample ? [
+            ...(onAddExample && canAddExample ? [
               { type: 'item' as const, label: t('Add Example'), icon: <CopyIcon />, onClick: () => { onAddExample(); setExamplesOpen(true); } },
               { type: 'separator' as const },
             ] : []),
