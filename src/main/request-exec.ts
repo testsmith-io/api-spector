@@ -660,6 +660,13 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
   // each cell value so a data table can use {{baseUrl}}, {{$randomEmail}},
   // {{faker.person.firstName()}}, etc. Resolved against the surrounding scopes
   // and freshly-generated dynamic vars, so faker yields a new value per row.
+  // Request-scoped variables: the most specific static scope. Folded in as the
+  // base of localVars so they override environment/folder/collection, while
+  // data-row / runtime (sp.set) / CLI values (already in localVars) still win.
+  if (req.variables && Object.keys(req.variables).length > 0) {
+    localVars = { ...req.variables, ...localVars };
+  }
+
   if (localVars && Object.keys(localVars).length > 0) {
     localVars = resolveDataRow(localVars, mergeVars(envVars, collectionVars, globals, {}, dynamicVars, folderVars));
   }

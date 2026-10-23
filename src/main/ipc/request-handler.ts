@@ -215,6 +215,13 @@ export function registerRequestHandler(ipc: IpcMain): void {
       localVars = resolveDataRow(dataRow, mergeVars(envVars, collectionVars, mergedGlobals, {}, dynamicVars));
     }
 
+    // Request-scoped variables (the most specific static scope): fold in as the
+    // base of localVars so they override environment/folder/collection, while
+    // data-row / runtime (sp.set) values still win over them.
+    if (req.variables && Object.keys(req.variables).length > 0) {
+      localVars = { ...req.variables, ...localVars };
+    }
+
     // Merge for pre-script
     let vars = mergeVars(envVars, collectionVars, mergedGlobals, localVars, dynamicVars);
 

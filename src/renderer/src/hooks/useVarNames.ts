@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { useStore } from '../store';
 import { useActiveEnvironment } from './useActiveEnvironment';
 import { DYNAMIC_VAR_NAMES } from '../components/RequestBuilder/atCompletions';
+import { collectFolderVars } from '../../../shared/folder-tree';
 import type { Folder } from '../../../shared/types';
 
 // Regex to extract keys from sp.*.set("key", ...) calls in scripts
@@ -25,11 +26,24 @@ export function useVarNames(): string[] {
   const collections         = useStore(s => s.collections);
   const globals             = useStore(s => s.globals);
   const sessionVars         = useStore(s => s.sessionVars);
+  const activeTabId         = useStore(s => s.activeTabId);
+  const tabs                = useStore(s => s.tabs);
   // Resolved through the extends chain so inherited variables autocomplete too.
   const activeEnv           = useActiveEnvironment();
 
   return useMemo(() => {
     const names = new Set<string>();
+
+    // The active request's own scope: request-level variables and the variables
+    // of every folder on its path. Scoped to the active request because its
+    // editors are what autocomplete here.
+    const tab = tabs.find(x => x.id === activeTabId);
+    const tabCol = tab?.collectionId ? collections[tab.collectionId]?.data : undefined;
+    const activeReq = tab?.requestId && tabCol ? tabCol.requests[tab.requestId] : undefined;
+    if (activeReq) {
+      Object.keys(activeReq.variables ?? {}).forEach(k => names.add(k));
+      Object.keys(collectFolderVars(tabCol!.rootFolder, activeReq.id)).forEach(k => names.add(k));
+    }
 
     // Globals
     Object.keys(globals).forEach(k => names.add(k));
@@ -66,5 +80,6 @@ export function useVarNames(): string[] {
   }, [
     activeEnv, activeCollectionId,
     collections, globals, sessionVars,
+    activeTabId, tabs,
   ]);
 }

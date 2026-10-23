@@ -67,6 +67,16 @@ describe('extractPathParamNames', () => {
   it('de-duplicates repeated names', () => {
     expect(extractPathParamNames('/a/[id]/b/[id]')).toEqual(['id']);
   });
+
+  it('also finds {name} (OpenAPI/Swagger) placeholders', () => {
+    expect(extractPathParamNames('https://api.example.com/users/{id}/orders/{orderId}'))
+      .toEqual(['id', 'orderId']);
+  });
+
+  it('mixes [name] and {name} and ignores {{variable}} tokens', () => {
+    expect(extractPathParamNames('https://{{host}}/users/{id}/pets/[petId]')).toEqual(['id', 'petId']);
+    expect(extractPathParamNames('https://x.com/{{only}}/a')).toEqual([]);
+  });
 });
 
 describe('syncParamsFromUrl', () => {

@@ -118,6 +118,16 @@ describe('buildUrl', () => {
     expect(url).toBe('https://example.com/pets/7');
   });
 
+  it('substitutes {name} (OpenAPI/Swagger) path placeholders', () => {
+    const rows: KeyValuePair[] = [{ key: 'id', value: '42', enabled: true, paramType: 'path' }];
+    expect(buildUrl('https://example.com/users/{id}', rows, {})).toBe('https://example.com/users/42');
+  });
+
+  it('resolves {name} without disturbing {{variable}} tokens', () => {
+    const url = buildUrl('https://{{host}}/users/{id}', [], { host: 'api.example.com', id: '9' });
+    expect(url).toBe('https://api.example.com/users/9');
+  });
+
   it('leaves an unresolved [name] placeholder as-is', () => {
     const url = buildUrl('https://example.com/pets/[missing]', [], {});
     expect(url).toBe('https://example.com/pets/[missing]');

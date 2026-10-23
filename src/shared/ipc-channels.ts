@@ -106,6 +106,7 @@ export const IPC = {
     http:              'import:http',
     har:               'import:har',
     arazzo:            'import:arazzo',
+    wsdl:              'import:wsdl',
     spector:           'import:spector',
     openapiSchemas:    'import:openapi-schemas',
     openapiSchemasUrl: 'import:openapi-schemas-url',

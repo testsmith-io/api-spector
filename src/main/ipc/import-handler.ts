@@ -16,8 +16,34 @@ import { importBruno }                                      from '../importers/b
 import { importHttpFile }                                   from '../importers/http-file';
 import { importHar }                                        from '../importers/har';
 import { importArazzoFiles }                                from '../importers/arazzo';
+import { importWsdlCollection }                             from '../importers/wsdl';
 
 export function registerImportHandlers(ipc: IpcMain): void {
+  // WSDL -> a collection of SOAP requests (one per operation). From a URL (e.g.
+  // http://www.dneonline.com/calculator.asmx?WSDL) or a local .wsdl/.xml file;
+  // routed through the import picker for selective import.
+  handleIpc(ipc, IPC.import.wsdl, async (_event, opts: { url?: string } = {}) => {
+    let wsdlText: string;
+    let name: string | undefined;
+    if (opts.url?.trim()) {
+      const url = opts.url.trim();
+      // Same fetch helper + SSRF guard the SOAP editor's WSDL fetch uses.
+      const { validateWsdlFetchUrl } = await import('./ipc-validate');
+      const { fetchUrl } = await import('./soap-handler');
+      validateWsdlFetchUrl(url);
+      wsdlText = await fetchUrl(url);
+      try { name = new URL(url).hostname; } catch { /* keep default */ }
+    } else {
+      const result = await dialog.showOpenDialog({
+        title: 'Import WSDL',
+        filters: [{ name: 'WSDL', extensions: ['wsdl', 'xml'] }],
+        properties: ['openFile'],
+      });
+      if (result.canceled || !result.filePaths[0]) return null;
+      wsdlText = await readFile(result.filePaths[0], 'utf8');
+    }
+    return importWsdlCollection(wsdlText, name);
+  });
   handleIpc(ipc, IPC.import.postman, async () => {
     const result = await dialog.showOpenDialog({
       title: 'Import Postman Collection',

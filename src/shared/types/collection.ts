@@ -127,6 +127,12 @@ export interface ApiRequest {
   /** Saved request/response snapshots (Postman/Bruno-style examples). Each
    *  overrides the parent request; shown nested under it in the tree. */
   examples?: RequestExample[]
+  /** Request-scoped variables: the most specific *static* scope. They override
+   *  environment / folder / collection / globals for this request (and its
+   *  examples), and are themselves overridden by data-row, runtime (sp.set) and
+   *  CLI (--var) values. Use them to locally override a higher-level variable or
+   *  to hold values only this request and its examples need. */
+  variables?: Record<string, string>
 }
 
 /** One child of a folder in display / execution order — either a request or a

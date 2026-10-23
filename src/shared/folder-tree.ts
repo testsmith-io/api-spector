@@ -122,3 +122,20 @@ export function cloneAndReId(folder: Folder, mapRequestId: (oldId: string) => st
   reIdFolderTree(cloned, mapRequestId);
   return cloned;
 }
+
+/**
+ * Merged folder-scope variables on the path from `root` to the folder that
+ * contains `reqId`: outer folders first, inner folders override. Returns `{}`
+ * when the request isn't found. Mirrors how folder scope resolves at send time.
+ */
+export function collectFolderVars(root: Folder, reqId: string): Record<string, string> {
+  const walk = (folder: Folder): Record<string, string> | null => {
+    if ((folder.requestIds ?? []).includes(reqId)) return { ...(folder.variables ?? {}) };
+    for (const sub of folder.folders ?? []) {
+      const inner = walk(sub);
+      if (inner) return { ...(folder.variables ?? {}), ...inner };
+    }
+    return null;
+  };
+  return walk(root) ?? {};
+}

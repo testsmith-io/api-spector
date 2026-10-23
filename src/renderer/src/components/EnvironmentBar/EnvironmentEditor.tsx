@@ -7,7 +7,7 @@ import type { EnvVariable } from '../../../../shared/types';
 import { MasterKeyModal } from './MasterKeyModal';
 import { Modal } from '../common/Modal';
 import { useConfirm } from '../common/useConfirm';
-import { envRelPath } from '../../../../shared/naming-utils';
+import { envRelPath, uniqueName } from '../../../../shared/naming-utils';
 import { resolveEnvironmentChain } from '../../../../shared/environments';
 import { useT } from '../../i18n';
 
@@ -169,6 +169,28 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
     // Select the duplicate — it's the most recently added environment.
     const next = Object.keys(useStore.getState().environments).at(-1);
     if (next) setSelectedId(next);
+  }
+
+  // Import a Postman environment export (.json) as a new environment: unique its
+  // name, write it to disk, register it in the workspace, select it.
+  async function importFromPostman() {
+    const imported = await electron.importPostmanEnvironment();
+    if (!imported) return;
+    const existingNames = Object.values(useStore.getState().environments).map(e => e.data.name);
+    const finalEnv = { ...imported, name: uniqueName(imported.name || t('Imported Environment'), existingNames) };
+    const relPath = envRelPath(finalEnv.name, finalEnv.id);
+    await electron.saveEnvironment(relPath, finalEnv);
+    useStore.setState(s => {
+      s.environments[finalEnv.id] = { relPath, data: finalEnv };
+      if (!s.activeEnvironmentId) s.activeEnvironmentId = finalEnv.id;
+      if (s.workspace && !s.workspace.environments.includes(relPath)) {
+        s.workspace.environments = [...s.workspace.environments, relPath];
+      }
+      return s;
+    });
+    const ws = useStore.getState().workspace;
+    if (ws) await electron.saveWorkspace(ws);
+    setSelectedId(finalEnv.id);
   }
 
   function updateVar(idx: number, patch: Partial<EnvVariable>) {
@@ -338,6 +360,12 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
               className="px-3 py-2 text-xs text-surface-400 hover:text-white border-t border-surface-800 transition-colors text-left"
             >
               {t('+ Add environment')}
+            </button>
+            <button
+              onClick={importFromPostman}
+              className="px-3 py-2 text-xs text-surface-400 hover:text-white border-t border-surface-800 transition-colors text-left"
+            >
+              {t('Import from Postman')}
             </button>
           </div>
 
