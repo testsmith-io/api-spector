@@ -130,6 +130,10 @@ export interface CollectionsSliceActions {
   renameExample: (requestId: string, exampleId: string, name: string) => void
   deleteExample: (requestId: string, exampleId: string) => void
   duplicateExample: (requestId: string, exampleId: string) => void
+  /** Move example `fromId` to the position of `toId` within a request's examples. */
+  reorderExample: (requestId: string, fromId: string, toId: string) => void
+  /** Sort a request's examples alphabetically by name (case-insensitive). */
+  sortExamples: (requestId: string) => void
   openExample: (requestId: string, collectionId: string, exampleId: string) => void
 
   // Tags
@@ -560,6 +564,26 @@ export const createCollectionsSlice: StateCreator<
       entry.dirty = true;
     });
   },
+
+  reorderExample: (requestId, fromId, toId) => set(s => {
+    const entry = Object.values(s.collections).find(c => c.data.requests[requestId]);
+    const list = entry?.data.requests[requestId].examples;
+    if (!entry || !list) return;
+    const from = list.findIndex(e => e.id === fromId);
+    const to   = list.findIndex(e => e.id === toId);
+    if (from < 0 || to < 0 || from === to) return;
+    const [moved] = list.splice(from, 1);
+    list.splice(to, 0, moved);
+    entry.dirty = true;
+  }),
+
+  sortExamples: (requestId) => set(s => {
+    const entry = Object.values(s.collections).find(c => c.data.requests[requestId]);
+    const list = entry?.data.requests[requestId].examples;
+    if (!entry || !list) return;
+    list.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
+    entry.dirty = true;
+  }),
 
   openExample: (requestId, collectionId, exampleId) => set(s => {
     const existing = s.tabs.find(t => t.requestId === requestId && t.exampleId === exampleId);

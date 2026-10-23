@@ -170,6 +170,8 @@ const api = {
     ipcRenderer.invoke(IPC.import.openapi),
   importOpenApiFromUrl: (url: string): Promise<Collection | null> =>
     ipcRenderer.invoke(IPC.import.openapiUrl, url),
+  importWsdl: (opts?: { url?: string }): Promise<Collection | null> =>
+    ipcRenderer.invoke(IPC.import.wsdl, opts ?? {}),
   importInsomnia: (): Promise<Collection | null> =>
     ipcRenderer.invoke(IPC.import.insomnia),
   importBruno: (): Promise<Collection | null> =>

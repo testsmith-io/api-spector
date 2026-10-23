@@ -849,6 +849,8 @@ function FolderContents ( {
   const renameExample    = useStore( s => s.renameExample );
   const deleteExample    = useStore( s => s.deleteExample );
   const duplicateExample = useStore( s => s.duplicateExample );
+  const reorderExample   = useStore( s => s.reorderExample );
+  const sortExamples     = useStore( s => s.sortExamples );
   const { confirm, dialog: confirmDialog } = useConfirm();
   const t = useT();
 
@@ -941,6 +943,8 @@ function FolderContents ( {
           confirm( t( 'Delete example ":name"?', { name: ex?.name ?? '' } ), () => deleteExample( req.id, exId ) );
         }}
         onDuplicateExample={exId => duplicateExample( req.id, exId )}
+        onReorderExample={( fromId, toId ) => reorderExample( req.id, fromId, toId )}
+        onSortExamples={() => sortExamples( req.id )}
       />
     );
   };

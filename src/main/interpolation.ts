@@ -4,9 +4,13 @@
 import type { Environment, KeyValuePair } from '../shared/types';
 import { decryptSecret } from './ipc/secret-handler';
 import { hasSecretScheme, resolveExternalSecret } from './secrets';
+import { PATH_PARAM_PATTERN } from '../shared/url-params';
 import type { faker as FakerType } from '@faker-js/faker';
 import dayjs from 'dayjs';
 import * as vm from 'node:vm';
+
+// `[name]` / `{name}` path-parameter placeholders (shared with url-params).
+const PATH_PARAM_RE = new RegExp(PATH_PARAM_PATTERN, 'g');
 
 let _fakerCache: { faker: typeof FakerType } | null = null;
 async function getFaker(): Promise<typeof FakerType> {
@@ -94,9 +98,9 @@ export function buildUrl(
     templateTokens.add(String(name).trim());
     return '';
   });
-  // `[name]` path placeholders (API Spector style) route their row to the path.
-  baseUrl.replaceAll(/\[([A-Za-z_]\w*)\]/g, (_m, name) => {
-    templateTokens.add(String(name));
+  // `[name]` / `{name}` path placeholders route their row to the path.
+  baseUrl.replaceAll(PATH_PARAM_RE, (_m, g1, g2) => {
+    templateTokens.add(g1 ?? g2);
     return '';
   });
 
@@ -119,11 +123,13 @@ export function buildUrl(
     }
     : vars;
 
-  // Substitute `{{name}}` (via interpolate) then `[name]` path placeholders.
-  // A `[name]` with no resolvable value is left as-is rather than blanked.
+  // Substitute `{{name}}` (via interpolate) then `[name]` / `{name}` path
+  // placeholders. A placeholder with no resolvable value is left as-is.
   let url = interpolate(baseUrl, mergedVars);
-  url = url.replaceAll(/\[([A-Za-z_]\w*)\]/g, (m, name) =>
-    name in mergedVars ? mergedVars[name] : m);
+  url = url.replaceAll(PATH_PARAM_RE, (m, g1, g2) => {
+    const name = g1 ?? g2;
+    return name in mergedVars ? mergedVars[name] : m;
+  });
 
   if (!queryRows.length) return url;
   const sep = url.includes('?') ? '&' : '?';

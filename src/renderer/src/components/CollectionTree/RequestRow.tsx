@@ -9,7 +9,7 @@ import { DragCtx, SelectionCtx, TagChips } from './CollectionTree';
 import { InlineEdit } from '../common/InlineEdit';
 import { type MenuItem, DotsBtn } from '../common/ContextMenu';
 import { onActivateKey } from '../../lib/a11y';
-import { PencilIcon, CopyIcon, TagIcon, SyncIcon, TrashIcon, ShieldIcon, BanIcon } from '../common/icons';
+import { PencilIcon, CopyIcon, TagIcon, SyncIcon, TrashIcon, ShieldIcon, BanIcon, SortAzIcon } from '../common/icons';
 import { useStore } from '../../store';
 import { useToast, Toast } from '../common/Toast';
 import { pushRequestAsMonitor, cloudEnabled } from '../../lib/cloud-push';
@@ -81,6 +81,8 @@ export interface RequestRowProps {
   readonly onRenameExample?: (exampleId: string, name: string) => void
   readonly onDeleteExample?: (exampleId: string) => void
   readonly onDuplicateExample?: (exampleId: string) => void
+  readonly onReorderExample?: (fromId: string, toId: string) => void
+  readonly onSortExamples?: () => void
 }
 
 export function RequestRow({
@@ -88,7 +90,11 @@ export function RequestRow({
   examples = [], activeExampleId,
   onSelect, onRename, onDelete, onDuplicate, onUpdateTags, onSetHookType, onToggleDisabled,
   onAddExample, onOpenExample, onRenameExample, onDeleteExample, onDuplicateExample,
+  onReorderExample, onSortExamples,
 }: RequestRowProps) {
+  // Which example is being dragged (for reorder) — tracked here so every
+  // ExampleRow shares one drag source.
+  const [dragExampleId, setDragExampleId] = useState<string | null>(null);
   const t = useT();
   // An example is a saved request + single response snapshot, which only fits
   // request/response protocols. Realtime ones (WebSocket, Socket.IO, MQTT) have
@@ -253,8 +259,12 @@ export function RequestRow({
           <DotsBtn items={[
             ...(onAddExample && canAddExample ? [
               { type: 'item' as const, label: t('Add Example'), icon: <CopyIcon />, onClick: () => { onAddExample(); setExamplesOpen(true); } },
-              { type: 'separator' as const },
             ] : []),
+            ...(onSortExamples && examples.length > 1 ? [
+              { type: 'item' as const, label: t('Sort examples A-Z'), icon: <SortAzIcon />, onClick: () => { onSortExamples(); setExamplesOpen(true); } },
+            ] : []),
+            ...((onAddExample && canAddExample) || (onSortExamples && examples.length > 1)
+              ? [{ type: 'separator' as const }] : []),
             { type: 'item', label: t('Rename'),     icon: <PencilIcon />, onClick: () => setRenaming(true) },
             { type: 'item', label: t('Duplicate'),  icon: <CopyIcon />,   onClick: onDuplicate },
             { type: 'item', label: t('Add tag'),    icon: <TagIcon />,    onClick: () => setAddingTag(true) },
@@ -283,6 +293,12 @@ export function RequestRow({
           name={ex.name}
           indent={indent + 18}
           isActive={activeExampleId === ex.id}
+          reorderable={!!onReorderExample && examples.length > 1}
+          dragging={dragExampleId === ex.id}
+          dragActive={dragExampleId !== null && dragExampleId !== ex.id}
+          onDragStart={() => setDragExampleId(ex.id)}
+          onDragEnd={() => setDragExampleId(null)}
+          onDropOn={() => { if (dragExampleId && dragExampleId !== ex.id) onReorderExample?.(dragExampleId, ex.id); setDragExampleId(null); }}
           onOpen={() => onOpenExample?.(ex.id)}
           onRename={n => onRenameExample?.(ex.id, n)}
           onDelete={() => onDeleteExample?.(ex.id)}
@@ -303,10 +319,16 @@ export function RequestRow({
 // ─── ExampleRow ──────────────────────────────────────────────────────────────
 // A saved request/response snapshot nested under its request in the tree.
 
-function ExampleRow({ name, indent, isActive, onOpen, onRename, onDelete, onDuplicate }: {
+function ExampleRow({ name, indent, isActive, reorderable, dragging, dragActive, onDragStart, onDragEnd, onDropOn, onOpen, onRename, onDelete, onDuplicate }: {
   readonly name: string
   readonly indent: number
   readonly isActive: boolean
+  readonly reorderable: boolean
+  readonly dragging: boolean
+  readonly dragActive: boolean
+  readonly onDragStart: () => void
+  readonly onDragEnd: () => void
+  readonly onDropOn: () => void
   readonly onOpen: () => void
   readonly onRename: (n: string) => void
   readonly onDelete: () => void
@@ -314,18 +336,25 @@ function ExampleRow({ name, indent, isActive, onOpen, onRename, onDelete, onDupl
 }) {
   const t = useT();
   const [renaming, setRenaming] = useState(false);
+  const [over, setOver] = useState(false);
   return (
     <div
       data-row
+      draggable={reorderable && !renaming}
       className={`group flex items-center gap-1.5 py-1 pr-1 rounded-sm cursor-pointer transition-colors ${
         isActive ? 'bg-surface-800 text-[var(--text-primary)]' : 'text-surface-400 hover:bg-surface-800'
-      }`}
+      } ${dragging ? 'opacity-40' : ''} ${over ? 'ring-1 ring-blue-500' : ''}`}
       style={{ paddingLeft: indent }}
       role="button"
       tabIndex={0}
       onClick={onOpen}
       onKeyDown={onActivateKey(onOpen)}
       onDoubleClick={() => setRenaming(true)}
+      onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', name); onDragStart(); }}
+      onDragEnd={() => { setOver(false); onDragEnd(); }}
+      onDragOver={e => { if (dragActive) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setOver(true); } }}
+      onDragLeave={() => setOver(false)}
+      onDrop={e => { if (dragActive) { e.preventDefault(); e.stopPropagation(); } setOver(false); onDropOn(); }}
     >
       <span className="shrink-0 text-[8px] font-bold px-1 py-px rounded bg-surface-700 text-surface-300" title={t('Example')}>EX</span>
       <div className="flex-1 min-w-0">

@@ -218,13 +218,22 @@ export function SoapEditor({ request, onChange }: Props) {
                   <button
                     key={`${op.binding ?? ''}:${op.name}:${op.soapVersion}`}
                     onClick={() => selectOperation(op)}
-                    className={`w-full text-left px-2.5 py-1.5 text-[11px] border-b border-surface-800/50 transition-colors ${
+                    className={`w-full text-left px-2.5 py-1.5 text-[11px] border-b border-surface-800/50 transition-colors flex items-center gap-1.5 ${
                       active ? 'bg-blue-900/30 text-blue-300' : 'text-surface-300 hover:bg-surface-800/60'
                     }`}
                   >
-                    <div className="font-mono truncate">{op.name}</div>
-                    {op.soapVersion === '1.2' && (
-                      <div className="text-[9px] text-surface-600 uppercase">SOAP 1.2</div>
+                    <span className="font-mono truncate flex-1 min-w-0">{op.name}</span>
+                    {/* Version chip — shown when the WSDL exposes both bindings,
+                        so a same-named 1.1 / 1.2 operation is distinguishable. */}
+                    {versions.length > 1 && (
+                      <span
+                        className={`shrink-0 text-[8px] font-bold px-1 py-px rounded tracking-wide ${
+                          op.soapVersion === '1.2' ? 'bg-violet-500/20 text-violet-300' : 'bg-sky-500/20 text-sky-300'
+                        }`}
+                        title={`SOAP ${op.soapVersion}`}
+                      >
+                        {op.soapVersion}
+                      </span>
                     )}
                   </button>
                 );

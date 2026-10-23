@@ -27,7 +27,7 @@ interface ImportOption {
 
 const OPTIONS: ImportOption[] = [
   { id: 'postman',  label: 'Postman',  description: 'Collection v2.1 JSON' },
-  { id: 'postman-env', label: 'Postman Env', description: 'Environment export JSON' },
+  { id: 'wsdl',     label: 'WSDL',     description: 'SOAP service -> requests (all or selected operations)', supportsUrl: true },
   { id: 'openapi',  label: 'OpenAPI',  description: 'JSON or YAML (v3.x)', supportsUrl: true },
   { id: 'insomnia', label: 'Insomnia', description: 'Export v4 JSON' },
   { id: 'bruno',    label: 'Bruno',    description: 'bruno.json collection file' },
@@ -126,17 +126,6 @@ export function ImportModal({ onImport, onClose }: Props) {
     setLoading(true);
     setError(null);
     try {
-      // Environments import to the workspace's environment list, not a
-      // collection — handle it and finish before the collection path below.
-      if (opt.id === 'postman-env') {
-        const env = await electron.importPostmanEnvironment();
-        if (env) {
-          await persistImportedEnvironment(env);
-          onImport(null);
-          onClose();
-        }
-        return;
-      }
       // Arazzo builds a collection AND one or more flows; register both, then
       // show any translation warnings instead of closing silently.
       if (opt.id === 'arazzo') {
@@ -158,10 +147,11 @@ export function ImportModal({ onImport, onClose }: Props) {
       if (opt.id === 'http')     col = await electron.importHttpFile();
       if (opt.id === 'har')      col = await electron.importHar();
       if (opt.id === 'spector')  col = await electron.importSpectorCollection();
+      if (opt.id === 'wsdl')     col = await electron.importWsdl();
       if (!col) { setLoading(false); return; }
-      // OpenAPI and HAR can carry many endpoints/captures, so route them
-      // through the endpoint picker (pick what to keep, extract a base URL).
-      if (opt.id === 'openapi' || opt.id === 'har') {
+      // OpenAPI, HAR and WSDL can carry many endpoints/operations, so route
+      // them through the picker (choose what to keep, extract a base URL).
+      if (opt.id === 'openapi' || opt.id === 'har' || opt.id === 'wsdl') {
         enterPreview(col);
       } else {
         onImport(col);
@@ -180,7 +170,9 @@ export function ImportModal({ onImport, onClose }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const col = await electron.importOpenApiFromUrl(trimmed);
+      const col = selected === 'wsdl'
+        ? await electron.importWsdl({ url: trimmed })
+        : await electron.importOpenApiFromUrl(trimmed);
       if (col) enterPreview(col);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -315,30 +307,6 @@ export function ImportModal({ onImport, onClose }: Props) {
     } finally {
       setLoading(false);
     }
-  }
-
-  /**
-   * Save an imported environment: ensure its name is unique, write it to disk,
-   * register it in the store + workspace, and make it active if none is. Mirrors
-   * the new-environment branch of persistBaseUrlVariable.
-   */
-  async function persistImportedEnvironment(env: Environment) {
-    const state = useStore.getState();
-    const existingNames = Object.values(state.environments).map(e => e.data.name);
-    const finalName = uniqueEnvName(env.name || t('Imported Environment'), existingNames);
-    const finalEnv: Environment = { ...env, name: finalName };
-    const relPath = envRelPath(finalName, finalEnv.id);
-    await electron.saveEnvironment(relPath, finalEnv);
-    useStore.setState(s => {
-      s.environments[finalEnv.id] = { relPath, data: finalEnv };
-      if (!s.activeEnvironmentId) s.activeEnvironmentId = finalEnv.id;
-      if (s.workspace && !s.workspace.environments.includes(relPath)) {
-        s.workspace.environments = [...s.workspace.environments, relPath];
-      }
-      return s;
-    });
-    const ws = useStore.getState().workspace;
-    if (ws) await electron.saveWorkspace(ws);
   }
 
   /**
@@ -606,8 +574,8 @@ export function ImportModal({ onImport, onClose }: Props) {
           ))}
         </div>
 
-        {/* OpenAPI URL input (shown only when OpenAPI selected) */}
-        {selected === 'openapi' && (
+        {/* URL input (shown for formats that support importing from a URL) */}
+        {(selected === 'openapi' || selected === 'wsdl') && (
           <div className="flex flex-col gap-2">
             <p className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">{t('Or import from URL')}</p>
             <div className="flex gap-2">
@@ -616,7 +584,7 @@ export function ImportModal({ onImport, onClose }: Props) {
                 value={url}
                 onChange={e => { setUrl(e.target.value); setError(null); }}
                 onKeyDown={e => { if (e.key === 'Enter') importFromUrl(); }}
-                placeholder="https://api.example.com/openapi.json"
+                placeholder={selected === 'wsdl' ? 'http://www.dneonline.com/calculator.asmx?WSDL' : 'https://api.example.com/openapi.json'}
                 className="flex-1 text-xs bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 placeholder-surface-600 font-mono"
               />
               <button

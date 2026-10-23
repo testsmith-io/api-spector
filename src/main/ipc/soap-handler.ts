@@ -21,7 +21,7 @@ import { DOMParser } from '@xmldom/xmldom';
 // regex parser couldn't follow `<wsdl:part element="tns:Add"/>` to the matching
 // `<xs:element name="Add">` definition in `<wsdl:types>`.
 
-function fetchUrl(url: string, headers: Record<string, string> = {}): Promise<string> {
+export function fetchUrl(url: string, headers: Record<string, string> = {}): Promise<string> {
   return new Promise((resolveP, rejectP) => {
     const lib = url.startsWith('https') ? https : http;
     const req = lib.get(url, { headers }, res => {
