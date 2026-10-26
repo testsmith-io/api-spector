@@ -49,7 +49,7 @@ export function MasterKeyModal({ onSuccess, onCancel }: Props) {
       overlayClassName="bg-black/60 z-[60] flex items-center justify-center"
       panelClassName="bg-surface-900 border border-surface-700 rounded-lg shadow-2xl w-[500px] p-5 flex flex-col gap-4"
     >
-        <div>
+        <div data-modal-drag className="cursor-move select-none">
           <h3 className="text-sm font-semibold">{t('Master Password Required')}</h3>
           <p className="text-xs text-surface-400 mt-1">
             {t('Secrets are encrypted with AES-256-GCM using a master password. Set')}{' '}

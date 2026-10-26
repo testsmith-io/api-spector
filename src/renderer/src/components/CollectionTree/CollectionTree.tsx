@@ -87,10 +87,11 @@ function DropLine ( { collectionId, parentFolderId, index, indent }: {
 
 export const SelectionCtx = createContext<{
   active: boolean
+  count: number
   isSelected: ( collectionId: string, requestId: string ) => boolean
   toggle: ( collectionId: string, requestId: string ) => void
   clear: () => void
-}>( { active: false, isSelected: () => false, toggle: () => { }, clear: () => { } } );
+}>( { active: false, count: 0, isSelected: () => false, toggle: () => { }, clear: () => { } } );
 
 // ─── Tag chips ────────────────────────────────────────────────────────────────
 
@@ -239,6 +240,7 @@ export function CollectionTree () {
   // RequestRow (a SelectionCtx consumer) would re-render on every tree render.
   const selectionCtx = useMemo( () => ( {
     active:     selected.size > 0,
+    count:      selected.size,
     isSelected: ( c: string, r: string ) => selected.has( selKey( c, r ) ),
     toggle:     ( c: string, r: string ) => setSelected( prev => {
       const next = new Set( prev );
@@ -262,9 +264,41 @@ export function CollectionTree () {
     setPendingConfirm( { message, onConfirm: () => { action(); setPendingConfirm( null ); } } );
   }
 
+  // Selected requests in tree order (top-to-bottom), so a multi-drag moves them
+  // as a block in the order they appear rather than the order they were picked.
+  function orderedSelectedRequests (): { collectionId: string; requestId: string }[] {
+    const out: { collectionId: string; requestId: string }[] = [];
+    const walk = ( collectionId: string, folder: Folder ): void => {
+      for ( const child of orderedChildren( folder ) ) {
+        if ( child.type === 'request' ) {
+          if ( selected.has( selKey( collectionId, child.id ) ) ) out.push( { collectionId, requestId: child.id } );
+        } else {
+          const sub = folder.folders.find( f => f.id === child.id );
+          if ( sub ) walk( collectionId, sub );
+        }
+      }
+    };
+    for ( const { data } of colList ) walk( data.id, data.rootFolder );
+    return out;
+  }
+
+  // The request(s) a drag should move: the whole multi-selection when the dragged
+  // request is part of it, otherwise just the dragged one.
+  function draggedRequests (): { collectionId: string; requestId: string }[] {
+    if ( dragging?.type !== 'request' ) return [];
+    const dragKey = selKey( dragging.collectionId, dragging.requestId );
+    if ( selected.size > 1 && selected.has( dragKey ) ) return orderedSelectedRequests();
+    return [{ collectionId: dragging.collectionId, requestId: dragging.requestId }];
+  }
+
   function onDropRequest ( destCollectionId: string, destFolderId: string, destIndex?: number ) {
-    if ( dragging?.type !== 'request' ) return;
-    moveRequest( dragging.collectionId, dragging.requestId, destCollectionId, destFolderId, destIndex );
+    const reqs = draggedRequests();
+    if ( reqs.length === 0 ) return;
+    // Callers always append (no index) here; keep the block's relative order.
+    reqs.forEach( ( r, i ) =>
+      moveRequest( r.collectionId, r.requestId, destCollectionId, destFolderId,
+        destIndex === undefined ? undefined : destIndex + i ) );
+    if ( reqs.length > 1 ) selectionCtx.clear();
     setDragging( null );
   }
 
@@ -279,14 +313,23 @@ export function CollectionTree () {
   // Same-collection only; cross-collection drags fall back to appending/nesting.
   function onReorderChild ( destCollectionId: string, destParentFolderId: string, destIndex: number ) {
     if ( !dragging ) return;
-    if ( dragging.collectionId === destCollectionId ) {
-      const ref = dragging.type === 'folder'
-        ? { type: 'folder' as const, id: dragging.folderId }
-        : { type: 'request' as const, id: dragging.requestId };
-      reorderChild( destCollectionId, ref, destParentFolderId, destIndex );
-    } else if ( dragging.type === 'request' ) {
-      moveRequest( dragging.collectionId, dragging.requestId, destCollectionId, destParentFolderId );
+    if ( dragging.type === 'folder' ) {
+      if ( dragging.collectionId === destCollectionId ) {
+        reorderChild( destCollectionId, { type: 'folder', id: dragging.folderId }, destParentFolderId, destIndex );
+      }
+      setDragging( null );
+      return;
     }
+    // Request(s): a multi-selection moves as a contiguous block at destIndex.
+    const reqs = draggedRequests();
+    reqs.forEach( ( r, i ) => {
+      if ( r.collectionId === destCollectionId ) {
+        reorderChild( destCollectionId, { type: 'request', id: r.requestId }, destParentFolderId, destIndex + i );
+      } else {
+        moveRequest( r.collectionId, r.requestId, destCollectionId, destParentFolderId );
+      }
+    } );
+    if ( reqs.length > 1 ) selectionCtx.clear();
     setDragging( null );
   }
 
@@ -538,8 +581,9 @@ function CollectionNode ( {
           } ${col.disabled ? 'opacity-50' : ''} ${dropOver ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
         role="button"
         tabIndex={0}
-        onClick={() => { onSelectCollection(); setExpanded( e => !e ); }}
-        onKeyDown={onActivateKey(() => { onSelectCollection(); setExpanded( e => !e ); })}
+        onClick={onSelectCollection}
+        onDoubleClick={e => { e.stopPropagation(); setRenaming( true ); }}
+        onKeyDown={onActivateKey( onSelectCollection )}
         onDragOver={dragCtx.dragging ? e => { e.preventDefault(); setDropOver( true ); } : undefined}
         onDragLeave={() => setDropOver( false )}
         onDrop={e => {
@@ -548,7 +592,13 @@ function CollectionNode ( {
           else dragCtx.onDropRequest( col.id, col.rootFolder.id );
         }}
       >
-        <span className="text-[22px] leading-none w-4 h-4 shrink-0 flex items-center justify-center">{expanded ? '▾' : '▸'}</span>
+        <button
+          type="button"
+          onClick={e => { e.stopPropagation(); setExpanded( e2 => !e2 ); }}
+          aria-expanded={expanded}
+          title={expanded ? t( 'Collapse' ) : t( 'Expand' )}
+          className="text-[22px] leading-none w-4 h-4 shrink-0 flex items-center justify-center text-surface-500 hover:text-[var(--text-primary)]"
+        >{expanded ? '▾' : '▸'}</button>
 
         <div className="flex-1 min-w-0">
           {renaming ? (
@@ -644,7 +694,7 @@ function FolderRow ( {
   expandCtrl, onRequestExpand,
   onAddRequest, onAddFolder,
   onRename, onDelete, onDuplicate, onToggleDisabled,
-  onUpdateTags, onRun,
+  onUpdateTags, onRun, siblingNames = [],
   children,
 }: {
   readonly folder: Folder
@@ -661,6 +711,9 @@ function FolderRow ( {
   readonly onToggleDisabled: () => void
   readonly onUpdateTags: ( tags: string[] ) => void
   readonly onRun: () => void
+  /** Names of the folders at this level (siblings, incl. this one) — used to
+   *  block a rename that would collide with a sibling. */
+  readonly siblingNames?: string[]
   readonly children: React.ReactNode
 } ) {
   const t = useT();
@@ -725,15 +778,22 @@ function FolderRow ( {
         style={{ paddingLeft: indent }}
         role="button"
         tabIndex={0}
-        onClick={() => { openFolderPanel( collectionId, folder.id ); setExpanded( e => !e ); }}
-        onKeyDown={onActivateKey(() => { openFolderPanel( collectionId, folder.id ); setExpanded( e => !e ); })}
+        onClick={() => openFolderPanel( collectionId, folder.id )}
+        onDoubleClick={e => { e.stopPropagation(); setRenaming( true ); }}
+        onKeyDown={onActivateKey(() => openFolderPanel( collectionId, folder.id ))}
         onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.stopPropagation(); dragCtx.setDragging( { type: 'folder', folderId: folder.id, collectionId } ); }}
         onDragEnd={() => { dragCtx.setDragging( null ); setDropInside( false ); }}
         onDragOver={handleFolderDragOver}
         onDragLeave={() => setDropInside( false )}
         onDrop={handleFolderDrop}
       >
-        <span className="text-[22px] leading-none w-4 h-4 shrink-0 flex items-center justify-center">{expanded ? '▾' : '▸'}</span>
+        <button
+          type="button"
+          onClick={e => { e.stopPropagation(); setExpanded( e2 => !e2 ); }}
+          aria-expanded={expanded}
+          title={expanded ? t( 'Collapse' ) : t( 'Expand' )}
+          className="text-[22px] leading-none w-4 h-4 shrink-0 flex items-center justify-center text-surface-500 hover:text-[var(--text-primary)]"
+        >{expanded ? '▾' : '▸'}</button>
         <FolderIcon className={`shrink-0 ${hasInheritedConfig ? 'text-blue-500' : 'text-amber-600'}`} />
 
         <div className="flex-1 min-w-0">
@@ -743,6 +803,8 @@ function FolderRow ( {
               onCommit={v => { onRename( v ); setRenaming( false ); }}
               onCancel={() => setRenaming( false )}
               className="w-full text-xs"
+              validate={v => siblingNames.filter( n => n !== folder.name ).includes( v.trim() )
+                ? t( '":name" already exists', { name: v.trim() } ) : null}
             />
           ) : (
             <span className="text-xs truncate flex items-center gap-1.5">
@@ -885,6 +947,7 @@ function FolderContents ( {
           depth={depth}
           expandCtrl={expandCtrl}
           onRequestExpand={onRequestExpand}
+          siblingNames={folder.folders.map( f => f.name )}
           onAddRequest={() => onAddRequest( sub.id )}
           onAddFolder={() => onAddFolder( sub.id, 'New Folder' )}
           onRename={name => onRenameFolder( sub.id, name )}

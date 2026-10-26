@@ -19,6 +19,25 @@ function parseHeaders(raw: any[]): KeyValuePair[] {
   }));
 }
 
+/**
+ * Collection-level variables (`collection.variable[]` in a v2.1 export) → our
+ * collection scope. Postman's `disabled: true` entries are kept in the parallel
+ * disabled map so a round-trip preserves them (and the toggle) rather than
+ * silently dropping them.
+ */
+function parseCollectionVariables(raw: any[]): { variables: Record<string, string>; disabled: Record<string, string> } {
+  const variables: Record<string, string> = {};
+  const disabled: Record<string, string> = {};
+  for (const v of raw ?? []) {
+    const key = typeof v?.key === 'string' ? v.key.trim() : '';
+    if (!key) continue;
+    const value = v.value == null ? '' : String(v.value);
+    if (v.disabled) disabled[key] = value;
+    else variables[key] = value;
+  }
+  return { variables, disabled };
+}
+
 function parseParams(urlObj: any): KeyValuePair[] {
   if (!urlObj || typeof urlObj === 'string') return [];
   return (urlObj.query ?? []).map((p: any) => ({
@@ -234,6 +253,8 @@ export async function importPostman(filePath: string): Promise<Collection> {
     }
   }
 
+  const { variables: collectionVariables, disabled: collectionVariablesDisabled } = parseCollectionVariables(data.variable);
+
   return {
     version: '1.0',
     id: uuidv4(),
@@ -241,5 +262,7 @@ export async function importPostman(filePath: string): Promise<Collection> {
     description: info.description ?? '',
     rootFolder,
     requests,
+    ...(Object.keys(collectionVariables).length ? { collectionVariables } : {}),
+    ...(Object.keys(collectionVariablesDisabled).length ? { collectionVariablesDisabled } : {}),
   };
 }

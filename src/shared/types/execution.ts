@@ -18,6 +18,8 @@ export interface ScriptExecutionMeta {
   updatedCollectionVars: Record<string, string>
   updatedGlobals: Record<string, string>
   updatedLocalVars: Record<string, string>
+  /** Folder-scope variables a script changed (sp.folder.set), as a delta. */
+  updatedFolderVars: Record<string, string>
   resolvedUrl: string
   preScriptError?: string
   postScriptError?: string
@@ -29,6 +31,10 @@ export interface SendRequestPayload {
   request: ApiRequest
   environment: Environment | null
   collectionVars: Record<string, string>
+  /** Folder-chain variables for this request (inner folder wins). A distinct
+   *  scope so they resolve at folder precedence — above the environment, below
+   *  request/local — instead of being folded into collectionVars. */
+  folderVars?: Record<string, string>
   globals: Record<string, string>
   /** A single data-table row to inject as local variables for this send, so an
    *  individual request can be run against one specific row. Values may contain

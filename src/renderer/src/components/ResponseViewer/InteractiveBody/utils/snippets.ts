@@ -57,9 +57,17 @@ export function makeXmlSnippet(
   }
 }
 
-// ─── Extract snippets (variable / environment) ────────────────────────────────
+// ─── Extract snippets ──────────────────────────────────────────────────────────
 
-export function makeJsonExtractSnippet(path: JsonPath, target: 'variables' | 'environment'): string {
+/**
+ * Scope a response value can be extracted into, named exactly as the `sp.*`
+ * accessor. `environment`, `collectionVariables`, `folder` and `globals` persist
+ * for the session (available to the next request); `variables` (local) is
+ * request-scoped and does NOT carry over — so the menu labels it accordingly.
+ */
+export type ExtractTarget = 'variables' | 'environment' | 'collectionVariables' | 'folder' | 'globals';
+
+export function makeJsonExtractSnippet(path: JsonPath, target: ExtractTarget): string {
   const acc     = jsonAccessor(path);
   const varName = varNameFromPath(path);
   return `sp.${target}.set("${varName}", String(${acc}));`;
@@ -69,13 +77,13 @@ export function makeJsonPathExtractSnippet(
   path: JsonPath,
   filterKey: string,
   filterValue: string,
-  target: 'variables' | 'environment',
+  target: ExtractTarget,
 ): string {
   const expr    = toJsonPathExpr(path, filterKey, filterValue);
   const varName = varNameFromPath(path);
   return `const matches = sp.jsonPath(json, '${expr}');\nsp.${target}.set("${varName}", String(matches[0] ?? ''));`;
 }
 
-export function makeXmlExtractSnippet(selector: string, target: 'variables' | 'environment'): string {
+export function makeXmlExtractSnippet(selector: string, target: ExtractTarget): string {
   return `sp.${target}.set("extracted_value", sp.response.xmlText("${selector.replaceAll('"', '\\"')}") ?? '');`;
 }

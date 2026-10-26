@@ -12,6 +12,7 @@ import {
   makeJsonExtractSnippet,
   makeJsonPathExtractSnippet,
   makeXmlExtractSnippet,
+  type ExtractTarget,
 } from './utils/snippets';
 
 interface Props {
@@ -47,6 +48,17 @@ export function AssertMenu({ state, onClose, onConfirm }: Props) {
   let options: { label: string; snippet: string }[] = [];
   let jpSiblingKeys: string[] = [];
   let jpAvailable = false;
+
+  // Extract targets, ordered so the scopes that persist for the session (and so
+  // are usable in the NEXT request) come first; the request-scoped `variables`
+  // is last and labelled to make clear it does not carry over.
+  const extractScopes: { label: string; target: ExtractTarget }[] = [
+    { label: t('Save to environment'),                  target: 'environment'         },
+    { label: t('Save to collection variable'),          target: 'collectionVariables' },
+    { label: t('Save to folder variable'),              target: 'folder'              },
+    { label: t('Save to global variable'),              target: 'globals'             },
+    { label: t('Save to variable (this request only)'), target: 'variables'           },
+  ];
 
   if (state.type === 'json') {
     const { path, value, root } = state;
@@ -165,17 +177,19 @@ export function AssertMenu({ state, onClose, onConfirm }: Props) {
                 </button>
                 <button
                   disabled={!filterKey || !filterVal}
-                  onClick={() => { onConfirm(makeJsonPathExtractSnippet(state.path, filterKey, filterVal, 'variables')); onClose(); }}
-                  className="text-xs px-2 py-1 bg-surface-700 hover:bg-surface-600 disabled:opacity-40 rounded transition-colors"
-                >
-                  {t('→ variable')}
-                </button>
-                <button
-                  disabled={!filterKey || !filterVal}
                   onClick={() => { onConfirm(makeJsonPathExtractSnippet(state.path, filterKey, filterVal, 'environment')); onClose(); }}
+                  title={t('Save to environment')}
                   className="text-xs px-2 py-1 bg-surface-700 hover:bg-surface-600 disabled:opacity-40 rounded transition-colors"
                 >
                   {t('→ env')}
+                </button>
+                <button
+                  disabled={!filterKey || !filterVal}
+                  onClick={() => { onConfirm(makeJsonPathExtractSnippet(state.path, filterKey, filterVal, 'collectionVariables')); onClose(); }}
+                  title={t('Save to collection variable')}
+                  className="text-xs px-2 py-1 bg-surface-700 hover:bg-surface-600 disabled:opacity-40 rounded transition-colors"
+                >
+                  {t('→ coll')}
                 </button>
               </div>
             </div>
@@ -186,37 +200,21 @@ export function AssertMenu({ state, onClose, onConfirm }: Props) {
       {/* ── Extract section ── */}
       <div className="mt-1 border-t border-surface-800 pt-1">
         <div className="text-[10px] text-surface-500 uppercase tracking-wider px-2 py-1">{t('Extract')}</div>
-        {state.type === 'json' ? (
-          <>
-            <button
-              onClick={() => { onConfirm(makeJsonExtractSnippet(state.path, 'variables')); onClose(); }}
-              className="w-full text-left text-xs text-surface-300 hover:text-white hover:bg-surface-800 rounded px-2 py-1.5 transition-colors"
-            >
-              {t('Save to variable')}
-            </button>
-            <button
-              onClick={() => { onConfirm(makeJsonExtractSnippet(state.path, 'environment')); onClose(); }}
-              className="w-full text-left text-xs text-surface-300 hover:text-white hover:bg-surface-800 rounded px-2 py-1.5 transition-colors"
-            >
-              {t('Save to environment')}
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              onClick={() => { onConfirm(makeXmlExtractSnippet(state.selector, 'variables')); onClose(); }}
-              className="w-full text-left text-xs text-surface-300 hover:text-white hover:bg-surface-800 rounded px-2 py-1.5 transition-colors"
-            >
-              {t('Save to variable')}
-            </button>
-            <button
-              onClick={() => { onConfirm(makeXmlExtractSnippet(state.selector, 'environment')); onClose(); }}
-              className="w-full text-left text-xs text-surface-300 hover:text-white hover:bg-surface-800 rounded px-2 py-1.5 transition-colors"
-            >
-              {t('Save to environment')}
-            </button>
-          </>
-        )}
+        {extractScopes.map(scope => (
+          <button
+            key={scope.target}
+            onClick={() => {
+              const snippet = state.type === 'json'
+                ? makeJsonExtractSnippet(state.path, scope.target)
+                : makeXmlExtractSnippet(state.selector, scope.target);
+              onConfirm(snippet);
+              onClose();
+            }}
+            className="w-full text-left text-xs text-surface-300 hover:text-white hover:bg-surface-800 rounded px-2 py-1.5 transition-colors"
+          >
+            {scope.label}
+          </button>
+        ))}
       </div>
     </div>
   );

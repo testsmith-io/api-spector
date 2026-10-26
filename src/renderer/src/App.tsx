@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { ApiRequest } from '../../shared/types';
+import { findFolder } from '../../shared/folder-tree';
 import { useStore } from './store';
 import { useAutoSave } from './hooks/useAutoSave';
 import { useWorkspaceLoader } from './hooks/useWorkspaceLoader';
@@ -172,6 +173,7 @@ const TAB_METHOD_COLORS: Record<string, string> = {
 // React.memo's shallow comparison catches no-op renders.
 interface TabRowProps {
   readonly tabId: string
+  readonly kind?: 'request' | 'folder' | 'collection'
   readonly method?: string
   readonly name: string
   readonly isActive: boolean
@@ -181,7 +183,7 @@ interface TabRowProps {
 }
 
 const TabRow = React.memo( function TabRow ( {
-  tabId, method, name, isActive, onActivate, onClose, onContextMenu,
+  tabId, kind = 'request', method, name, isActive, onActivate, onClose, onContextMenu,
 }: TabRowProps ) {
   const t = useT();
   return (
@@ -199,11 +201,15 @@ const TabRow = React.memo( function TabRow ( {
         : 'hover:bg-surface-900/50 text-surface-600'
         }`}
     >
-      {method && (
+      {kind === 'folder' ? (
+        <svg className="w-3 h-3 shrink-0 text-amber-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M2 5a2 2 0 012-2h3.5l2 2H16a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V5z"/></svg>
+      ) : kind === 'collection' ? (
+        <svg className="w-3 h-3 shrink-0 text-blue-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4h14v2.5H3V4zm0 4.75h14v2.5H3v-2.5zM3 13.5h14V16H3v-2.5z"/></svg>
+      ) : method ? (
         <span className={`text-[10px] font-bold shrink-0 ${TAB_METHOD_COLORS[method] ?? 'text-gray-400'}`}>
           {method}
         </span>
-      )}
+      ) : null}
       <span className={`text-xs truncate ${isActive ? 'text-white' : ''}`}>
         {name}
       </span>
@@ -476,6 +482,10 @@ export default function App () {
       params:  o.params  ?? [],
       headers: o.headers ?? [],
       body:    o.body    ?? { mode: 'none' },
+      // Variables are the exception to "replace": an example's own variables
+      // override the request's, but inherit the ones it doesn't define, so an
+      // example can hold its own values without losing the request's others.
+      variables: { ...activeBaseRequest.variables, ...(o.variables ?? {}) },
     };
   }, [activeBaseRequest, activeTab?.exampleId] );
 
@@ -684,14 +694,27 @@ export default function App () {
               <div className="flex items-center border-b border-surface-800 bg-surface-950 flex-shrink-0">
                 <div className="flex items-center overflow-x-auto flex-1 min-w-0">
                   {tabs.map( tab => {
-                    const req = tab.requestId ? requestsById.get( tab.requestId ) ?? null : null;
-                    const exampleName = tab.exampleId ? req?.examples?.find( e => e.id === tab.exampleId )?.name : null;
+                    const kind = tab.kind ?? 'request';
+                    let name: string;
+                    let method: string | undefined;
+                    if ( kind === 'collection' ) {
+                      name = ( tab.collectionId ? collections[tab.collectionId]?.data.name : null ) ?? t( 'Collection' );
+                    } else if ( kind === 'folder' ) {
+                      const root = tab.collectionId ? collections[tab.collectionId]?.data.rootFolder : undefined;
+                      name = ( root && tab.folderId ? findFolder( root, tab.folderId )?.name : null ) ?? t( 'Folder' );
+                    } else {
+                      const req = tab.requestId ? requestsById.get( tab.requestId ) ?? null : null;
+                      const exampleName = tab.exampleId ? req?.examples?.find( e => e.id === tab.exampleId )?.name : null;
+                      method = req?.method;
+                      name = exampleName ? `${req?.name ?? t( 'Untitled' )} · ${exampleName}` : ( req?.name ?? t( 'Untitled' ) );
+                    }
                     return (
                       <TabRow
                         key={tab.id}
                         tabId={tab.id}
-                        method={req?.method}
-                        name={exampleName ? `${req?.name ?? t( 'Untitled' )} · ${exampleName}` : ( req?.name ?? t( 'Untitled' ) )}
+                        kind={kind}
+                        method={method}
+                        name={name}
                         isActive={tab.id === activeTabId}
                         onActivate={setActiveTabId}
                         onClose={closeTab}
@@ -885,6 +908,10 @@ export default function App () {
                     </ErrorBoundary>
                   </div>
                 )}
+              </div>
+            ) : tabs.length === 0 ? (
+              <div className="flex-1 min-h-0 flex items-center justify-center p-6 text-center text-surface-600 text-sm">
+                {t( 'No tabs open. Select a request, folder, or collection from the sidebar.' )}
               </div>
             ) : (
               <div className="flex-1 min-h-0">

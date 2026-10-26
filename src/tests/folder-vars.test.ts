@@ -49,6 +49,38 @@ describe('sp.folder in the sandbox', () => {
   });
 });
 
+describe('sp.request in the sandbox (run-only)', () => {
+  it('sets a request variable (applied this run via the local tier)', async () => {
+    const r = await runScript('sp.request.set("token", "abc")', {
+      envVars: {}, collectionVars: {}, globals: {}, localVars: {},
+    });
+    expect(r.error).toBeUndefined();
+    expect(r.updatedLocalVars.token).toBe('abc');
+  });
+
+  it('reads a request variable', async () => {
+    const r = await runScript('sp.variables.set("out", sp.request.get("token"))', {
+      envVars: {}, collectionVars: {}, globals: {}, localVars: { token: 'xyz' },
+    });
+    expect(r.updatedLocalVars.out).toBe('xyz');
+  });
+});
+
+describe('sp scopes available to scripts', () => {
+  it('exposes request, folder, collection, environment and global setters', async () => {
+    const r = await runScript(
+      'sp.request.set("a","1"); sp.folder.set("b","2"); sp.collectionVariables.set("c","3"); sp.environment.set("d","4"); sp.globals.set("e","5")',
+      { envVars: {}, collectionVars: {}, globals: {}, localVars: {}, folderVars: {} },
+    );
+    expect(r.error).toBeUndefined();
+    expect(r.updatedLocalVars.a).toBe('1');       // request (local tier)
+    expect(r.updatedFolderVars.b).toBe('2');      // folder
+    expect(r.updatedCollectionVars.c).toBe('3');  // collection
+    expect(r.updatedEnvVars.d).toBe('4');         // environment
+    expect(r.updatedGlobals.e).toBe('5');         // global
+  });
+});
+
 describe('mergeVars folder precedence', () => {
   it('folder overrides collection', () => {
     const vars = mergeVars({}, { k: 'collection' }, {}, {}, {}, { k: 'folder' });

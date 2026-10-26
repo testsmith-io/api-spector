@@ -3,9 +3,12 @@
 
 import { describe, it, expect } from 'vitest';
 import { join } from 'node:path';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { importInsomnia } from '../main/importers/insomnia';
 import { importBruno } from '../main/importers/bruno';
 import { parseBruFile } from '../main/importers/bruno';
+import { importPostman } from '../main/importers/postman';
 
 const FIXTURES = join(import.meta.dirname, 'fixtures');
 
@@ -272,5 +275,95 @@ describe('importBruno', () => {
 
   it('throws on a non-existent file', async () => {
     await expect(importBruno('/nonexistent/bruno.json')).rejects.toThrow();
+  });
+});
+
+// ─── Variable import alignment (collection / folder / request scopes) ──────────
+
+describe('importer variable scopes', () => {
+  it('Bruno: vars:pre-request on a request → request variables (~ = disabled)', () => {
+    const req = parseBruFile(`
+meta {
+  name: Get
+  type: http
+  seq: 1
+}
+
+get {
+  url: https://x/{{petId}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  petId: 42
+  ~draft: true
+}
+`, 'get.bru');
+    expect(req.variables).toEqual({ petId: '42' });
+    expect(req.variablesDisabled).toEqual({ draft: 'true' });
+  });
+
+  it('Bruno: folder.bru and collection.bru vars → folder and collection scopes', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bruno-'));
+    try {
+      writeFileSync(join(dir, 'bruno.json'), JSON.stringify({ name: 'Shop', version: '1' }));
+      writeFileSync(join(dir, 'collection.bru'), 'vars:pre-request {\n  baseUrl: https://api\n}\n');
+      mkdirSync(join(dir, 'pets'));
+      writeFileSync(join(dir, 'pets', 'folder.bru'), 'meta {\n  name: Pets\n}\n\nvars:pre-request {\n  species: dog\n}\n');
+      writeFileSync(join(dir, 'pets', 'list.bru'), 'meta {\n  name: List\n  type: http\n  seq: 1\n}\n\nget {\n  url: https://api/pets\n  body: none\n  auth: none\n}\n');
+
+      const col = await importBruno(join(dir, 'bruno.json'));
+      expect(col.collectionVariables).toEqual({ baseUrl: 'https://api' });
+      const pets = col.rootFolder.folders.find(f => f.name === 'Pets');
+      expect(pets?.variables).toEqual({ species: 'dog' });
+      // folder.bru / collection.bru must not become requests
+      expect(Object.values(col.requests).map(r => r.name)).toEqual(['List']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('Postman: collection variable[] → collectionVariables (disabled kept separately)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pm-'));
+    try {
+      const file = join(dir, 'c.json');
+      writeFileSync(file, JSON.stringify({
+        info: { name: 'C', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
+        item: [],
+        variable: [
+          { key: 'baseUrl', value: 'https://api', type: 'string' },
+          { key: 'token', value: 'secret' },
+          { key: 'legacy', value: 'x', disabled: true },
+        ],
+      }));
+      const col = await importPostman(file);
+      expect(col.collectionVariables).toEqual({ baseUrl: 'https://api', token: 'secret' });
+      expect(col.collectionVariablesDisabled).toEqual({ legacy: 'x' });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('Insomnia: base environment → collectionVariables; request_group.environment → folder variables', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'inso-'));
+    try {
+      const file = join(dir, 'i.json');
+      writeFileSync(file, JSON.stringify({
+        _type: 'export', __export_format: 4,
+        resources: [
+          { _type: 'workspace', _id: 'wrk_1', name: 'WS' },
+          { _type: 'environment', _id: 'env_base', parentId: 'wrk_1', data: { baseUrl: 'https://api', retries: 3 } },
+          { _type: 'request_group', _id: 'grp_1', parentId: 'wrk_1', name: 'Pets', environment: { species: 'dog' } },
+          { _type: 'request', _id: 'req_1', parentId: 'grp_1', name: 'List', method: 'GET', url: '{{ baseUrl }}/pets' },
+        ],
+      }));
+      const col = await importInsomnia(file);
+      expect(col.collectionVariables).toEqual({ baseUrl: 'https://api', retries: '3' });
+      const pets = col.rootFolder.folders.find(f => f.name === 'Pets');
+      expect(pets?.variables).toEqual({ species: 'dog' });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

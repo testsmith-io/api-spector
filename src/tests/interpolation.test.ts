@@ -189,12 +189,17 @@ describe('mergeVars', () => {
     expect(result.key).toBe('local');
   });
 
-  it('env vars override collection and globals', () => {
+  it('collection vars override environment and globals', () => {
     const result = mergeVars({ key: 'env' }, { key: 'col' }, { key: 'glob' });
-    expect(result.key).toBe('env');
+    expect(result.key).toBe('col');
   });
 
-  it('resolves the full precedence chain low->high: dynamic < global < collection < env < folder < local', () => {
+  it('environment vars override globals but lose to collection', () => {
+    expect(mergeVars({ key: 'env' }, {}, { key: 'glob' }).key).toBe('env');
+    expect(mergeVars({ key: 'env' }, { key: 'col' }, {}).key).toBe('col');
+  });
+
+  it('resolves the full precedence chain low->high: dynamic < global < env < collection < folder < local', () => {
     const dynamic = { k: 'dynamic' };
     const globals = { k: 'global' };
     const collection = { k: 'collection' };
@@ -203,8 +208,8 @@ describe('mergeVars', () => {
     const local = { k: 'local' };
     // mergeVars(env, collection, globals, local, dynamic, folder)
     expect(mergeVars({}, {}, globals, {}, dynamic).k).toBe('global');
-    expect(mergeVars({}, collection, globals, {}, dynamic).k).toBe('collection');
-    expect(mergeVars(env, collection, globals, {}, dynamic).k).toBe('env');
+    expect(mergeVars(env, {}, globals, {}, dynamic).k).toBe('env');
+    expect(mergeVars(env, collection, globals, {}, dynamic).k).toBe('collection');
     expect(mergeVars(env, collection, globals, {}, dynamic, folder).k).toBe('folder');
     expect(mergeVars(env, collection, globals, local, dynamic, folder).k).toBe('local');
   });

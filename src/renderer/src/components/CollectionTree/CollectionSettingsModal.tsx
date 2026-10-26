@@ -60,7 +60,7 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
       panelClassName="w-[600px] bg-surface-900 border border-surface-800 rounded-lg shadow-2xl flex flex-col max-h-[80vh]"
     >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-surface-800 shrink-0">
+        <div data-modal-drag className="flex items-center justify-between px-4 py-2.5 border-b border-surface-800 shrink-0 cursor-move select-none">
           <div>
             <h2 className="text-sm font-semibold">{t('Collection settings')}</h2>
             <p className="text-[10px] text-surface-600 mt-0.5">{t(':name - auth and headers inherited by all requests in this collection', { name: collection.name })}</p>

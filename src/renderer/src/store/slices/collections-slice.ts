@@ -29,7 +29,7 @@ import {
   removeFromFolder,
   sortChildOrder,
 } from '../../../../shared/folder-tree';
-import { makeTab, protocolFor } from './tabs-slice';
+import { makeTab, protocolFor, syncPanelsToActiveTab } from './tabs-slice';
 import { generateSecurityTests } from '../../../../shared/security-tests';
 import type { FullState } from '../index';
 
@@ -47,6 +47,22 @@ function makeRequest(override: Partial<ApiRequest> = {}): ApiRequest {
     body: { mode: 'none' },
     ...override,
   };
+}
+
+/**
+ * A folder name unique among its siblings. If `desired` is free it is returned
+ * as-is; otherwise " 2", " 3", … is appended until free. `exclude` is the id of
+ * a folder to ignore (the one being renamed/moved), so it doesn't clash with
+ * itself. Used so create / duplicate / move never produce two folders with the
+ * same name at the same level.
+ */
+function uniqueFolderName(parent: Folder, desired: string, exclude?: string): string {
+  const taken = new Set(parent.folders.filter(f => f.id !== exclude).map(f => f.name));
+  if (!taken.has(desired)) return desired;
+  for (let i = 2; ; i++) {
+    const candidate = `${desired} ${i}`;
+    if (!taken.has(candidate)) return candidate;
+  }
 }
 
 function makeCollection(name: string): Collection {
@@ -156,7 +172,7 @@ export interface CollectionsSliceActions {
   updateCollectionTls: (id: string, tls: TlsSettings | undefined) => void
   updateCollectionAuthAndHeaders: (id: string, auth: AuthConfig, headers: KeyValuePair[]) => void
   updateCollectionDescription: (id: string, description: string) => void
-  updateCollectionVariables: (id: string, variables: Record<string, string>) => void
+  updateCollectionVariables: (id: string, variables: Record<string, string>, disabled?: Record<string, string>) => void
 }
 
 export type CollectionsSlice = CollectionsSliceState & CollectionsSliceActions
@@ -344,13 +360,14 @@ export const createCollectionsSlice: StateCreator<
       if (s.workspace && relPath) {
         s.workspace.collections = s.workspace.collections.filter(p => p !== relPath);
       }
-      // Close any tabs belonging to this collection
+      // Close any tabs belonging to this collection (requests, folder, data)
       s.tabs = s.tabs.filter(t => t.collectionId !== id);
       if (s.activeCollectionId === id) {
         s.activeCollectionId = Object.keys(s.collections)[0] ?? null;
         const hasActiveTab = s.tabs.some(t => t.id === s.activeTabId);
         if (!hasActiveTab) s.activeTabId = s.tabs[0]?.id ?? null;
       }
+      syncPanelsToActiveTab(s);
     });
   },
 
@@ -372,9 +389,10 @@ export const createCollectionsSlice: StateCreator<
     s.collections[id].dirty = true;
   }),
 
-  updateCollectionVariables: (id, variables) => set(s => {
+  updateCollectionVariables: (id, variables, disabled) => set(s => {
     if (!s.collections[id]) return;
     s.collections[id].data.collectionVariables = variables;
+    s.collections[id].data.collectionVariablesDisabled = disabled;
     s.collections[id].dirty = true;
   }),
 
@@ -391,7 +409,7 @@ export const createCollectionsSlice: StateCreator<
     if (!col) return;
     const parent = findFolder(col.rootFolder, parentFolderId);
     if (!parent) return;
-    parent.folders.push({ id: uuidv4(), name, description: '', folders: [], requestIds: [] });
+    parent.folders.push({ id: uuidv4(), name: uniqueFolderName(parent, name), description: '', folders: [], requestIds: [] });
     s.collections[collectionId].dirty = true;
   }),
 
@@ -399,7 +417,13 @@ export const createCollectionsSlice: StateCreator<
     const col = s.collections[collectionId]?.data;
     if (!col) return;
     const folder = findFolder(col.rootFolder, folderId);
-    if (folder) { folder.name = name; s.collections[collectionId].dirty = true; }
+    if (!folder) return;
+    // Reject a rename that would collide with a sibling folder (the inline
+    // editor blocks this too; this guards any other caller).
+    const parent = findFolderParent(col.rootFolder, folderId) ?? col.rootFolder;
+    if (parent.folders.some(f => f.id !== folderId && f.name === name)) return;
+    folder.name = name;
+    s.collections[collectionId].dirty = true;
   }),
 
   duplicateFolder: (collectionId, folderId) => set(s => {
@@ -414,10 +438,9 @@ export const createCollectionsSlice: StateCreator<
       col.requests[newId] = { ...JSON.parse(JSON.stringify(col.requests[oldId])), id: newId };
       return newId;
     });
-    copy.name = orig.name + ' (copy)';
-
-    // Insert after the original in its parent
+    // Insert after the original in its parent, with a name unique among siblings.
     const parent = findFolderParent(col.rootFolder, folderId) ?? col.rootFolder;
+    copy.name = uniqueFolderName(parent, orig.name + ' (copy)');
     const idx = parent.folders.findIndex(f => f.id === folderId);
     parent.folders.splice(idx + 1, 0, copy);
     s.collections[collectionId].dirty = true;
@@ -427,11 +450,24 @@ export const createCollectionsSlice: StateCreator<
     const col = s.collections[collectionId]?.data;
     if (!col) return;
     const folder = findFolder(col.rootFolder, folderId);
+    const removedRequests = new Set<string>();
+    const removedFolders = new Set<string>();
     if (folder) {
-      collectRequestIds(folder).forEach(rid => delete col.requests[rid]);
+      collectRequestIds(folder).forEach(rid => { removedRequests.add(rid); delete col.requests[rid]; });
+      const collect = (f: Folder) => { removedFolders.add(f.id); f.folders.forEach(collect); };
+      collect(folder);
     }
     removeFolderById(col.rootFolder, folderId);
     s.collections[collectionId].dirty = true;
+    // Close any open tabs for the deleted folder(s) or the requests inside them.
+    s.tabs = s.tabs.filter(t => !(
+      (t.requestId && removedRequests.has(t.requestId)) ||
+      (t.kind === 'folder' && t.folderId && removedFolders.has(t.folderId))
+    ));
+    if (!s.tabs.some(t => t.id === s.activeTabId)) {
+      s.activeTabId = s.tabs[s.tabs.length - 1]?.id ?? null;
+    }
+    syncPanelsToActiveTab(s);
   }),
 
   // ── Request CRUD ────────────────────────────────────────────────────────────
@@ -448,6 +484,7 @@ export const createCollectionsSlice: StateCreator<
       const tab = makeTab(req.id, collectionId, { defaultTab: s.workspace?.settings?.defaultRequestTab });
       s.tabs.push(tab);
       s.activeTabId = tab.id;
+      syncPanelsToActiveTab(s);
     });
     return req.id;
   },
@@ -593,13 +630,10 @@ export const createCollectionsSlice: StateCreator<
   }),
 
   openExample: (requestId, collectionId, exampleId) => set(s => {
-    // Showing an example supersedes the collection / folder data panels, which
-    // otherwise take precedence in the main area and keep the example hidden
-    // (the reason an example only appeared after its parent request was opened).
-    s.collectionPanelOpen = false;
-    s.folderPanel = null;
+    // Showing an example supersedes the collection / folder data panels — the
+    // active tab (a request/example tab) drives this via syncPanelsToActiveTab.
     const existing = s.tabs.find(t => t.requestId === requestId && t.exampleId === exampleId);
-    if (existing) { s.activeTabId = existing.id; s.activeCollectionId = collectionId; return; }
+    if (existing) { s.activeTabId = existing.id; s.activeCollectionId = collectionId; syncPanelsToActiveTab(s); return; }
     const ex = Object.values(s.collections).find(c => c.data.requests[requestId])
       ?.data.requests[requestId].examples?.find(e => e.id === exampleId);
     const tab = makeTab(requestId, collectionId, { protocol: protocolFor(s, requestId), exampleId });
@@ -607,6 +641,7 @@ export const createCollectionsSlice: StateCreator<
     s.tabs.push(tab);
     s.activeTabId = tab.id;
     s.activeCollectionId = collectionId;
+    syncPanelsToActiveTab(s);
   }),
 
   renameRequest: (id, name) => set(s => {
@@ -629,7 +664,7 @@ export const createCollectionsSlice: StateCreator<
       if (wasActive) {
         const next = s.tabs[tabIdx] ?? s.tabs[tabIdx - 1] ?? null;
         s.activeTabId = next?.id ?? null;
-        s.activeCollectionId = next?.collectionId ?? null;
+        syncPanelsToActiveTab(s);
       }
     }
     s.collections[collectionId].dirty = true;
@@ -652,6 +687,7 @@ export const createCollectionsSlice: StateCreator<
     const tab = makeTab(copy.id, collectionId, { protocol: copy.protocol, defaultTab: s.workspace?.settings?.defaultRequestTab });
     s.tabs.push(tab);
     s.activeTabId = tab.id;
+    syncPanelsToActiveTab(s);
   }),
 
   addSecurityTests: (collectionId, requestId) => {
@@ -729,9 +765,11 @@ export const createCollectionsSlice: StateCreator<
     // Remove from source
     srcParent.folders.splice(srcIdx, 1);
 
-    // Insert into destination
+    // Insert into destination. When moving to a different parent, make sure the
+    // name stays unique among the destination's folders.
     const destParent = findFolder(col.rootFolder, destParentFolderId);
     if (!destParent) return;
+    if (destParent.id !== srcParent.id) folder.name = uniqueFolderName(destParent, folder.name, folder.id);
     if (destIndex !== undefined) {
       let adjusted = destIndex;
       if (srcParent.id === destParent.id && srcIdx < destIndex) adjusted--;
@@ -761,6 +799,8 @@ export const createCollectionsSlice: StateCreator<
       const srcParent = findFolderParent(col.rootFolder, ref.id) ?? col.rootFolder;
       const srcIdx    = srcParent.folders.findIndex(f => f.id === ref.id);
       if (srcIdx >= 0) srcParent.folders.splice(srcIdx, 1);
+      // Keep the name unique when landing under a different parent.
+      if (destParent.id !== srcParent.id) moving.name = uniqueFolderName(destParent, moving.name, moving.id);
       if (!destParent.folders.some(f => f.id === ref.id)) destParent.folders.push(moving);
     }
 

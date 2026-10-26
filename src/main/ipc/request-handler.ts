@@ -15,7 +15,7 @@ import type {
 } from '../../shared/types';
 import { interpolate, buildUrl, buildEnvVars, mergeVars, buildDynamicVars, resolveDataRow } from '../interpolation';
 import { runScript } from '../script-runner';
-import { getGlobals, patchGlobals, persistGlobals } from '../globals-store';
+import { getGlobals } from '../globals-store';
 import { buildProxyUri } from '../proxy-utils';
 import { validateSendRequestPayload } from './ipc-validate';
 import {
@@ -37,6 +37,16 @@ export {
   buildSchemaTestResults,
   buildProtocolFaultTests,
 } from '../request-exec';
+
+// Only the entries a script actually changed (new or different) relative to the
+// inputs it was given. Returned to the renderer so it persists just those — not
+// the echoed inputs, which would otherwise write the sent session/request vars
+// back into the collection/environment and overwrite their stored values.
+function scopeDelta(base: Record<string, string>, updated: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(updated)) if (base[k] !== v) out[k] = v;
+  return out;
+}
 
 // ─── Error diagnostics ────────────────────────────────────────────────────────
 
@@ -154,6 +164,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
       request: req,
       environment,
       collectionVars,
+      folderVars = {},
       globals: payloadGlobals,
       proxy,
       tls,
@@ -212,7 +223,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
     // A chosen data-table row (running one request against a specific row) is
     // injected as local vars, resolving any {{vars}} / faker in its cells first.
     if (dataRow && Object.keys(dataRow).length > 0) {
-      localVars = resolveDataRow(dataRow, mergeVars(envVars, collectionVars, mergedGlobals, {}, dynamicVars));
+      localVars = resolveDataRow(dataRow, mergeVars(envVars, collectionVars, mergedGlobals, {}, dynamicVars, folderVars));
     }
 
     // Request-scoped variables (the most specific static scope): fold in as the
@@ -222,20 +233,28 @@ export function registerRequestHandler(ipc: IpcMain): void {
       localVars = { ...req.variables, ...localVars };
     }
 
+    // Baseline of the local vars we SEED (request-scoped + data-row). Anything a
+    // script leaves unchanged from this is not a script-set value, so it must not
+    // be persisted back into the session (which would leak a request/data value
+    // across requests and, via the session, into the collection screen).
+    const seededLocalVars = { ...localVars };
+
     // Merge for pre-script
-    let vars = mergeVars(envVars, collectionVars, mergedGlobals, localVars, dynamicVars);
+    let vars = mergeVars(envVars, collectionVars, mergedGlobals, localVars, dynamicVars, folderVars);
 
     // ── Pre-request script ────────────────────────────────────────────────────
     let preScriptMeta: { error?: string; consoleOutput: string[] } = { consoleOutput: [] };
     let updatedCollectionVars = { ...collectionVars };
     let updatedEnvVars        = { ...envVars };
     let updatedGlobals        = { ...mergedGlobals };
+    let updatedFolderVars     = { ...folderVars };
 
     if (req.preRequestScript?.trim()) {
       const result = await runScript(interpolate(req.preRequestScript, vars), {
         envVars:        { ...envVars },
         collectionVars: { ...collectionVars },
         globals:        { ...mergedGlobals },
+        folderVars:     { ...folderVars },
         // Seed the script's local scope with the already-resolved local vars
         // (request-scoped variables + any data-row) so they survive the script
         // run — otherwise updatedLocalVars below would overwrite them with {} and
@@ -247,11 +266,11 @@ export function registerRequestHandler(ipc: IpcMain): void {
       updatedEnvVars        = result.updatedEnvVars;
       updatedCollectionVars = result.updatedCollectionVars;
       updatedGlobals        = result.updatedGlobals;
+      updatedFolderVars     = result.updatedFolderVars;
 
-      patchGlobals(result.updatedGlobals);
-      await persistGlobals();
-
-      vars = mergeVars(updatedEnvVars, updatedCollectionVars, updatedGlobals, localVars, dynamicVars);
+      // Run-only: a script's sp.globals.set applies for this send (threaded via
+      // `updatedGlobals` into mergeVars below) but is not persisted to globals.json.
+      vars = mergeVars(updatedEnvVars, updatedCollectionVars, updatedGlobals, localVars, dynamicVars, updatedFolderVars);
     }
 
     // ── Build & send HTTP request ─────────────────────────────────────────────
@@ -398,6 +417,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
         envVars:        { ...updatedEnvVars },
         collectionVars: { ...updatedCollectionVars },
         globals:        { ...updatedGlobals },
+        folderVars:     { ...updatedFolderVars },
         localVars:      { ...localVars },
         // Pass the *unmasked* response so the script can extract real values
         // (tokens, ids, …). The displayed `response` keeps the redacted copy.
@@ -409,10 +429,9 @@ export function registerRequestHandler(ipc: IpcMain): void {
       updatedEnvVars        = result.updatedEnvVars;
       updatedCollectionVars = result.updatedCollectionVars;
       updatedGlobals        = result.updatedGlobals;
+      updatedFolderVars     = result.updatedFolderVars;
       localVars             = result.updatedLocalVars;
-
-      patchGlobals(result.updatedGlobals);
-      await persistGlobals();
+      // Run-only: script variable writes (globals included) are not persisted.
     }
 
     // If the HTTP response was a 4xx/5xx and the user has NO tests at all,
@@ -435,10 +454,14 @@ export function registerRequestHandler(ipc: IpcMain): void {
     const scriptResult: ScriptExecutionMeta = {
       testResults:          combinedTestResults,
       consoleOutput:        [...decryptionWarnings, ...preScriptMeta.consoleOutput, ...postConsole],
-      updatedEnvVars,
-      updatedCollectionVars,
-      updatedGlobals,
-      updatedLocalVars:     localVars,
+      // Persist only what the scripts actually changed, so echoed inputs (the
+      // sent session/collection vars, the seeded request/data vars) don't get
+      // written back and overwrite stored values.
+      updatedEnvVars:        scopeDelta(envVars, updatedEnvVars),
+      updatedCollectionVars: scopeDelta(collectionVars, updatedCollectionVars),
+      updatedGlobals:        scopeDelta(mergedGlobals, updatedGlobals),
+      updatedLocalVars:      scopeDelta(seededLocalVars, localVars),
+      updatedFolderVars:     scopeDelta(folderVars, updatedFolderVars),
       resolvedUrl,
       preScriptError:  preScriptMeta.error,
       postScriptError: postError,
@@ -461,8 +484,8 @@ export function registerRequestHandler(ipc: IpcMain): void {
   ) => {
     const { script, envVars, collectionVars, globals } = payload;
     const result = await runScript(script, { envVars, collectionVars, globals, localVars: {} });
-    patchGlobals(result.updatedGlobals);
-    await persistGlobals();
+    // Run-only: the hook's script writes are returned to the caller for in-run
+    // threading, not persisted to globals.json.
     return {
       updatedEnvVars:        result.updatedEnvVars,
       updatedCollectionVars: result.updatedCollectionVars,

@@ -25,7 +25,7 @@ export function useVarNames(): string[] {
   const activeCollectionId  = useStore(s => s.activeCollectionId);
   const collections         = useStore(s => s.collections);
   const globals             = useStore(s => s.globals);
-  const sessionVars         = useStore(s => s.sessionVars);
+  const sessionScriptVars   = useStore(s => s.sessionScriptVars);
   const activeTabId         = useStore(s => s.activeTabId);
   const tabs                = useStore(s => s.tabs);
   // Resolved through the extends chain so inherited variables autocomplete too.
@@ -48,8 +48,12 @@ export function useVarNames(): string[] {
     // Globals
     Object.keys(globals).forEach(k => names.add(k));
 
-    // Session vars (sp.variables.set from previous requests this session)
-    Object.keys(sessionVars).forEach(k => names.add(k));
+    // Session vars (sp.environment/collection/folder/globals.set from earlier
+    // sends this session — kept in memory, available to later requests).
+    Object.keys(sessionScriptVars.env).forEach(k => names.add(k));
+    Object.keys(sessionScriptVars.collection).forEach(k => names.add(k));
+    Object.keys(sessionScriptVars.folder).forEach(k => names.add(k));
+    Object.keys(sessionScriptVars.globals).forEach(k => names.add(k));
 
     // Collection variables + script-defined variables
     if (activeCollectionId) {
@@ -79,7 +83,7 @@ export function useVarNames(): string[] {
     return [...DYNAMIC_VAR_NAMES, ...Array.from(names).sort((a, b) => a.localeCompare(b))];
   }, [
     activeEnv, activeCollectionId,
-    collections, globals, sessionVars,
+    collections, globals, sessionScriptVars,
     activeTabId, tabs,
   ]);
 }

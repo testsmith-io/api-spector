@@ -144,12 +144,17 @@ export async function pushRequestAsMonitor(
   assertEnabled();
   const s = useStore.getState();
 
-  // Collection vars: collection-level + folder-chain + session (same as send).
+  // Collection vars: collection-level + folder-chain + any session script values
+  // (sp.*.set from earlier sends). The monitor re-runs its setup chain, so these
+  // are a seed; its own setup hooks refresh them at run time.
   const colEntry = Object.values(s.collections).find(c => c.data.requests[request.id]);
   const collectionVars: Record<string, string> = {
     ...colEntry?.data.collectionVariables,
     ...s.getInheritedVariables(request.id),
-    ...s.sessionVars,
+    ...s.sessionScriptVars.globals,
+    ...s.sessionScriptVars.env,
+    ...s.sessionScriptVars.collection,
+    ...s.sessionScriptVars.folder,
   };
 
   // "before" hooks in this request's folder chain (e.g. an authenticate step)

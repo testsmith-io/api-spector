@@ -33,7 +33,10 @@ export function FolderPanel() {
   useEffect(() => {
     const c = folderPanel ? useStore.getState().collections[folderPanel.collectionId]?.data : null;
     const f = c ? findFolder(c.rootFolder, folderPanel!.folderId) : null;
-    setVarRows(Object.entries(f?.variables ?? {}).map(([key, value]) => ({ key, value, enabled: true })));
+    setVarRows([
+      ...Object.entries(f?.variables ?? {}).map(([key, value]) => ({ key, value, enabled: true })),
+      ...Object.entries(f?.variablesDisabled ?? {}).map(([key, value]) => ({ key, value, enabled: false })),
+    ]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folderKey]);
 
@@ -48,8 +51,11 @@ export function FolderPanel() {
 
   function setVars(rows: KeyValuePair[]) {
     setVarRows(rows);
-    const variables = Object.fromEntries(rows.filter(r => r.key.trim()).map(r => [r.key.trim(), r.value]));
-    updateFolder(cid, folder!.id, { variables });
+    // Enabled rows apply (the resolver reads `variables`); disabled rows are kept
+    // in `variablesDisabled` so a toggle persists instead of deleting the value.
+    const variables = Object.fromEntries(rows.filter(r => r.enabled && r.key.trim()).map(r => [r.key.trim(), r.value]));
+    const variablesDisabled = Object.fromEntries(rows.filter(r => !r.enabled && r.key.trim()).map(r => [r.key.trim(), r.value]));
+    updateFolder(cid, folder!.id, { variables, variablesDisabled });
   }
 
   return (
