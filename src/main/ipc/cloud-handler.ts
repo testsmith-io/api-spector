@@ -3,6 +3,9 @@
 
 import { type IpcMain, shell } from 'electron';
 import { fetch } from 'undici';
+import { createServer } from 'node:http';
+import crypto from 'node:crypto';
+import os from 'node:os';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
 import { getSecret } from './secret-handler';
@@ -223,7 +226,68 @@ function slugify(name: string): string {
     .slice(0, 63) || 'mock';
 }
 
+// ─── One-click connect ("Sign in with API Spector") ───────────────────────────
+//
+// Public-client OAuth: open the cloud consent page in the browser with a loopback
+// callback, receive a single-use code, exchange it (with the PKCE verifier) for a
+// Sanctum token. No client secret — PKCE binds the code to this flow. The caller
+// (renderer) stores the returned token in the OS keychain, same as a pasted one.
+
+const b64url = (buf: Buffer): string =>
+  buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+async function cloudConnect(): Promise<{ token: string; email: string; organization: string | null }> {
+  const endpoint = resolveCloudEndpoint().replace(/\/+$/, '');
+  const verifier = b64url(crypto.randomBytes(32));
+  const challenge = b64url(crypto.createHash('sha256').update(verifier).digest());
+  const state = b64url(crypto.randomBytes(16));
+  const device = os.hostname();
+
+  const code = await new Promise<string>((resolve, reject) => {
+    const server = createServer((req, res) => {
+      const u = new URL(req.url ?? '/', 'http://127.0.0.1');
+      if (u.pathname !== '/cb') { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end('<!doctype html><meta charset="utf-8"><body style="font-family:system-ui,sans-serif;text-align:center;padding:3rem">'
+        + '<h2>Connected to API Spector</h2><p>You can close this tab and return to the app.</p></body>');
+      server.close();
+      const err = u.searchParams.get('error');
+      if (err) { reject(new Error(`Authorization failed: ${err}`)); return; }
+      if (u.searchParams.get('state') !== state) { reject(new Error('State mismatch — sign-in aborted for safety.')); return; }
+      const c = u.searchParams.get('code');
+      if (!c) { reject(new Error('No authorization code returned.')); return; }
+      resolve(c);
+    });
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address();
+      const port = typeof addr === 'object' && addr ? addr.port : 0;
+      const authUrl = new URL(endpoint + '/connect/authorize');
+      authUrl.searchParams.set('callback', `http://127.0.0.1:${port}/cb`);
+      authUrl.searchParams.set('state', state);
+      authUrl.searchParams.set('device', device);
+      authUrl.searchParams.set('code_challenge', challenge);
+      shell.openExternal(authUrl.toString()).catch(reject);
+    });
+    setTimeout(() => { server.close(); reject(new Error('Sign-in timed out (3 min).')); }, 3 * 60 * 1000);
+  });
+
+  const res = await fetch(endpoint + '/connect/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ code, code_verifier: verifier }),
+  });
+  const json = await res.json().catch(() => ({})) as { token?: string; email?: string; organization?: string | null; error?: string };
+  if (!res.ok || !json.token) {
+    throw new Error(json.error ? `Connect failed: ${json.error}` : `Connect failed (HTTP ${res.status}).`);
+  }
+  return { token: json.token, email: json.email ?? '', organization: json.organization ?? null };
+}
+
 export function registerCloudHandlers(ipc: IpcMain): void {
+
+  handleIpc(ipc, IPC.cloud.connect, async () => cloudConnect());
+
   // Verify the token against the configured endpoint.
   handleIpc(ipc, IPC.cloud.test, async () => {
     return cloudFetch('/api/me', 'GET');

@@ -156,6 +156,7 @@ export interface CollectionsSliceActions {
   updateCollectionTls: (id: string, tls: TlsSettings | undefined) => void
   updateCollectionAuthAndHeaders: (id: string, auth: AuthConfig, headers: KeyValuePair[]) => void
   updateCollectionDescription: (id: string, description: string) => void
+  updateCollectionVariables: (id: string, variables: Record<string, string>) => void
 }
 
 export type CollectionsSlice = CollectionsSliceState & CollectionsSliceActions
@@ -368,6 +369,12 @@ export const createCollectionsSlice: StateCreator<
   updateCollectionDescription: (id, description) => set(s => {
     if (!s.collections[id]) return;
     s.collections[id].data.description = description;
+    s.collections[id].dirty = true;
+  }),
+
+  updateCollectionVariables: (id, variables) => set(s => {
+    if (!s.collections[id]) return;
+    s.collections[id].data.collectionVariables = variables;
     s.collections[id].dirty = true;
   }),
 
@@ -586,6 +593,11 @@ export const createCollectionsSlice: StateCreator<
   }),
 
   openExample: (requestId, collectionId, exampleId) => set(s => {
+    // Showing an example supersedes the collection / folder data panels, which
+    // otherwise take precedence in the main area and keep the example hidden
+    // (the reason an example only appeared after its parent request was opened).
+    s.collectionPanelOpen = false;
+    s.folderPanel = null;
     const existing = s.tabs.find(t => t.requestId === requestId && t.exampleId === exampleId);
     if (existing) { s.activeTabId = existing.id; s.activeCollectionId = collectionId; return; }
     const ex = Object.values(s.collections).find(c => c.data.requests[requestId])

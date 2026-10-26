@@ -33,6 +33,16 @@ export function MockPanel() {
   const setRecorderPort           = useStore(s => s.setRecorderPort);
 
   const [recorderError, setRecorderError] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  async function copyCloudUrl(e: React.MouseEvent, url: string, id: string) {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(c => (c === id ? null : c)), 1500);
+    } catch { /* clipboard unavailable */ }
+  }
 
   // WSDL import mini-form
   const [wsdlOpen, setWsdlOpen]     = useState(false);
@@ -268,9 +278,32 @@ export function MockPanel() {
                   <div className="text-[10px] text-surface-400 font-mono">
                     :{mock.port} · {t(':count route|:count routes', { count: (mock.routes ?? []).length })}
                   </div>
+                  {mock.cloud?.url && (
+                    <div className="text-[10px] text-blue-400/80 font-mono truncate" title={mock.cloud.url}>
+                      ☁ {mock.cloud.url}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0">
+                  {mock.cloud?.url && (
+                    <>
+                      <button
+                        onClick={e => copyCloudUrl(e, mock.cloud!.url, mock.id)}
+                        className="text-[10px] px-1 py-0.5 rounded text-blue-400/70 hover:text-blue-300 transition-colors"
+                        title={t('Copy cloud link')}
+                      >
+                        {copiedId === mock.id ? '✓' : '🔗'}
+                      </button>
+                      <button
+                        onClick={e => { e.stopPropagation(); void electron.openExternal(mock.cloud!.url); }}
+                        className="text-[10px] px-1 py-0.5 rounded text-blue-400/70 hover:text-blue-300 transition-colors"
+                        title={t('Open cloud mock')}
+                      >
+                        ↗
+                      </button>
+                    </>
+                  )}
                   <button
                     onClick={e => toggleRunning(e, mock.id)}
                     className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${

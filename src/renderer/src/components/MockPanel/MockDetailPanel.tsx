@@ -413,6 +413,7 @@ export function MockDetailPanel({ mockId }: { readonly mockId: string }) {
   const deleteMock = useStore(s => s.deleteMock);
   const setRunning = useStore(s => s.setMockRunning);
   const setActive  = useStore(s => s.setActiveMockId);
+  const openWorkspaceSettings = useStore(s => s.openWorkspaceSettings);
   const workspace  = useStore(s => s.workspace);
 
   const [editMeta,   setEditMeta]   = useState(false);
@@ -422,6 +423,15 @@ export function MockDetailPanel({ mockId }: { readonly mockId: string }) {
   const [newRouteId, setNewRouteId] = useState<string | null>(null);
   const [activeTab,  setActiveTab]  = useState<'routes' | 'requests'>('routes');
   const [showPush,   setShowPush]   = useState(false);
+  // One-time, dismissible nudge toward the hosted-mock feature. Dismissal is a
+  // per-viewer convenience, so localStorage is fine (and guarded).
+  const [nudgeDismissed, setNudgeDismissed] = useState(() => {
+    try { return localStorage.getItem('apispector.pushMockNudge.dismissed') === '1'; } catch { return false; }
+  });
+  function dismissNudge() {
+    setNudgeDismissed(true);
+    try { localStorage.setItem('apispector.pushMockNudge.dismissed', '1'); } catch { /* ignore */ }
+  }
 
   if (!entry) return null;
   const { data: mock, running } = entry;
@@ -566,6 +576,32 @@ export function MockDetailPanel({ mockId }: { readonly mockId: string }) {
           </button>
         </div>
       </div>
+
+      {/* Activation nudge: only for workspaces not yet connected to the cloud.
+          Once connected, the header "Push to cloud" button is the single entry
+          point, so there is no duplicate CTA here. Dismissible (per viewer). */}
+      {!nudgeDismissed && !cloudEnabled() && (
+        <div className="flex items-center gap-2 px-5 py-2 text-xs bg-blue-950/40 border-b border-blue-900/40 text-surface-300 flex-shrink-0">
+          <span className="text-blue-300" aria-hidden="true">☁</span>
+          <span className="flex-1">
+            {t('This mock only runs on your machine. Connect to API Spector Cloud to host it at an always-on URL your team and CI can reach.')}
+          </span>
+          <button
+            onClick={() => openWorkspaceSettings('cloud')}
+            className="px-2.5 py-1 rounded bg-blue-700 hover:bg-blue-600 text-white font-medium transition-colors"
+          >
+            {t('Connect to cloud')}
+          </button>
+          <button
+            onClick={dismissNudge}
+            className="text-surface-500 hover:text-surface-300 px-1 transition-colors"
+            title={t('Dismiss')}
+            aria-label={t('Dismiss')}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex border-b border-surface-800 px-5 gap-0 flex-shrink-0 bg-surface-950">

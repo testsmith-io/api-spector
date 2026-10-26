@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../../store';
 import type { DataSet, KeyValuePair } from '../../../../shared/types';
 import { findFolder } from '../../../../shared/folder-tree';
@@ -25,6 +25,18 @@ export function FolderPanel() {
 
   const [activeTab, setActiveTab] = useState<'documentation' | 'data' | 'variables'>('documentation');
 
+  // Local draft rows for the variables editor (see CollectionPanel): kept in
+  // state so a freshly-added blank row survives until it has a key, which a
+  // Record<string,string> can't store. Reseeded when the folder changes.
+  const [varRows, setVarRows] = useState<KeyValuePair[]>([]);
+  const folderKey = folderPanel ? `${folderPanel.collectionId}/${folderPanel.folderId}` : '';
+  useEffect(() => {
+    const c = folderPanel ? useStore.getState().collections[folderPanel.collectionId]?.data : null;
+    const f = c ? findFolder(c.rootFolder, folderPanel!.folderId) : null;
+    setVarRows(Object.entries(f?.variables ?? {}).map(([key, value]) => ({ key, value, enabled: true })));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [folderKey]);
+
   if (!folderPanel) return null;
   const col = collections[folderPanel.collectionId]?.data;
   const folder = col ? findFolder(col.rootFolder, folderPanel.folderId) : null;
@@ -32,10 +44,10 @@ export function FolderPanel() {
 
   const cid = folderPanel.collectionId;
   const ds: DataSet = folder.dataSet ?? { columns: [], rows: [] };
-  const varRows: KeyValuePair[] = Object.entries(folder.variables ?? {}).map(([key, value]) => ({ key, value, enabled: true }));
   const iterCount = ds.rows.length;
 
   function setVars(rows: KeyValuePair[]) {
+    setVarRows(rows);
     const variables = Object.fromEntries(rows.filter(r => r.key.trim()).map(r => [r.key.trim(), r.value]));
     updateFolder(cid, folder!.id, { variables });
   }
@@ -67,7 +79,7 @@ export function FolderPanel() {
         {([
           { id: 'documentation', label: 'Documentation', badge: folder.description?.trim() ? 1 : 0 },
           { id: 'data',          label: 'Data',          badge: Math.max(iterCount, 0) },
-          { id: 'variables',     label: 'Variables',     badge: varRows.length },
+          { id: 'variables',     label: 'Variables',     badge: varRows.filter(r => r.key.trim()).length },
         ] as const).map(tab => (
           <button
             key={tab.id}

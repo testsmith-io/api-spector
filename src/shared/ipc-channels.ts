@@ -328,6 +328,8 @@ export const IPC = {
 
   // ─── Cloud (API Spector Cloud integration) ──────────────────────────────────
   cloud: {
+    /** One-click connect: browser consent + PKCE, returns a fresh token. */
+    connect:     'cloud:connect',
     /** Verify the endpoint + token (GET /api/me). */
     test:        'cloud:test',
     /** Push a mock server definition (POST /api/mocks). */

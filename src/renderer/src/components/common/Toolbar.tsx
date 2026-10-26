@@ -28,6 +28,7 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { readonly onOpenDocs?: () 
   const loadCollection = useStore(s => s.loadCollection);
   const setActiveCollection = useStore(s => s.setActiveCollection);
   const workspaceSettingsOpen = useStore(s => s.workspaceSettingsOpen);
+  const workspaceSettingsTab = useStore(s => s.workspaceSettingsTab);
   const setWorkspaceSettingsOpen = useStore(s => s.setWorkspaceSettingsOpen);
 
   const [saving, setSaving]       = useState(false);
@@ -108,7 +109,7 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { readonly onOpenDocs?: () 
   return (
     <div className="no-drag bg-surface-950 border-b border-surface-800 flex-shrink-0">
       {workspaceSettingsOpen && (
-        <WorkspaceSettingsModal onClose={() => setWorkspaceSettingsOpen(false)} />
+        <WorkspaceSettingsModal initialTab={workspaceSettingsTab} onClose={() => setWorkspaceSettingsOpen(false)} />
       )}
       {docsOpen && (
         <DocsGeneratorModal onClose={() => setDocsOpen(false)} />

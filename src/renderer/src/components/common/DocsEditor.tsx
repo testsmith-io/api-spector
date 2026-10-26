@@ -27,6 +27,7 @@ export function DocsEditor({ value, onChange, placeholder, onGenerate, aiAvailab
   const [mode, setMode] = useState<'write' | 'preview'>(value.trim() ? 'preview' : 'write');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDiagramHelp, setShowDiagramHelp] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
   // Wrap the current selection with `before`/`after` (e.g. ** ** for bold).
@@ -64,6 +65,20 @@ export function DocsEditor({ value, onChange, placeholder, onGenerate, aiAvailab
     requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(start + snippet.length - 1, start + snippet.length - 1); });
   }
 
+  // Drop a starter flowchart block at the cursor (and make sure we're in Write
+  // so the user can edit it). Rendered as a diagram in Preview.
+  function insertDiagram() {
+    const ta = taRef.current;
+    setMode('write');
+    const start = ta ? ta.selectionStart : value.length;
+    const snippet = '\n```flow\nflowchart TD\n  A([Start]) --> B[Do something]\n  B --> C{OK?}\n  C -->|yes| D([Done])\n  C -->|no| B\n```\n';
+    onChange(value.slice(0, start) + snippet + value.slice(start));
+    requestAnimationFrame(() => {
+      ta?.focus();
+      ta?.setSelectionRange(start + snippet.length, start + snippet.length);
+    });
+  }
+
   async function generate() {
     if (!onGenerate) return;
     setGenerating(true);
@@ -99,8 +114,18 @@ export function DocsEditor({ value, onChange, placeholder, onGenerate, aiAvailab
             <button onClick={() => prefixLine('> ')} className={btn} title={t('Quote')}>&ldquo;</button>
             <button onClick={insertLink} className={btn} title={t('Link')}>🔗</button>
             <button onClick={() => wrap('\n```\n', '\n```\n')} className={`${btn} font-mono`} title={t('Code block')}>{'{ }'}</button>
+            <button onClick={insertDiagram} className={btn} title={t('Insert flowchart')}>⬡</button>
           </div>
         )}
+
+        <button
+          onClick={() => setShowDiagramHelp(v => !v)}
+          className={`${btn} ${showDiagramHelp ? 'text-white bg-surface-700' : ''}`}
+          title={t('Flowchart syntax help')}
+          aria-expanded={showDiagramHelp}
+        >
+          {t('⬡ Diagram help')}
+        </button>
 
         {onGenerate && (
           <button
@@ -115,6 +140,27 @@ export function DocsEditor({ value, onChange, placeholder, onGenerate, aiAvailab
       </div>
 
       {error && <p className="text-[11px] text-red-400">{error}</p>}
+
+      {showDiagramHelp && (
+        <div className="text-[11px] text-surface-300 bg-surface-800/60 border border-surface-700 rounded p-3 flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-semibold text-surface-100">{t('Flowchart syntax')}</span>
+            <button onClick={insertDiagram} className="text-[10px] px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white transition-colors">
+              {t('Insert example')}
+            </button>
+          </div>
+          <p className="text-surface-400">{t('Wrap the diagram in a fenced code block tagged flow. It renders as a graph in Preview.')}</p>
+          <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 items-baseline">
+            <span className="text-surface-500">{t('Direction')}</span><code className="font-mono text-surface-200">flowchart TD · LR · RL · BT</code>
+            <span className="text-surface-500">{t('Steps')}</span><code className="font-mono text-surface-200">{'A[Box]  A(Round)  A([Start/End])'}</code>
+            <span className="text-surface-500">{t('Decision')}</span><code className="font-mono text-surface-200">{'A{OK?}'}</code>
+            <span className="text-surface-500">{t('More shapes')}</span><code className="font-mono text-surface-200">{'A((Circle))  A{{Hexagon}}  A[[Subroutine]]'}</code>
+            <span className="text-surface-500">{t('Arrows')}</span><code className="font-mono text-surface-200">{'A --> B    A -->|label| B'}</code>
+            <span className="text-surface-500">{t('Link styles')}</span><code className="font-mono text-surface-200">{'A -.-> B (dotted)   A ==> B (thick)   A --- B'}</code>
+            <span className="text-surface-500">{t('Chain')}</span><code className="font-mono text-surface-200">A --&gt; B --&gt; C</code>
+          </div>
+        </div>
+      )}
 
       {/* Body */}
       {mode === 'write' ? (

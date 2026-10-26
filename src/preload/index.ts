@@ -226,6 +226,8 @@ const api = {
     ipcRenderer.invoke(IPC.oauth2.refreshToken, auth, ctx, refreshToken),
 
   // ─── Cloud integration ────────────────────────────────────────────────────────
+  cloudConnect: (): Promise<{ token: string; email: string; organization: string | null }> =>
+    ipcRenderer.invoke(IPC.cloud.connect),
   cloudTest: (): Promise<{ email: string; organization: string; plan: string }> =>
     ipcRenderer.invoke(IPC.cloud.test),
   cloudPushMock: (server: MockServer): Promise<{ id: number; url: string; routes: number }> =>
