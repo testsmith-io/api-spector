@@ -9,14 +9,14 @@
 //
 // Run with: npx vitest --project renderer
 
-import React from 'react';
+import * as React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 
 // --- Mocks: keep the row hermetic (no real store / i18n / cloud / modals). ---
 
 vi.mock('../components/CollectionTree/CollectionTree', async () => {
-  const { createContext } = await vi.importActual<typeof import('react')>('react');
+  const { createContext } = await vi.importActual<typeof React>('react');
   return {
     DragCtx: createContext({ dragging: null, setDragging: () => {}, onDropRequest: () => {}, onDropFolder: () => {}, onReorderChild: () => {} }),
     SelectionCtx: createContext({ active: false, isSelected: () => false, toggle: () => {}, clear: () => {} }),
