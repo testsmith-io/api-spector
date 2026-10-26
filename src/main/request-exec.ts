@@ -32,7 +32,6 @@ import { stripJsonComments } from '../shared/strip-json-comments';
 import { runScript } from './script-runner';
 import { runMqttTest } from './mqtt-test';
 import { runWsTest, runSocketIoTest } from './realtime-test';
-import { patchGlobals, persistGlobals } from './globals-store';
 import {
   buildAuthHeaders,
   buildApiKeyParam,
@@ -798,8 +797,8 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
     updatedCollectionVars = r.updatedCollectionVars;
     updatedGlobals = r.updatedGlobals;
     updatedFolderVars = r.updatedFolderVars;
-    patchGlobals(r.updatedGlobals);
-    await persistGlobals();
+    // Run-only: script var writes (globals included) apply this run via the
+    // locals threaded into mergeVars below; they are not persisted to disk.
     onScriptOutput?.('pre', r.consoleOutput, r.error);
     vars = mergeVars(updatedEnvVars, updatedCollectionVars, updatedGlobals, localVars, dynamicVars, updatedFolderVars);
     if (Object.keys(inlineSecrets).length) vars = { ...vars, ...inlineSecrets };
@@ -851,8 +850,7 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
       updatedGlobals = r.updatedGlobals;
       updatedFolderVars = r.updatedFolderVars;
       localVars = r.updatedLocalVars;
-      patchGlobals(r.updatedGlobals);
-      await persistGlobals();
+      // Run-only: script var writes are not persisted to disk.
       onScriptOutput?.('post', r.consoleOutput, r.error);
     }
 

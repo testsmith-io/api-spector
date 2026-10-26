@@ -370,7 +370,7 @@ export function ImportModal({ onImport, onClose }: Props) {
         overlayClassName="z-50 flex items-center justify-center bg-black/60"
         panelClassName="bg-surface-900 border border-surface-700 rounded-xl shadow-2xl w-[640px] max-h-[80vh] p-5 flex flex-col gap-4"
       >
-          <div className="flex items-center justify-between">
+          <div data-modal-drag className="flex items-center justify-between cursor-move select-none">
             <h2 className="text-sm font-semibold text-surface-100">
               {t('Import - :name', { name: previewCol.name })}
             </h2>

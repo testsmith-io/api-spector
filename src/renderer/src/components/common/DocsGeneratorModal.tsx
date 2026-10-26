@@ -95,7 +95,7 @@ export function DocsGeneratorModal({ onClose }: Props) {
       panelClassName="bg-surface-900 border border-surface-700 rounded-lg shadow-2xl w-[680px] max-h-[80vh] flex flex-col"
     >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-surface-800 flex-shrink-0">
+        <div data-modal-drag className="flex items-center justify-between px-4 py-3 border-b border-surface-800 flex-shrink-0 cursor-move select-none">
           <span className="text-sm font-semibold text-white">{t('Generate API Documentation')}</span>
           <button
             onClick={onClose}

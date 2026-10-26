@@ -102,7 +102,7 @@ export const createUiSlice: StateCreator<
   [['zustand/immer', never]],
   [],
   UiSlice
-> = (set) => ({
+> = (set, get) => ({
   showGeneratorPanel: false,
   theme: (localStorage.getItem(STORAGE_KEYS.theme) as Theme) ?? 'dark',
   zoom: Number(localStorage.getItem(STORAGE_KEYS.zoom) ?? '1.1'),
@@ -173,11 +173,15 @@ export const createUiSlice: StateCreator<
   setFocusedPane: pane => set(s => { s.focusedPane = pane; }),
   cycleSubTab: dir => set(s => { s.subTabCycle = { nonce: s.subTabCycle.nonce + 1, pane: s.focusedPane, dir }; }),
 
-  setCollectionPanelOpen: (open) => set(s => { s.collectionPanelOpen = open; if (open) s.folderPanel = null; }),
-  openFolderPanel: (collectionId, folderId) => set(s => {
-    s.folderPanel = { collectionId, folderId };
-    s.collectionPanelOpen = false;
-  }),
+  // A collection / folder now opens as a tab. These keep their old names (and
+  // callers) but delegate to the tab openers; the active tab drives the panels.
+  setCollectionPanelOpen: (open) => {
+    if (!open) { set(s => { s.collectionPanelOpen = false; }); return; }
+    const collectionId = get().activeCollectionId;
+    if (collectionId) get().openCollectionTab(collectionId);
+    else set(s => { s.collectionPanelOpen = true; s.folderPanel = null; });
+  },
+  openFolderPanel: (collectionId, folderId) => get().openFolderTab(collectionId, folderId),
 
   setCoverageOpen: (open) => set(s => { s.coverageOpen = open; }),
 

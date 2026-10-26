@@ -14,18 +14,26 @@ The scripting API is available as `sp` (API **Sp**ector).
 ### Variable scopes
 
 ```js
-// Environment variables
+// Environment variables (session value: kept in memory, not saved to .env.json)
 sp.environment.get('key')
 sp.environment.set('key', 'value')
 sp.environment.clear('key')
 sp.environment.has('key')
 sp.environment.toObject()
 
-// Collection variables
+// Collection variables (session value: kept in memory, not saved to disk)
 sp.collectionVariables.get('key')
 sp.collectionVariables.set('key', 'value')
 
-// Global variables
+// Folder variables (innermost folder; session value, not saved to disk)
+sp.folder.get('key')
+sp.folder.set('key', 'value')
+
+// Request variables (run-only dynamic values, this send only)
+sp.request.get('key')
+sp.request.set('key', 'value')
+
+// Global variables (session value: kept in memory, not saved to globals.json)
 sp.globals.get('key')
 sp.globals.set('key', 'value')
 
@@ -37,6 +45,8 @@ sp.variables.set('key', 'value')
 sp.variables_get('key')
 sp.variables_set('key', 'value')
 ```
+
+> **Script writes are session values, not saved to disk.** A write to a *named* scope — `sp.environment`, `sp.collectionVariables`, `sp.folder`, or `sp.globals` — is kept in memory for the running session: it is available to the current request and to **later manually-sent requests** (so you can extract a token in one request and use it in the next), resolving at that scope's normal precedence. It is never written back to the collection, environment, or globals files, it does not change the GUI Variables screens, and it clears on app restart / workspace close. `sp.variables` (local) and `sp.request` are request-scoped — they live only for the single send/run they were set in. To make a value survive a restart, author it in the GUI editors. See [Variables: Scopes and Precedence](./variables.md#the-scopes).
 
 ### Response object (post-response only)
 
@@ -114,13 +124,15 @@ sp.response.to.have.status(201)
 
 ## Examples
 
-### Extract a token from the response and store it
+### Extract a token from the response and reuse it
 
 ```js
 // Post-response script
 const body = sp.response.json()
 sp.environment.set('authToken', body.token)
 ```
+
+The token is available to later requests this session — both within one flow/runner run and across separate manual sends. It is a session value held in memory, not saved to the environment file, and clears on app restart.
 
 ### Generate a unique request ID before sending
 

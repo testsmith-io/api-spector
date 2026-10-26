@@ -294,6 +294,10 @@ function buildAt(
   const sp: Record<string, unknown> = {
     // Variable scopes
     variables:           makeVarScope(localVars,      'variables'),
+    // Request-scoped set/get. Request variables live in the local tier at run
+    // time, so this shares the local store: values apply for the current run (and
+    // the in-memory session) but are never written back to the saved collection.
+    request:             makeVarScope(localVars,      'request'),
     environment:         makeVarScope(envVars,         'environment'),
     collectionVariables: makeVarScope(collectionVars,  'collectionVariables'),
     folder:              makeVarScope(folderVars,       'folder'),

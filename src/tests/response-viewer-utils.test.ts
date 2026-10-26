@@ -316,9 +316,20 @@ describe('extract snippets', () => {
     expect(out).toContain('sp.variables.set("token", String(json.user.token))');
   });
 
-  it('makeJsonExtractSnippet supports environment target', () => {
-    const out = makeJsonExtractSnippet(['user', 'token'], 'environment');
-    expect(out).toContain('sp.environment.set');
+  it('makeJsonExtractSnippet supports the carry-over scopes', () => {
+    // Named scopes persist for the session (usable in the next request); each
+    // maps to its sp.* accessor so the generated snippet writes to that scope.
+    expect(makeJsonExtractSnippet(['user', 'token'], 'environment')).toContain('sp.environment.set("token"');
+    expect(makeJsonExtractSnippet(['user', 'token'], 'collectionVariables')).toContain('sp.collectionVariables.set("token"');
+    expect(makeJsonExtractSnippet(['user', 'token'], 'folder')).toContain('sp.folder.set("token"');
+    expect(makeJsonExtractSnippet(['user', 'token'], 'globals')).toContain('sp.globals.set("token"');
+  });
+
+  it('makeJsonPathExtractSnippet and makeXmlExtractSnippet honor the collection scope', () => {
+    expect(makeJsonPathExtractSnippet(['users', 0, 'token'], 'id', '42', 'collectionVariables'))
+      .toContain('sp.collectionVariables.set("token"');
+    expect(makeXmlExtractSnippet('user > token', 'collectionVariables'))
+      .toContain('sp.collectionVariables.set("extracted_value"');
   });
 
   it('makeJsonPathExtractSnippet uses the JSONPath filter expression', () => {

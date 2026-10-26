@@ -16,8 +16,13 @@ api-spector run --workspace ./my-workspace.spector
 | `--env <name>` | Environment name to activate |
 | `--collection <name>` | Run only this collection (by name) |
 | `--tags <a,b>` | Comma-separated tag filter; only run requests with matching tags |
-| `--output <path>` | Write a results report to file (`.json` or `.xml`) |
-| `--format json\|junit` | Report format; inferred from `--output` extension if omitted |
+| `--var "key=value"` | Override a variable for this run (repeatable). CLI tier: overrides stored environment/collection/folder/request values; a runtime script `.set()` overrides it. |
+| `--env-var "key=value"` | Set an environment variable for this run (repeatable). Seeds the environment scope; a script `sp.environment.set` may override it. |
+| `--global-var "key=value"` | Set a global variable for this run (repeatable). Seeds the globals scope; a script `sp.globals.set` may override it. |
+| `--ask "Message=value"` | Supply an ask variable (`{{@Message}}`) for this run (repeatable) |
+| `--output <path>` | Write a results report to file (`.json`, `.xml`, `.html`, `.sarif`) |
+| `--format json\|junit\|html\|sarif` | Report format; inferred from `--output` extension if omitted |
+| `--concurrency <n>` | Run n requests at a time (default 1 = sequential) |
 | `--verbose` | Print per-request console output and individual test results |
 | `--bail` | Stop after the first failed or errored request |
 | `--help` | Show usage |
@@ -52,6 +57,25 @@ Write a JSON report:
 ```bash
 api-spector run --workspace ./project.spector --output results.json
 ```
+
+## Overriding variables
+
+Three repeatable flags override variables for a single run, each at a different scope:
+
+```bash
+# Scope-agnostic override at the CLI tier (overrides stored values)
+api-spector run --workspace ./project.spector --var "email=admin"
+
+# Postman/Bruno-style scope seeds
+api-spector run --workspace ./project.spector \
+  --env-var "BASE_URL=https://staging.example.com" \
+  --global-var "apiKey=ci-key-123"
+```
+
+Each is repeatable (`--var "a=1" --var "b=2"`). How they interact with the rest of the [variable precedence](../reference/variables.md#resolution-order-precedence):
+
+- `--var` sits at the **CLI tier** — above the stored environment / collection / folder / request values, below data-row and runtime values. It is the *initial* value: the moment a script `sp.*.set()`s that key during the run, the script's value takes over for later requests.
+- `--env-var` and `--global-var` **seed** the environment and globals scopes. They override the stored value in that scope, resolve at that scope's precedence (so a collection/folder/request value of the same name still wins, since collection outranks environment here), and a script `sp.environment.set` / `sp.globals.set` overrides them for later requests.
 
 Stop on first failure:
 

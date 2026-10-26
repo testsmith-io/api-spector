@@ -131,8 +131,13 @@ export interface ApiRequest {
    *  environment / folder / collection / globals for this request (and its
    *  examples), and are themselves overridden by data-row, runtime (sp.set) and
    *  CLI (--var) values. Use them to locally override a higher-level variable or
-   *  to hold values only this request and its examples need. */
+   *  to hold values only this request and its examples need. Only the enabled
+   *  ones live here — the resolver reads this map. */
   variables?: Record<string, string>
+  /** Disabled request variables, kept so the editor can round-trip (toggle) them
+   *  without applying them. Not read by the resolver. (On an example, these live
+   *  on the example's `request` override, so an example can disable its own.) */
+  variablesDisabled?: Record<string, string>
 }
 
 /** One child of a folder in display / execution order — either a request or a
@@ -162,9 +167,14 @@ export interface Folder {
   tags?: string[]
   auth?: AuthConfig
   headers?: KeyValuePair[]
-  /** Variables scoped to this folder. Override collection variables and are
-   *  overridden by an inner folder, the environment, and local (script) vars. */
+  /** Variables scoped to this folder. Override collection and environment
+   *  variables and are overridden by an inner folder, the request, and local
+   *  (script) vars. Only the enabled ones live here — they're the single source
+   *  the resolver reads. */
   variables?: Record<string, string>
+  /** Disabled folder variables, kept so the editor can round-trip (toggle) them
+   *  without applying them. Not read by the resolver. */
+  variablesDisabled?: Record<string, string>
   /** Data-driven dataset for this folder: each row runs the folder once with
    *  those variables injected. Used when running the folder; takes priority
    *  over the collection dataset for folder runs. */
@@ -192,6 +202,9 @@ export interface Collection {
   /** When true, the whole collection is excluded from workspace/CI runs. */
   disabled?: boolean
   collectionVariables?: Record<string, string>
+  /** Disabled collection variables, kept so the editor can round-trip (toggle)
+   *  them without applying them. Not read by the resolver. */
+  collectionVariablesDisabled?: Record<string, string>
   /** Data-driven dataset: each row runs the full collection once with those variables injected. */
   dataSet?: DataSet
   /** On-disk pointer to the collection's data table (a separate CSV under

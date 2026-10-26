@@ -237,12 +237,12 @@ export function mergeVars(
   dynamicVars: Record<string, string> = {},
   folderVars: Record<string, string> = {}
 ): Record<string, string> {
-  // Precedence low→high: dynamic < globals < collection < env < folder < local.
-  // The structural scopes follow "the closer to the request, the stronger":
-  // collection < folder, and both are overridden by the local bucket (request,
-  // CLI --var, data-row and runtime script-set). The environment sits between
-  // collection and folder — it overrides collection-level defaults but a folder
-  // (or request) value, set closer to the request, wins over it. A null/undefined
+  // Precedence low→high: dynamic < globals < env < collection < folder < local.
+  // The collection/folder/request structure is one chain, "the closer to the
+  // request, the stronger": collection < folder, both overridden by the local
+  // bucket (request, CLI --var, data-row and runtime script-set). The environment
+  // is a shared default BELOW the collection (above globals): a collection, folder
+  // or request value — set closer to the request — overrides it. A null/undefined
   // value is treated as UNSET: it must not shadow a real value from a
   // lower-precedence scope, and must never render as the literal string
   // "null"/"undefined" in a template (e.g. a stale env placeholder `token:null`
@@ -250,7 +250,7 @@ export function mergeVars(
   // Values arrive typed as string, but baked/serialized definitions can carry
   // real nulls, so guard at runtime.
   const out: Record<string, string> = {};
-  for (const src of [dynamicVars, globals, collectionVars, envVars, folderVars, localVars]) {
+  for (const src of [dynamicVars, globals, envVars, collectionVars, folderVars, localVars]) {
     for (const [k, v] of Object.entries(src ?? {})) {
       if (v == null) continue;
       out[k] = v;

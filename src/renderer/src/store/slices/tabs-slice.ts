@@ -15,9 +15,17 @@ import type { FullState } from '../index';
 
 // ─── Tab model ───────────────────────────────────────────────────────────────
 
+/** What a tab shows. A collection and a folder now open as tabs too (not a
+ *  separate panel that drew over the request tabs), so the whole main area is
+ *  one consistent tab strip. */
+export type TabKind = 'request' | 'folder' | 'collection'
+
 export interface AppTab {
   id: string
+  kind: TabKind
   requestId: string | null
+  /** Set on a folder tab — the folder it shows. */
+  folderId?: string | null
   /** When set, this tab is editing an EXAMPLE of `requestId` (its overrides +
    *  saved response), not the base request. Null/undefined = the base request. */
   exampleId?: string | null
@@ -31,25 +39,65 @@ export interface AppTab {
   requestTab: 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'schema' | 'contract' | 'stream' | 'docs' | 'variables'
 }
 
-export function makeTab(requestId: string, collectionId: string, opts: { protocol?: ApiRequest['protocol']; exampleId?: string | null; defaultTab?: AppTab['requestTab'] } = {}): AppTab {
+function baseTab(collectionId: string | null): Omit<AppTab, 'kind' | 'requestId' | 'folderId' | 'exampleId' | 'requestTab'> {
   return {
     id: uuidv4(),
-    requestId,
-    exampleId: opts.exampleId ?? null,
     collectionId,
     lastResponse: null,
     lastScriptResult: null,
     lastSentRequest: null,
     lastHookResults: null,
     isSending: false,
+    scriptTab: 'post',
+  };
+}
+
+export function makeTab(requestId: string, collectionId: string, opts: { protocol?: ApiRequest['protocol']; exampleId?: string | null; defaultTab?: AppTab['requestTab'] } = {}): AppTab {
+  return {
+    ...baseTab(collectionId),
+    kind: 'request',
+    requestId,
+    folderId: null,
+    exampleId: opts.exampleId ?? null,
     // Examples have no Docs tab and fall back to Body (see RequestBuilder).
     // Otherwise open on the workspace's configured default sub-tab (Docs unless
     // the workspace overrides it).
     requestTab: opts.exampleId ? 'body' : (opts.defaultTab ?? 'docs'),
-    // Default to the post-response tab — that's where the typical workflow
-    // (assertions, extracting tokens, saving variables) lives.
-    scriptTab: 'post',
   };
+}
+
+export function makeFolderTab(collectionId: string, folderId: string): AppTab {
+  return { ...baseTab(collectionId), kind: 'folder', requestId: null, folderId, exampleId: null, requestTab: 'docs' };
+}
+
+export function makeCollectionTab(collectionId: string): AppTab {
+  return { ...baseTab(collectionId), kind: 'collection', requestId: null, folderId: null, exampleId: null, requestTab: 'docs' };
+}
+
+/** Keep the legacy panel flags (`folderPanel`, `collectionPanelOpen`) and
+ *  `activeCollectionId` in lockstep with whatever the active tab is, so the
+ *  main area (which still switches on those flags) shows the active tab's
+ *  content and nothing overlaps. Call this anywhere `activeTabId` changes. */
+export function syncPanelsToActiveTab(s: {
+  tabs: AppTab[]
+  activeTabId: string | null
+  activeCollectionId: string | null
+  collectionPanelOpen: boolean
+  folderPanel: { collectionId: string; folderId: string } | null
+}): void {
+  const tab = s.tabs.find(t => t.id === s.activeTabId);
+  if (!tab) { s.collectionPanelOpen = false; s.folderPanel = null; return; }
+  if (tab.collectionId) s.activeCollectionId = tab.collectionId;
+  if (tab.kind === 'folder' && tab.collectionId && tab.folderId) {
+    s.folderPanel = { collectionId: tab.collectionId, folderId: tab.folderId };
+    s.collectionPanelOpen = false;
+  } else if (tab.kind === 'collection') {
+    s.collectionPanelOpen = true;
+    s.folderPanel = null;
+  } else {
+    s.folderPanel = null;
+    s.collectionPanelOpen = false;
+  }
 }
 
 /** Look up a request's protocol by id across all loaded collections.
@@ -77,6 +125,10 @@ export interface TabsSliceState {
 
 export interface TabsSliceActions {
   openInTab: (requestId: string, collectionId: string) => void
+  /** Open (or focus) a tab showing a folder's data panel. */
+  openFolderTab: (collectionId: string, folderId: string) => void
+  /** Open (or focus) a tab showing a collection's data panel. */
+  openCollectionTab: (collectionId: string) => void
   closeTab: (tabId: string) => void
   closeAllTabs: () => void
   closeOtherTabs: (keepTabId: string) => void
@@ -114,18 +166,30 @@ export const createTabsSlice: StateCreator<
   activeCollectionId: null,
 
   openInTab: (requestId, collectionId) => set(s => {
-    s.collectionPanelOpen = false; // activating a request supersedes the data panel
-    s.folderPanel = null;
-    const existing = s.tabs.find(t => t.requestId === requestId && !t.exampleId);
+    const existing = s.tabs.find(t => t.kind === 'request' && t.requestId === requestId && !t.exampleId);
     if (existing) {
       s.activeTabId = existing.id;
-      s.activeCollectionId = collectionId;
     } else {
       const tab = makeTab(requestId, collectionId, { protocol: protocolFor(s, requestId), defaultTab: s.workspace?.settings?.defaultRequestTab });
       s.tabs.push(tab);
       s.activeTabId = tab.id;
-      s.activeCollectionId = collectionId;
     }
+    s.activeCollectionId = collectionId;
+    syncPanelsToActiveTab(s);
+  }),
+
+  openFolderTab: (collectionId, folderId) => set(s => {
+    const existing = s.tabs.find(t => t.kind === 'folder' && t.folderId === folderId && t.collectionId === collectionId);
+    if (existing) s.activeTabId = existing.id;
+    else { const tab = makeFolderTab(collectionId, folderId); s.tabs.push(tab); s.activeTabId = tab.id; }
+    syncPanelsToActiveTab(s);
+  }),
+
+  openCollectionTab: (collectionId) => set(s => {
+    const existing = s.tabs.find(t => t.kind === 'collection' && t.collectionId === collectionId);
+    if (existing) s.activeTabId = existing.id;
+    else { const tab = makeCollectionTab(collectionId); s.tabs.push(tab); s.activeTabId = tab.id; }
+    syncPanelsToActiveTab(s);
   }),
 
   closeTab: (tabId) => set(s => {
@@ -136,13 +200,15 @@ export const createTabsSlice: StateCreator<
       // Activate adjacent tab: prefer right, then left, then null
       const next = s.tabs[idx] ?? s.tabs[idx - 1] ?? null;
       s.activeTabId = next?.id ?? null;
-      s.activeCollectionId = next?.collectionId ?? null;
+      syncPanelsToActiveTab(s);
     }
   }),
 
   closeAllTabs: () => set(s => {
     s.tabs = [];
     s.activeTabId = null;
+    s.collectionPanelOpen = false;
+    s.folderPanel = null;
     // Don't clear activeCollectionId — the sidebar selection should stay put.
   }),
 
@@ -150,15 +216,12 @@ export const createTabsSlice: StateCreator<
     const kept = s.tabs.find(t => t.id === keepTabId);
     s.tabs = kept ? [kept] : [];
     s.activeTabId = kept?.id ?? null;
-    if (kept) s.activeCollectionId = kept.collectionId;
+    syncPanelsToActiveTab(s);
   }),
 
   setActiveTabId: (id) => set(s => {
     s.activeTabId = id;
-    s.collectionPanelOpen = false; // clicking a request tab supersedes the data panel
-    s.folderPanel = null;
-    const tab = s.tabs.find(t => t.id === id);
-    if (tab) s.activeCollectionId = tab.collectionId;
+    syncPanelsToActiveTab(s);
   }),
 
   setTabResponse: (tabId, response, scriptResult, sentRequest) => set(s => {

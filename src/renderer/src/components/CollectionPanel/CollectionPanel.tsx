@@ -32,8 +32,11 @@ export function CollectionPanel() {
   // blanks out. Reseeded when the active collection changes.
   const [varRows, setVarRows] = useState<KeyValuePair[]>([]);
   useEffect(() => {
-    const vars = activeCollectionId ? collections[activeCollectionId]?.data.collectionVariables : undefined;
-    setVarRows(Object.entries(vars ?? {}).map(([key, value]) => ({ key, value, enabled: true })));
+    const data = activeCollectionId ? collections[activeCollectionId]?.data : undefined;
+    setVarRows([
+      ...Object.entries(data?.collectionVariables ?? {}).map(([key, value]) => ({ key, value, enabled: true })),
+      ...Object.entries(data?.collectionVariablesDisabled ?? {}).map(([key, value]) => ({ key, value, enabled: false })),
+    ]);
   // Reseed only on collection switch, not on every keystroke-driven store update.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCollectionId]);
@@ -41,8 +44,10 @@ export function CollectionPanel() {
   function setVars(rows: KeyValuePair[]) {
     setVarRows(rows);
     if (!activeCollectionId) return;
-    const variables = Object.fromEntries(rows.filter(r => r.key.trim()).map(r => [r.key.trim(), r.value]));
-    updateCollectionVariables(activeCollectionId, variables);
+    // Enabled rows apply; disabled rows are kept (not deleted) so a toggle persists.
+    const variables = Object.fromEntries(rows.filter(r => r.enabled && r.key.trim()).map(r => [r.key.trim(), r.value]));
+    const disabled = Object.fromEntries(rows.filter(r => !r.enabled && r.key.trim()).map(r => [r.key.trim(), r.value]));
+    updateCollectionVariables(activeCollectionId, variables, disabled);
   }
 
   if (!activeCollectionId) {
@@ -144,7 +149,7 @@ export function CollectionPanel() {
         {activeTab === 'variables' && (
           <div className="flex flex-col gap-2 text-xs">
             <p className="text-surface-500">
-              {t('Variables scoped to this collection. They are overridden by folder variables, the active environment, and script-set values. Reference them anywhere with :token.', { token: '{{name}}' })}
+              {t('Variables scoped to this collection. They override environment and global variables, and are overridden by folder and request variables (and runtime / CLI / data-row values). Reference them anywhere with :token.', { token: '{{name}}' })}
             </p>
             <KVTable rows={varRows} onChange={setVars} keyPlaceholder={t('name')} valuePlaceholder={t('value')} />
             <p className="text-surface-600 text-[11px]">

@@ -80,13 +80,24 @@ function printResult(r: RunRequestResult, verbose: boolean) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
+  // `--ask`, `--var`, `--env-var` and `--global-var` may be given more than
+  // once, so collect them as arrays.
+  const args = parseArgs(process.argv.slice(2), ['ask', 'var', 'env-var', 'global-var']);
 
   if (args.help) {
     console.log(
       '\nUsage:\n  api-spector run --workspace <path> [--environment <name>] [--tags <a,b>]\n' +
-      '                  [--collection <name>] [--output <path>] [--format json|junit|html|sarif]\n' +
+      '                  [--collection <name>] [--var "key=value"]\n' +
+      '                  [--env-var "key=value"] [--global-var "key=value"]\n' +
+      '                  [--output <path>] [--format json|junit|html|sarif]\n' +
       '                  [--ask "Message=value"] [--concurrency <n>] [--verbose] [--bail]\n\n' +
+      '  --var "key=value"      Override a variable for this run (repeatable). Sits at\n' +
+      '                         the CLI tier: above environment/collection/folder/\n' +
+      '                         request values, below data-row and script-set values.\n' +
+      '  --env-var "key=value"  Set an environment variable for this run (repeatable).\n' +
+      '                         Seeds the environment scope; a script may override it.\n' +
+      '  --global-var "key=value"  Set a global variable for this run (repeatable).\n' +
+      '                         Seeds the globals scope; a script may override it.\n' +
       '  --ask "Message=value"  Supply an ask variable ({{@Message}}) for this run\n' +
       '                         (repeatable). Requests whose ask variables are not\n' +
       '                         supplied are skipped.\n' +
@@ -171,6 +182,29 @@ async function main() {
     if (eq > 0) askAnswers[entry.slice(0, eq).trim()] = entry.slice(eq + 1);
   }
 
+  // Parse a repeatable "key=value" CLI argument into a map.
+  const parseKeyVals = (raw: string | boolean | string[] | undefined): Record<string, string> => {
+    const out: Record<string, string> = {};
+    for (const entry of Array.isArray(raw) ? raw : raw ? [raw] : []) {
+      if (typeof entry !== 'string') continue;
+      const eq = entry.indexOf('=');
+      if (eq > 0) out[entry.slice(0, eq).trim()] = entry.slice(eq + 1);
+    }
+    return out;
+  };
+
+  // --var "key=value" (repeatable): a scope-agnostic override at the CLI tier of
+  // the precedence chain — above environment/collection/folder/request/example,
+  // below data-row and runtime (script-set) values. Injected as the initial
+  // value of each request's local vars; a script that sets the key takes over.
+  const cliVars = parseKeyVals(args['var']);
+  // --env-var / --global-var "key=value" (repeatable): Postman/Bruno-style scope
+  // seeds. They set the INITIAL value of the environment / globals scope (over
+  // the stored value), resolve at that scope's precedence, and are overridden by
+  // a script `sp.environment.set` / `sp.globals.set` later in the run.
+  const envVarOverrides    = parseKeyVals(args['env-var']);
+  const globalVarOverrides = parseKeyVals(args['global-var']);
+
   // Concurrency: run this many requests at once (1 = sequential). Hooks are
   // barriers and concurrent requests share the pre-batch variable snapshot, so
   // a parallel run suits independent requests.
@@ -251,14 +285,50 @@ async function main() {
 
     if (!firstColName) firstColName = col.name;
 
-    let runEnvVars        = await buildEnvVars(env);
-    let runGlobals        = getGlobals();
+    // Seed the environment / globals scopes with the Postman/Bruno-style CLI
+    // overrides (--env-var / --global-var). They override the stored values but
+    // stay in the scope accumulators, so a script's sp.environment.set /
+    // sp.globals.set during the run overrides them for later requests.
+    let runEnvVars        = { ...(await buildEnvVars(env)), ...envVarOverrides };
+    let runGlobals        = { ...getGlobals(), ...globalVarOverrides };
     let runCollectionVars: Record<string, string> = { ...col.collectionVariables };
     let runLocalVars:     Record<string, string> = {};
     // Folder-scoped variables accumulated during the run, keyed by folder id, so
     // sp.folder.set in one request is visible to later requests in the same
     // folder (mirrors the GUI runner).
     const runFolderVars: Record<string, Record<string, string>> = {};
+    // CLI `--var` is the *initial* value for a variable, not a hard override:
+    // per the precedence chain, a runtime script-set outranks it. So once a
+    // script writes a key (in any scope) during this collection's run, we stop
+    // re-seeding the CLI value for it and let the script's value carry forward.
+    const cliOverridden = new Set<string>();
+    const cliSeed = (): Record<string, string> =>
+      Object.fromEntries(Object.entries(cliVars).filter(([k]) => !cliOverridden.has(k)));
+    // The CLI seed is re-applied fresh each request via cliSeed(); it must NOT
+    // stick in the threaded local vars (the executor echoes the localVars we
+    // pass back as updatedLocalVars), or it would shadow a later script write to
+    // the same key in another scope. So strip CLI keys from the threaded state.
+    const stripCliSeed = (m: Record<string, string>): Record<string, string> => {
+      const copy = { ...m };
+      for (const k of Object.keys(cliVars)) delete copy[k];
+      return copy;
+    };
+    // Flag any CLI key a script changed this request (by scope, vs the fed input).
+    const trackCliOverrides = (
+      out: RunnerExecResult,
+      inputs: { col: Record<string, string>; env: Record<string, string>; globals: Record<string, string>; folder: Record<string, string>; local: Record<string, string> },
+    ): void => {
+      for (const k of Object.keys(cliVars)) {
+        if (cliOverridden.has(k)) continue;
+        if (out.updatedCollectionVars[k] !== inputs.col[k]
+          || out.updatedEnvVars[k]       !== inputs.env[k]
+          || out.updatedGlobals[k]       !== inputs.globals[k]
+          || out.updatedFolderVars[k]    !== inputs.folder[k]
+          || out.updatedLocalVars[k]     !== inputs.local[k]) {
+          cliOverridden.add(k);
+        }
+      }
+    };
 
     console.log(color(`  ┌ ${col.name}`, C.bold, C.white));
 
@@ -345,16 +415,16 @@ async function main() {
           iterationLabel: item.iterationLabel,
         };
       } else {
+        const colInput    = { ...item.collectionVars, ...runCollectionVars, ...resolveAskValues(itemAsks, askAnswers) };
+        const folderInput  = { ...(item.folderVars ?? {}), ...(item.folderId ? runFolderVars[item.folderId] ?? {} : {}) };
+        const localInput   = { ...cliSeed(), ...runLocalVars, ...item.dataRow };
         const out = await executeRunnerRequest({
           req: item.request,
-          collectionVars: { ...item.collectionVars, ...runCollectionVars, ...resolveAskValues(itemAsks, askAnswers) },
+          collectionVars: colInput,
           envVars: runEnvVars,
           globals: runGlobals,
-          localVars: { ...runLocalVars, ...item.dataRow },
-          folderVars: {
-            ...(item.folderVars ?? {}),
-            ...(item.folderId ? runFolderVars[item.folderId] ?? {} : {}),
-          },
+          localVars: localInput,
+          folderVars: folderInput,
           dispatcher,
           piiMaskPatterns: piiPatterns,
           tls: effectiveTls,
@@ -362,11 +432,12 @@ async function main() {
           expectStatus: item.expectStatus,
           owaspTag: item.owaspTag,
         });
+        trackCliOverrides(out, { col: colInput, env: runEnvVars, globals: runGlobals, folder: folderInput, local: localInput });
         result            = out.result;
         runEnvVars        = out.updatedEnvVars;
         runCollectionVars = out.updatedCollectionVars;
         runGlobals        = out.updatedGlobals;
-        runLocalVars      = out.updatedLocalVars;
+        runLocalVars      = stripCliSeed(out.updatedLocalVars);
         if (item.folderId) {
           runFolderVars[item.folderId] = { ...(runFolderVars[item.folderId] ?? {}), ...out.updatedFolderVars };
         }
@@ -420,18 +491,22 @@ async function main() {
         if (skipReason) { resultsByIndex[i] = preResult(item, 'failed', skipReason); return; }
         if (missingAsks.length) { resultsByIndex[i] = preResult(item, 'skipped', `Ask variable(s) not provided: ${missingAsks.join(', ')}`); return; }
         try {
+          const colInput    = { ...item.collectionVars, ...runCollectionVars, ...resolveAskValues(itemAsks, askAnswers) };
+          const folderInput = { ...(item.folderVars ?? {}), ...(item.folderId ? runFolderVars[item.folderId] ?? {} : {}) };
+          const localInput  = { ...cliSeed(), ...runLocalVars, ...item.dataRow };
           const out: RunnerExecResult = await executeRunnerRequest({
             req: item.request,
-            collectionVars: { ...item.collectionVars, ...runCollectionVars, ...resolveAskValues(itemAsks, askAnswers) },
-            envVars: runEnvVars, globals: runGlobals, localVars: { ...runLocalVars, ...item.dataRow },
-            folderVars: { ...(item.folderVars ?? {}), ...(item.folderId ? runFolderVars[item.folderId] ?? {} : {}) },
+            collectionVars: colInput,
+            envVars: runEnvVars, globals: runGlobals, localVars: localInput,
+            folderVars: folderInput,
             dispatcher, piiMaskPatterns: piiPatterns, tls: effectiveTls,
             expectStatus: item.expectStatus, owaspTag: item.owaspTag,
           });
+          trackCliOverrides(out, { col: colInput, env: runEnvVars, globals: runGlobals, folder: folderInput, local: localInput });
           runEnvVars = { ...runEnvVars, ...out.updatedEnvVars };
           runCollectionVars = { ...runCollectionVars, ...out.updatedCollectionVars };
           runGlobals = { ...runGlobals, ...out.updatedGlobals };
-          runLocalVars = { ...runLocalVars, ...out.updatedLocalVars };
+          runLocalVars = stripCliSeed({ ...runLocalVars, ...out.updatedLocalVars });
           if (item.folderId) runFolderVars[item.folderId] = { ...(runFolderVars[item.folderId] ?? {}), ...out.updatedFolderVars };
           const result = out.result;
           result.isHook = item.isHook; result.hookType = item.hookType; result.scopeId = item.scopeId;

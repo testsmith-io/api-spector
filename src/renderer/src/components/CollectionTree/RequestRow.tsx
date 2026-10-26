@@ -161,7 +161,19 @@ export function RequestRow({
         style={{ paddingLeft: indent }}
         onClick={handleRowClick}
         onDoubleClick={() => setRenaming(true)}
-        onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; dragCtx.setDragging({ type: 'request', requestId: reqId, collectionId }); }}
+        onDragStart={e => {
+          e.dataTransfer.effectAllowed = 'move';
+          dragCtx.setDragging({ type: 'request', requestId: reqId, collectionId });
+          // When this request is part of a multi-selection, show how many move.
+          if (selected && sel.count > 1) {
+            const ghost = document.createElement('div');
+            ghost.textContent = t(':count request|:count requests', { count: sel.count });
+            ghost.style.cssText = 'position:absolute;top:-1000px;left:-1000px;padding:4px 8px;font-size:12px;border-radius:4px;background:#1d4ed8;color:#fff;';
+            document.body.appendChild(ghost);
+            e.dataTransfer.setDragImage(ghost, 0, 0);
+            setTimeout(() => ghost.remove(), 0);
+          }
+        }}
         onDragEnd={() => { dragCtx.setDragging(null); }}
       >
         {/* Multi-select checkbox — overlaid in the left indentation gutter (just

@@ -7,7 +7,7 @@ import type { ApiRequest, HttpMethod, KeyValuePair, RunRequestResult } from '../
 import { getHooksForRequest, authIsConfigured } from '../../../../shared/request-collection';
 import { findFolderContaining } from '../../../../shared/folder-tree';
 import { syncParamsFromUrl, buildPreviewUrl } from '../../../../shared/url-params';
-import { resolveEnvironmentById } from '../../hooks/useActiveEnvironment';
+import { resolveEnvironmentById, withEnvOverrides } from '../../hooks/useActiveEnvironment';
 import { useVarValues } from '../../hooks/useVarValues';
 import { ParamsTab } from './ParamsTab';
 import { VarInput } from '../common/VarInput';
@@ -88,7 +88,7 @@ export function RequestBuilder({ request }: Props) {
   const setTabSending       = useStore(s => s.setTabSending);
   const setTabRequestTab    = useStore(s => s.setTabRequestTab);
   const addHistoryEntry     = useStore(s => s.addHistoryEntry);
-  const applyScriptUpdates  = useStore(s => s.applyScriptUpdates);
+  const recordScriptSession = useStore(s => s.recordScriptSession);
   const startLiveStream     = useStore(s => s.startLiveStream);
   const finishLiveStream    = useStore(s => s.finishLiveStream);
   const workspaceSettings   = useStore(s => s.workspace?.settings);
@@ -256,7 +256,6 @@ export function RequestBuilder({ request }: Props) {
     const collectedHookResults: RunRequestResult[] = [];
     try {
       const activeEnv = resolveEnvironmentById(environments, activeEnvironmentId);
-      const sessionVars = useStore.getState().sessionVars;
       const tls = collectionTls
         ? { ...workspaceSettings?.tls, ...collectionTls }
         : workspaceSettings?.tls;
@@ -267,13 +266,32 @@ export function RequestBuilder({ request }: Props) {
         piiMaskPatterns: workspaceSettings?.piiMaskPatterns,
       };
 
+      // Session script values (sp.*.set from earlier sends this session) seed the
+      // scopes so an extracted value — e.g. a token set by a previous manual send
+      // — is visible to this request. They are held in memory only (never written
+      // to disk / the Variables screens) and clear on workspace close / restart.
+      const session = useStore.getState().sessionScriptVars;
+
       let collectionVars: Record<string, string> = {
         ...(activeCollectionId ? (collections[activeCollectionId]?.data.collectionVariables ?? {}) : {}),
-        // Folder-chain variables sit above collection vars and below session/local.
-        ...useStore.getState().getInheritedVariables(request.id),
-        ...sessionVars,
+        ...session.collection,
       };
-      let liveGlobals = { ...globals };
+      // Folder-chain variables are their own scope (folder precedence: above the
+      // environment, below request/local) — passed to the send separately rather
+      // than flattened into collectionVars, which would drop them to collection
+      // precedence (below the environment).
+      const folderVars = {
+        ...useStore.getState().getInheritedVariables(request.id),
+        ...session.folder,
+      };
+      let liveGlobals = { ...globals, ...session.globals };
+      // Script-write accumulators threaded WITHIN this send: a before-hook's
+      // sp.*.set flows into the next hook and the main request through these
+      // locals. Env writes seed from the session and are overlaid onto the
+      // environment via withEnvOverrides; local (sp.variables) is in-send only
+      // (request-scoped) and starts empty.
+      let liveLocalVars: Record<string, string> = {};
+      let liveEnvOverrides: Record<string, string> = { ...session.env };
 
       // Merge folder/collection-level auth and headers for the main request.
       // The request's own auth wins only when it actually carries a credential;
@@ -306,22 +324,29 @@ export function RequestBuilder({ request }: Props) {
       for (const hook of hooks.before) {
         const start = Date.now();
         try {
-          // Re-read the environment each iteration — a prior hook may have
-          // updated it via sp.environment.set() or sp.variables.set().
-          const hookEnv = resolveEnvironmentById(
-            useStore.getState().environments, activeEnvironmentId,
-          );
-          const hookSessionVars = useStore.getState().sessionVars;
+          // Thread any run-only env writes from prior hooks onto the environment
+          // (sp.environment.set / sp.variables.set), without re-reading the store.
+          const hookEnv = withEnvOverrides(activeEnv, liveEnvOverrides);
           const r = await electron.sendRequest({
             ...basePayload,
             environment: hookEnv,
             request: hook,
-            collectionVars: { ...collectionVars, ...hookSessionVars },
+            folderVars: useStore.getState().getInheritedVariables(hook.id),
+            collectionVars: { ...collectionVars, ...liveLocalVars },
             globals: liveGlobals,
           });
-          applyScriptUpdates(r.scriptResult);
-          collectionVars = { ...collectionVars, ...r.scriptResult.updatedCollectionVars };
-          liveGlobals    = { ...liveGlobals,    ...r.scriptResult.updatedGlobals };
+          collectionVars   = { ...collectionVars,   ...r.scriptResult.updatedCollectionVars };
+          liveGlobals      = { ...liveGlobals,      ...r.scriptResult.updatedGlobals };
+          liveLocalVars    = { ...liveLocalVars,    ...r.scriptResult.updatedLocalVars };
+          liveEnvOverrides = { ...liveEnvOverrides, ...r.scriptResult.updatedEnvVars };
+          // Persist the named-scope writes into the session so the next manual
+          // send can read them (in memory only; local vars stay request-scoped).
+          recordScriptSession({
+            env:        r.scriptResult.updatedEnvVars,
+            collection: r.scriptResult.updatedCollectionVars,
+            folder:     r.scriptResult.updatedFolderVars,
+            globals:    r.scriptResult.updatedGlobals,
+          });
           collectedHookResults.push({
             requestId:   hook.id,
             name:        hook.name,
@@ -347,13 +372,10 @@ export function RequestBuilder({ request }: Props) {
       }
 
       // ── Run main request ────────────────────────────────────────────────────
-      // Re-read the environment from the store — before hooks may have updated
-      // it via sp.environment.set() (e.g. extracting a token), and the original
-      // snapshot in basePayload would be stale.
-      const freshEnv = resolveEnvironmentById(
-        useStore.getState().environments, activeEnvironmentId,
-      );
-      const freshSessionVars = useStore.getState().sessionVars;
+      // Before hooks may have set env/local vars via scripts (e.g. extracting a
+      // token); thread those run-only writes onto the environment and into the
+      // collection-var bag for this send. Nothing was written to the store.
+      const freshEnv = withEnvOverrides(activeEnv, liveEnvOverrides);
       // A streamId lets the main process push live frames back for this send;
       // the viewer renders them as they arrive. Only the main request streams.
       const streamId = crypto.randomUUID();
@@ -364,7 +386,8 @@ export function RequestBuilder({ request }: Props) {
           ...basePayload,
           environment: freshEnv,
           request: mergedRequest,
-          collectionVars: { ...collectionVars, ...freshSessionVars },
+          folderVars,
+          collectionVars: { ...collectionVars, ...liveLocalVars },
           globals: liveGlobals,
           streamId,
           ...(selectedDataRow() ? { dataRow: selectedDataRow() } : {}),
@@ -374,9 +397,18 @@ export function RequestBuilder({ request }: Props) {
       }
 
       setTabResponse(activeTabId, result.response, result.scriptResult, result.sentRequest);
-      applyScriptUpdates(result.scriptResult);
-      collectionVars = { ...collectionVars, ...result.scriptResult.updatedCollectionVars };
-      liveGlobals    = { ...liveGlobals,    ...result.scriptResult.updatedGlobals };
+      collectionVars   = { ...collectionVars,   ...result.scriptResult.updatedCollectionVars };
+      liveGlobals      = { ...liveGlobals,      ...result.scriptResult.updatedGlobals };
+      liveLocalVars    = { ...liveLocalVars,    ...result.scriptResult.updatedLocalVars };
+      liveEnvOverrides = { ...liveEnvOverrides, ...result.scriptResult.updatedEnvVars };
+      // Persist the main request's named-scope writes into the session so the
+      // next manual send can read them (in memory only; local stays request-scoped).
+      recordScriptSession({
+        env:        result.scriptResult.updatedEnvVars,
+        collection: result.scriptResult.updatedCollectionVars,
+        folder:     result.scriptResult.updatedFolderVars,
+        globals:    result.scriptResult.updatedGlobals,
+      });
 
       addHistoryEntry({
         id: crypto.randomUUID(),
@@ -392,20 +424,27 @@ export function RequestBuilder({ request }: Props) {
       for (const hook of hooks.after) {
         const start = Date.now();
         try {
-          const hookEnv = resolveEnvironmentById(
-            useStore.getState().environments, activeEnvironmentId,
-          );
-          const hookSessionVars = useStore.getState().sessionVars;
+          const hookEnv = withEnvOverrides(activeEnv, liveEnvOverrides);
           const r = await electron.sendRequest({
             ...basePayload,
             environment: hookEnv,
             request: hook,
-            collectionVars: { ...collectionVars, ...hookSessionVars },
+            folderVars: useStore.getState().getInheritedVariables(hook.id),
+            collectionVars: { ...collectionVars, ...liveLocalVars },
             globals: liveGlobals,
           });
-          applyScriptUpdates(r.scriptResult);
-          collectionVars = { ...collectionVars, ...r.scriptResult.updatedCollectionVars };
-          liveGlobals    = { ...liveGlobals,    ...r.scriptResult.updatedGlobals };
+          collectionVars   = { ...collectionVars,   ...r.scriptResult.updatedCollectionVars };
+          liveGlobals      = { ...liveGlobals,      ...r.scriptResult.updatedGlobals };
+          liveLocalVars    = { ...liveLocalVars,    ...r.scriptResult.updatedLocalVars };
+          liveEnvOverrides = { ...liveEnvOverrides, ...r.scriptResult.updatedEnvVars };
+          // Persist the named-scope writes into the session so the next manual
+          // send can read them (in memory only; local vars stay request-scoped).
+          recordScriptSession({
+            env:        r.scriptResult.updatedEnvVars,
+            collection: r.scriptResult.updatedCollectionVars,
+            folder:     r.scriptResult.updatedFolderVars,
+            globals:    r.scriptResult.updatedGlobals,
+          });
           collectedHookResults.push({
             requestId:   hook.id,
             name:        hook.name,
