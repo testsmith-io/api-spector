@@ -15,8 +15,8 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 
 // --- Mocks: keep the row hermetic (no real store / i18n / cloud / modals). ---
 
-vi.mock('../components/CollectionTree/CollectionTree', () => {
-  const { createContext } = require('react');
+vi.mock('../components/CollectionTree/CollectionTree', async () => {
+  const { createContext } = await vi.importActual<typeof import('react')>('react');
   return {
     DragCtx: createContext({ dragging: null, setDragging: () => {}, onDropRequest: () => {}, onDropFolder: () => {}, onReorderChild: () => {} }),
     SelectionCtx: createContext({ active: false, isSelected: () => false, toggle: () => {}, clear: () => {} }),
@@ -27,9 +27,11 @@ vi.mock('../components/CollectionTree/CollectionTree', () => {
 vi.mock('../components/CollectionTree/SchemaSyncModal', () => ({ SchemaSyncModal: () => null }));
 
 vi.mock('../store', () => {
-  const state: any = { addSecurityTests: () => 0, collections: {} };
-  const useStore: any = (sel: any) => sel(state);
-  useStore.getState = () => state;
+  const state = { addSecurityTests: () => 0, collections: {} as Record<string, unknown> };
+  const useStore = Object.assign(
+    (selector: (s: typeof state) => unknown) => selector(state),
+    { getState: () => state },
+  );
   return { useStore };
 });
 
