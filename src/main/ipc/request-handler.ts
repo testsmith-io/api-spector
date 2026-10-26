@@ -236,7 +236,11 @@ export function registerRequestHandler(ipc: IpcMain): void {
         envVars:        { ...envVars },
         collectionVars: { ...collectionVars },
         globals:        { ...mergedGlobals },
-        localVars:      {},
+        // Seed the script's local scope with the already-resolved local vars
+        // (request-scoped variables + any data-row) so they survive the script
+        // run — otherwise updatedLocalVars below would overwrite them with {} and
+        // {{request-level vars}} would go un-interpolated at send time.
+        localVars:      { ...localVars },
       });
       preScriptMeta         = { error: result.error, consoleOutput: result.consoleOutput };
       localVars             = result.updatedLocalVars;
