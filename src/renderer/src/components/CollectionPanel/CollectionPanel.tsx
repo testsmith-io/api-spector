@@ -1,11 +1,12 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../../store';
-import type { DataSet } from '../../../../shared/types';
+import type { DataSet, KeyValuePair } from '../../../../shared/types';
 import { DataSetEditor } from '../common/DataSetEditor';
 import { DocsEditor } from '../common/DocsEditor';
+import { KVTable } from '../RequestBuilder/KVTable';
 import { useAiAvailable, generateDocs, collectionDocsContext } from '../../lib/ai';
 import { useT } from '../../i18n';
 
@@ -17,12 +18,32 @@ export function CollectionPanel() {
   const collections               = useStore(s => s.collections);
   const updateCollectionDataSet   = useStore(s => s.updateCollectionDataSet);
   const updateCollectionDescription = useStore(s => s.updateCollectionDescription);
+  const updateCollectionVariables = useStore(s => s.updateCollectionVariables);
   const openRunner                = useStore(s => s.openRunner);
   const setCoverageOpen           = useStore(s => s.setCoverageOpen);
   const setCompareOpen            = useStore(s => s.setCompareOpen);
   const aiAvailable               = useAiAvailable();
 
   const [activeTab, setActiveTab] = useState<'documentation' | 'data' | 'variables'>('documentation');
+
+  // Local draft rows for the variables editor. Kept in component state (not
+  // derived each render) so a freshly-added blank row survives until it gets a
+  // key — a Record<string,string> can't hold an empty key, so storing filters
+  // blanks out. Reseeded when the active collection changes.
+  const [varRows, setVarRows] = useState<KeyValuePair[]>([]);
+  useEffect(() => {
+    const vars = activeCollectionId ? collections[activeCollectionId]?.data.collectionVariables : undefined;
+    setVarRows(Object.entries(vars ?? {}).map(([key, value]) => ({ key, value, enabled: true })));
+  // Reseed only on collection switch, not on every keystroke-driven store update.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCollectionId]);
+
+  function setVars(rows: KeyValuePair[]) {
+    setVarRows(rows);
+    if (!activeCollectionId) return;
+    const variables = Object.fromEntries(rows.filter(r => r.key.trim()).map(r => [r.key.trim(), r.value]));
+    updateCollectionVariables(activeCollectionId, variables);
+  }
 
   if (!activeCollectionId) {
     return (
@@ -86,7 +107,7 @@ export function CollectionPanel() {
         {([
           { id: 'documentation', label: 'Documentation', badge: col.description?.trim() ? 1 : 0 },
           { id: 'data',          label: 'Data',          badge: Math.max(iterCount, 0) },
-          { id: 'variables',     label: 'Variables',     badge: Object.keys(col.collectionVariables ?? {}).length },
+          { id: 'variables',     label: 'Variables',     badge: varRows.filter(r => r.key.trim()).length },
         ] as const).map(tab => (
           <button
             key={tab.id}
@@ -121,27 +142,14 @@ export function CollectionPanel() {
         )}
 
         {activeTab === 'variables' && (
-          <div className="flex flex-col gap-2 text-xs text-surface-600">
-            {Object.keys(col.collectionVariables ?? {}).length === 0 ? (
-              <p>{t('No collection variables. Scripts can set them via')} <code className="text-surface-500">sp.collectionVariables.set(…)</code>.</p>
-            ) : (
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-surface-700 text-surface-500">
-                    <th className="px-2 py-1 text-left font-medium">{t('Key')}</th>
-                    <th className="px-2 py-1 text-left font-medium">{t('Value')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(col.collectionVariables ?? {}).map(([k, v]) => (
-                    <tr key={k} className="border-b border-surface-800/60">
-                      <td className="px-2 py-1 font-mono text-blue-400">{k}</td>
-                      <td className="px-2 py-1 font-mono text-surface-300">{v}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+          <div className="flex flex-col gap-2 text-xs">
+            <p className="text-surface-500">
+              {t('Variables scoped to this collection. They are overridden by folder variables, the active environment, and script-set values. Reference them anywhere with :token.', { token: '{{name}}' })}
+            </p>
+            <KVTable rows={varRows} onChange={setVars} keyPlaceholder={t('name')} valuePlaceholder={t('value')} />
+            <p className="text-surface-600 text-[11px]">
+              {t('Scripts can also set these at runtime via')} <code className="text-surface-500">sp.collectionVariables.set(…)</code>.
+            </p>
           </div>
         )}
       </div>

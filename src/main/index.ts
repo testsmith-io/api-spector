@@ -3,7 +3,6 @@
 
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell } from 'electron';
 import { IPC } from '../shared/ipc-channels';
-import { handleIpc } from './ipc/handle';
 
 // Managed / locked-down machines (corporate Windows with EDR software, or
 // Linux with user-namespaces disabled) can hit "permission denied" with
@@ -18,31 +17,13 @@ if (process.env.ELECTRON_NO_SANDBOX === '1') {
 }
 import { join, resolve } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
-import { registerFileHandlers } from './ipc/file-handler';
-import { registerRequestHandler } from './ipc/request-handler';
-import { registerSecretHandlers, initSecretStore } from './ipc/secret-handler';
-import { registerAiHandlers } from './ipc/ai-handler';
-import { registerImportHandlers } from './ipc/import-handler';
-import { registerGenerateHandlers } from './ipc/generate-handler';
-import { registerRunnerHandler } from './ipc/runner-handler';
-import { registerFlowHandler } from './ipc/flow-handler';
-import { registerMockHandlers } from './ipc/mock-handler';
-import { registerOAuth2Handlers } from './ipc/oauth2-handler';
-import { registerVaultHandlers } from './ipc/vault-handler';
-import { registerWsHandlers, closeAllWsConnections } from './ipc/ws-handler';
-import { registerSocketIoHandlers, closeAllSocketIoConnections } from './ipc/socketio-handler';
-import { registerJqHandlers } from './ipc/jq-handler';
-import { registerGraphqlWsHandlers, closeAllGraphqlWsConnections } from './ipc/graphqlws-handler';
-import { registerMqttHandlers, closeAllMqttConnections } from './ipc/mqtt-handler';
-import { registerPerfHandlers } from './ipc/perf-handler';
-import { registerGrpcHandlers, closeAllGrpcConnections } from './ipc/grpc-handler';
-import { registerSoapHandlers } from './ipc/soap-handler';
-import { registerDocsHandlers }     from './ipc/docs-handler';
-import { registerCoverageHandlers } from './ipc/coverage-handler';
-import { registerContractHandlers } from './ipc/contract-handler';
-import { registerGitHandlers }    from './ipc/git-handler';
-import { registerRecordHandlers }  from './ipc/record-handler';
-import { registerCloudHandlers }   from './ipc/cloud-handler';
+import { registerAllHandlers } from './register-handlers';
+import { initSecretStore } from './ipc/secret-handler';
+import { closeAllWsConnections } from './ipc/ws-handler';
+import { closeAllSocketIoConnections } from './ipc/socketio-handler';
+import { closeAllGraphqlWsConnections } from './ipc/graphqlws-handler';
+import { closeAllMqttConnections } from './ipc/mqtt-handler';
+import { closeAllGrpcConnections } from './ipc/grpc-handler';
 import { checkForUpdate }          from './update-check';
 import { initAutoUpdater, installUpdate, updateMode } from './auto-updater';
 import { stopAll } from './mock-server';
@@ -259,35 +240,13 @@ app.on('open-url', (event, url) => {
 app.whenReady().then(async () => {
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null);
   await initSecretStore(app.getPath('userData'));
-  registerFileHandlers(ipcMain);
-  registerRequestHandler(ipcMain);
-  registerSecretHandlers(ipcMain);
-  registerAiHandlers(ipcMain);
-  registerImportHandlers(ipcMain);
-  registerGenerateHandlers(ipcMain);
-  registerRunnerHandler(ipcMain);
-  registerFlowHandler(ipcMain);
-  registerMockHandlers(ipcMain);
-  registerOAuth2Handlers(ipcMain);
-  registerVaultHandlers(ipcMain);
-  registerWsHandlers(ipcMain);
-  registerSocketIoHandlers(ipcMain);
-  registerJqHandlers(ipcMain);
-  registerGraphqlWsHandlers(ipcMain);
-  registerMqttHandlers(ipcMain);
-  registerPerfHandlers(ipcMain);
-  registerGrpcHandlers(ipcMain);
-  registerSoapHandlers(ipcMain);
-  registerDocsHandlers(ipcMain);
-  registerCoverageHandlers(ipcMain);
-  registerContractHandlers(ipcMain);
-  registerGitHandlers(ipcMain);
-  registerRecordHandlers(ipcMain, () => BrowserWindow.getAllWindows()[0]?.webContents ?? null);
-  registerCloudHandlers(ipcMain);
-  handleIpc(ipcMain, IPC.shell.openExternal, (_e, url: string) => shell.openExternal(url));
-  handleIpc(ipcMain, IPC.app.checkUpdate, () => checkForUpdate());
-  handleIpc(ipcMain, IPC.app.updateMode, () => updateMode());
-  handleIpc(ipcMain, IPC.app.installUpdate, () => installUpdate());
+  registerAllHandlers(ipcMain, {
+    getRecordWebContents: () => BrowserWindow.getAllWindows()[0]?.webContents ?? null,
+    openExternal:  (url) => shell.openExternal(url),
+    checkUpdate:   () => checkForUpdate(),
+    updateMode:    () => updateMode(),
+    installUpdate: () => installUpdate(),
+  });
 
   createWindow();
 

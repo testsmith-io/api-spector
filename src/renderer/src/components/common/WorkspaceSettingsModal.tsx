@@ -18,7 +18,9 @@ const ZOOM_STEPS = [0.75, 0.90, 1.0, 1.10, 1.25, 1.50];
 
 type SettingsTab = 'general' | 'appearance' | 'proxy' | 'tls' | 'privacy' | 'cloud' | 'ai' | 'secrets'
 
-export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => void }) {
+const SETTINGS_TABS: SettingsTab[] = ['general', 'appearance', 'proxy', 'tls', 'privacy', 'cloud', 'ai', 'secrets'];
+
+export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClose: () => void; readonly initialTab?: string | null }) {
   const workspace = useStore(s => s.workspace);
   const updateWorkspaceSettings = useStore(s => s.updateWorkspaceSettings);
   const environments = useStore(s => s.environments);
@@ -34,7 +36,9 @@ export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => vo
 
   const existing = workspace?.settings ?? {};
 
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+  const [activeTab, setActiveTab] = useState<SettingsTab>(
+    initialTab && SETTINGS_TABS.includes(initialTab as SettingsTab) ? initialTab as SettingsTab : 'general',
+  );
 
   // General state
   const [defaultEnvironment, setDefaultEnvironment] = useState(existing.defaultEnvironment ?? '');
@@ -59,8 +63,28 @@ export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => vo
   // the endpoint is fixed for end users, so it is not shown here)
   const [cloudEnabled, setCloudEnabled] = useState(existing.cloud?.enabled ?? false);
   const [cloudToken,   setCloudToken]   = useState('');
-  const cloudTokenSet = existing.cloud?.tokenSet ?? false;
+  const [cloudTokenSet, setCloudTokenSet] = useState(existing.cloud?.tokenSet ?? false);
   const [cloudTest, setCloudTest] = useState<{ status: 'idle' | 'testing' | 'ok' | 'err'; msg?: string }>({ status: 'idle' });
+  const [connecting, setConnecting] = useState(false);
+
+  // One-click connect: browser consent + PKCE in the main process, then store the
+  // returned token like a pasted one and turn cloud on.
+  async function connectCloud() {
+    setConnecting(true);
+    setCloudTest({ status: 'testing' });
+    try {
+      const r = await electron.cloudConnect();
+      await electron.setSecret('cloud:token', r.token);
+      setCloudEnabled(true);
+      setCloudTokenSet(true);
+      setCloudToken('');
+      setCloudTest({ status: 'ok', msg: t('Connected as :email', { email: r.email }) });
+    } catch (e) {
+      setCloudTest({ status: 'err', msg: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setConnecting(false);
+    }
+  }
 
   async function testCloud() {
     setCloudTest({ status: 'testing' });
@@ -508,6 +532,20 @@ export function WorkspaceSettingsModal({ onClose }: { readonly onClose: () => vo
                   </span>
                 </span>
               </label>
+
+              {/* One-click connect — the primary path; no token to copy. */}
+              <button
+                onClick={connectCloud}
+                disabled={connecting}
+                className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded font-medium transition-colors"
+              >
+                {connecting ? t('Waiting for your browser…') : t('Sign in with API Spector')}
+              </button>
+              <p className="text-surface-600 text-[11px] -mt-1">
+                {t('Opens your browser to approve this device, then connects automatically. Free to start, no card.')}
+              </p>
+
+              <div className="text-surface-600 text-[11px] uppercase tracking-wide pt-1">{t('or paste a token manually')}</div>
 
               <div className="flex flex-col gap-1">
                 <label className={labelCls}>

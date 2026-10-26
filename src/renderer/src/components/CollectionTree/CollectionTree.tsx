@@ -40,6 +40,20 @@ export const DragCtx = createContext<{
   onReorderChild: ( destCollectionId: string, destParentFolderId: string, destIndex: number ) => void
 }>( { dragging: null, setDragging: () => { }, onDropRequest: () => { }, onDropFolder: () => { }, onReorderChild: () => { } } );
 
+// Left padding (px) for a tree row at a given folder depth. Depth is the real
+// collection/folder nesting only — requests and examples do NOT add a level, so
+// first-level requests sit close to the edge and get the width back for names.
+// Capped so deeply nested folders can't push content off-screen.
+const INDENT_STEP = 12;
+// Enough left gutter at the first level to host the hover-only selection
+// checkbox (overlaid in the indentation, so it reserves no column) while still
+// bringing the method far closer to the edge than before.
+const INDENT_BASE = 16;
+const INDENT_MAX_DEPTH = 12;
+function indentPx ( depth: number ): number {
+  return Math.min( depth, INDENT_MAX_DEPTH ) * INDENT_STEP + INDENT_BASE;
+}
+
 // ─── Drop line (unified child ordering) ─────────────────────────────────────────
 // A thin target between rows (and at the very top, under the collection name)
 // that drops the dragged item at a specific position among a folder's children.
@@ -520,7 +534,7 @@ function CollectionNode ( {
     <div>
       <div
         data-row
-        className={`group flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-surface-800 transition-colors ${panelActive ? 'bg-surface-800 text-[var(--text-primary)]' : isActive ? 'text-[var(--text-primary)]' : 'text-surface-400'
+        className={`group flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-surface-800 transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${panelActive ? 'bg-surface-800 text-[var(--text-primary)]' : isActive ? 'text-[var(--text-primary)]' : 'text-surface-400'
           } ${col.disabled ? 'opacity-50' : ''} ${dropOver ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
         role="button"
         tabIndex={0}
@@ -682,7 +696,7 @@ function FolderRow ( {
   const [dropInside, setDropInside] = useState( false );
   const dragCtx = useContext( DragCtx );
   const tags = folder.tags ?? [];
-  const indent = depth * 12 + 8;
+  const indent = indentPx( depth );
   const hasInheritedConfig = ( folder.auth && folder.auth.type !== 'none' ) || ( folder.headers && folder.headers.length > 0 );
 
   function handleFolderDragOver ( e: React.DragEvent<HTMLDivElement> ) {
@@ -707,7 +721,7 @@ function FolderRow ( {
       <div
         data-row
         draggable
-        className={`group flex items-center gap-1 py-1 transition-colors cursor-pointer ${isActive ? 'bg-surface-800 text-[var(--text-primary)]' : 'text-surface-400 hover:bg-surface-800'} ${folder.disabled ? 'opacity-40' : ''} ${dropInside ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
+        className={`group flex items-center gap-1 py-1 transition-colors cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${isActive ? 'bg-surface-800 text-[var(--text-primary)]' : 'text-surface-400 hover:bg-surface-800'} ${folder.disabled ? 'opacity-40' : ''} ${dropInside ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
         style={{ paddingLeft: indent }}
         role="button"
         tabIndex={0}
@@ -854,7 +868,7 @@ function FolderContents ( {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const t = useT();
 
-  const dropIndent = ( depth + 1 ) * 12 + 8;
+  const dropIndent = indentPx( depth );
 
   // Requests and sub-folders are rendered in one unified, drag-orderable list
   // (folder.childOrder). A drop line sits before every child and after the last,
@@ -868,7 +882,7 @@ function FolderContents ( {
           folder={sub}
           collectionId={collectionId}
           parentFolderId={folder.id}
-          depth={depth + 1}
+          depth={depth}
           expandCtrl={expandCtrl}
           onRequestExpand={onRequestExpand}
           onAddRequest={() => onAddRequest( sub.id )}
@@ -925,7 +939,7 @@ function FolderContents ( {
         tags={req.meta?.tags ?? []}
         isActive={req.id === activeRequestId}
         autoRename={req.id === newRequestId}
-        indent={( depth + 1 ) * 12 + 8}
+        indent={indentPx( depth )}
         examples={req.examples?.map( e => ( { id: e.id, name: e.name } ) )}
         activeExampleId={req.id === activeRequestId ? activeExampleId : null}
         onSelect={() => onSelectRequest( req.id )}

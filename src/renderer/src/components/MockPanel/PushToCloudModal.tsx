@@ -5,8 +5,11 @@ import React, { useEffect, useState } from 'react';
 import { Modal } from '../common/Modal';
 import { pushMockToCloud, getCloudMockRoutes } from '../../lib/cloud-push';
 import { getMethodColor } from '../../../../shared/colors';
+import { useStore } from '../../store';
 import { useT } from '../../i18n';
 import type { MockServer } from '../../../../shared/types';
+
+const { electron } = window;
 
 /** Normalised key for matching a route to what the cloud already has. */
 function routeKey(method: string, path: string): string {
@@ -19,7 +22,9 @@ export function PushToCloudModal({ mock, onClose }: { readonly mock: MockServer;
   const t = useT();
   const routes = mock.routes ?? [];
   const [selected, setSelected] = useState<Set<string>>(new Set(routes.map(r => r.id)));
-  const [status, setStatus] = useState<{ state: 'idle' | 'pushing' | 'ok' | 'err'; msg?: string }>({ state: 'idle' });
+  const [status, setStatus] = useState<{ state: 'idle' | 'pushing' | 'ok' | 'err'; msg?: string; url?: string }>({ state: 'idle' });
+  const [copied, setCopied] = useState(false);
+  const updateMock = useStore(s => s.updateMock);
   // Keys of routes that already exist in the cloud mock (null = still loading).
   const [existing, setExisting] = useState<Set<string> | null>(null);
 
@@ -51,10 +56,26 @@ export function PushToCloudModal({ mock, onClose }: { readonly mock: MockServer;
     setStatus({ state: 'pushing' });
     try {
       const r = await pushMockToCloud(mock, [...selected]);
-      setStatus({ state: 'ok', msg: r.url });
+      // Persist the shareable URL on the mock so the panel can surface it later
+      // without a re-push.
+      const entry = useStore.getState().mocks[mock.id];
+      if (entry) {
+        const next: MockServer = { ...entry.data, cloud: { id: r.id, url: r.url, pushedAt: Date.now() } };
+        updateMock(mock.id, next);
+        await electron.saveMock(entry.relPath, next);
+      }
+      setStatus({ state: 'ok', url: r.url });
     } catch (e) {
       setStatus({ state: 'err', msg: (e as Error).message });
     }
+  }
+
+  async function copyUrl(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* clipboard unavailable */ }
   }
 
   return (
@@ -98,30 +119,50 @@ export function PushToCloudModal({ mock, onClose }: { readonly mock: MockServer;
         )}
       </div>
 
-      <div className="px-4 py-3 border-t border-surface-800 flex items-center gap-2 flex-shrink-0">
-        {status.state === 'ok' ? (
-          <>
-            <span className="text-green-400 text-[11px] flex-1 truncate">✓ {t('Pushed :count route → :url|Pushed :count routes → :url', { count: selected.size, url: status.msg ?? '' })}</span>
-            <button onClick={onClose} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-xs font-medium">{t('Done')}</button>
-          </>
-        ) : (
-          <>
-            {status.state === 'err' && <span className="text-red-400 text-[11px] flex-1 truncate">✗ {status.msg}</span>}
+      {status.state === 'ok' ? (
+        <div className="px-4 py-3 border-t border-surface-800 flex flex-col gap-2 flex-shrink-0">
+          <span className="text-green-400 text-[11px]">✓ {t('Pushed :count route to the cloud. Share this link with your team:|Pushed :count routes to the cloud. Share this link with your team:', { count: selected.size })}</span>
+          <div className="flex items-center gap-2">
+            <input
+              readOnly
+              value={status.url ?? ''}
+              onFocus={e => e.currentTarget.select()}
+              className="flex-1 min-w-0 bg-surface-900 border border-surface-700 rounded px-2 py-1 text-[11px] font-mono text-surface-200 focus:outline-none focus:border-blue-500"
+            />
             <button
-              onClick={push}
-              disabled={status.state === 'pushing' || selected.size === 0}
-              className="ml-auto px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 rounded text-xs font-medium"
+              onClick={() => copyUrl(status.url ?? '')}
+              className="px-3 py-1 rounded text-[11px] bg-surface-800 hover:bg-surface-700 transition-colors"
             >
-              {status.state === 'pushing'
-                ? t('Pushing…')
-                : overwriteCount > 0
-                  ? t('Push :count (:add new, :overwrite overwrite)', { count: selected.size, add: addCount, overwrite: overwriteCount })
-                  : t('Push :count route|Push :count routes', { count: selected.size })}
+              {copied ? t('Copied') : t('Copy')}
             </button>
-            <button onClick={onClose} className="px-4 py-1.5 bg-surface-800 hover:bg-surface-700 rounded text-xs">{t('Cancel')}</button>
-          </>
-        )}
-      </div>
+            <button
+              onClick={() => { if (status.url) void electron.openExternal(status.url); }}
+              className="px-3 py-1 rounded text-[11px] bg-surface-800 hover:bg-surface-700 transition-colors"
+            >
+              {t('Open')}
+            </button>
+          </div>
+          <div className="flex justify-end">
+            <button onClick={onClose} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-xs font-medium">{t('Done')}</button>
+          </div>
+        </div>
+      ) : (
+        <div className="px-4 py-3 border-t border-surface-800 flex items-center gap-2 flex-shrink-0">
+          {status.state === 'err' && <span className="text-red-400 text-[11px] flex-1 truncate">✗ {status.msg}</span>}
+          <button
+            onClick={push}
+            disabled={status.state === 'pushing' || selected.size === 0}
+            className="ml-auto px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 rounded text-xs font-medium"
+          >
+            {status.state === 'pushing'
+              ? t('Pushing…')
+              : overwriteCount > 0
+                ? t('Push :count (:add new, :overwrite overwrite)', { count: selected.size, add: addCount, overwrite: overwriteCount })
+                : t('Push :count route|Push :count routes', { count: selected.size })}
+          </button>
+          <button onClick={onClose} className="px-4 py-1.5 bg-surface-800 hover:bg-surface-700 rounded text-xs">{t('Cancel')}</button>
+        </div>
+      )}
     </Modal>
   );
 }

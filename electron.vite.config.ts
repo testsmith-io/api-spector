@@ -16,6 +16,9 @@ export default defineConfig( {
       rollupOptions: {
         input: {
           index: resolve( __dirname, 'src/main/index.ts' ),
+          // Composable backend registration, emitted standalone so another
+          // Electron host (the webinar presenter) can re-host the IPC handlers.
+          'register-handlers': resolve( __dirname, 'src/main/register-handlers.ts' ),
           // Load-generation worker (Electron utilityProcess) for performance runs.
           'perf-worker': resolve( __dirname, 'src/main/perf-worker.ts' ),
           runner:   resolve( __dirname, 'src/cli/runner.ts' ),

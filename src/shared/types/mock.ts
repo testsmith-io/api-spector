@@ -30,6 +30,10 @@ export interface MockServer {
   name: string
   port: number
   routes: MockRoute[]
+  /** Set once the mock has been pushed to the cloud: its public shareable URL
+   *  and the cloud record id. Lets the UI surface the share link without a
+   *  re-push. Cleared is fine; it is refreshed on the next push. */
+  cloud?: { id: number; url: string; pushedAt: number }
 }
 
 export interface MockHit {

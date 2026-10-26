@@ -355,6 +355,7 @@ function FlowEditor({ flow }: { readonly flow: Flow }) {
   const theme        = useStore(s => s.theme);
   const collections  = useStore(s => s.collections);
   const storeFlows   = useStore(s => s.flows);
+  const openWorkspaceSettings = useStore(s => s.openWorkspaceSettings);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(useMemo(() => toRfNodes(flow), [flow]));
   const [edges, setEdges, onEdgesChange] = useEdgesState(useMemo(() => toRfEdges(flow), [flow]));
@@ -725,7 +726,7 @@ function FlowEditor({ flow }: { readonly flow: Flow }) {
         )}
 
         <div className="ml-auto flex items-center gap-2">
-          {showCloud && (
+          {showCloud ? (
             <div className="flex items-center gap-1.5 pr-2 mr-1 border-r border-surface-800">
               <button onClick={doPushCloud} disabled={cloudBusy} title={t('Upload this flow to the cloud')}
                 className="px-2.5 py-1.5 text-xs text-sky-200 bg-sky-900/40 hover:bg-sky-900/60 border border-sky-800/50 disabled:opacity-50 rounded font-medium transition-colors">☁ {t('Push')}</button>
@@ -734,6 +735,10 @@ function FlowEditor({ flow }: { readonly flow: Flow }) {
               <button onClick={() => openCloudFlow(liveFlow)} title={t('Open in cloud')}
                 className="px-2 py-1.5 text-xs text-surface-400 hover:text-surface-200 bg-surface-800 hover:bg-surface-700 rounded transition-colors">↗</button>
             </div>
+          ) : (
+            // Activation nudge: run flows on a schedule in the cloud. Opens Settings → Cloud.
+            <button onClick={() => openWorkspaceSettings('cloud')} title={t('Connect to API Spector Cloud to run flows on a schedule')}
+              className="px-2.5 py-1.5 mr-1 text-xs text-sky-300 bg-sky-900/30 hover:bg-sky-900/50 border border-sky-800/50 rounded font-medium transition-colors">☁ {t('Run in the cloud')}</button>
           )}
           <select
             value={selectedEnv}

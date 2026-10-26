@@ -28,6 +28,7 @@ import type {
 } from '../shared/types';
 import { detectStreamKind, readStream } from './stream/parse';
 import { interpolate, buildUrl, mergeVars, buildDynamicVars, resolveDataRow, resolveInlineSecretRefs } from './interpolation';
+import { stripJsonComments } from '../shared/strip-json-comments';
 import { runScript } from './script-runner';
 import { runMqttTest } from './mqtt-test';
 import { runWsTest, runSocketIoTest } from './realtime-test';
@@ -339,7 +340,10 @@ export function buildBodyAndApplyHeaders(
   let body: string | undefined;
 
   if (req.body.mode === 'json' && req.body.json) {
-    body = interpolate(req.body.json, vars);
+    // Allow // and /* */ comments in the JSON body (JSONC): strip them before
+    // interpolating, so authored comments are removed but a `//` inside an
+    // interpolated value (e.g. a URL) is left untouched.
+    body = interpolate(stripJsonComments(req.body.json), vars);
     if (!headers.has('content-type')) headers.set('Content-Type', 'application/json');
   } else if (req.body.mode === 'form' && req.body.form) {
     body = req.body.form
@@ -355,7 +359,7 @@ export function buildBodyAndApplyHeaders(
     const gqlBody: Record<string, unknown> = { query: interpolate(gql.query, vars) };
     const rawVars = gql.variables?.trim();
     if (rawVars) {
-      try { gqlBody.variables = JSON.parse(interpolate(rawVars, vars)); } catch { /* keep out */ }
+      try { gqlBody.variables = JSON.parse(interpolate(stripJsonComments(rawVars), vars)); } catch { /* keep out */ }
     }
     if (gql.operationName?.trim()) gqlBody.operationName = gql.operationName.trim();
     body = JSON.stringify(gqlBody);

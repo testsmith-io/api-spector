@@ -22,6 +22,8 @@ export interface UiSliceState {
   activePerfPlanId: string | null
 
   workspaceSettingsOpen: boolean
+  /** When set, the settings modal opens on this tab (e.g. 'cloud' from a nudge). */
+  workspaceSettingsTab: string | null
 
   // Command palette
   commandPaletteOpen: boolean
@@ -72,6 +74,8 @@ export interface UiSliceActions {
   setSidebarTab: (tab: UiSliceState['sidebarTab']) => void
   setActivePerfPlanId: (id: string | null) => void
   setWorkspaceSettingsOpen: (open: boolean) => void
+  /** Open the settings modal, optionally jumping straight to a tab. */
+  openWorkspaceSettings: (tab?: string | null) => void
   setCommandPaletteOpen: (open: boolean) => void
   setPinnedResponse: (r: ResponsePayload | null) => void
   setActiveGitDiff: (d: { path: string; staged: boolean } | null) => void
@@ -105,6 +109,7 @@ export const createUiSlice: StateCreator<
   sidebarTab: 'collections' as UiSliceState['sidebarTab'],
   activePerfPlanId: null,
   workspaceSettingsOpen: false,
+  workspaceSettingsTab: null,
   commandPaletteOpen: false,
   pinnedResponse: null,
   activeGitDiff: null,
@@ -153,7 +158,8 @@ export const createUiSlice: StateCreator<
   setSidebarTab: (tab) => set(s => { s.sidebarTab = tab; }),
   setActivePerfPlanId: (id) => set(s => { s.activePerfPlanId = id; }),
 
-  setWorkspaceSettingsOpen: (open) => set(s => { s.workspaceSettingsOpen = open; }),
+  setWorkspaceSettingsOpen: (open) => set(s => { s.workspaceSettingsOpen = open; if (!open) s.workspaceSettingsTab = null; }),
+  openWorkspaceSettings: (tab = null) => set(s => { s.workspaceSettingsOpen = true; s.workspaceSettingsTab = tab; }),
 
   setCommandPaletteOpen: (open) => set(s => { s.commandPaletteOpen = open; }),
 

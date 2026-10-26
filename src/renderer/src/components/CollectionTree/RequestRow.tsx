@@ -9,7 +9,7 @@ import { DragCtx, SelectionCtx, TagChips } from './CollectionTree';
 import { InlineEdit } from '../common/InlineEdit';
 import { type MenuItem, DotsBtn } from '../common/ContextMenu';
 import { onActivateKey } from '../../lib/a11y';
-import { PencilIcon, CopyIcon, TagIcon, SyncIcon, TrashIcon, ShieldIcon, BanIcon, SortAzIcon } from '../common/icons';
+import { PencilIcon, CopyIcon, TagIcon, SyncIcon, TrashIcon, ShieldIcon, BanIcon, SortAzIcon, FileCodeIcon, KeyIcon } from '../common/icons';
 import { useStore } from '../../store';
 import { useToast, Toast } from '../common/Toast';
 import { pushRequestAsMonitor, cloudEnabled } from '../../lib/cloud-push';
@@ -101,12 +101,21 @@ export function RequestRow({
   // no single response, so they do not offer "Add Example".
   const canAddExample = !protocol || protocol === 'http' || protocol === 'soap' || protocol === 'grpc';
   const [renaming, setRenaming] = useState(autoRename);
-  const [examplesOpen, setExamplesOpen] = useState(true);
+  // Examples start collapsed: the count on the request row already signals they
+  // exist, and expanding reveals the grouped "Saved examples" panel.
+  const [examplesOpen, setExamplesOpen] = useState(false);
   const [addingTag, setAddingTag] = useState(false);
   const [showSchemaSync, setShowSchemaSync] = useState(false);
   const dragCtx = useContext(DragCtx);
   const sel = useContext(SelectionCtx);
   const selected = sel.isSelected(collectionId, reqId);
+  // When an example of this request is the open tab, the example row owns the
+  // selection highlight — the parent request must not also look selected, but
+  // it keeps a subtle cue (the connector line tints blue).
+  const exampleActive = activeExampleId != null && examples.some(e => e.id === activeExampleId);
+  // The "Saved examples" group is nudged in from the request's left edge so it
+  // reads as belonging to the request without consuming a full indent level.
+  const groupIndent = indent + 14;
   const { toast, show } = useToast();
   const addSecurityTests = useStore(s => s.addSecurityTests);
 
@@ -143,11 +152,11 @@ export function RequestRow({
         role="button"
         tabIndex={0}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRowClick(e as unknown as React.MouseEvent); } }}
-        className={`group flex items-start gap-1.5 py-1 pr-1 rounded-sm cursor-pointer transition-colors ${
+        className={`group relative flex items-start gap-1.5 py-1 pr-1 rounded-sm cursor-pointer transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${
           disabled ? 'opacity-40' : ''
         } ${
           selected ? 'bg-blue-950/40 ring-1 ring-inset ring-blue-500' :
-          isActive ? 'bg-surface-800 text-[var(--text-primary)]' : 'text-surface-300 hover:bg-surface-800'
+          isActive && !exampleActive ? 'bg-surface-800 text-[var(--text-primary)]' : 'text-surface-300 hover:bg-surface-800'
         }`}
         style={{ paddingLeft: indent }}
         onClick={handleRowClick}
@@ -155,63 +164,50 @@ export function RequestRow({
         onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; dragCtx.setDragging({ type: 'request', requestId: reqId, collectionId }); }}
         onDragEnd={() => { dragCtx.setDragging(null); }}
       >
-        {/* Multi-select checkbox — hidden until row hover, always shown once a
-            selection is in progress so every row can be toggled without the
-            Cmd/Ctrl modifier. */}
+        {/* Multi-select checkbox — overlaid in the left indentation gutter (just
+            left of the chevron) so it reserves no column and causes no layout
+            shift. Hidden + non-interactive until the row is hovered; stays
+            visible once a selection is in progress. */}
         <input
           type="checkbox"
           checked={selected}
           onClick={e => e.stopPropagation()}
           onChange={() => sel.toggle(collectionId, reqId)}
           title={t('Select request (or Cmd/Ctrl+click the row)')}
-          className={`shrink-0 mt-0.5 accent-blue-500 cursor-pointer ${sel.active || selected ? '' : 'opacity-0 group-hover:opacity-100'}`}
+          style={{ left: Math.max(indent - 13, 0) }}
+          className={`absolute top-1.5 accent-blue-500 cursor-pointer ${sel.active || selected ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto'}`}
         />
 
-        {/* Expand caret for nested examples (spacer keeps alignment when none). */}
-        {examples.length > 0 ? (
-          <button
-            onClick={e => { e.stopPropagation(); setExamplesOpen(o => !o); }}
-            className="shrink-0 w-4 h-4 mt-0.5 inline-flex items-center justify-center text-surface-500 hover:text-white leading-none text-[22px]"
-            title={examplesOpen ? t('Hide examples') : t('Show :count example(s)', { count: examples.length })}
-          >{examplesOpen ? '▾' : '▸'}</button>
-        ) : (
-          <span className="shrink-0 w-3" />
-        )}
+        {/* Col 1 — compact, fixed-width chevron slot. Empty (but same width)
+            when the request has no examples, so method and name never shift. */}
+        <span className="shrink-0 w-4 flex items-center justify-center mt-0.5">
+          {examples.length > 0 && (
+            <button
+              onClick={e => { e.stopPropagation(); setExamplesOpen(o => !o); }}
+              aria-expanded={examplesOpen}
+              className="w-4 h-4 inline-flex items-center justify-center text-surface-500 hover:text-white leading-none text-[22px] outline-none focus-visible:ring-1 focus-visible:ring-blue-400 rounded-sm"
+              title={examplesOpen ? t('Hide examples') : t('Show :count example(s)', { count: examples.length })}
+            >{examplesOpen ? '▾' : '▸'}</button>
+          )}
+        </span>
 
-        {/* Protocol badge — SOAP/WS get distinct colors so they don't blend
-            with REST POSTs. Falls back to the standard method badge for HTTP. */}
-        {protocol === 'soap' ? (
-          <span
-            className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-700/80 text-amber-50"
-            title={t('SOAP request')}
-          >
-            SOAP
-          </span>
-        ) : protocol === 'websocket' ? (
-          <span
-            className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-700/80 text-cyan-50"
-            title={t('WebSocket')}
-          >
-            WS
-          </span>
-        ) : protocol === 'socketio' ? (
-          <span
-            className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-fuchsia-700/80 text-fuchsia-50"
-            title={t('Socket.IO')}
-          >
-            IO
-          </span>
-        ) : protocol === 'mqtt' ? (
-          <span
-            className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-700/80 text-teal-50"
-            title={t('MQTT')}
-          >
-            MQTT
-          </span>
-        ) : (
-          <MethodBadge method={method} size="xs" />
-        )}
+        {/* Col 2 — HTTP method / protocol, in a fixed-width column so request
+            names always begin at the same x regardless of the method. */}
+        <span className="shrink-0 w-10 flex items-center mt-0.5">
+          {protocol === 'soap' ? (
+            <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-amber-700/80 text-amber-50" title={t('SOAP request')}>SOAP</span>
+          ) : protocol === 'websocket' ? (
+            <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-cyan-700/80 text-cyan-50" title={t('WebSocket')}>WS</span>
+          ) : protocol === 'socketio' ? (
+            <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-fuchsia-700/80 text-fuchsia-50" title={t('Socket.IO')}>IO</span>
+          ) : protocol === 'mqtt' ? (
+            <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-teal-700/80 text-teal-50" title={t('MQTT')}>MQTT</span>
+          ) : (
+            <MethodBadge method={method} size="xs" />
+          )}
+        </span>
 
+        {/* Col 3 — request name (priority) + muted URL + tags. */}
         <div className="flex-1 min-w-0">
           {renaming ? (
             <InlineEdit
@@ -221,21 +217,37 @@ export function RequestRow({
               className="w-full text-xs"
             />
           ) : (
-            <div className="flex items-center gap-1 min-w-0">
-              <span className="text-xs truncate">{name}</span>
-              {hookType && (
-                <span className={`shrink-0 text-[9px] font-bold px-1 py-px rounded ${HOOK_COLORS[hookType]}`}>
-                  {t(HOOK_LABELS[hookType]).toUpperCase()}
-                </span>
-              )}
-              {authType !== 'none' && (
-                <span
-                  className="shrink-0 text-[9px] px-1 py-px rounded bg-amber-800/40 text-amber-400"
-                  title={t('Auth: :name', { name: AUTH_BADGE_LABELS[authType] ?? authType })}
-                >
-                  {AUTH_BADGE_LABELS[authType] ?? authType}
-                </span>
-              )}
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs truncate" title={name}>{name}</span>
+              {/* Col 4 — secondary metadata, compact icons pinned right so the
+                  name keeps the width. Each carries a descriptive tooltip. */}
+              <span className="shrink-0 ml-auto flex items-center gap-1.5">
+                {hookType && (
+                  <span className={`shrink-0 text-[9px] font-bold px-1 py-px rounded ${HOOK_COLORS[hookType]}`}>
+                    {t(HOOK_LABELS[hookType]).toUpperCase()}
+                  </span>
+                )}
+                {authType !== 'none' && (
+                  <span
+                    className="inline-flex text-amber-400"
+                    title={t('Auth: :name', { name: AUTH_BADGE_LABELS[authType] ?? authType })}
+                  >
+                    <KeyIcon className="w-3.5 h-3.5" />
+                  </span>
+                )}
+                {/* Example count — small and secondary; shown only while the
+                    group is collapsed (expanded, the EXAMPLES header carries it).
+                    Derived from props, so it stays correct on add/move/delete. */}
+                {examples.length > 0 && !examplesOpen && (
+                  <span
+                    className={`inline-flex items-center gap-0.5 text-[10px] tabular-nums ${exampleActive ? 'text-blue-400' : 'text-surface-500'}`}
+                    title={t(':count example|:count examples', { count: examples.length })}
+                  >
+                    <FileCodeIcon className="w-2.5 h-2.5" />
+                    {examples.length}
+                  </span>
+                )}
+              </span>
             </div>
           )}
           {(() => {
@@ -287,24 +299,32 @@ export function RequestRow({
         </div>
         {toast && <div className="fixed bottom-4 right-4 z-[100] w-96"><Toast toast={toast} /></div>}
       </div>
-      {examplesOpen && examples.map(ex => (
-        <ExampleRow
-          key={ex.id}
-          name={ex.name}
-          indent={indent + 18}
-          isActive={activeExampleId === ex.id}
-          reorderable={!!onReorderExample && examples.length > 1}
-          dragging={dragExampleId === ex.id}
-          dragActive={dragExampleId !== null && dragExampleId !== ex.id}
-          onDragStart={() => setDragExampleId(ex.id)}
-          onDragEnd={() => setDragExampleId(null)}
-          onDropOn={() => { if (dragExampleId && dragExampleId !== ex.id) onReorderExample?.(dragExampleId, ex.id); setDragExampleId(null); }}
-          onOpen={() => onOpenExample?.(ex.id)}
-          onRename={n => onRenameExample?.(ex.id, n)}
-          onDelete={() => onDeleteExample?.(ex.id)}
-          onDuplicate={() => onDuplicateExample?.(ex.id)}
-        />
-      ))}
+      {/* Examples under the request: a plain, compact indented list (no card,
+          no header, no connector line). Marked with a neutral icon and their
+          own selection state. Hidden when collapsed (the count then shows on
+          the request row). */}
+      {examplesOpen && examples.length > 0 && (
+        <div className="mb-0.5" style={{ paddingLeft: groupIndent }}>
+          {examples.map(ex => (
+            <ExampleRow
+              key={ex.id}
+              name={ex.name}
+              indent={4}
+              isActive={activeExampleId === ex.id}
+              reorderable={!!onReorderExample && examples.length > 1}
+              dragging={dragExampleId === ex.id}
+              dragActive={dragExampleId !== null && dragExampleId !== ex.id}
+              onDragStart={() => setDragExampleId(ex.id)}
+              onDragEnd={() => setDragExampleId(null)}
+              onDropOn={() => { if (dragExampleId && dragExampleId !== ex.id) onReorderExample?.(dragExampleId, ex.id); setDragExampleId(null); }}
+              onOpen={() => onOpenExample?.(ex.id)}
+              onRename={n => onRenameExample?.(ex.id, n)}
+              onDelete={() => onDeleteExample?.(ex.id)}
+              onDuplicate={() => onDuplicateExample?.(ex.id)}
+            />
+          ))}
+        </div>
+      )}
       {showSchemaSync && (
         <SchemaSyncModal
           collectionId={collectionId}
@@ -317,10 +337,13 @@ export function RequestRow({
 }
 
 // ─── ExampleRow ──────────────────────────────────────────────────────────────
-// A saved request/response snapshot nested under its request in the tree.
+// One saved request/response snapshot, rendered as a compact member of its
+// request's "Saved examples" group (no collection-level indentation, no method
+// badge, a neutral icon, and its own selection/hover styling).
 
 function ExampleRow({ name, indent, isActive, reorderable, dragging, dragActive, onDragStart, onDragEnd, onDropOn, onOpen, onRename, onDelete, onDuplicate }: {
   readonly name: string
+  /** Left padding (px) so the example sits nested under its request. */
   readonly indent: number
   readonly isActive: boolean
   readonly reorderable: boolean
@@ -341,12 +364,13 @@ function ExampleRow({ name, indent, isActive, reorderable, dragging, dragActive,
     <div
       data-row
       draggable={reorderable && !renaming}
-      className={`group flex items-center gap-1.5 py-1 pr-1 rounded-sm cursor-pointer transition-colors ${
-        isActive ? 'bg-surface-800 text-[var(--text-primary)]' : 'text-surface-400 hover:bg-surface-800'
-      } ${dragging ? 'opacity-40' : ''} ${over ? 'ring-1 ring-blue-500' : ''}`}
+      className={`group/ex flex items-center gap-2 h-[26px] pr-2 rounded-sm cursor-pointer transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${
+        isActive ? 'bg-blue-900/40 text-[var(--text-primary)]' : 'text-surface-400 hover:bg-surface-800'
+      } ${dragging ? 'opacity-40' : ''} ${over ? 'ring-1 ring-inset ring-blue-500' : ''}`}
       style={{ paddingLeft: indent }}
       role="button"
       tabIndex={0}
+      aria-label={t('Example: :name', { name })}
       onClick={onOpen}
       onKeyDown={onActivateKey(onOpen)}
       onDoubleClick={() => setRenaming(true)}
@@ -356,7 +380,7 @@ function ExampleRow({ name, indent, isActive, reorderable, dragging, dragActive,
       onDragLeave={() => setOver(false)}
       onDrop={e => { if (dragActive) { e.preventDefault(); e.stopPropagation(); } setOver(false); onDropOn(); }}
     >
-      <span className="shrink-0 text-[8px] font-bold px-1 py-px rounded bg-surface-700 text-surface-300" title={t('Example')}>EX</span>
+      <FileCodeIcon className={`shrink-0 ${isActive ? 'text-blue-300' : 'text-surface-500'}`} />
       <div className="flex-1 min-w-0">
         {renaming ? (
           <InlineEdit
@@ -366,10 +390,10 @@ function ExampleRow({ name, indent, isActive, reorderable, dragging, dragActive,
             className="w-full text-xs"
           />
         ) : (
-          <span className="text-xs truncate">{name}</span>
+          <span className="text-xs truncate block" title={name}>{name}</span>
         )}
       </div>
-      <div className="shrink-0">
+      <div className="shrink-0 opacity-0 group-hover/ex:opacity-100 focus-within:opacity-100 transition-opacity">
         <DotsBtn items={[
           { type: 'item', label: t('Open'), onClick: onOpen },
           { type: 'item', label: t('Rename'), icon: <PencilIcon />, onClick: () => setRenaming(true) },

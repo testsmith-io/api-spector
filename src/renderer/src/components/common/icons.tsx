@@ -38,6 +38,17 @@ export function FolderIcon ( { className = '' }: { readonly className?: string }
     </svg>
   );
 }
+// A document-with-code glyph used to mark saved request/response examples in
+// the tree. Neutral by design — examples are not independent requests, so this
+// reads as a quiet child marker rather than a coloured method badge.
+export function FileCodeIcon ( { className = '' }: { readonly className?: string } ) {
+  return (
+    <svg className={`w-3 h-3 ${className}`} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14 3v5h5M10.5 12.5L9 14l1.5 1.5M13.5 12.5L15 14l-1.5 1.5" />
+    </svg>
+  );
+}
 export function PencilIcon () {
   return (
     <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -83,9 +94,9 @@ export function CopyIcon () {
     </svg>
   );
 }
-export function KeyIcon () {
+export function KeyIcon ( { className = 'w-3 h-3' }: { readonly className?: string } = {} ) {
   return (
-    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a4 4 0 110 8 4 4 0 010-8zm-7 8l-1 1m0 0l-1 1m1-1l1 1M3 20l5-5" />
     </svg>
   );

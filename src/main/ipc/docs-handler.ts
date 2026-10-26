@@ -6,6 +6,8 @@ import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
 import type { Collection, ApiRequest, Folder, SentRequest, ResponsePayload } from '../../shared/types';
 import { escapeHtml } from '../../shared/escape';
+import { markdownToHtml } from '../../shared/markdown-to-html';
+import { flowchartToSvg } from '../../shared/flowchart-svg';
 
 // ─── Payload types ────────────────────────────────────────────────────────────
 
@@ -171,6 +173,12 @@ export function generateMarkdown(payload: DocsPayload): string {
 
 export const escHtml = escapeHtml;
 
+// A description is markdown: render it (headings, lists, code, tables) and turn
+// any `flow` fenced block into an inline SVG diagram.
+function descriptionToHtml(markdown: string): string {
+  return `<div class="md">${markdownToHtml(markdown, { flowchart: flowchartToSvg })}</div>`;
+}
+
 const METHOD_COLORS: Record<string, string> = {
   GET: '#34d399', POST: '#60a5fa', PUT: '#fbbf24', PATCH: '#fb923c',
   DELETE: '#f87171', HEAD: '#6aa3c8', OPTIONS: '#9ca3af', WS: '#22d3ee',
@@ -183,7 +191,7 @@ function requestToHtml(req: ApiRequest, example?: ExampleSnapshot): string {
   html += `<h4><span class="method" style="color:${color}">${escHtml(methodLabel)}</span> ${escHtml(req.name)}</h4>`;
 
   if (req.description?.trim()) {
-    html += `<p class="desc">${escHtml(req.description.trim())}</p>`;
+    html += descriptionToHtml(req.description.trim());
   }
 
   html += `<div class="label">URL</div><pre><code>${escHtml(req.url || '(no url)')}</code></pre>`;
@@ -247,7 +255,7 @@ function folderToHtml(folder: Folder, requests: Record<string, ApiRequest>, dept
   if (folder.name !== 'root') {
     html += `<${tag} class="folder-heading">${escHtml(folder.name)}</${tag}>`;
     if (folder.description?.trim()) {
-      html += `<p class="folder-desc">${escHtml(folder.description.trim())}</p>`;
+      html += descriptionToHtml(folder.description.trim());
     }
   }
 
@@ -269,7 +277,7 @@ export function generateHtml(payload: DocsPayload): string {
   for (const { collection, requests } of payload.collections) {
     body += `<section class="collection"><h2>${escHtml(collection.name)}</h2>`;
     if (collection.description?.trim()) {
-      body += `<p class="collection-desc">${escHtml(collection.description.trim())}</p>`;
+      body += descriptionToHtml(collection.description.trim());
     }
     body += folderToHtml(collection.rootFolder, requests, 3, examples);
     body += `</section>`;
@@ -300,6 +308,18 @@ export function generateHtml(payload: DocsPayload): string {
   td { padding: .35rem .6rem; border: 1px solid #2d3748; color: #cbd5e1; font-family: monospace; font-size: .8rem; }
   .auth-type { background: #1e2433; border: 1px solid #2d3748; border-radius: 4px; display: inline-block; padding: .2rem .6rem; font-size: .8rem; color: #a5f3fc; margin: 0; }
   .folder-heading { color: #94a3b8; font-size: 1.05rem; }
+  .md { color: #cbd5e1; font-size: .9rem; margin: .25rem 0 1rem; }
+  .md > *:first-child { margin-top: 0; }
+  .md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { color: #e2e8f0; border: none; margin: 1rem 0 .4rem; }
+  .md h1 { font-size: 1.15rem; } .md h2 { font-size: 1.05rem; } .md h3 { font-size: .98rem; }
+  .md h4, .md h5, .md h6 { font-size: .9rem; }
+  .md p { margin: .5rem 0; }
+  .md ul, .md ol { padding-left: 1.4rem; margin: .5rem 0; }
+  .md li { margin: .15rem 0; }
+  .md blockquote { border-left: 3px solid #2d3748; padding-left: .8rem; margin: .6rem 0; color: #94a3b8; }
+  .md pre, .md table { margin: .5rem 0; }
+  .md-diagram { overflow-x: auto; margin: 1rem 0; }
+  .md-diagram svg { max-width: 100%; height: auto; background: #131924; border: 1px solid #2d3748; border-radius: 8px; padding: 10px; }
 </style>
 </head>
 <body>

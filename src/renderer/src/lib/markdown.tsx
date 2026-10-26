@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import React from 'react';
+import { FlowchartPreview } from '../components/common/FlowchartPreview';
 
 // A compact, dependency-free Markdown renderer for documentation preview.
 // It escapes all text (React does this for us by rendering strings as children)
@@ -52,10 +53,21 @@ export function renderMarkdown(md: string): React.ReactNode {
 
     // Fenced code block
     if (line.trim().startsWith("```")) {
+      const lang = line.trim().slice(3).trim().toLowerCase();
       const buf: string[] = [];
       i++;
       while (i < lines.length && !lines[i].trim().startsWith("```")) { buf.push(lines[i]); i++; }
       i++; // consume closing fence
+      // A `flow` / `flowchart` fence is a flowchart: render it with the app's
+      // graph canvas instead of showing the source as text.
+      if (lang === 'flow' || lang === 'flowchart') {
+        blocks.push(
+          <div key={k()} className="h-72 border border-surface-700 rounded overflow-hidden bg-surface-900">
+            <FlowchartPreview code={buf.join('\n')} />
+          </div>,
+        );
+        continue;
+      }
       blocks.push(
         <pre key={k()} className="bg-surface-800 border border-surface-700 rounded p-2.5 overflow-x-auto text-[11px] font-mono leading-relaxed">
           <code>{buf.join('\n')}</code>

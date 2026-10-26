@@ -16,11 +16,26 @@ import { generateRestAssured }    from '../generators/rest-assured';
 import { generateKarate }         from '../generators/karate';
 import { generateHttpFile }       from '../generators/http-file';
 import { generateCurl }           from '../generators/curl';
-import type { GenerateOptions, GeneratedFile } from '../../shared/types';
+import { stripJsonComments }       from '../../shared/strip-json-comments';
+import type { GenerateOptions, GeneratedFile, Collection } from '../../shared/types';
+
+// JSON bodies may contain // and /* */ comments (JSONC). Strip them before any
+// generator runs, so generated code embeds valid JSON, not commented source.
+function stripJsonBodyComments(collection: Collection): Collection {
+  const requests = Object.fromEntries(
+    Object.entries(collection.requests).map(([id, req]) =>
+      req.body?.mode === 'json' && req.body.json
+        ? [id, { ...req, body: { ...req.body, json: stripJsonComments(req.body.json) } }]
+        : [id, req],
+    ),
+  );
+  return { ...collection, requests };
+}
 
 export function registerGenerateHandlers(ipc: IpcMain): void {
   handleIpc(ipc, IPC.generate.code, (_e, opts: GenerateOptions): GeneratedFile[] => {
-    const { collection, environment, target } = opts;
+    const { environment, target } = opts;
+    const collection = stripJsonBodyComments(opts.collection);
     switch (target) {
       case 'robot_framework': return generateRobotFramework(collection, environment);
       case 'playwright_ts':   return generatePlaywright(collection, environment);
