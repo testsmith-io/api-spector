@@ -194,6 +194,21 @@ describe('mergeVars', () => {
     expect(result.key).toBe('env');
   });
 
+  it('resolves the full precedence chain low->high: dynamic < global < collection < env < folder < local', () => {
+    const dynamic = { k: 'dynamic' };
+    const globals = { k: 'global' };
+    const collection = { k: 'collection' };
+    const env = { k: 'env' };
+    const folder = { k: 'folder' };
+    const local = { k: 'local' };
+    // mergeVars(env, collection, globals, local, dynamic, folder)
+    expect(mergeVars({}, {}, globals, {}, dynamic).k).toBe('global');
+    expect(mergeVars({}, collection, globals, {}, dynamic).k).toBe('collection');
+    expect(mergeVars(env, collection, globals, {}, dynamic).k).toBe('env');
+    expect(mergeVars(env, collection, globals, {}, dynamic, folder).k).toBe('folder');
+    expect(mergeVars(env, collection, globals, local, dynamic, folder).k).toBe('local');
+  });
+
   it('collection vars override globals', () => {
     const result = mergeVars({}, { key: 'col' }, { key: 'glob' });
     expect(result.key).toBe('col');

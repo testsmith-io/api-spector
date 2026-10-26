@@ -2,26 +2,33 @@
 
 > Environments may extend other environments (see [Environment inheritance](../gui/environments.md#environment-inheritance)). Inheritance is resolved first, producing one flat set of environment variables; the scope precedence below then applies to that resolved set.
 
-API Spector has four variable scopes. Understanding how they relate lets you share data between requests, across collections, and across sessions.
+API Spector resolves `{{variables}}` from several scopes. Understanding how they relate lets you share data between requests, across collections, and across sessions.
 
-## The four scopes
+## The scopes
 
-| Scope | Stored in | Lifetime | Shared across |
+| Scope | Set from | Stored in | Applies to |
 |---|---|---|---|
-| **Local** | Memory only | Single request | Nothing (request-scoped) |
-| **Environment** | `.env.json` file | Persists on disk | All collections using that environment |
-| **Collection** | `.spector` collection file | Persists on disk | All requests in that collection |
-| **Global** | `globals.json` in workspace dir | Persists on disk | All collections in the workspace |
+| **Built-in dynamic** | `{{$timestamp}}`, `{{$guid}}`, … | — | Everywhere (fallback values) |
+| **Global** | script (`sp.globals.set`) | `globals.json` in the workspace dir | All collections in the workspace |
+| **Collection** | GUI (Collection → Variables) or script | `.spector` collection file | Every request in that collection |
+| **Environment** | GUI (Environment editor) or script | `.env.json` file | All collections using that environment |
+| **Folder** | GUI (Folder → Variables) or script | `.spector` collection file | Requests in that folder (an inner folder wins) |
+| **Request** | GUI (Request → Variables) | `.spector` collection file | That request and its examples |
+| **CLI `--var`** | `api-spector run --var k=v` | — | That CLI run |
+| **Data-row** | data table / `--data` file | — | One iteration of a run |
+| **Local / runtime** | script (`sp.variables.set`) | memory | One request (threaded across a run/flow) |
 
-## Resolution order
+## Resolution order (precedence)
 
-When `{{variableName}}` is resolved, the lookup order is:
+When `{{name}}` is resolved, a higher scope overrides a lower one. Low → high:
 
 ```
-Local  →  Environment  →  Collection  →  Global
+built-in dynamic  <  global  <  collection  <  environment  <  folder  <  request  <  CLI --var  <  data-row  <  runtime (script-set)
 ```
 
-**Local wins:** a variable set in a pre-request script overrides all other scopes for that request. A global with the same name is shadowed but not overwritten.
+The rule is **"the closer to the request, the stronger"**: a **folder** value overrides the **environment**, a **request** value overrides the **folder**, and the **environment** overrides collection-level defaults. Runtime script-set values — and a **data-row** for the current iteration — override everything, so a script or a data file can always take control.
+
+**A `null`/`undefined` value is treated as UNSET** — it does not shadow a real value from a lower scope (and never renders as the literal `"null"`).
 
 ---
 
@@ -230,13 +237,13 @@ Because **local wins**, `{{BASE_URL}}` resolves to the local value for this requ
 
 ## Variable scopes summary
 
-```
-┌────────────┬──────────────────────────────┬──────────────────────────────┐
-│ Scope      │ Set from GUI                 │ Set from script              │
-├────────────┼──────────────────────────────┼──────────────────────────────┤
-│ Local      │ Not available                │ sp.variables.set()           │
-│ Environment│ Environment editor           │ sp.environment.set()         │
-│ Collection │ Collection → Variables tab   │ sp.collectionVariables.set() │
-│ Global     │ Not available (script only)  │ sp.globals.set()             │
-└────────────┴──────────────────────────────┴──────────────────────────────┘
-```
+| Scope | Set from GUI | Set from script |
+|---|---|---|
+| Request | Request → Variables tab | — (script writes go to local) |
+| Folder | Folder → Variables tab | `sp.folder.set()` |
+| Collection | Collection → Variables tab | `sp.collectionVariables.set()` |
+| Environment | Environment editor | `sp.environment.set()` |
+| Global | — (script only) | `sp.globals.set()` |
+| Local / runtime | — (script only) | `sp.variables.set()` |
+
+(Listed by where they're authored, not by precedence — see [Resolution order](#resolution-order-precedence) above. Folder overrides environment, request overrides folder.)

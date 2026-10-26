@@ -55,8 +55,10 @@ describe('mergeVars folder precedence', () => {
     expect(vars.k).toBe('folder');
   });
 
-  it('env and local override folder', () => {
-    expect(mergeVars({ k: 'env' }, {}, {}, {}, {}, { k: 'folder' }).k).toBe('env');
+  it('folder overrides environment; local overrides folder', () => {
+    // "Closer to the request wins": a folder value beats the active environment,
+    // and the local bucket (request / CLI / data-row / runtime) beats both.
+    expect(mergeVars({ k: 'env' }, {}, {}, {}, {}, { k: 'folder' }).k).toBe('folder');
     expect(mergeVars({}, {}, {}, { k: 'local' }, {}, { k: 'folder' }).k).toBe('local');
   });
 });
