@@ -11,7 +11,7 @@ import { TrashIcon } from '../common/icons';
 import { useT } from '../../i18n';
 
 // Scopes, from most general to most specific. Precedence (higher wins):
-// global < collection < folder < environment < request. Request variables are
+// global < collection < environment < folder < request. Request variables are
 // the most specific static scope; they locally override any higher scope and
 // are available to the request's examples. (Data-row, runtime sp.set and CLI
 // --var values still override request variables at send time.)
@@ -56,7 +56,7 @@ function collectUsedTokens(req: ApiRequest): string[] {
 
 /**
  * Variables available to a request, by scope, plus an editable request scope.
- * Shows which scope each variable resolves from (request > environment > folder
+ * Shows which scope each variable resolves from (request > folder > environment
  * > collection > global), flags used-but-undefined tokens, and lets you define
  * request-local variables or locally override a higher-level one.
  */
@@ -90,8 +90,8 @@ export function VariablesTab({ request }: { readonly request: ApiRequest }) {
 
   const sourceOf = (name: string): Scope =>
     name in requestVars ? 'request'
-    : envKeys.has(name) ? 'environment'
     : name in folderVars ? 'folder'
+    : envKeys.has(name) ? 'environment'
     : name in collectionVars ? 'collection'
     : 'global';
 

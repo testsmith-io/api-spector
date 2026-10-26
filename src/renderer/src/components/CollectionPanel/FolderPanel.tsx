@@ -114,7 +114,7 @@ export function FolderPanel() {
         {activeTab === 'variables' && (
           <div className="flex flex-col gap-2">
             <p className="text-[11px] text-surface-500 leading-relaxed">
-              {t('Variables scoped to this folder. They override collection variables and are overridden by an inner folder, the active environment, and script-set values. Reference them anywhere with :token.', { token: '{{name}}' })}
+              {t('Variables scoped to this folder. They override collection and environment variables, and are overridden by an inner folder, a request’s own variables, and runtime / CLI / data-row values. Reference them anywhere with :token.', { token: '{{name}}' })}
             </p>
             <KVTable rows={varRows} onChange={setVars} keyPlaceholder={t('name')} valuePlaceholder={t('value')} />
           </div>
