@@ -29,6 +29,12 @@ describe('runPerfTest scheduler', () => {
     expect(res.peakVus).toBeLessThanOrEqual(6);
   });
 
+  it('a run that finishes normally is not flagged as stopped early', async () => {
+    const schedule: PerfSchedule = { executor: 'vus', stages: [{ durationSec: 1, target: 2, ramp: false }], maxVus: 0, totalSec: 1, mode: 'request', pattern: 'basic' };
+    const res = await runPerfTest(schedule, okIterate(5, 200));
+    expect(res.stopped).toBe(false);
+  });
+
   it('open model (arrival) starts iterations at a rate within the VU cap', async () => {
     const schedule: PerfSchedule = { executor: 'arrival', stages: [{ durationSec: 1, target: 30, ramp: false }], maxVus: 50, totalSec: 1, mode: 'request', pattern: 'arrivals' };
     const res = await runPerfTest(schedule, okIterate(5, 200));

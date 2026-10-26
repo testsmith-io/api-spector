@@ -72,10 +72,15 @@ export async function runPerfTest(
   let activeVus = 0;
   let peakVus = 0;
   let dropped = 0;
+  // `stopped` is the internal wind-down signal — it is also set on normal
+  // completion to drain the workers, so it does NOT mean "the user stopped it".
+  // `stoppedEarly` is the real indicator: only a stop() call (the Stop button)
+  // sets it, so the result reflects an actual early stop, not a finished run.
   let stopped = false;
+  let stoppedEarly = false;
 
   const start = Date.now();
-  active = { stop: () => { stopped = true; } };
+  active = { stop: () => { stopped = true; stoppedEarly = true; } };
 
   const record = (s: PerfIterationSample): void => {
     iterations += 1;
@@ -217,7 +222,7 @@ export async function runPerfTest(
     series,
     peakVus,
     droppedArrivals: dropped,
-    stopped,
+    stopped: stoppedEarly,
     thresholds: [],
     passed: true,
   };
