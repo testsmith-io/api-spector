@@ -44,6 +44,18 @@ describe('folder name uniqueness at one level', () => {
     expect(folders(colId).map(f => f.name)).toEqual(['Animals']);
   });
 
+  it('duplicateFolder works and gives the copy a unique name', () => {
+    // Regression: cloneAndReId used structuredClone on the immer draft (a Proxy),
+    // which threw DataCloneError — so "Duplicate folder" silently did nothing.
+    const { colId, rootId } = freshCollection();
+    useStore.getState().addFolder(colId, rootId, 'Pets');
+    const pets = folders(colId).find(f => f.name === 'Pets')!;
+    useStore.getState().duplicateFolder(colId, pets.id);
+    const names = folders(colId).map(f => f.name);
+    expect(names).toContain('Pets');
+    expect(names).toContain('Pets (copy)');
+  });
+
   it('a nested folder may reuse a name used at a different level', () => {
     const { colId, rootId } = freshCollection();
     useStore.getState().addFolder(colId, rootId, 'Pets');

@@ -95,41 +95,9 @@ cost, data location, and secrets.
 
 ---
 
-## 🎬 Main demo
+## Exercises
 
-> **Step by step through a typical workday**
 
-1. Initialize a new **git project**
-2. Build an **API request**
-3. Add verifications:
-   - via the **response tree view**
-   - via **snippets** in Quick Inserts
-   - as a **contract** (status / schema / headers)
-4. Work with **variables** between requests
-5. **Sensitive info** — secrets in the OS keychain
-6. Generate **random data** with faker
-7. The built-in **diff** for responses
-8. **SOAP** request — fetch the WSDL, pick an operation
-9. **GraphQL** request — schema introspection
-10. **Commit** the tests to the repo — everything plain JSON
-11. **GitHub Action** result + generated report
-
-*Time — about 22 minutes total. Step away from the slides — show the work.*
-
-<!-- Backup strategy — if a demo step is sticky, skip and come back later.
-Never get stuck on one problem. -->
-
----
-
-## What we just saw
-
-✅ One workspace, one `.gitignore`, one commit history
-✅ No accounts — no tokens to third parties — no telemetry
-✅ Verifications on three levels (response level, post-script, contract)
-✅ Variables on four scopes (global · collection · environment · session)
-✅ Secrets live in the **OS keychain**, not in JSON
-✅ SOAP and GraphQL with the same tool, the same flow
-✅ CI reports in JUnit XML — readable by GitHub Actions out of the box
 
 ---
 
