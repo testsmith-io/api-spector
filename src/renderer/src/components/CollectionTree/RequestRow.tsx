@@ -149,7 +149,6 @@ export function RequestRow({
       <div
         data-row
         draggable
-        role="button"
         tabIndex={0}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRowClick(e as unknown as React.MouseEvent); } }}
         className={`group relative flex items-start gap-1.5 py-1 pr-1 rounded-sm cursor-pointer transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${
@@ -380,7 +379,6 @@ function ExampleRow({ name, indent, isActive, reorderable, dragging, dragActive,
         isActive ? 'bg-blue-900/40 text-[var(--text-primary)]' : 'text-surface-400 hover:bg-surface-800'
       } ${dragging ? 'opacity-40' : ''} ${over ? 'ring-1 ring-inset ring-blue-500' : ''}`}
       style={{ paddingLeft: indent }}
-      role="button"
       tabIndex={0}
       aria-label={t('Example: :name', { name })}
       onClick={onOpen}

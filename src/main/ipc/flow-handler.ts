@@ -83,6 +83,11 @@ export function registerFlowHandler(ipc: IpcMain): void {
           name: result.name,
           method: result.method,
           resolvedUrl: result.resolvedUrl,
+          // The request actually sent (resolved headers/body), so the run log
+          // and report can show it — especially on failures.
+          sentRequest: result.sentRequest
+            ? { method: result.method, url: result.resolvedUrl, headers: result.sentRequest.headers, body: result.sentRequest.body }
+            : undefined,
         };
       },
 

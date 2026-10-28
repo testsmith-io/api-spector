@@ -50,7 +50,7 @@ function parseVarTokens(str: string): { name: string; display: string }[] {
   const push = (name: string, display: string) => {
     if (!seen.has(display)) { seen.add(display); found.push({ name, display }); }
   };
-  for (const m of str.matchAll(/\{\{([^}]+)\}\}/g)) push(m[1].trim(), `{{${m[1].trim()}}}`);
+  for (const m of str.matchAll(/\{\{\s*((?:[^{}]|\{[^{}]*\})+?)\s*\}\}/g)) push(m[1].trim(), `{{${m[1].trim()}}}`);
   for (const m of str.matchAll(/\[([A-Za-z_]\w*)\]/g)) push(m[1], `[${m[1]}]`);
   return found;
 }
@@ -157,7 +157,8 @@ export function VarInput({ value, onChange, className, wrapperClassName, staticS
     partialLen.current = from;
     setSuggestions(items);
     setSuggestionMode('var');
-    setActiveIndex(-1);
+    // Highlight the top match so Enter accepts it (matches the body editor).
+    setActiveIndex(items.length ? 0 : -1);
   }
 
   function detectQuery(val: string, cursor: number) {
@@ -252,9 +253,11 @@ export function VarInput({ value, onChange, className, wrapperClassName, staticS
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setActiveIndex(i => Math.max(i - 1, -1));
-    } else if (e.key === 'Enter' && activeIndex >= 0) {
-      e.preventDefault();
-      apply(suggestions[activeIndex]);
+    } else if (e.key === 'Enter') {
+      // Accept the highlighted item, or the top match in {{var}} mode. Static
+      // suggestions with nothing highlighted fall through so a typed value stays.
+      const idx = activeIndex >= 0 ? activeIndex : (suggestionMode === 'var' ? 0 : -1);
+      if (idx >= 0 && idx < suggestions.length) { e.preventDefault(); apply(suggestions[idx]); }
     } else if (e.key === 'Escape') {
       setSuggestions([]);
     }
@@ -272,9 +275,12 @@ export function VarInput({ value, onChange, className, wrapperClassName, staticS
     const before = value.slice(0, cursor);
     const after  = value.slice(cursor);
     const start  = cursor - partialLen.current;                 // replace the token being typed
-    const insert = item.insert + (item.close ? '}}' : '');
+    // Reuse the closing braces already after the cursor (editing an existing
+    // {{var}}, or the user typed them) instead of appending another pair.
+    const closeAlready = item.close && after.startsWith('}}');
+    const insert    = item.insert + (item.close && !closeAlready ? '}}' : '');
     const newVal    = before.slice(0, start) + insert + after;
-    const newCursor = start + insert.length;
+    const newCursor = start + insert.length + (closeAlready ? 2 : 0);
     onChange(newVal);
 
     if (item.close) {

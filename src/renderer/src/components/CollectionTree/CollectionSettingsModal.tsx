@@ -65,7 +65,7 @@ export function CollectionSettingsModal({ collection, onClose }: Props) {
             <h2 className="text-sm font-semibold">{t('Collection settings')}</h2>
             <p className="text-[10px] text-surface-600 mt-0.5">{t(':name - auth and headers inherited by all requests in this collection', { name: collection.name })}</p>
           </div>
-          <button onClick={onClose} className="text-surface-400 hover:text-white text-lg leading-none">×</button>
+          <button onClick={onClose} aria-label="Close" title="Close" className="text-surface-400 hover:text-white text-lg leading-none">×</button>
         </div>
 
         {/* Tabs */}

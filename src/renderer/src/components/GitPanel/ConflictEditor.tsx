@@ -111,7 +111,7 @@ export function ConflictEditor({ path, onClose, onResolved }: { readonly path: s
             onClick={() => setManual(m => (m != null ? null : assemble(parts ?? [])))}
             className={`text-[10px] px-2 py-0.5 rounded transition-colors ${manual != null ? 'bg-blue-700 text-white' : 'bg-surface-800 hover:bg-surface-700'}`}
           >{t('Edit manually')}</button>
-          <button onClick={onClose} className="text-surface-400 hover:text-white text-lg leading-none pl-1">×</button>
+          <button onClick={onClose} aria-label="Close" title="Close" className="text-surface-400 hover:text-white text-lg leading-none pl-1">×</button>
         </div>
       </div>
 

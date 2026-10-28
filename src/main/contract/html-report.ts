@@ -30,7 +30,7 @@ function modeLabel(mode: string): string {
 }
 
 // API Spector color scheme (mirrors src/renderer/src/index.css dark theme):
-// surfaces #272630/#312f3b/#3d3b48, text #e4e3ea, muted #9d9aa8/#7a7785,
+// surfaces #272630/#312f3b/#3d3b48, text #e4e3ea, muted #9d9aa8,
 // Testsmith blue #205d96 (#6aa3c8 light), Testsmith green #9fc93c.
 const STYLE = `
 :root { color-scheme: dark; }
@@ -61,8 +61,8 @@ h1 { font-size: 20px; margin: 0 0 4px; }
 .card.pend { border-color: #92600a; }
 .method { font: 700 12px ui-monospace,SFMono-Regular,Menlo,monospace; width: 56px; flex-shrink: 0; color: #6aa3c8; }
 .name { flex: 1; color: #e4e3ea; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.url { color: #7a7785; font: 11px ui-monospace,monospace; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dur { color: #7a7785; font-size: 11px; }
+.url { color: #9d9aa8; font: 11px ui-monospace,monospace; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dur { color: #9d9aa8; font-size: 11px; }
 .code { font: 700 12px ui-monospace,monospace; }
 .code.s2 { color: #9fc93c; } .code.s3 { color: #fbbf24; } .code.s4, .code.s5 { color: #f87171; }
 .viol { padding: 14px 16px; border-top: 1px solid #3d3b48; display: flex; flex-direction: column; gap: 10px; }
@@ -71,7 +71,7 @@ h1 { font-size: 20px; margin: 0 0 4px; }
 .v .path { font: 10px ui-monospace,monospace; color: #9d9aa8; background: #272630; padding: 1px 6px; border-radius: 4px; margin-left: 8px; }
 .v .m { color: #fecaca; font-size: 13px; margin: 4px 0 0; }
 .v .ea { font: 11px ui-monospace,monospace; margin-top: 4px; display: flex; gap: 18px; }
-.v .ea .lab { color: #7a7785; }
+.v .ea .lab { color: #9d9aa8; }
 .v .ea .exp { color: #9fc93c; } .v .ea .act { color: #f87171; }
 .pass-note { color: #9fc93c; font-size: 13px; padding: 12px 16px; border-top: 1px solid #3d3b48; }
 table { border-collapse: collapse; width: 100%; margin-top: 16px; font-size: 13px; }
@@ -81,10 +81,10 @@ td.cell { text-align: center; }
 .b { display: inline-block; min-width: 56px; padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 700; }
 .b.ok { background: #2d3a12; color: #9fc93c; }
 .b.bad { background: rgba(127,29,29,.55); color: #f87171; }
-.b.na { background: #272630; color: #7a7785; }
+.b.na { background: #272630; color: #9d9aa8; }
 a.b { text-decoration: none; }
 a.b.ok:hover { background: #4a5e1d; } a.b.bad:hover { background: rgba(127,29,29,.8); }
-.foot { color: #7a7785; font-size: 11px; margin-top: 40px; text-align: center; }
+.foot { color: #9d9aa8; font-size: 11px; margin-top: 40px; text-align: center; }
 summary { cursor: pointer; list-style: none; }
 summary::-webkit-details-marker { display: none; }
 `;

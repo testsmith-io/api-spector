@@ -194,18 +194,18 @@ export function buildHtmlReport(
   :root {
     --bg:         #0f1117; --bg-surface:  #161b22; --bg-panel:    #0d1117;
     --border:     #21262d; --border-hover:#30363d;
-    --text:       #c9d1d9; --text-bright: #e6edf3; --text-muted:  #8b949e; --text-dim: #484f58;
+    --text:       #c9d1d9; --text-bright: #e6edf3; --text-muted:  #8b949e; --text-dim: #818992;
     --green:      #3fb950; --red:         #f85149; --amber:       #d29922; --blue: #79c0ff;
     --badge-pass-bg: #0d3a1e; --badge-fail-bg: #3d1014; --badge-err-bg: #3d2a00; --badge-skip-bg: #21262d;
     --hook-before-border: #7c3aed; --hook-after-border: #0e7490;
     --hook-before-bg: #4c1d95; --hook-before-fg: #c4b5fd;
     --hook-after-bg:  #164e63; --hook-after-fg:  #67e8f9;
-    --link: #3d7fb2;
+    --link: #58a6ff;
   }
   html.light {
     --bg:         #ffffff; --bg-surface:  #f6f8fa; --bg-panel:    #ffffff;
     --border:     #d0d7de; --border-hover:#c4c9cf;
-    --text:       #1f2328; --text-bright: #1f2328; --text-muted:  #656d76; --text-dim: #8b949e;
+    --text:       #1f2328; --text-bright: #1f2328; --text-muted:  #656d76; --text-dim: #6b7280;
     --green:      #1a7f37; --red:         #cf222e; --amber:       #9a6700; --blue: #0969da;
     --badge-pass-bg: #dafbe1; --badge-fail-bg: #ffebe9; --badge-err-bg: #fff8c5; --badge-skip-bg: #f6f8fa;
     --hook-before-border: #8b5cf6; --hook-after-border: #06b6d4;

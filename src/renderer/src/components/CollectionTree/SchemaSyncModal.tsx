@@ -239,7 +239,7 @@ export function SchemaSyncModal({
             <h2 className="text-sm font-semibold text-surface-100">
               {t('Sync schemas - :name', { name: scopeLabel })}
             </h2>
-            <button onClick={onClose} className="text-surface-500 hover:text-surface-300 text-lg leading-none">×</button>
+            <button onClick={onClose} aria-label="Close" title="Close" className="text-surface-500 hover:text-surface-300 text-lg leading-none">×</button>
           </div>
 
           {/* Stats */}
@@ -356,7 +356,7 @@ export function SchemaSyncModal({
     >
         <div data-modal-drag className="flex items-center justify-between cursor-move select-none">
           <h2 className="text-sm font-semibold text-surface-100">{t('Sync schemas from OpenAPI')}</h2>
-          <button onClick={onClose} className="text-surface-500 hover:text-surface-300 text-lg leading-none">×</button>
+          <button onClick={onClose} aria-label="Close" title="Close" className="text-surface-500 hover:text-surface-300 text-lg leading-none">×</button>
         </div>
 
         <p className="text-xs text-surface-400">

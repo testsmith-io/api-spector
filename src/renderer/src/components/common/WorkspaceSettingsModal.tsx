@@ -318,6 +318,7 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
                 <select
                   value={defaultEnvironment}
                   onChange={e => setDefaultEnvironment(e.target.value)}
+                  aria-label={t('Default environment')}
                   className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500"
                 >
                   <option value="">{t('(none)')}</option>
@@ -335,6 +336,7 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
                 <select
                   value={defaultRequestTab}
                   onChange={e => setDefaultRequestTab(e.target.value as typeof defaultRequestTab)}
+                  aria-label={t('Default request tab')}
                   className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500"
                 >
                   <option value="docs">{t('Docs')}</option>
@@ -407,6 +409,7 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
                 <select
                   value={locale}
                   onChange={e => setLocale(e.target.value as Locale)}
+                  aria-label={t('Language')}
                   className="bg-surface-800 hover:bg-surface-700 text-surface-300 text-xs rounded py-1.5 px-2 outline-none"
                 >
                   {Object.entries(LOCALES).map(([code, name]) => (
@@ -726,6 +729,7 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
                   <div className="flex flex-col gap-1">
                     <label className={labelCls}>{t('Auth method')}</label>
                     <select value={vAuthMethod} onChange={e => setVAuthMethod(e.target.value as 'token' | 'approle' | 'jwt')}
+                      aria-label={t('Auth method')}
                       className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500">
                       <option value="token">{t('Token / OIDC')}</option>
                       <option value="approle">{t('AppRole')}</option>
@@ -756,6 +760,7 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
                   <div className="flex flex-col gap-1">
                     <label className={labelCls}>{t('KV version')}</label>
                     <select value={vKvVersion} onChange={e => setVKvVersion(e.target.value as 'auto' | '1' | '2')}
+                      aria-label={t('KV version')}
                       className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500">
                       <option value="auto">auto</option>
                       <option value="2">v2</option>
@@ -789,16 +794,19 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
                 <div className="flex flex-col gap-1">
                   <label className={labelCls}>{t('Azure vault')}</label>
                   <input value={azVault} onChange={e => setAzVault(e.target.value)} placeholder="acme-kv"
+                    aria-label={t('Azure vault')}
                     className={`${inputCls} placeholder-surface-600`} />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className={labelCls}>{t('Tenant id')}</label>
                   <input value={azTenantId} onChange={e => setAzTenantId(e.target.value)}
+                    aria-label={t('Tenant id')}
                     className={inputCls} />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className={labelCls}>{t('Client id')}</label>
                   <input value={azClientId} onChange={e => setAzClientId(e.target.value)}
+                    aria-label={t('Client id')}
                     className={inputCls} />
                 </div>
               </div>

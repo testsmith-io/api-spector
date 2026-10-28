@@ -105,7 +105,7 @@ export function perfReportToHtml(result: PerfResult, meta: PerfReportMeta = {}):
   .muted { color: #7f93ab; } .small { font-size: 11px; margin-top: 8px; }
   code { background: #0d1a28; padding: 1px 5px; border-radius: 4px; color: #f9a8a8; font-size: 12px; }
   .errs { margin: 0; padding-left: 18px; } .errs li { margin: 3px 0; }
-  footer { margin-top: 40px; color: #55697f; font-size: 11px; }
+  footer { margin-top: 40px; color: #7f93ab; font-size: 11px; }
   .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
   @media (max-width: 720px) { .kpis { grid-template-columns: repeat(2, 1fr); } .cols { grid-template-columns: 1fr; } }
 </style></head>

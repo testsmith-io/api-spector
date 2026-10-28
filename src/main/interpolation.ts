@@ -54,7 +54,9 @@ export async function buildDynamicVars(): Promise<Record<string, string>> {
  *  Tokens that don't match a variable and look like expressions (contain `.` or `(`)
  *  are evaluated with faker and dayjs in scope when available. */
 export function interpolate(str: string, vars: Record<string, string>): string {
-  return str.replaceAll(/\{\{([^}]+)\}\}/g, (match, key) => {
+  // Allow a single level of `{...}` inside the token so expressions with object
+  // args resolve, e.g. {{faker.date.between({ from: '…', to: '…' })}}.
+  return str.replaceAll(/\{\{\s*((?:[^{}]|\{[^{}]*\})+?)\s*\}\}/g, (match, key) => {
     const trimmed = key.trim();
     if (trimmed in vars) return vars[trimmed];
     // Try evaluating as an expression (e.g. faker.internet.email(), dayjs().format(...))
@@ -94,7 +96,7 @@ export function buildUrl(
   //   - AND either paramType === 'path' OR its key appears in the URL template
   // Everything else gets appended as a query string parameter.
   const templateTokens = new Set<string>();
-  baseUrl.replaceAll(/\{\{([^}]+)\}\}/g, (_m, name) => {
+  baseUrl.replaceAll(/\{\{\s*((?:[^{}]|\{[^{}]*\})+?)\s*\}\}/g, (_m, name) => {
     templateTokens.add(String(name).trim());
     return '';
   });

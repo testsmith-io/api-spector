@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useId } from 'react';
 
 // ─── Shared modal shell ───────────────────────────────────────────────────────
 //
@@ -105,6 +105,10 @@ export function Modal({
   // Safety: drop listeners if the modal unmounts mid-drag.
   useEffect(() => endDrag, [endDrag]);
 
+  // Every dialog needs an accessible name (WCAG / axe aria-dialog-name): point at
+  // the title heading when there is one, else a generic label so it's never nameless.
+  const titleId = useId();
+
   return (
     <div
       role={closeOnBackdrop ? 'button' : undefined}
@@ -120,6 +124,8 @@ export function Modal({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title !== undefined ? titleId : undefined}
+        aria-label={title === undefined ? 'Dialog' : undefined}
         className={panelClassName}
         style={(offset.x || offset.y) ? { transform: `translate(${offset.x}px, ${offset.y}px)` } : undefined}
         onMouseDown={onPanelMouseDown}
@@ -130,12 +136,12 @@ export function Modal({
             className="flex items-center justify-between px-4 py-2.5 border-b border-surface-800 flex-shrink-0 cursor-move select-none"
           >
             <div>
-              <h2 className="text-sm font-semibold">{title}</h2>
+              <h2 id={titleId} className="text-sm font-semibold">{title}</h2>
               {subtitle !== undefined && (
                 <p className="text-[10px] text-surface-400 mt-0.5">{subtitle}</p>
               )}
             </div>
-            <button onClick={onClose} className="text-surface-400 hover:text-[var(--text-primary)] text-lg leading-none cursor-pointer">×</button>
+            <button onClick={onClose} aria-label="Close" title="Close" className="text-surface-400 hover:text-[var(--text-primary)] text-lg leading-none cursor-pointer">×</button>
           </div>
         )}
         {children}

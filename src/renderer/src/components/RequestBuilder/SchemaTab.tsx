@@ -3,6 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
+import { cmLabel } from '../../lib/cmA11y';
 import { json } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
 import type { ApiRequest } from '../../../../shared/types';
@@ -104,7 +105,7 @@ export function SchemaTab({ request, onChange }: Props) {
           height="300px"
           maxHeight="50vh"
           theme={oneDark}
-          extensions={[json()]}
+          extensions={[json(), ...cmLabel(t('JSON schema'))]}
           onChange={val => setSchema(val)}
           placeholder={'{\n  "type": "object",\n  "properties": {}\n}'}
           basicSetup={{ lineNumbers: true, foldGutter: true }}

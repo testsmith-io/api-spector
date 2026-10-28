@@ -54,6 +54,7 @@ export function EnvironmentBar({ inline = false }: { readonly inline?: boolean }
       <select
         value={activeEnvironmentId ?? ''}
         onChange={e => handleEnvChange(e.target.value || null)}
+        aria-label={t('Active environment')}
         className="bg-surface-800 border border-surface-700 rounded px-2 py-0.5 text-xs focus:outline-none focus:border-blue-500 max-w-[140px]"
         style={{ color: 'var(--text-primary)' }}
       >

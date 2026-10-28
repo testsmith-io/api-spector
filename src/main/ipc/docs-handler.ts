@@ -300,11 +300,11 @@ export function generateHtml(payload: DocsPayload): string {
   .collection { margin-bottom: 3rem; }
   .collection-desc, .folder-desc, .desc { color: #94a3b8; font-size: .9rem; margin: .25rem 0 1rem; }
   .request { background: #1e2433; border: 1px solid #2d3748; border-radius: 8px; padding: 1rem 1.25rem; margin: 1rem 0; }
-  .label { font-size: .7rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: #64748b; margin: .75rem 0 .3rem; }
+  .label { font-size: .7rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: #94a3b8; margin: .75rem 0 .3rem; }
   pre { background: #131924; border: 1px solid #2d3748; border-radius: 6px; padding: .75rem 1rem; overflow-x: auto; margin: 0; }
   code { font-family: 'JetBrains Mono', 'Fira Mono', monospace; font-size: .8rem; color: #a5f3fc; }
   table { border-collapse: collapse; width: 100%; font-size: .85rem; margin: .25rem 0; }
-  th { background: #131924; color: #64748b; font-weight: 600; text-align: left; padding: .4rem .6rem; border: 1px solid #2d3748; }
+  th { background: #131924; color: #94a3b8; font-weight: 600; text-align: left; padding: .4rem .6rem; border: 1px solid #2d3748; }
   td { padding: .35rem .6rem; border: 1px solid #2d3748; color: #cbd5e1; font-family: monospace; font-size: .8rem; }
   .auth-type { background: #1e2433; border: 1px solid #2d3748; border-radius: 4px; display: inline-block; padding: .2rem .6rem; font-size: .8rem; color: #a5f3fc; margin: 0; }
   .folder-heading { color: #94a3b8; font-size: 1.05rem; }

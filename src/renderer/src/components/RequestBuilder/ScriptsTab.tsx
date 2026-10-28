@@ -3,6 +3,7 @@
 
 import React, { useMemo, useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
+import { cmLabel } from '../../lib/cmA11y';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
 import type { ApiRequest } from '../../../../shared/types';
@@ -97,7 +98,7 @@ export function ScriptsTab({ request, onChange }: Props) {
             value={value}
             height="100%"
             theme={oneDark}
-            extensions={extensions}
+            extensions={[...extensions, ...cmLabel(t('Script editor'))]}
             onChange={handleChange}
             basicSetup={{ lineNumbers: true, foldGutter: false, autocompletion: false }}
           />

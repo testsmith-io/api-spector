@@ -54,12 +54,24 @@
   --surface-900: #312f3b;
   --surface-950: #272630;
   --text-primary: #e4e3ea;
-  --text-muted:   #9d9aa8;
-  --wordmark-muted: #9d9aa8;
+  /* Muted text lifted to meet WCAG AA (4.5:1) on cards/hover surfaces too
+     (surface-800); the old #9d9aa8 failed at 3.97 there. */
+  --text-muted:   #a8a5b2;
+  --wordmark-muted: #a8a5b2;
+  /* Brand ghost-blue used for the "Spector" wordmark + title-bar link. AA on the
+     dark title bar (surface-950); the light theme overrides it to a darker blue. */
+  --wordmark-accent: #6aa3c8;
 
   --bg-app:  #272630;
   --border:  #3d3b48;
 }
+
+/* Faint text (`text-surface-500`) fails WCAG AA as readable text on every
+   surface (~2.5–3.4:1). Lift just the TEXT colour to the AA-passing muted value
+   per theme; the surface-500 token (borders, backgrounds, icons) is untouched. */
+.text-surface-500 { color: #a8a5b2 !important; }
+:root.light .text-surface-500 { color: #504e60 !important; }
+
 
 /* ─── Light theme ──────────────────────────────────────────────────────────── */
 /* Warm stone scale — pulled down from near-white to a readable grey-paper     */
@@ -74,8 +86,13 @@
   --surface-900: #d5d3dc;
   --surface-950: #e2e0e9;
   --text-primary: #1c1b24;
-  --text-muted:   #615e6d;
+  /* Muted text darkened to meet WCAG AA (4.5:1) on cards/hover (surface-800)
+     and surface-900; the old #615e6d failed at 3.58 / 4.26. */
+  --text-muted:   #504e60;
   --wordmark-muted: #4a5568;
+  /* Darker blue so the wordmark + title-bar link clear AA (4.5:1) on the light
+     title bar (surface-950 #e2e0e9); the dark #6aa3c8 only hits ~2.5:1 there. */
+  --wordmark-accent: #1e5f8c;
 
   --bg-app:  #e2e0e9;
   --border:  #c4c2cb;
@@ -140,7 +157,7 @@ body {
 }
 
 /* Orange — errors */
-:root.light .text-orange-400 { color: #c2410c !important; }  /* orange-700 */
+:root.light .text-orange-400 { color: #7c2d12 !important; }  /* orange-900 — AA on light surfaces */
 :root.light .text-orange-500 { color: #9a3412 !important; }  /* orange-800 */
 
 /* Info callouts (Schema/Contract tab headers) use a dark-palette tint + light   */
@@ -173,7 +190,7 @@ body {
 /* Red — errors, failures */
 :root.light .text-red-200 { color: #7f1d1d !important; }   /* red-900  */
 :root.light .text-red-300 { color: #b91c1c !important; }   /* red-700  */
-:root.light .text-red-400 { color: #dc2626 !important; }   /* red-600  */
+:root.light .text-red-400 { color: #7f1d1d !important; }   /* red-900 — AA on light surfaces */
 :root.light .text-red-500 { color: #991b1b !important; }   /* red-800  */
 :root.light .bg-red-800       { background-color: #fecaca !important; }  /* red-200 (fail badge) */
 :root.light .bg-red-900\/30 { background-color: #fee2e2 !important; }  /* red-100  */
@@ -189,7 +206,7 @@ body {
 
 /* Emerald — success, passed tests, diff additions */
 :root.light .text-emerald-300 { color: #15803d !important; }  /* green-700 */
-:root.light .text-emerald-400 { color: #16a34a !important; }  /* green-600 */
+:root.light .text-emerald-400 { color: #14532d !important; }  /* green-900 — AA on light surfaces */
 :root.light .bg-emerald-900\/20 { background-color: #f0fdf4 !important; }  /* green-50  */
 :root.light .bg-emerald-900\/30 { background-color: #dcfce7 !important; }  /* green-100 */
 :root.light .bg-emerald-900\/50 { background-color: #dcfce7 !important; }  /* green-100 */
@@ -200,18 +217,18 @@ body {
 
 /* Amber — warnings, auth badges */
 :root.light .text-amber-300 { color: #b45309 !important; }  /* amber-700 */
-:root.light .text-amber-400 { color: #d97706 !important; }  /* amber-500 */
+:root.light .text-amber-400 { color: #713f12 !important; }  /* amber-900 — AA on light surfaces */
 :root.light .bg-amber-800\/40 { background-color: #fef3c7 !important; }  /* amber-100 */
 
 /* Cyan — console [set] output, WS badge */
-:root.light .text-cyan-400 { color: #0e7490 !important; }   /* cyan-700  */
+:root.light .text-cyan-400 { color: #164e63 !important; }   /* cyan-900 — AA on light surfaces */
 
 /* Blue — informational text/badges (tags, "contract defined" banner, selected
    import card, etc.). The dark-mode tints (blue-200/300, blue-900/50, etc.)
    wash out completely on a light background, so re-map them to readable hues. */
 :root.light .text-blue-200 { color: #1e3a8a !important; }   /* blue-900  */
 :root.light .text-blue-300 { color: #1d4ed8 !important; }   /* blue-700  */
-:root.light .text-blue-400 { color: #2563eb !important; }   /* blue-600  */
+:root.light .text-blue-400 { color: #1e40af !important; }   /* blue-800 — AA on light surfaces */
 :root.light .bg-blue-900\/50 { background-color: #dbeafe !important; }  /* blue-100 */
 :root.light .bg-blue-950\/40 { background-color: #eff6ff !important; }  /* blue-50  */
 :root.light .bg-blue-950\/50 { background-color: #dbeafe !important; }  /* blue-100 */
@@ -224,21 +241,29 @@ body {
 
 /* Fuchsia — p95 series, GraphQL subscription accent, Socket.IO/graphql dots */
 :root.light .text-fuchsia-300    { color: #a21caf !important; }  /* fuchsia-700 */
-:root.light .text-fuchsia-400    { color: #c026d3 !important; }  /* fuchsia-600 */
-:root.light .text-fuchsia-400\/70 { color: #c026d3 !important; }
+:root.light .text-fuchsia-400    { color: #701a75 !important; }  /* fuchsia-900 — AA on light surfaces */
+:root.light .text-fuchsia-400\/70 { color: #701a75 !important; }
 
 /* Amber — Performance accent + warnings (opacity variants the base remap misses) */
 :root.light .text-amber-500      { color: #b45309 !important; }  /* amber-700 */
 :root.light .text-amber-500\/80  { color: #b45309 !important; }
 :root.light .text-amber-500\/70  { color: #b45309 !important; }
-:root.light .text-amber-400\/70  { color: #d97706 !important; }  /* amber-500 */
+:root.light .text-amber-400\/70  { color: #713f12 !important; }  /* amber-900 — AA on light surfaces */
 
 /* Cyan / emerald dots (opacity variants) */
-:root.light .text-cyan-500\/70    { color: #0e7490 !important; } /* cyan-700  */
-:root.light .text-emerald-500\/70 { color: #16a34a !important; } /* green-600 */
+:root.light .text-cyan-500\/70    { color: #164e63 !important; } /* cyan-900 — AA on light surfaces */
+:root.light .text-emerald-500\/70 { color: #14532d !important; } /* green-900 — AA on light surfaces */
 
 /* Sky — 3xx status chips */
-:root.light .text-sky-400 { color: #0369a1 !important; }  /* sky-700 */
+:root.light .text-sky-400 { color: #0c4a6e !important; }  /* sky-900 — AA on light surfaces */
+
+/* Method badges + misc accents the base remaps above don't cover (HEAD=purple,
+   OPTIONS=gray, gRPC=violet, green alias) — darkened to clear WCAG AA (4.5:1) on
+   the light surfaces where 10px-bold badges render (down to surface-800). */
+:root.light .text-purple-400 { color: #581c87 !important; }  /* purple-900 */
+:root.light .text-violet-400 { color: #5b21b6 !important; }  /* violet-800 */
+:root.light .text-green-400  { color: #14532d !important; }  /* green-900  */
+:root.light .text-gray-400   { color: #374151 !important; }  /* gray-700   */
 
 /* Chart strokes / fills (inline SVG) — darken so the lines and bars read on the
    light chart background. */

@@ -4,6 +4,7 @@
 import type { CompletionContext, CompletionResult, Completion } from '@codemirror/autocomplete';
 import { autocompletion } from '@codemirror/autocomplete';
 import { hoverTooltip } from '@codemirror/view';
+import { FAKER_NS_ALL, FAKER_ALL } from './fakerCatalog';
 
 // ─── Built-in dynamic variables ──────────────────────────────────────────────
 
@@ -179,24 +180,20 @@ function chaiChainCompletion(textBefore: string, pos: number): CompletionResult 
 
 // ─── faker ───────────────────────────────────────────────────────────────────
 
-export const FAKER_NAMESPACES: Completion[] = [
-  { label: 'string',   type: 'property', info: 'String generators' },
-  { label: 'number',   type: 'property', info: 'Number generators' },
-  { label: 'person',   type: 'property', info: 'Names, titles, etc.' },
-  { label: 'internet', type: 'property', info: 'Emails, URLs, IPs, etc.' },
-  { label: 'date',     type: 'property', info: 'Date generators' },
-  { label: 'lorem',    type: 'property', info: 'Lorem ipsum text' },
-  { label: 'location', type: 'property', info: 'Addresses, cities, countries' },
-  { label: 'finance',  type: 'property', info: 'Credit cards, currency, etc.' },
-  { label: 'color',    type: 'property', info: 'Color values' },
-  { label: 'company',  type: 'property', info: 'Company names, catch phrases' },
-  { label: 'commerce', type: 'property', info: 'Products, prices, departments' },
-  { label: 'image',    type: 'property', info: 'Image URLs / placeholders' },
-  { label: 'system',   type: 'property', info: 'File names, MIME types, semver' },
-  { label: 'helpers',  type: 'property', info: 'Utility helpers (slugify, arrayElement, …)' },
-];
+// Short descriptions for the common namespaces; the rest fall back to a generic
+// hint. Overlaid on the full generated catalogue below.
+const CURATED_NS_INFO: Record<string, string> = {
+  string: 'String generators', number: 'Number generators', person: 'Names, titles, etc.',
+  internet: 'Emails, URLs, IPs, etc.', date: 'Date generators', lorem: 'Lorem ipsum text',
+  location: 'Addresses, cities, countries', finance: 'Credit cards, currency, etc.',
+  color: 'Color values', company: 'Company names, catch phrases',
+  commerce: 'Products, prices, departments', image: 'Image URLs / placeholders',
+  system: 'File names, MIME types, semver', helpers: 'Utility helpers (slugify, arrayElement, …)',
+};
 
-export const FAKER_SUB: Record<string, Completion[]> = {
+// Hand-written detail/info for the most-used generators; merged over the full
+// catalogue so common methods keep their nicer hints and the rest still appear.
+const CURATED_SUB: Record<string, Completion[]> = {
   string: [
     { label: 'uuid',         type: 'function', detail: '()',         info: 'Random UUID v4' },
     { label: 'alphanumeric', type: 'function', detail: '(length)',   info: 'Random alphanumeric string' },
@@ -299,6 +296,23 @@ export const FAKER_SUB: Record<string, Completion[]> = {
     { label: 'multiple',     type: 'function', detail: '(fn, {count}?)', info: 'Call a generator multiple times' },
   ],
 };
+
+// Full catalogue: every faker namespace and method from the installed version,
+// with the curated detail/info overlaid where we have it.
+export const FAKER_NAMESPACES: Completion[] = FAKER_NS_ALL.map(ns => ({
+  label: ns,
+  type:  'property',
+  info:  CURATED_NS_INFO[ns] ?? `faker.${ns} generators`,
+}));
+
+export const FAKER_SUB: Record<string, Completion[]> = Object.fromEntries(
+  FAKER_NS_ALL.map(ns => {
+    const curated = new Map((CURATED_SUB[ns] ?? []).map(c => [c.label, c] as const));
+    const items = (FAKER_ALL[ns] ?? []).map(name =>
+      curated.get(name) ?? ({ label: name, type: 'function', detail: '()' } as Completion));
+    return [ns, items] as [string, Completion[]];
+  }),
+);
 
 // ─── Completion source factory ────────────────────────────────────────────────
 

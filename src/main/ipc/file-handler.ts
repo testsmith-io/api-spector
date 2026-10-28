@@ -9,6 +9,7 @@ import type { Dirent } from 'node:fs';
 import { join, dirname, resolve, basename, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import JSZip from 'jszip';
+import { simpleGit } from 'simple-git';
 import type { Collection, Environment, Workspace, Flow } from '../../shared/types';
 import { externalizeDataSets, inlineDataSets } from '../data-files';
 import { loadGlobals, getGlobals, setGlobals, persistGlobals } from '../globals-store';
@@ -541,10 +542,8 @@ export function registerFileHandlers(ipc: IpcMain): void {
   // binary and no auth — public repos only. Returns null if the user cancels
   // the folder picker; throws (surfaced to the renderer) on any other failure.
   handleIpc(ipc, IPC.file.openFromGit, async (_e, repoUrl: string) => {
-    const archiveUrl = await resolveArchiveUrl(repoUrl);
-    if (!archiveUrl) {
-      throw new Error('unsupported URL — use a public GitHub repo URL or a direct .zip link');
-    }
+    const url = repoUrl.trim();
+    if (!url) throw new Error('Enter a repository URL');
 
     const pick = await dialog.showOpenDialog({
       title: 'Choose a folder to clone the repository into',
@@ -554,11 +553,10 @@ export function registerFileHandlers(ipc: IpcMain): void {
     if (pick.canceled || pick.filePaths.length === 0) return null;
     const parent = pick.filePaths[0];
 
-    // Derive a folder name from the repo, and refuse to overwrite existing
-    // content so a clone never clobbers a folder the user already uses.
+    // Derive a folder name from the repo (works for https and git@host:owner/repo.git),
+    // and refuse to overwrite existing content so a clone never clobbers a folder.
     const repoName =
-      ((/github\.com\/[^/]+\/([^/#?]+)/i.exec(repoUrl))?.[1] ?? 'repository')
-        .replace(/\.git$/i, '')
+      ((/[/:]([^/:]+?)(?:\.git)?\/?$/.exec(url))?.[1] ?? 'repository')
         .replaceAll(/[^a-zA-Z0-9._-]+/g, '-') || 'repository';
     const destDir = join(parent, repoName);
     try {
@@ -570,10 +568,25 @@ export function registerFileHandlers(ipc: IpcMain): void {
       // ENOENT is expected (folder doesn't exist yet); rethrow the not-empty error.
       if (err instanceof Error && err.message.includes('already exists')) throw err;
     }
-    await mkdir(destDir, { recursive: true });
 
-    const buf = await downloadArchive(archiveUrl);
-    await extractZip(buf, destDir);
+    // Prefer a real `git clone`: supports private repos (the user's SSH keys /
+    // git credentials), keeps history, and wires up `origin` so the Git panel's
+    // commit/pull/push work immediately. Fall back to a zip download for public
+    // http(s) repos only when the git binary isn't available.
+    try {
+      await simpleGit(parent).clone(url, destDir);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const gitMissing = /not found|ENOENT|not recognized|command not found|spawn git/i.test(msg);
+      const archiveUrl = gitMissing ? await resolveArchiveUrl(url).catch(() => null) : null;
+      if (gitMissing && archiveUrl) {
+        await mkdir(destDir, { recursive: true });
+        const buf = await downloadArchive(archiveUrl);
+        await extractZip(buf, destDir);
+      } else {
+        throw new Error(`git clone failed: ${msg}`);
+      }
+    }
 
     const wsPath = await findWorkspaceSpector(destDir);
     const parsed = JSON.parse(await readFile(wsPath, 'utf8')) as Workspace;

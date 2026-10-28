@@ -26,6 +26,10 @@ function pretty(v: unknown): string {
   try { return esc(JSON.stringify(v, null, 2)); } catch { return esc(String(v)); }
 }
 
+function headerLines(h: Record<string, string>): string {
+  return Object.entries(h).map(([k, v]) => `${k}: ${v}`).join('\n');
+}
+
 const STATUS_CLS: Record<string, string> = {
   passed: 'badge-pass', failed: 'badge-fail', error: 'badge-err', done: 'badge-done', skipped: 'badge-skip', running: 'badge-done',
 };
@@ -39,8 +43,21 @@ function blockDetail(b: FlowBlockRunRecord): string {
     ).join('');
     parts.push(`<div class="section-label">Tests</div><div class="tests-wrap">${rows}</div>`);
   }
-  if (b.type === 'request' && b.resolvedUrl) {
-    parts.push(`<div class="section-label">Request</div><div class="mono url">${esc(b.method ?? '')} ${esc(b.resolvedUrl)}</div>`);
+  if (b.type === 'request' && (b.resolvedUrl || b.http)) {
+    const h = b.http;
+    parts.push('<div class="section-label">Request</div>');
+    if (b.resolvedUrl) parts.push(`<div class="mono url">${esc(b.method ?? '')} ${esc(b.resolvedUrl)}</div>`);
+    if (h?.reqHeaders && Object.keys(h.reqHeaders).length) parts.push(`<pre class="code-block">${esc(headerLines(h.reqHeaders))}</pre>`);
+    if (h?.reqBody) parts.push(`<pre class="code-block">${pretty(h.reqBody)}</pre>`);
+
+    parts.push('<div class="section-label">Response</div>');
+    const statusLine = b.httpStatus != null
+      ? `${b.httpStatus}${h?.statusText ? ' ' + h.statusText : ''}${h?.bodySize != null ? ` · ${h.bodySize} bytes` : ''}`
+      : '(no response received)';
+    parts.push(`<div class="mono url">${esc(statusLine)}</div>`);
+    if (h?.resHeaders && Object.keys(h.resHeaders).length) parts.push(`<pre class="code-block">${esc(headerLines(h.resHeaders))}</pre>`);
+    if (h?.resBody) parts.push(`<pre class="code-block">${pretty(h.resBody)}</pre>`);
+    if (h?.truncated) parts.push('<div class="muted" style="font-size:11px">Request/response body truncated for the report.</div>');
   }
   if (b.type === 'log' && b.message) {
     parts.push(`<div class="section-label">Message</div><pre class="code-block">${esc(b.message)}</pre>`);

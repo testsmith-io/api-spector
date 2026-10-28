@@ -579,7 +579,6 @@ function CollectionNode ( {
         data-row
         className={`group flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-surface-800 transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${panelActive ? 'bg-surface-800 text-[var(--text-primary)]' : isActive ? 'text-[var(--text-primary)]' : 'text-surface-400'
           } ${col.disabled ? 'opacity-50' : ''} ${dropOver ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
-        role="button"
         tabIndex={0}
         onClick={onSelectCollection}
         onDoubleClick={e => { e.stopPropagation(); setRenaming( true ); }}
@@ -776,7 +775,6 @@ function FolderRow ( {
         draggable
         className={`group flex items-center gap-1 py-1 transition-colors cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${isActive ? 'bg-surface-800 text-[var(--text-primary)]' : 'text-surface-400 hover:bg-surface-800'} ${folder.disabled ? 'opacity-40' : ''} ${dropInside ? 'outline outline-1 outline-blue-500 rounded' : ''}`}
         style={{ paddingLeft: indent }}
-        role="button"
         tabIndex={0}
         onClick={() => openFolderPanel( collectionId, folder.id )}
         onDoubleClick={e => { e.stopPropagation(); setRenaming( true ); }}
