@@ -131,12 +131,16 @@ export async function fetchContracts(cfg: BrokerConfig, input: { consumer?: stri
 }
 
 /** Publish a provider verification result for a contract. */
-export async function publishVerification(cfg: BrokerConfig, input: { contractId: number; providerVersion: string; success: boolean; buildUrl?: string }): Promise<void> {
+export async function publishVerification(cfg: BrokerConfig, input: { contractId: number; providerVersion: string; success: boolean; buildUrl?: string; results?: unknown }): Promise<void> {
   const r = await brokerFetch(cfg, '/api/verifications', 'POST', {
     contractId: input.contractId,
     providerVersion: input.providerVersion,
     success: input.success,
     ...(input.buildUrl ? { buildUrl: input.buildUrl } : {}),
+    // Full per-interaction detail (a ContractReport) so the cloud can show WHY
+    // a verification failed, not just pass/fail. Optional — omitted when no
+    // report is supplied.
+    ...(input.results !== undefined ? { results: input.results } : {}),
   });
   if (!r.ok) fail(r, 'Publish verification failed');
 }

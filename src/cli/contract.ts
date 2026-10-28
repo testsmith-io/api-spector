@@ -24,6 +24,14 @@
  *   --output <path>           Write ContractReport JSON to a file.
  *   --allow-pending           Never-verified failures report as pending.
  *
+ * publish-verification options:
+ *   --consumer / --provider   Pacticipant names (required).
+ *   --success <true|false>    The outcome (required). In CI, derive it from the
+ *                             exit code of `contract run`.
+ *   --report <path>           Attach the ContractReport written by
+ *                             `contract run --output <path>`, so the cloud shows
+ *                             the per-interaction violations, not just pass/fail.
+ *
  * Also: pin, can-i-deploy [--to <env>], record-deployment, environments,
  * webhooks [--test], report [--html <path>], pact-import, pact-export.
  */
@@ -799,6 +807,15 @@ async function cmdPublishVerification ( args: Record<string, string | boolean> )
   const buildUrl = str( args['build-url'] );
   const consumerVersion = str( args['consumer-version'] );
 
+  // Optional: attach the full ContractReport (written by `contract run
+  // --output report.json`) so the cloud shows WHY it failed, not just pass/fail.
+  let results: unknown;
+  const reportPath = str( args['report'] );
+  if ( reportPath ) {
+    try { results = JSON.parse( await readFile( resolvePath( reportPath ), 'utf8' ) ); }
+    catch ( e ) { die( `Could not read --report ${reportPath}: ${e instanceof Error ? e.message : String( e )}` ); }
+  }
+
   const cfg = brokerConfigFromEnv();
   const contracts = await brokerFetchContracts( cfg, { consumer, provider } );
   const match = consumerVersion
@@ -806,8 +823,8 @@ async function cmdPublishVerification ( args: Record<string, string | boolean> )
     : contracts[contracts.length - 1]; // latest published
   if ( !match ) die( `No published contract for ${consumer} -> ${provider}${consumerVersion ? '@' + consumerVersion : ''}.` );
 
-  await brokerPublishVerification( cfg, { contractId: match.id, providerVersion, success, buildUrl } );
-  console.log( `  Published verification: ${provider}@${providerVersion.slice( 0, 7 )} -> ${consumer}@${match.consumerVersion} = ${success ? 'passed' : 'FAILED'}` );
+  await brokerPublishVerification( cfg, { contractId: match.id, providerVersion, success, buildUrl, results } );
+  console.log( `  Published verification: ${provider}@${providerVersion.slice( 0, 7 )} -> ${consumer}@${match.consumerVersion} = ${success ? 'passed' : 'FAILED'}${results ? ' (+ report)' : ''}` );
 }
 
 async function main (): Promise<void> {

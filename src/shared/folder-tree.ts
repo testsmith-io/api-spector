@@ -118,7 +118,11 @@ export function reIdFolderTree(root: Folder, mapRequestId: (oldId: string) => st
  * duplicate-folder / merge-collection flows that must avoid id collisions.
  */
 export function cloneAndReId(folder: Folder, mapRequestId: (oldId: string) => string): Folder {
-  const cloned: Folder = structuredClone(folder);
+  // JSON clone, NOT structuredClone: callers pass an immer draft (a Proxy), and
+  // structuredClone throws DataCloneError on a Proxy — which silently broke
+  // "Duplicate folder". Folder data is plain JSON, so a JSON round-trip is safe
+  // and also reads cleanly through the draft. (Mirrors duplicateRequest.)
+  const cloned: Folder = JSON.parse(JSON.stringify(folder));
   reIdFolderTree(cloned, mapRequestId);
   return cloned;
 }

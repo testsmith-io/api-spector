@@ -9,6 +9,7 @@ import { writeFile, readFile, mkdir, stat } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import type { GitStatus, GitCommit, GitBranch, GitRemote } from '../../shared/types';
 import { getWorkspaceDir, ensureGitignore } from './file-handler';
+import { BRANCH_REF_FORMAT, parseBranchRefs } from '../git-branch-parse';
 
 function git() {
   const dir = getWorkspaceDir();
@@ -135,37 +136,10 @@ export function registerGitHandlers(ipc: IpcMain): void {
     // so upstream/ahead/behind were silently dropped. Run the format flag
     // via `raw` and parse line-by-line so we get the real metadata.
     const raw = await git().raw([
-      'for-each-ref',
-      '--format=%(refname:short)|%(HEAD)|%(upstream:short)|%(upstream:track)',
-      'refs/heads', 'refs/remotes',
+      'for-each-ref', `--format=${BRANCH_REF_FORMAT}`, 'refs/heads', 'refs/remotes',
     ]);
     const current = (await git().branch()).current;
-
-    const branches: GitBranch[] = [];
-    for (const line of raw.split('\n')) {
-      if (!line.trim()) continue;
-      const [shortName, head, upstream, track] = line.split('|');
-      if (!shortName || shortName.endsWith('/HEAD')) continue;
-      const isRemote = shortName.startsWith('origin/') || shortName.includes('/');
-      const looksLocal = !isRemote;
-
-      // `--format=%(upstream:track)` → "[ahead 1, behind 2]" or empty
-      let ahead: number | undefined;
-      let behind: number | undefined;
-      const aheadM  = /ahead (\d+)/.exec(track);
-      const behindM = /behind (\d+)/.exec(track);
-      if (aheadM)  ahead  = Number(aheadM[1]);
-      if (behindM) behind = Number(behindM[1]);
-
-      branches.push({
-        name:     shortName,
-        current:  looksLocal && (head === '*' || shortName === current),
-        remote:   isRemote,
-        upstream: upstream || undefined,
-        ahead, behind,
-      });
-    }
-    return branches;
+    return parseBranchRefs(raw, current);
   });
 
   handleIpc(ipc, IPC.git.checkout, async (_e, branch: string, create: boolean) => {

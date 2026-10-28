@@ -39,6 +39,16 @@ function renderInline(text: string, keyBase: string): React.ReactNode[] {
   });
 }
 
+// Split a pipe-table row into trimmed cells, tolerating optional leading/
+// trailing pipes. Mirrors splitRow in shared/markdown-to-html.ts so the preview
+// and the exported HTML render the same table.
+function splitRow(line: string): string[] {
+  let s = line.trim();
+  if (s.startsWith('|')) s = s.slice(1);
+  if (s.endsWith('|')) s = s.slice(0, -1);
+  return s.split('|').map(c => c.trim());
+}
+
 // ── Blocks ──────────────────────────────────────────────────────────────────
 
 export function renderMarkdown(md: string): React.ReactNode {
@@ -102,6 +112,42 @@ export function renderMarkdown(md: string): React.ReactNode {
         <blockquote key={k()} className="border-l-2 border-surface-600 pl-3 text-surface-400 italic">
           {renderInline(buf.join(' '), k())}
         </blockquote>,
+      );
+      continue;
+    }
+
+    // GitHub-style pipe table: a header row followed by a |---|---| separator.
+    if (line.includes('|') && i + 1 < lines.length
+      && /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/.test(lines[i + 1])) {
+      const header = splitRow(line);
+      i += 2;
+      const rows: string[][] = [];
+      while (i < lines.length && lines[i].includes('|') && lines[i].trim() !== '') { rows.push(splitRow(lines[i])); i++; }
+      blocks.push(
+        <div key={k()} className="overflow-x-auto my-1">
+          <table className="border-collapse text-xs">
+            <thead>
+              <tr>
+                {header.map((c, ci) => (
+                  <th key={ci} className="border border-surface-700 bg-surface-800 px-2 py-1 text-left font-semibold text-surface-200 whitespace-nowrap">
+                    {renderInline(c, k())}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, ri) => (
+                <tr key={ri}>
+                  {header.map((_, ci) => (
+                    <td key={ci} className="border border-surface-700 px-2 py-1 align-top text-surface-300">
+                      {renderInline(r[ci] ?? '', k())}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
       );
       continue;
     }
