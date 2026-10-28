@@ -169,7 +169,7 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { readonly onOpenDocs?: () 
             </svg>
             <div className="flex flex-col leading-tight">
               <span className="text-xs font-semibold tracking-wide">
-                <span style={{ color: 'var(--wordmark-muted)' }}>API</span> <span style={{ color: '#6aa3c8' }}>Spector</span>
+                <span style={{ color: 'var(--wordmark-muted)' }}>API</span> <span style={{ color: 'var(--wordmark-accent)' }}>Spector</span>
               </span>
               <button
                 onClick={() => window.electron.openExternal('https://testsmith.io')}

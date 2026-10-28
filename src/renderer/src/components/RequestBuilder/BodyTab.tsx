@@ -3,6 +3,7 @@
 
 import React, { useMemo, lazy, Suspense } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
+import { cmLabel } from '../../lib/cmA11y';
 import { oneDark } from '@codemirror/theme-one-dark';
 import type { ApiRequest, RequestBody } from '../../../../shared/types';
 import { KVTable } from './KVTable';
@@ -89,7 +90,7 @@ export function BodyTab({ request, onChange }: { readonly request: ApiRequest; r
             height="300px"
             maxHeight="50vh"
             theme={oneDark}
-            extensions={[jsonWithComments(), varExt]}
+            extensions={[jsonWithComments(), varExt, ...cmLabel(t('Request body'))]}
             onChange={val => onChange({ body: { ...body, json: val } })}
             basicSetup={{ lineNumbers: true, foldGutter: false, autocompletion: false }}
           />
@@ -122,7 +123,7 @@ export function BodyTab({ request, onChange }: { readonly request: ApiRequest; r
               // XML payloads (application/xml, text/xml, image/svg+xml, ...) get the
               // XML language so Cmd/Ctrl+/ toggles <!-- --> comments; anything else
               // stays plain text with the same keymap (a no-op without comment tokens).
-              extensions={/xml/i.test(body.rawContentType ?? '') ? [xmlWithComments(), varExt] : [commentKeymap, varExt]}
+              extensions={[...(/xml/i.test(body.rawContentType ?? '') ? [xmlWithComments(), varExt] : [commentKeymap, varExt]), ...cmLabel(t('Request body'))]}
               onChange={val => onChange({ body: { ...body, raw: val } })}
               basicSetup={{ lineNumbers: true, foldGutter: false, autocompletion: false }}
             />

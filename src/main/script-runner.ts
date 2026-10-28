@@ -314,10 +314,11 @@ function buildAt(
         fn();
         testResults.push({ name, passed: true });
       } catch (err) {
+        const line = scriptLineOf(err);
         testResults.push({
           name,
           passed: false,
-          error: err instanceof Error ? err.message : String(err),
+          error: (err instanceof Error ? err.message : String(err)) + (line ? ` (line ${line})` : ''),
         });
       }
     },
@@ -475,6 +476,17 @@ function buildSandbox(
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
+// Pull the user-script line number out of an error thrown inside the vm.
+// Scripts run unwrapped with filename 'script.js', so stack frames map 1:1 to
+// the lines the user typed.
+function scriptLineOf(err: unknown): number | undefined {
+  if (err instanceof Error && err.stack) {
+    const m = err.stack.match(/script\.js:(\d+):\d+/);
+    if (m) return Number(m[1]);
+  }
+  return undefined;
+}
+
 export async function runScript(
   code: string,
   ctx: ScriptContext,
@@ -509,6 +521,7 @@ export async function runScript(
   try {
     vm.runInNewContext(code, sandbox, { timeout: timeoutMs, filename: 'script.js' });
   } catch (err) {
+    const line = scriptLineOf(err);
     const message = err instanceof Error ? err.message : String(err);
     return {
       testResults,
@@ -518,7 +531,7 @@ export async function runScript(
       updatedGlobals:        globalsCopy,
       updatedLocalVars:      localVarsCopy,
       updatedFolderVars:     folderCopy,
-      error: message,
+      error: (line ? `Line ${line}: ` : '') + message,
     };
   }
 

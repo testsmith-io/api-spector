@@ -36,7 +36,6 @@ import { CommandPalette } from './components/common/CommandPalette';
 import { DocsGeneratorModal } from './components/common/DocsGeneratorModal';
 import { UpdateToast } from './components/common/UpdateToast';
 import { ProductTour } from './components/common/ProductTour';
-import { onActivateKey } from './lib/a11y';
 import { useT } from './i18n';
 
 const { electron } = window;
@@ -132,18 +131,23 @@ function ActivityBarBtn ( {
     <div className="relative group/ab" data-tour={dataTour}>
       <button
         onClick={onClick}
+        aria-label={title}
+        aria-pressed={active}
         className={`relative w-10 h-10 flex items-center justify-center rounded transition-colors ${active
           ? 'text-white bg-surface-800'
           : 'text-surface-600 hover:text-surface-300 hover:bg-surface-800/50'
           }`}
       >
         {children}
-        {badge !== undefined && badge > 0 && (
-          <span className="absolute top-1 right-1 text-[9px] bg-surface-600 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center font-medium leading-none">
-            {badge > 9 ? '9+' : badge}
-          </span>
-        )}
       </button>
+      {/* Badge lives OUTSIDE the button (positioned over it) so the button has no
+          visible text content that would conflict with its aria-label
+          (axe: label-content-name-mismatch); the count is in the aria-label. */}
+      {badge !== undefined && badge > 0 && (
+        <span aria-hidden="true" className="pointer-events-none absolute top-1 right-1 text-[9px] bg-surface-600 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center font-medium leading-none">
+          {badge > 9 ? '9+' : badge}
+        </span>
+      )}
       <div className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 hidden group-hover/ab:block">
         <span className="whitespace-nowrap rounded px-2 py-1 text-[11px] bg-surface-900 text-[var(--text-primary)] border border-surface-700 shadow-lg">
           {title}
@@ -187,35 +191,39 @@ const TabRow = React.memo( function TabRow ( {
 }: TabRowProps ) {
   const t = useT();
   return (
+    // Plain container (no interactive role) so the activate + close buttons below
+    // are siblings, not nested interactives — screen readers announce both.
     <div
-      role="button"
-      tabIndex={0}
-      onClick={() => onActivate( tabId )}
-      onKeyDown={onActivateKey( () => onActivate( tabId ) )}
       onContextMenu={e => {
         e.preventDefault();
         onContextMenu( tabId, e.clientX, e.clientY );
       }}
-      className={`group flex items-center gap-1.5 px-3 py-1.5 border-r border-surface-800 cursor-pointer min-w-0 max-w-[200px] flex-shrink-0 transition-colors ${isActive
+      className={`group flex items-center gap-1.5 pr-1 border-r border-surface-800 min-w-0 max-w-[200px] flex-shrink-0 transition-colors ${isActive
         ? 'bg-surface-900 border-b-2 border-b-blue-500 -mb-px'
         : 'hover:bg-surface-900/50 text-surface-600'
         }`}
     >
-      {kind === 'folder' ? (
-        <svg className="w-3 h-3 shrink-0 text-amber-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M2 5a2 2 0 012-2h3.5l2 2H16a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V5z"/></svg>
-      ) : kind === 'collection' ? (
-        <svg className="w-3 h-3 shrink-0 text-blue-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4h14v2.5H3V4zm0 4.75h14v2.5H3v-2.5zM3 13.5h14V16H3v-2.5z"/></svg>
-      ) : method ? (
-        <span className={`text-[10px] font-bold shrink-0 ${TAB_METHOD_COLORS[method] ?? 'text-gray-400'}`}>
-          {method}
+      <button
+        onClick={() => onActivate( tabId )}
+        className="flex items-center gap-1.5 pl-3 py-1.5 min-w-0 flex-1 cursor-pointer focus:outline-none"
+      >
+        {kind === 'folder' ? (
+          <svg className="w-3 h-3 shrink-0 text-amber-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M2 5a2 2 0 012-2h3.5l2 2H16a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V5z"/></svg>
+        ) : kind === 'collection' ? (
+          <svg className="w-3 h-3 shrink-0 text-blue-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4h14v2.5H3V4zm0 4.75h14v2.5H3v-2.5zM3 13.5h14V16H3v-2.5z"/></svg>
+        ) : method ? (
+          <span className={`text-[10px] font-bold shrink-0 ${TAB_METHOD_COLORS[method] ?? 'text-gray-400'}`}>
+            {method}
+          </span>
+        ) : null}
+        <span className={`text-xs truncate ${isActive ? 'text-white' : ''}`}>
+          {name}
         </span>
-      ) : null}
-      <span className={`text-xs truncate ${isActive ? 'text-white' : ''}`}>
-        {name}
-      </span>
+      </button>
       <button
         onClick={e => { e.stopPropagation(); onClose( tabId ); }}
-        className="ml-auto opacity-0 group-hover:opacity-100 shrink-0 text-surface-600 hover:text-white transition-all leading-none"
+        className="mr-2 opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0 text-surface-600 hover:text-white transition-all leading-none"
+        aria-label={t( 'Close tab' )}
         title={t( 'Close tab' )}
       >
         ×
@@ -526,13 +534,13 @@ export default function App () {
       {window.electron.platform !== 'win32' && (
         <div className="drag-region flex-shrink-0 bg-surface-950 flex items-center justify-center">
           <span className="no-drag text-[11px] font-medium tracking-widest select-none" style={{ color: 'var(--text-muted)' }}>
-            <span style={{ color: 'var(--wordmark-muted)' }}>API</span> <span style={{ color: '#6aa3c8' }}>Spector</span>
-            {__APP_VERSION__ && <span className="ml-2 text-[10px] font-normal opacity-50">v{__APP_VERSION__}</span>}
-            <span className="mx-2 opacity-30">·</span>
+            <span style={{ color: 'var(--wordmark-muted)' }}>API</span> <span style={{ color: 'var(--wordmark-accent)' }}>Spector</span>
+            {__APP_VERSION__ && <span className="ml-2 text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>v{__APP_VERSION__}</span>}
+            <span className="mx-2 opacity-30" aria-hidden="true">·</span>
             <button
               onClick={() => window.electron.openExternal('https://testsmith.io')}
-              className="no-drag text-[10px] font-normal opacity-60 hover:opacity-100 hover:underline focus:outline-none transition-opacity"
-              style={{ color: '#6aa3c8' }}
+              className="no-drag text-[10px] font-normal hover:underline focus:outline-none"
+              style={{ color: 'var(--wordmark-accent)' }}
             >
               testsmith.io
             </button>
@@ -852,31 +860,34 @@ export default function App () {
                 >
                   <RequestBuilder request={activeRequest} />
                 </div>
-                {/* Resize + collapse handle */}
-                <div
-                  role="separator"
-                  aria-orientation="vertical"
-                  aria-label="Resize request pane"
-                  aria-valuemin={200}
-                  aria-valuenow={requestPaneWidth ?? leftPaneRef.current?.offsetWidth ?? 400}
-                  tabIndex={0}
-                  className="flex-shrink-0 w-1 relative cursor-col-resize border-x border-surface-800 hover:border-blue-500 focus:border-blue-500 focus:outline-none transition-colors group"
-                  onMouseDown={e => {
-                    dragging.current = 'request';
-                    dragStart.current = { x: e.clientX, w: leftPaneRef.current?.offsetWidth ?? requestPaneWidth ?? 400 };
-                    document.body.style.cursor = 'col-resize';
-                    document.body.style.userSelect = 'none';
-                    e.preventDefault();
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                {/* Resize + collapse handle. The separator and the collapse button
+                    are SIBLINGS (not nested) so the focusable separator doesn't
+                    contain a focusable button (axe: nested-interactive). */}
+                <div className="flex-shrink-0 w-1 relative group">
+                  <div
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label="Resize request pane"
+                    aria-valuemin={200}
+                    aria-valuenow={requestPaneWidth ?? leftPaneRef.current?.offsetWidth ?? 400}
+                    tabIndex={0}
+                    className="absolute inset-0 cursor-col-resize border-x border-surface-800 hover:border-blue-500 focus:border-blue-500 focus:outline-none transition-colors"
+                    onMouseDown={e => {
+                      dragging.current = 'request';
+                      dragStart.current = { x: e.clientX, w: leftPaneRef.current?.offsetWidth ?? requestPaneWidth ?? 400 };
+                      document.body.style.cursor = 'col-resize';
+                      document.body.style.userSelect = 'none';
                       e.preventDefault();
-                      const step = e.key === 'ArrowLeft' ? -16 : 16;
-                      const cur = leftPaneRef.current?.offsetWidth ?? requestPaneWidth ?? 400;
-                      setRequestPaneWidth(Math.max(200, Math.min(window.innerWidth - 300, cur + step)));
-                    }
-                  }}
-                >
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                        e.preventDefault();
+                        const step = e.key === 'ArrowLeft' ? -16 : 16;
+                        const cur = leftPaneRef.current?.offsetWidth ?? requestPaneWidth ?? 400;
+                        setRequestPaneWidth(Math.max(200, Math.min(window.innerWidth - 300, cur + step)));
+                      }
+                    }}
+                  />
                   <button
                     onClick={() => setResponseOpen( v => !v )}
                     title={responseOpen ? t( 'Collapse response' ) : t( 'Expand response' )}

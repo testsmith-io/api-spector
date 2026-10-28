@@ -5,8 +5,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { ApiRequest } from '../../../../shared/types';
 import { useStore } from '../../store';
 import { useActiveEnvironment } from '../../hooks/useActiveEnvironment';
-import { collectFolderVars } from '../../../../shared/folder-tree';
+import { collectFolderVars, findFolderPath } from '../../../../shared/folder-tree';
 import { VarInput } from '../common/VarInput';
+import { MoveVariableMenu } from '../common/MoveVariableMenu';
+import type { VarLoc } from '../../lib/variableMove';
 import { TrashIcon } from '../common/icons';
 import { useT } from '../../i18n';
 
@@ -177,6 +179,40 @@ export function VariablesTab({ request }: { readonly request: ApiRequest }) {
     addRow(name, valueOf(name) === '••••••••' ? '' : `{{${name}}}`);
   };
 
+  // ── Move a variable to another scope ─────────────────────────────────────────
+  // The request's own context resolves every destination here (its collection,
+  // its folder chain, the active environment, globals). `locForScope` turns a
+  // shown scope into the concrete source location; `reseedRows` resyncs the
+  // editable buffer from the store after a move removes a request-level copy.
+  const folderChain = useMemo(() => (col ? findFolderPath(col.rootFolder, request.id) : []), [col, request.id]);
+  const folderLocFor = (name: string): VarLoc | null => {
+    if (!col) return null;
+    for (let i = folderChain.length - 1; i >= 0; i--) {
+      if (folderChain[i].variables && name in folderChain[i].variables!) {
+        return { kind: 'folder', collectionId: col.id, folderId: folderChain[i].id };
+      }
+    }
+    return null;
+  };
+  const locForScope = (scope: Scope, name: string): VarLoc | null => {
+    switch (scope) {
+      case 'request':     return col ? { kind: 'request', collectionId: col.id, requestId: request.id } : null;
+      case 'folder':      return folderLocFor(name);
+      case 'collection':  return col ? { kind: 'collection', collectionId: col.id } : null;
+      case 'environment': return activeEnv ? { kind: 'environment', environmentId: activeEnv.id } : null;
+      case 'global':      return { kind: 'global' };
+    }
+  };
+  const reseedRows = () => {
+    const base = useStore.getState().collections[col?.id ?? '']?.data.requests[request.id];
+    const enabled = base?.variables ?? {};
+    const disabled = base?.variablesDisabled ?? {};
+    setRows([
+      ...Object.entries(enabled).map(([key, value]) => ({ key, value, enabled: true })),
+      ...Object.entries(disabled).map(([key, value]) => ({ key, value, enabled: false })),
+    ]);
+  };
+
   return (
     <div className="space-y-5 text-xs">
       {/* ── Request variables (editable) ──────────────────────────────────── */}
@@ -228,6 +264,13 @@ export function VariablesTab({ request }: { readonly request: ApiRequest }) {
                     <span className="shrink-0 text-[9px] uppercase tracking-wider text-fuchsia-400 border border-fuchsia-500/30 rounded px-1 py-px" title={t('Overrides a higher-level variable of the same name')}>
                       {t('override')}
                     </span>
+                  )}
+                  {!isExample && key && col && (
+                    <MoveVariableMenu
+                      from={{ kind: 'request', collectionId: col.id, requestId: request.id }}
+                      name={key}
+                      onMoved={reseedRows}
+                    />
                   )}
                   <button onClick={() => removeRow(i)} className="shrink-0 text-surface-500 hover:text-red-400 p-1" title={t('Remove')}>
                     <TrashIcon />
@@ -307,6 +350,9 @@ export function VariablesTab({ request }: { readonly request: ApiRequest }) {
                     >
                       {t('override')}
                     </button>
+                  )}
+                  {locForScope(scope, name) && (
+                    <MoveVariableMenu from={locForScope(scope, name)!} name={name} onMoved={reseedRows} />
                   )}
                   <span className={`shrink-0 text-[9px] uppercase tracking-wider border rounded px-1 py-px ${SCOPE_BADGE[scope]}`}>
                     {SCOPE_LABEL[scope]}

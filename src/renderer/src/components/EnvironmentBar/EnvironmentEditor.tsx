@@ -6,6 +6,7 @@ import { useStore } from '../../store';
 import type { EnvVariable } from '../../../../shared/types';
 import { MasterKeyModal } from './MasterKeyModal';
 import { Modal } from '../common/Modal';
+import { MoveVariableMenu } from '../common/MoveVariableMenu';
 import { useConfirm } from '../common/useConfirm';
 import { envRelPath, uniqueName } from '../../../../shared/naming-utils';
 import { resolveEnvironmentChain } from '../../../../shared/environments';
@@ -383,7 +384,7 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
                     }`}
                     placeholder={t('Environment name')}
                   />
-                  <button onClick={onClose} className="text-surface-400 hover:text-white text-lg leading-none">×</button>
+                  <button onClick={onClose} aria-label="Close" title="Close" className="text-surface-400 hover:text-white text-lg leading-none">×</button>
                 </div>
                 {nameError && <p className="text-[10px] text-red-400 mt-1">{nameError}</p>}
 
@@ -520,12 +521,21 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
                             )}
                           </td>
 
-                          {/* Delete */}
+                          {/* Move + Delete */}
                           <td className="px-2 py-1.5">
-                            <button
-                              onClick={() => removeVar(idx)}
-                              className="text-surface-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                            >×</button>
+                            <div className="flex items-center gap-1 justify-end">
+                              {v.key.trim() && env && (
+                                <MoveVariableMenu
+                                  from={{ kind: 'environment', environmentId: env.id }}
+                                  name={v.key.trim()}
+                                  buttonClassName="text-[9px] uppercase tracking-wider text-surface-500 hover:text-blue-400 border border-surface-700 hover:border-blue-500/40 rounded px-1 py-px opacity-0 group-hover:opacity-100 transition-all"
+                                />
+                              )}
+                              <button
+                                onClick={() => removeVar(idx)}
+                                className="text-surface-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                              >×</button>
+                            </div>
                           </td>
                         </tr>
 

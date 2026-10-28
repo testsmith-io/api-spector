@@ -41,6 +41,10 @@ export interface FlowLogEntry {
   atMs?: number
   message?: string
   value?: unknown
+  /** Request blocks: method + resolved URL and the captured request/response. */
+  method?: string
+  resolvedUrl?: string
+  http?: FlowBlockRunRecord['http']
 }
 
 export interface FlowRunState {
@@ -139,6 +143,7 @@ export function useFlowRunner() {
         blockId: b.blockId, type: b.type, label: b.label, status: b.status,
         httpStatus: b.httpStatus, durationMs: b.durationMs, error: b.error,
         iteration: b.iteration, atMs: b.atMs, message: b.message, value: b.display,
+        method: b.method, resolvedUrl: b.resolvedUrl, http: b.http,
       }));
       const rebuiltOutputs: FlowOutput[] = summary.blocks
         .filter((b: FlowBlockRunRecord) => b.type === "log" || b.type === "display")

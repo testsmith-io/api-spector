@@ -24,7 +24,6 @@ import { SocketIoPanel } from '../SocketIO/SocketIoPanel';
 import { MqttPanel } from '../MQTT/MqttPanel';
 import { GrpcPanel } from '../Grpc/GrpcPanel';
 import { isSubscriptionQuery, deriveWsUrl } from './GraphQlSubscription';
-import { useVarValues } from '../../hooks/useVarValues';
 import { FuzzModal } from './FuzzModal';
 import { AskVarsModal } from './AskVarsModal';
 import { askVarsInRequest, resolveAskValues, type AskVar } from '../../../../shared/ask-vars';
@@ -618,6 +617,7 @@ export function RequestBuilder({ request }: Props) {
           />
         ) : (
           <select
+            aria-label={t('HTTP method')}
             value={METHODS.includes(request.method) ? request.method : '__current__'}
             onChange={e => {
               if (e.target.value === '__custom__') setCustomVerb(true);

@@ -58,6 +58,15 @@ export function FolderPanel() {
     updateFolder(cid, folder!.id, { variables, variablesDisabled });
   }
 
+  // Resync draft rows from the store after a variable is moved to another scope.
+  function reseedVarRows() {
+    const f = useStore.getState().collections[cid]?.data && findFolder(useStore.getState().collections[cid]!.data.rootFolder, folder!.id);
+    setVarRows([
+      ...Object.entries(f?.variables ?? {}).map(([key, value]) => ({ key, value, enabled: true })),
+      ...Object.entries(f?.variablesDisabled ?? {}).map(([key, value]) => ({ key, value, enabled: false })),
+    ]);
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -122,7 +131,14 @@ export function FolderPanel() {
             <p className="text-[11px] text-surface-500 leading-relaxed">
               {t('Variables scoped to this folder. They override collection and environment variables, and are overridden by an inner folder, a request’s own variables, and runtime / CLI / data-row values. Reference them anywhere with :token.', { token: '{{name}}' })}
             </p>
-            <KVTable rows={varRows} onChange={setVars} keyPlaceholder={t('name')} valuePlaceholder={t('value')} />
+            <KVTable
+              rows={varRows}
+              onChange={setVars}
+              keyPlaceholder={t('name')}
+              valuePlaceholder={t('value')}
+              moveFrom={() => ({ kind: 'folder', collectionId: cid, folderId: folder.id })}
+              onMoved={reseedVarRows}
+            />
           </div>
         )}
       </div>

@@ -1,5 +1,9 @@
 {
   "Close tab": "Close tab",
+  "Request body": "Request body",
+  "Script editor": "Script editor",
+  "JSON schema": "JSON schema",
+  "Filtered response": "Filtered response",
   "Collections": "Collections",
   "History": "History",
   "Mock servers": "Mock servers",

@@ -103,14 +103,14 @@ export function WelcomeScreen() {
       <div>
         <h1 className="text-2xl font-semibold mb-1">
           <span style={{ color: 'var(--wordmark-muted)' }}>API</span>{' '}
-          <span style={{ color: '#6aa3c8' }}>Spector</span>
+          <span style={{ color: 'var(--wordmark-accent)' }}>Spector</span>
         </h1>
         <p className="text-[11px] mb-3" style={{ color: 'var(--text-muted)' }}>
           {t('by')}{' '}
           <button
             onClick={() => window.electron.openExternal('https://testsmith.io')}
             className="hover:underline focus:outline-none"
-            style={{ color: '#6aa3c8' }}
+            style={{ color: 'var(--wordmark-accent)' }}
           >
             Testsmith
           </button>
@@ -147,7 +147,7 @@ export function WelcomeScreen() {
               value={gitUrl}
               onChange={e => setGitUrl(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') openFromGit(); }}
-              placeholder="https://github.com/owner/repo"
+              placeholder="https://github.com/owner/repo  or  git@host:owner/repo.git"
               autoFocus
               disabled={busy || gitBusy}
               className="px-3 py-2 bg-surface-900 border border-surface-700 rounded text-xs focus:outline-none focus:border-blue-600 disabled:opacity-60"

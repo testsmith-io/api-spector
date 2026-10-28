@@ -39,10 +39,6 @@ export const SNIPPET_GROUPS: SnippetGroup[] = [
         label: 'Check JSON value',
         code: `sp.test("JSON field equals value", function() {\n  sp.expect(json.field).to.equal("expected_value");\n});`,
       },
-      {
-        label: 'Validate JSON schema (tv4)',
-        code: `sp.test("JSON matches schema", function() {\n  const schema = {\n    type: "object",\n    properties: {\n      id: { type: "number" },\n      name: { type: "string" }\n    },\n    required: ["id", "name"]\n  };\n  sp.expect(tv4.validate(json, schema)).to.be.true;\n});`,
-      },
     ],
   },
   {

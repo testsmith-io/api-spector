@@ -11,7 +11,7 @@
 // are injected via `deps`, so this module is pure orchestration: unit-testable
 // with stubs, and reused verbatim by the desktop UI (IPC) and the `flow` CLI.
 
-import type { Flow, FlowBlock, FlowBlockType, FlowRequestRef } from './types/flow';
+import type { Flow, FlowBlock, FlowBlockType, FlowBlockConfig, FlowRequestRef } from './types/flow';
 import type { ResponsePayload, RunStatus, TestResult } from './types';
 import { BLOCK_SPECS } from './flow-blocks';
 

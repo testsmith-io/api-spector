@@ -4,6 +4,8 @@
 import React, { useState } from 'react';
 import type { KeyValuePair } from '../../../../shared/types';
 import { VarInput } from '../common/VarInput';
+import { MoveVariableMenu } from '../common/MoveVariableMenu';
+import type { VarLoc } from '../../lib/variableMove';
 import { HEADER_NAMES, getValueSuggestions } from './header-suggestions';
 import { useT } from '../../i18n';
 
@@ -16,9 +18,13 @@ interface Props {
   readonly headerMode?: boolean
   /** When true, each row shows a "query/path" type selector. */
   readonly paramMode?: boolean
+  /** When these rows are scope variables, the source location for each key — a
+   *  per-row "move ▸" control relocates it to another scope. */
+  readonly moveFrom?: (key: string) => VarLoc | null
+  readonly onMoved?: () => void
 }
 
-export function KVTable({ rows, onChange, keyPlaceholder, valuePlaceholder, headerMode, paramMode }: Props) {
+export function KVTable({ rows, onChange, keyPlaceholder, valuePlaceholder, headerMode, paramMode, moveFrom, onMoved }: Props) {
   const t = useT();
   const keyPh = keyPlaceholder ?? t('Key');
   const valuePh = valuePlaceholder ?? t('Value');
@@ -166,6 +172,14 @@ export function KVTable({ rows, onChange, keyPlaceholder, valuePlaceholder, head
             >
               ≡
             </button>
+            {moveFrom && row.key.trim() && moveFrom(row.key.trim()) && (
+              <MoveVariableMenu
+                from={moveFrom(row.key.trim())!}
+                name={row.key.trim()}
+                onMoved={onMoved}
+                buttonClassName="flex-shrink-0 text-[9px] uppercase tracking-wider text-surface-500 hover:text-blue-400 border border-surface-700 hover:border-blue-500/40 rounded px-1 py-px opacity-0 group-hover:opacity-100 transition-opacity"
+              />
+            )}
             <button
               onClick={() => remove(idx)}
               className="text-surface-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity px-1"

@@ -267,7 +267,6 @@ function ChangesTab({ status, onRefresh }: { readonly status: GitStatus; readonl
               <div
                 key={f.path}
                 className={`flex items-center gap-2 px-3 py-1 hover:bg-surface-800/50 cursor-pointer group text-xs ${diffFile === f.path && diffStaged ? 'bg-surface-800' : ''}`}
-                role="button"
                 tabIndex={0}
                 onClick={() => showDiff(f, true)}
                 onKeyDown={onActivateKey(() => showDiff(f, true))}
@@ -300,7 +299,6 @@ function ChangesTab({ status, onRefresh }: { readonly status: GitStatus; readonl
               <div
                 key={f.path}
                 className={`flex items-center gap-2 px-3 py-1 hover:bg-surface-800/50 cursor-pointer group text-xs ${diffFile === f.path && !diffStaged ? 'bg-surface-800' : ''}`}
-                role="button"
                 tabIndex={0}
                 onClick={() => showDiff(f, false)}
                 onKeyDown={onActivateKey(() => showDiff(f, false))}
@@ -329,7 +327,6 @@ function ChangesTab({ status, onRefresh }: { readonly status: GitStatus; readonl
               <div
                 key={path}
                 className={`flex items-center gap-2 px-3 py-1 hover:bg-surface-800/50 cursor-pointer group text-xs ${diffFile === path && !diffStaged ? 'bg-surface-800' : ''}`}
-                role="button"
                 tabIndex={0}
                 onClick={() => showDiff({ path, status: 'modified' }, false)}
                 onKeyDown={onActivateKey(() => showDiff({ path, status: 'modified' }, false))}

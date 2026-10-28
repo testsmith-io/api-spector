@@ -4,6 +4,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useStore } from '../../store';
 import CodeMirror from '@uiw/react-codemirror';
+import { cmLabel } from '../../lib/cmA11y';
 import { json } from '@codemirror/lang-json';
 import { xml } from '@codemirror/lang-xml';
 import { oneDark } from '@codemirror/theme-one-dark';
@@ -505,8 +506,12 @@ export function ResponseViewer() {
             <span className="text-xs text-surface-400">{(response.bodySize / 1024).toFixed(1)} KB</span>
           </div>
 
-          <div role="tablist" tabIndex={-1} aria-label={t('Response sections')} onKeyDown={onTablistKey} className="flex items-center gap-0 min-w-0 ml-1">
-            {tabList.map(def => renderTabButton(def, 'inline'))}
+          {/* The overflow menu is a SIBLING of the tablist, not a child: a
+              role="tablist" may only contain role="tab" children (aria-required-children). */}
+          <div className="flex items-center gap-0 min-w-0 ml-1">
+            <div role="tablist" tabIndex={-1} aria-label={t('Response sections')} onKeyDown={onTablistKey} className="flex items-center gap-0 min-w-0">
+              {tabList.map(def => renderTabButton(def, 'inline'))}
+            </div>
             <OverflowMenu
               wrapperClassName="flex @min-[720px]:hidden"
               buttonClassName="px-2 py-1 text-xs rounded text-surface-400 hover:text-white hover:bg-surface-800 flex items-center gap-1"
@@ -710,7 +715,7 @@ export function ResponseViewer() {
             <CodeMirror
               value={jqResult ?? ''}
               theme={oneDark}
-              extensions={[json()]}
+              extensions={[json(), ...cmLabel(t('Filtered response'))]}
               readOnly
               basicSetup={{ lineNumbers: true, foldGutter: true }}
             />
@@ -734,7 +739,7 @@ export function ResponseViewer() {
           <CodeMirror
             value={displayBody}
             theme={oneDark}
-            extensions={isJson ? [json()] : isXml ? [xml()] : []}
+            extensions={[...(isJson ? [json()] : isXml ? [xml()] : []), ...cmLabel(t('Response body'))]}
             readOnly
             basicSetup={{ lineNumbers: true, foldGutter: true }}
           />

@@ -50,6 +50,15 @@ export function CollectionPanel() {
     updateCollectionVariables(activeCollectionId, variables, disabled);
   }
 
+  // Resync the draft rows from the store after a variable is moved out to another scope.
+  function reseedVarRows() {
+    const data = useStore.getState().collections[activeCollectionId ?? '']?.data;
+    setVarRows([
+      ...Object.entries(data?.collectionVariables ?? {}).map(([key, value]) => ({ key, value, enabled: true })),
+      ...Object.entries(data?.collectionVariablesDisabled ?? {}).map(([key, value]) => ({ key, value, enabled: false })),
+    ]);
+  }
+
   if (!activeCollectionId) {
     return (
       <div className="flex items-center justify-center h-full text-surface-400 text-sm">
@@ -151,7 +160,14 @@ export function CollectionPanel() {
             <p className="text-surface-500">
               {t('Variables scoped to this collection. They override environment and global variables, and are overridden by folder and request variables (and runtime / CLI / data-row values). Reference them anywhere with :token.', { token: '{{name}}' })}
             </p>
-            <KVTable rows={varRows} onChange={setVars} keyPlaceholder={t('name')} valuePlaceholder={t('value')} />
+            <KVTable
+              rows={varRows}
+              onChange={setVars}
+              keyPlaceholder={t('name')}
+              valuePlaceholder={t('value')}
+              moveFrom={() => (activeCollectionId ? { kind: 'collection', collectionId: activeCollectionId } : null)}
+              onMoved={reseedVarRows}
+            />
             <p className="text-surface-600 text-[11px]">
               {t('Scripts can also set these at runtime via')} <code className="text-surface-500">sp.collectionVariables.set(…)</code>.
             </p>

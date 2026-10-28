@@ -182,6 +182,9 @@ function AddBlockMenu({ onAdd }: { readonly onAdd: (type: FlowBlockType) => void
 
 // ─── Output panel ──────────────────────────────────────────────────────────
 
+const headerText = (h: Record<string, string>) =>
+  Object.entries(h).map(([k, v]) => `${k}: ${v}`).join('\n');
+
 const LOG_ICON: Record<string, string> = {
   passed: '✓', failed: '✗', error: '⚠', running: '•', done: '•', skipped: '○',
 };
@@ -220,6 +223,19 @@ function BottomPanel({ runner, flowName, problems, onFocusBlock, tab, setTab }: 
 }) {
   const t = useT();
   const { outputs, variables, data, log, summary } = runner;
+  // Expanded request/response detail in the Run log, keyed by log index.
+  const [openLog, setOpenLog] = useState<Set<number>>(new Set());
+  // When a run finishes, auto-expand failed/errored request steps so their
+  // actual request + response are visible without a click.
+  useEffect(() => {
+    if (!summary) return;
+    const fails = new Set<number>();
+    log.forEach((e, i) => {
+      if ((e.http || e.resolvedUrl) && (e.status === 'failed' || e.status === 'error')) fails.add(i);
+    });
+    setOpenLog(fails);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summary]);
   const varEntries = Object.entries(variables);
   // Rich data values that aren't already visible as a scalar variable.
   const dataEntries = Object.entries(data).filter(([k, v]) => typeof v === 'object' && v !== null || !(k in variables));
@@ -291,14 +307,40 @@ function BottomPanel({ runner, flowName, problems, onFocusBlock, tab, setTab }: 
               if (e.kind === 'display') return (
                 <div key={i} className="text-teal-400"><span className="text-surface-600 mr-2">{at}</span>▣ {e.label ?? 'display'}: <span className="text-surface-300 break-all">{typeof e.value === 'string' ? e.value : JSON.stringify(e.value)}</span></div>
               );
+              const hasDetail = !!(e.http || e.resolvedUrl);
+              const open = openLog.has(i);
+              const toggle = () => setOpenLog(s => { const n = new Set(s); if (n.has(i)) n.delete(i); else n.add(i); return n; });
+              const reqHeaders = e.http?.reqHeaders;
+              const resHeaders = e.http?.resHeaders;
               return (
-                <div key={i} className="flex items-baseline gap-2">
-                  <span className="text-surface-600 w-14 shrink-0 text-right">{at}</span>
-                  <span className={LOG_ICON_CLS[e.status ?? 'done']}>{LOG_ICON[e.status ?? 'done'] ?? '•'}</span>
-                  <span className="text-surface-300">{e.label ?? e.type}{e.iteration != null && <span className="text-surface-600"> #{e.iteration}</span>}</span>
-                  {e.httpStatus != null && <span className={e.httpStatus < 400 ? 'text-emerald-400' : 'text-red-400'}>{e.httpStatus}</span>}
-                  {e.durationMs != null && <span className="text-surface-600">{e.durationMs}ms</span>}
-                  {e.error && <span className="text-red-400 break-all">— {e.error}</span>}
+                <div key={i} className="flex flex-col">
+                  <div
+                    className={`flex items-baseline gap-2 ${hasDetail ? 'cursor-pointer hover:bg-surface-800/40 rounded' : ''}`}
+                    onClick={hasDetail ? toggle : undefined}
+                  >
+                    <span className="text-surface-600 w-14 shrink-0 text-right">{at}</span>
+                    <span className={LOG_ICON_CLS[e.status ?? 'done']}>{LOG_ICON[e.status ?? 'done'] ?? '•'}</span>
+                    {hasDetail && <span className="text-surface-600 w-2 shrink-0">{open ? '▾' : '▸'}</span>}
+                    <span className="text-surface-300">{e.label ?? e.type}{e.iteration != null && <span className="text-surface-600"> #{e.iteration}</span>}</span>
+                    {e.httpStatus != null && <span className={e.httpStatus < 400 ? 'text-emerald-400' : 'text-red-400'}>{e.httpStatus}</span>}
+                    {e.durationMs != null && <span className="text-surface-600">{e.durationMs}ms</span>}
+                    {e.error && <span className="text-red-400 break-all">— {e.error}</span>}
+                  </div>
+                  {open && hasDetail && (
+                    <div className="ml-16 mt-1 mb-2 flex flex-col gap-1 text-[10px]">
+                      <div className="text-surface-500 uppercase tracking-wider">{t('Request')}</div>
+                      {e.resolvedUrl && <div className="text-surface-300 break-all">{e.method} {e.resolvedUrl}</div>}
+                      {reqHeaders && Object.keys(reqHeaders).length > 0 && <pre className="whitespace-pre-wrap break-all text-surface-400 bg-surface-900 rounded p-1.5 m-0">{headerText(reqHeaders)}</pre>}
+                      {e.http?.reqBody && <pre className="whitespace-pre-wrap break-all text-surface-300 bg-surface-900 rounded p-1.5 m-0">{e.http.reqBody}</pre>}
+                      <div className="text-surface-500 uppercase tracking-wider mt-1">{t('Response')}</div>
+                      <div className={e.httpStatus != null && e.httpStatus < 400 ? 'text-emerald-400' : 'text-red-400'}>
+                        {e.httpStatus != null ? e.httpStatus : t('(no response)')}{e.http?.statusText ? ' ' + e.http.statusText : ''}{e.http?.bodySize != null ? ` · ${e.http.bodySize} bytes` : ''}
+                      </div>
+                      {resHeaders && Object.keys(resHeaders).length > 0 && <pre className="whitespace-pre-wrap break-all text-surface-400 bg-surface-900 rounded p-1.5 m-0">{headerText(resHeaders)}</pre>}
+                      {e.http?.resBody && <pre className="whitespace-pre-wrap break-all text-surface-300 bg-surface-900 rounded p-1.5 m-0">{e.http.resBody}</pre>}
+                      {e.http?.truncated && <div className="text-surface-600">{t('body truncated')}</div>}
+                    </div>
+                  )}
                 </div>
               );
             })}
