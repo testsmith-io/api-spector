@@ -711,12 +711,17 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
                 <span className="font-mono text-surface-400">vault:secret/data/app#token</span>{' '}
                 {t('in an environment variable or an auth field; it is resolved at send-time and never written to the workspace. This connection config is non-secret - tokens and secret-ids come from your environment (or the Vault sign-in below).')}
               </p>
+              <p className="text-surface-600 text-[11px]">
+                {t('Using OpenBao? It is API-compatible, so the same settings apply. Reference secrets with')}{' '}
+                <span className="font-mono text-surface-400">bao:secret/data/app#token</span>{' '}
+                {t('and set BAO_ADDR / BAO_TOKEN (VAULT_* also works).')}
+              </p>
 
-              {/* HashiCorp Vault */}
+              {/* HashiCorp Vault / OpenBao (OpenBao is API-compatible). */}
               <div className="flex flex-col gap-2 border border-surface-800 rounded p-3">
-                <div className="text-[10px] uppercase tracking-wider text-surface-500 font-semibold">HashiCorp Vault</div>
+                <div className="text-[10px] uppercase tracking-wider text-surface-500 font-semibold">{t('HashiCorp Vault / OpenBao')}</div>
                 <div className="flex flex-col gap-1">
-                  <label className={labelCls}>{t('Address (VAULT_ADDR)')}</label>
+                  <label className={labelCls}>{t('Address (VAULT_ADDR / BAO_ADDR)')}</label>
                   <input value={vAddress} onChange={e => setVAddress(e.target.value)} placeholder="https://vault.acme.internal:8200"
                     className={`${inputCls} placeholder-surface-600`} />
                 </div>

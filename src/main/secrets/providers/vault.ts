@@ -8,15 +8,18 @@ import type { Dispatcher } from 'undici';
 import { getSecretsConfig } from '../config';
 import type { SecretProvider } from '../types';
 
-// HashiCorp Vault provider. References look like `vault:<path>#<key>`, where
-// <path> is the exact Vault API path (e.g. `secret/data/app` for KV v2, `kv/app`
-// for KV v1) and <key> is the field within that secret.
+// HashiCorp Vault / OpenBao provider. References look like `vault:<path>#<key>`
+// (or `bao:<path>#<key>` for OpenBao), where <path> is the exact API path
+// (e.g. `secret/data/app` for KV v2, `kv/app` for KV v1) and <key> is the field
+// within that secret. OpenBao is API-compatible with Vault (same /v1 paths and
+// X-Vault-Token header), so the two schemes share this implementation and differ
+// only in which environment variables they read first (BAO_* vs VAULT_*).
 //
 // Authentication follows the ambient context (same across UI / CLI / CI, only
 // the source differs):
-//   1. explicit token          — VAULT_TOKEN
-//   2. `vault login` token     — ~/.vault-token
-//   3. AppRole                 — VAULT_ROLE_ID + VAULT_SECRET_ID
+//   1. explicit token          — VAULT_TOKEN / BAO_TOKEN
+//   2. login token file        — ~/.vault-token / ~/.bao-token
+//   3. AppRole                 — VAULT_ROLE_ID + VAULT_SECRET_ID (or BAO_*)
 //   4. JWT / OIDC (CI)         — VAULT_JWT | VAULT_JWT_PATH  (+ role)
 // Non-secret bits (address, namespace, role, mount) may also come from the
 // workspace's settings.secrets.vault; environment variables always win.
@@ -56,26 +59,28 @@ function readFileTrim(path: string): string | undefined {
 function resolveConn(): VaultConn {
   const cfg = getSecretsConfig()?.vault ?? {};
 
-  const address = env('VAULT_ADDR', 'API_SPECTOR_VAULT_ADDR') ?? cfg.address;
+  const address = env('VAULT_ADDR', 'BAO_ADDR', 'API_SPECTOR_VAULT_ADDR') ?? cfg.address;
   if (!address) {
-    throw new Error('Vault is not configured: set VAULT_ADDR (or settings.secrets.vault.address)');
+    throw new Error('Vault/OpenBao is not configured: set VAULT_ADDR or BAO_ADDR (or settings.secrets.vault.address)');
   }
 
-  const token = env('VAULT_TOKEN', 'API_SPECTOR_VAULT_TOKEN')
-    ?? readFileTrim(join(homedir(), '.vault-token'));
-  const roleId = env('VAULT_ROLE_ID', 'API_SPECTOR_VAULT_ROLE_ID') ?? cfg.roleId;
-  const secretId = env('VAULT_SECRET_ID', 'API_SPECTOR_VAULT_SECRET_ID');
-  const jwt = env('VAULT_JWT', 'API_SPECTOR_VAULT_JWT')
-    ?? (env('VAULT_JWT_PATH', 'API_SPECTOR_VAULT_JWT_PATH') ? readFileTrim(env('VAULT_JWT_PATH', 'API_SPECTOR_VAULT_JWT_PATH')!) : undefined);
-  const jwtRole = env('VAULT_JWT_ROLE', 'API_SPECTOR_VAULT_JWT_ROLE') ?? cfg.jwtRole;
+  const token = env('VAULT_TOKEN', 'BAO_TOKEN', 'API_SPECTOR_VAULT_TOKEN')
+    ?? readFileTrim(join(homedir(), '.vault-token'))
+    ?? readFileTrim(join(homedir(), '.bao-token'));
+  const roleId = env('VAULT_ROLE_ID', 'BAO_ROLE_ID', 'API_SPECTOR_VAULT_ROLE_ID') ?? cfg.roleId;
+  const secretId = env('VAULT_SECRET_ID', 'BAO_SECRET_ID', 'API_SPECTOR_VAULT_SECRET_ID');
+  const jwtPath = env('VAULT_JWT_PATH', 'BAO_JWT_PATH', 'API_SPECTOR_VAULT_JWT_PATH');
+  const jwt = env('VAULT_JWT', 'BAO_JWT', 'API_SPECTOR_VAULT_JWT')
+    ?? (jwtPath ? readFileTrim(jwtPath) : undefined);
+  const jwtRole = env('VAULT_JWT_ROLE', 'BAO_JWT_ROLE', 'API_SPECTOR_VAULT_JWT_ROLE') ?? cfg.jwtRole;
 
-  const explicit = (env('VAULT_AUTH_METHOD', 'API_SPECTOR_VAULT_AUTH_METHOD') ?? cfg.authMethod) as VaultConn['authMethod'] | undefined;
+  const explicit = (env('VAULT_AUTH_METHOD', 'BAO_AUTH_METHOD', 'API_SPECTOR_VAULT_AUTH_METHOD') ?? cfg.authMethod) as VaultConn['authMethod'] | undefined;
   const authMethod: VaultConn['authMethod'] = explicit
     ?? (token ? 'token' : roleId ? 'approle' : jwt ? 'jwt' : 'token');
 
   return {
     address: address.replace(/\/+$/, ''),
-    namespace: env('VAULT_NAMESPACE', 'API_SPECTOR_VAULT_NAMESPACE') ?? cfg.namespace,
+    namespace: env('VAULT_NAMESPACE', 'BAO_NAMESPACE', 'API_SPECTOR_VAULT_NAMESPACE') ?? cfg.namespace,
     authMethod,
     token,
     roleId,
@@ -83,9 +88,9 @@ function resolveConn(): VaultConn {
     jwt,
     jwtRole,
     loginMount: cfg.loginMount,
-    kvVersion: (env('VAULT_KV_VERSION', 'API_SPECTOR_VAULT_KV_VERSION') ?? cfg.kvVersion ?? 'auto') as VaultConn['kvVersion'],
-    skipVerify: (env('VAULT_SKIP_VERIFY', 'API_SPECTOR_VAULT_SKIP_VERIFY') ?? '').toLowerCase() === 'true' || cfg.skipVerify === true,
-    caPath: env('VAULT_CACERT', 'API_SPECTOR_VAULT_CACERT'),
+    kvVersion: (env('VAULT_KV_VERSION', 'BAO_KV_VERSION', 'API_SPECTOR_VAULT_KV_VERSION') ?? cfg.kvVersion ?? 'auto') as VaultConn['kvVersion'],
+    skipVerify: (env('VAULT_SKIP_VERIFY', 'BAO_SKIP_VERIFY', 'API_SPECTOR_VAULT_SKIP_VERIFY') ?? '').toLowerCase() === 'true' || cfg.skipVerify === true,
+    caPath: env('VAULT_CACERT', 'BAO_CACERT', 'API_SPECTOR_VAULT_CACERT'),
   };
 }
 
@@ -173,15 +178,15 @@ async function clientToken(conn: VaultConn): Promise<string> {
   return token;
 }
 
-async function readSecret(refBody: string): Promise<string> {
+async function readSecret(refBody: string, scheme: string): Promise<string> {
   const hash = refBody.lastIndexOf('#');
   if (hash < 0) {
-    throw new Error(`Vault reference must be 'vault:<path>#<key>' (got 'vault:${refBody}')`);
+    throw new Error(`${scheme} reference must be '${scheme}:<path>#<key>' (got '${scheme}:${refBody}')`);
   }
   const path = refBody.slice(0, hash).replace(/^\/+/, '');
   const key = refBody.slice(hash + 1);
   if (!path || !key) {
-    throw new Error(`Vault reference must be 'vault:<path>#<key>' (got 'vault:${refBody}')`);
+    throw new Error(`${scheme} reference must be '${scheme}:<path>#<key>' (got '${scheme}:${refBody}')`);
   }
 
   const conn = resolveConn();
@@ -221,5 +226,12 @@ export function _resetVaultCache(): void {
 
 export const vaultProvider: SecretProvider = {
   scheme: 'vault',
-  resolve: (refBody) => readSecret(refBody),
+  resolve: (refBody) => readSecret(refBody, 'vault'),
+};
+
+// OpenBao is API-compatible with Vault, so `bao:<path>#<key>` references resolve
+// through the exact same client (reading BAO_* env vars first; see resolveConn).
+export const openBaoProvider: SecretProvider = {
+  scheme: 'bao',
+  resolve: (refBody) => readSecret(refBody, 'bao'),
 };

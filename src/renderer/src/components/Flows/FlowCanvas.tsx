@@ -172,7 +172,10 @@ function AddBlockMenu({ onAdd }: { readonly onAdd: (type: FlowBlockType) => void
           <div className="fixed inset-0 z-40" role="button" tabIndex={-1} aria-label={t('Close menu')}
             onClick={() => setOpen(false)} onKeyDown={e => { if (e.key === 'Escape') setOpen(false); }} />
           <div className="absolute left-0 top-full mt-1 z-50 w-56 bg-surface-900 border border-surface-700 rounded-lg shadow-2xl max-h-[70vh] overflow-y-auto">
-            <BlockPickerList onPick={type => { onAdd(type); setOpen(false); }} />
+            {/* includeEnd: End is a 'terminal' block (excluded from the normal
+                palette), but it must be re-addable here too — otherwise deleting
+                the End node leaves no way to add one back from the toolbar. */}
+            <BlockPickerList onPick={type => { onAdd(type); setOpen(false); }} includeEnd />
           </div>
         </>
       )}

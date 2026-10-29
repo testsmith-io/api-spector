@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useStore, colRelPath } from '../../store';
 import type { Collection, Flow } from '../../../../shared/types';
 import { EnvironmentBar } from '../EnvironmentBar/EnvironmentBar';
@@ -9,7 +9,47 @@ import { WorkspaceSettingsModal } from './WorkspaceSettingsModal';
 import { DocsGeneratorModal } from './DocsGeneratorModal';
 import { ImportModal } from './ImportModal';
 import { useWorkspaceLoader } from '../../hooks/useWorkspaceLoader';
+import { GearIcon } from './icons';
+import { Tooltip } from './Tooltip';
 import { useT } from '../../i18n';
+
+// Small document icon for the "Generate docs" action (stroke style matches the
+// shared icon set). Kept local since it is only used here.
+function DocIcon () {
+  return (
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14 3v5h5M8.5 13h7M8.5 16.5h5" />
+    </svg>
+  );
+}
+
+// Import icon (arrow down into a tray).
+function ImportIcon () {
+  return (
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v10m0 0l-3.5-3.5M12 13l3.5-3.5" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3" />
+    </svg>
+  );
+}
+
+// ─── Workspace-action icons (stroke style matches the shared set) ────────────
+function Svg ({ children }: { readonly children: ReactNode }) {
+  return (
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+      {children}
+    </svg>
+  );
+}
+// Open workspace (folder-open).
+const OpenWsIcon = () => <Svg><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9.75h16.5a1.5 1.5 0 011.47 1.8l-1.2 6a1.5 1.5 0 01-1.47 1.2H4.95a1.5 1.5 0 01-1.47-1.2l-1.2-6a1.5 1.5 0 011.47-1.8zM3.75 9.75V6.75A1.5 1.5 0 015.25 5.25h3.88a1.5 1.5 0 011.06.44l1.12 1.12a1.5 1.5 0 001.06.44h4.88a1.5 1.5 0 011.5 1.5v.56" /></Svg>;
+// New workspace (folder with a plus).
+const NewWsIcon = () => <Svg><path strokeLinecap="round" strokeLinejoin="round" d="M12 11v5m2.5-2.5h-5M3.75 7.5V18a1.5 1.5 0 001.5 1.5h13.5A1.5 1.5 0 0020.25 18V9a1.5 1.5 0 00-1.5-1.5h-5.19a1.5 1.5 0 01-1.06-.44l-1.12-1.12a1.5 1.5 0 00-1.06-.44H5.25a1.5 1.5 0 00-1.5 1.5z" /></Svg>;
+// Close workspace (x).
+const CloseWsIcon = () => <Svg><path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" /></Svg>;
+// Save (floppy disk).
+const SaveIcon = () => <Svg><path strokeLinecap="round" strokeLinejoin="round" d="M5 4h11l3 3v12a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z" /><path strokeLinecap="round" strokeLinejoin="round" d="M8 4v4h6V4M8 13h8v6H8z" /></Svg>;
 
 const { electron } = window;
 
@@ -143,6 +183,12 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { readonly onOpenDocs?: () 
             .logo-pupil-r { animation-delay: 0.04s; }
           `}</style>
           <div className="flex items-center gap-1.5 mr-1 shrink-0 select-none">
+            <button
+              onClick={() => window.electron.openExternal('https://api-spector.dev')}
+              title={t('Open api-spector.dev')}
+              aria-label={t('API Spector home')}
+              className="shrink-0 focus:outline-none rounded hover:opacity-80 transition-opacity cursor-pointer"
+            >
             <svg width="52" height="52" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
               <defs>
                 <radialGradient id="logoBody" cx="35%" cy="22%" r="70%">
@@ -167,10 +213,15 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { readonly onOpenDocs?: () 
               <ellipse cx="310" cy="254" rx="6" ry="7" fill="white" opacity="0.65"/>
               <ellipse cx="256" cy="100" rx="200" ry="180" fill="url(#logoGloss)" clipPath="url(#logoGhostClip)"/>
             </svg>
+            </button>
             <div className="flex flex-col leading-tight">
-              <span className="text-xs font-semibold tracking-wide">
+              <button
+                onClick={() => window.electron.openExternal('https://api-spector.dev')}
+                title={t('Open api-spector.dev')}
+                className="text-xs font-semibold tracking-wide text-left hover:underline focus:outline-none cursor-pointer"
+              >
                 <span style={{ color: 'var(--wordmark-muted)' }}>API</span> <span style={{ color: 'var(--wordmark-accent)' }}>Spector</span>
-              </span>
+              </button>
               <button
                 onClick={() => window.electron.openExternal('https://testsmith.io')}
                 className="text-[9px] tracking-wide hover:underline focus:outline-none text-left"
@@ -181,18 +232,6 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { readonly onOpenDocs?: () 
             </div>
           </div>
 
-          {/* Import */}
-          <button
-            onClick={() => setImportOpen(true)}
-            className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors shrink-0"
-            title={t('Import collection (Postman, OpenAPI, Insomnia, Bruno)')}
-          >
-            {t('Import')}
-          </button>
-
-          {/* Separator */}
-          <div className="w-px h-4 bg-surface-800 mx-1 shrink-0" />
-
           {/* Environment controls (inline) */}
           <span className="text-surface-600 text-xs shrink-0">{t('ENV')}</span>
           <EnvironmentBar inline />
@@ -200,74 +239,113 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { readonly onOpenDocs?: () 
 
         {/* ── Fixed right section (popovers live here, no overflow clipping) ── */}
         <div className="flex items-center gap-2 px-3 py-1.5 shrink-0 border-l border-surface-800">
-          {/* Workspace switcher */}
-          <button
-            onClick={openWs}
-            disabled={wsBusy}
-            className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title={t('Open a different workspace')}
-          >
-            {t('Open WS')}
-          </button>
-          <button
-            onClick={newWs}
-            disabled={wsBusy}
-            className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title={t('Create a new workspace')}
-          >
-            {t('New WS')}
-          </button>
-          <button
-            onClick={async () => {
-              await electron.closeWorkspace();
-              closeWorkspace();
-            }}
-            className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
-            title={t('Close current workspace')}
-          >
-            {t('Close WS')}
-          </button>
+          {/* Workspace group: open / new / close / save, then a separator + import */}
+          <span className="text-surface-600 text-xs shrink-0">{t('Workspace')}</span>
+          <Tooltip label={t('Open a different workspace')}>
+            <button
+              onClick={openWs}
+              disabled={wsBusy}
+              className="p-1.5 bg-surface-800 hover:bg-surface-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label={t('Open a different workspace')}
+            >
+              <OpenWsIcon />
+            </button>
+          </Tooltip>
+          <Tooltip label={t('Create a new workspace')}>
+            <button
+              onClick={newWs}
+              disabled={wsBusy}
+              className="p-1.5 bg-surface-800 hover:bg-surface-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label={t('Create a new workspace')}
+            >
+              <NewWsIcon />
+            </button>
+          </Tooltip>
+          <Tooltip label={t('Close current workspace')}>
+            <button
+              onClick={async () => {
+                await electron.closeWorkspace();
+                closeWorkspace();
+              }}
+              className="p-1.5 bg-surface-800 hover:bg-surface-700 rounded transition-colors"
+              aria-label={t('Close current workspace')}
+            >
+              <CloseWsIcon />
+            </button>
+          </Tooltip>
 
-          {/* Save */}
-          <button
-            onClick={saveAll}
-            disabled={saving}
-            className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center gap-1.5 ${
-              hasDirty
-                ? 'bg-blue-700 hover:bg-blue-600 text-white'
-                : 'bg-surface-800 hover:bg-surface-700 text-surface-500'
-            }`}
-            title={t('Save all unsaved changes')}
-          >
-            {hasDirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />}
-            {saving ? t('Saving…') : t('Save')}
-          </button>
+          {/* Save (keeps the dirty indicator: blue + amber dot) */}
+          <Tooltip label={saving ? t('Saving…') : t('Save all unsaved changes')}>
+            <button
+              onClick={saveAll}
+              disabled={saving}
+              className={`relative p-1.5 rounded transition-colors ${
+                hasDirty
+                  ? 'bg-blue-700 hover:bg-blue-600 text-white'
+                  : 'bg-surface-800 hover:bg-surface-700 text-surface-500'
+              } ${saving ? 'opacity-60' : ''}`}
+              aria-label={t('Save all unsaved changes')}
+            >
+              <SaveIcon />
+              {hasDirty && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />}
+            </button>
+          </Tooltip>
 
-          <button
-            onClick={() => setWorkspaceSettingsOpen(true)}
-            className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
-            title={t('Workspace settings')}
-          >
-            <span style={{ fontSize: '16px', lineHeight: 1 }}>⚙</span>
-          </button>
+          {/* Separator */}
+          <div className="w-px h-4 bg-surface-800 mx-1 shrink-0" />
 
-          <button
-            onClick={() => setDocsOpen(true)}
-            className="px-2.5 py-1 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors"
-            title={t('Generate API documentation')}
-          >
-            {t('Docs')}
-          </button>
+          {/* Import (icon) */}
+          <Tooltip label={t('Import collection (Postman, OpenAPI, Insomnia, Bruno)')}>
+            <button
+              onClick={() => setImportOpen(true)}
+              className="p-1.5 bg-surface-800 hover:bg-surface-700 rounded transition-colors"
+              aria-label={t('Import collection (Postman, OpenAPI, Insomnia, Bruno)')}
+            >
+              <ImportIcon />
+            </button>
+          </Tooltip>
 
-          <button
-            onClick={() => setShowGeneratorPanel(!showGeneratorPanel)}
-            className={`px-2.5 py-1 text-xs rounded transition-colors font-mono ${
-              showGeneratorPanel ? 'bg-blue-700 text-white' : 'bg-surface-800 hover:bg-surface-700'
-            }`}
-            title={t('Toggle code generator')}
-          >
-            &lt;/&gt;
-          </button>
+          {/* Section separator */}
+          <div className="w-px h-4 bg-surface-800 mx-1 shrink-0" />
+
+          {/* Generate group: Docs + code generator, as compact icon buttons */}
+          <div className="flex items-center gap-1 shrink-0">
+            <span className="text-surface-600 text-xs">{t('Generate')}</span>
+            <Tooltip label={t('Generate API documentation')}>
+              <button
+                onClick={() => setDocsOpen(true)}
+                className="p-1.5 bg-surface-800 hover:bg-surface-700 rounded transition-colors"
+                aria-label={t('Generate API documentation')}
+              >
+                <DocIcon />
+              </button>
+            </Tooltip>
+            <Tooltip label={t('Toggle code generator')}>
+              <button
+                onClick={() => setShowGeneratorPanel(!showGeneratorPanel)}
+                className={`px-2 py-1 text-xs font-mono rounded transition-colors ${
+                  showGeneratorPanel ? 'bg-blue-700 text-white' : 'bg-surface-800 hover:bg-surface-700'
+                }`}
+                aria-label={t('Toggle code generator')}
+              >
+                &lt;/&gt;
+              </button>
+            </Tooltip>
+          </div>
+
+          {/* Separator */}
+          <div className="w-px h-4 bg-surface-800 mx-1 shrink-0" />
+
+          {/* Workspace settings (far right) */}
+          <Tooltip label={t('Workspace settings')} align="right">
+            <button
+              onClick={() => setWorkspaceSettingsOpen(true)}
+              className="p-1.5 bg-surface-800 hover:bg-surface-700 rounded transition-colors"
+              aria-label={t('Workspace settings')}
+            >
+              <GearIcon />
+            </button>
+          </Tooltip>
         </div>
       </div>
     </div>
