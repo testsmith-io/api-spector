@@ -13,8 +13,8 @@ export function detectPlatform(remotes: GitRemote[]): CiPlatform {
 
 const NODE_LTS = 'lts/*';
 
-// External secret managers a workspace can reference (vault:, aws:, azure:, gcp:, op://).
-export type SecretManagerKind = 'vault' | 'aws' | 'azure' | 'gcp' | 'op';
+// External secret managers a workspace can reference (vault:, bao:, aws:, azure:, gcp:, op://).
+export type SecretManagerKind = 'vault' | 'bao' | 'aws' | 'azure' | 'gcp' | 'op';
 
 // The environment each provider reads to authenticate. Kept in sync with
 // docs/reference/secrets-vault.md. On GitHub, Vault is authenticated with the
@@ -22,6 +22,7 @@ export type SecretManagerKind = 'vault' | 'aws' | 'azure' | 'gcp' | 'op';
 // is passed through there — see githubVaultStep / the github branch below.
 const PROVIDER_ENV: Record<SecretManagerKind, string[]> = {
   vault: ['VAULT_ADDR', 'VAULT_ROLE_ID', 'VAULT_SECRET_ID'],
+  bao:   ['BAO_ADDR', 'BAO_ROLE_ID', 'BAO_SECRET_ID'],
   aws:   ['AWS_REGION', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'],
   azure: ['AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET'],
   gcp:   ['GCP_PROJECT', 'GOOGLE_APPLICATION_CREDENTIALS_JSON'],
@@ -32,14 +33,14 @@ const PROVIDER_ENV: Record<SecretManagerKind, string[]> = {
 export function secretManagerOf(ref: string): SecretManagerKind | null {
   if (ref.startsWith('op://')) return 'op';
   const scheme = ref.split(':', 1)[0];
-  if (scheme === 'vault' || scheme === 'aws' || scheme === 'azure' || scheme === 'gcp') return scheme;
+  if (scheme === 'vault' || scheme === 'bao' || scheme === 'aws' || scheme === 'azure' || scheme === 'gcp') return scheme;
   return null;
 }
 
 // Inline references are written as {{vault:...}} / {{aws:...}} / {{azure:...}} /
 // {{gcp:...}} / {{op://...}} and can appear anywhere a variable can: URL, headers,
 // params, body, auth fields, and pre/post-request scripts.
-const INLINE_REF_RE = /\{\{\s*(vault:|aws:|azure:|gcp:|op:\/\/)/g;
+const INLINE_REF_RE = /\{\{\s*(vault:|bao:|aws:|azure:|gcp:|op:\/\/)/g;
 
 export function inlineSecretManagers(text: string | null | undefined): SecretManagerKind[] {
   if (!text) return [];

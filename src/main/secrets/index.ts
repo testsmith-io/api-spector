@@ -10,13 +10,14 @@
 //   registerSecretProvider(awsSecretsProvider)   // enables `aws:...` references
 
 import { registerSecretProvider } from './registry';
-import { vaultProvider } from './providers/vault';
+import { vaultProvider, openBaoProvider } from './providers/vault';
 import { awsSecretsProvider } from './providers/aws';
 import { azureKeyVaultProvider } from './providers/azure';
 import { onePasswordProvider } from './providers/onepassword';
 import { gcpSecretManagerProvider } from './providers/gcp';
 
 registerSecretProvider(vaultProvider);          // vault:secret/data/app#token
+registerSecretProvider(openBaoProvider);        // bao:secret/data/app#token (OpenBao)
 registerSecretProvider(awsSecretsProvider);     // aws:my/secret#key
 registerSecretProvider(azureKeyVaultProvider);  // azure:my-kv/db-password
 registerSecretProvider(onePasswordProvider);    // op://vault/item/field
