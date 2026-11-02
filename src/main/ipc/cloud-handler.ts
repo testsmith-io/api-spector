@@ -90,7 +90,7 @@ interface PushMonitorInput {
 
 /** POST/GET JSON to the cloud API with the stored bearer token. Throws a
  *  human-readable Error on any non-2xx so the renderer can surface it. */
-async function cloudFetch(path: string, method: 'GET' | 'POST' | 'PUT', body?: unknown): Promise<any> {
+async function cloudFetch(path: string, method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', body?: unknown): Promise<any> {
   const token = await getSecret(CLOUD_TOKEN_REF);
   if (!token) throw new Error('No cloud API token set. Add one in Settings → Cloud.');
 
@@ -403,6 +403,112 @@ export function registerCloudHandlers(ipc: IpcMain): void {
   // Open the flow's page in the cloud UI.
   handleIpc(ipc, IPC.cloud.openFlow, async (_e, name: string) => {
     await shell.openExternal(CLOUD_ENDPOINT + '/flows/' + encodeURIComponent(slugify(name)));
+  });
+
+  // ─── Share collection / request as a public link ─────────────────────────────
+  // The payload is a definition, not data: requests carry {{variable}} refs, and
+  // environment secret values live outside the collection entirely. We ALSO strip
+  // data sets (CSV rows, which can hold real test data) and saved examples
+  // (captured responses, which can hold tokens) before upload — belt and braces.
+  const stripRequest = (r: ApiRequest): ApiRequest => {
+    const { examples: _examples, ...rest } = r as ApiRequest & { examples?: unknown };
+    return rest as ApiRequest;
+  };
+  const stripFolder = (f: Record<string, unknown> | undefined): Record<string, unknown> => {
+    const { dataSet: _d, dataSetRef: _r, ...rest } = (f ?? {}) as Record<string, unknown>;
+    const folders = Array.isArray(rest['folders']) ? (rest['folders'] as Record<string, unknown>[]).map(stripFolder) : [];
+    return { ...rest, folders };
+  };
+  const stripCollection = (col: Collection): Record<string, unknown> => {
+    const { dataSet: _d, dataSetRef: _r, ...rest } = col as Collection & { dataSet?: unknown; dataSetRef?: unknown };
+    const requests: Record<string, ApiRequest> = {};
+    for (const [id, req] of Object.entries(col.requests ?? {})) requests[id] = stripRequest(req);
+    return { ...rest, requests, rootFolder: stripFolder(col.rootFolder as unknown as Record<string, unknown>) };
+  };
+
+  handleIpc(ipc, IPC.cloud.shareCollection, async (_e, col: Collection) => {
+    return cloudFetch('/api/share', 'POST', { type: 'collection', source_id: col.id, name: col.name, payload: stripCollection(col) });
+  });
+
+  handleIpc(ipc, IPC.cloud.shareRequest, async (_e, req: ApiRequest) => {
+    return cloudFetch('/api/share', 'POST', { type: 'request', source_id: req.id, name: req.name, payload: stripRequest(req) });
+  });
+
+  // A folder is shared as a collection-shaped payload (the folder as its root +
+  // the subtree's request objects), assembled in the renderer. Same stripping.
+  handleIpc(ipc, IPC.cloud.shareFolder, async (_e, arg: { sourceId: string; name: string; payload: Collection }) => {
+    return cloudFetch('/api/share', 'POST', { type: 'folder', source_id: arg.sourceId, name: arg.name, payload: stripCollection(arg.payload) });
+  });
+
+  // Is this local collection/request already shared? Returns { exists, token?, url?, ... }.
+  handleIpc(ipc, IPC.cloud.shareLookup, async (_e, arg: { type: 'collection' | 'request' | 'folder'; sourceId: string }) => {
+    const q = new URLSearchParams({ type: arg.type, source_id: arg.sourceId }).toString();
+    return cloudFetch('/api/share-lookup?' + q, 'GET');
+  });
+
+  // Restrict: set or clear the expiry (expiresDays 0/undefined = never expires).
+  handleIpc(ipc, IPC.cloud.shareUpdate, async (_e, arg: { token: string; expiresDays?: number }) => {
+    const token = String(arg.token).replace(/[^a-z0-9]/gi, '');
+    return cloudFetch('/api/share/' + encodeURIComponent(token), 'PATCH', { expires_days: arg.expiresDays ?? 0 });
+  });
+
+  // Revoke the link.
+  handleIpc(ipc, IPC.cloud.shareRevoke, async (_e, token: string) => {
+    const clean = String(token).replace(/[^a-z0-9]/gi, '');
+    return cloudFetch('/api/share/' + encodeURIComponent(clean), 'DELETE');
+  });
+
+  // ─── Cloud-synced workspaces (collaborate without git) ───────────────────────
+  handleIpc(ipc, IPC.cloud.workspaceList, async () => cloudFetch('/api/workspaces', 'GET'));
+
+  handleIpc(ipc, IPC.cloud.workspaceCreate, async (_e, arg: { name: string; payload: unknown; author?: string }) =>
+    cloudFetch('/api/workspaces', 'POST', { name: arg.name, payload: arg.payload, author: arg.author }));
+
+  handleIpc(ipc, IPC.cloud.workspacePull, async (_e, id: number) =>
+    cloudFetch('/api/workspaces/' + encodeURIComponent(String(id)), 'GET'));
+
+  handleIpc(ipc, IPC.cloud.workspaceVersions, async (_e, id: number) =>
+    cloudFetch('/api/workspaces/' + encodeURIComponent(String(id)) + '/versions', 'GET'));
+
+  handleIpc(ipc, IPC.cloud.workspaceRestore, async (_e, arg: { id: number; version: number }) =>
+    cloudFetch('/api/workspaces/' + encodeURIComponent(String(arg.id)) + '/restore', 'POST', { version: arg.version }));
+
+  // Push returns a structured result rather than throwing, so the renderer can
+  // handle a 409 "someone else pushed" conflict distinctly from a hard error.
+  handleIpc(ipc, IPC.cloud.workspacePush, async (_e, arg: { id: number; baseVersion: number; payload: unknown; author?: string }) => {
+    const token = await getSecret(CLOUD_TOKEN_REF);
+    if (!token) throw new Error('No cloud API token set. Add one in Settings → Cloud.');
+    const dispatcher = await buildDispatcher();
+    const res = await fetch(CLOUD_ENDPOINT + '/api/workspaces/' + encodeURIComponent(String(arg.id)), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ base_version: arg.baseVersion, payload: arg.payload, author: arg.author }),
+      dispatcher,
+    });
+    const json = await res.json().catch(() => ({})) as { version?: number; current_version?: number; error?: string; message?: string };
+    if (res.status === 409) return { conflict: true as const, currentVersion: json.current_version };
+    if (!res.ok) throw new Error(json.error || json.message || `Push failed (HTTP ${res.status}).`);
+    return { conflict: false as const, version: json.version };
+  });
+
+  // Import a shared collection/request by token. This endpoint is PUBLIC (the
+  // token is the capability), so it is fetched WITHOUT the Sanctum bearer — a
+  // recipient need not have a cloud account to receive a share.
+  handleIpc(ipc, IPC.cloud.importShare, async (_e, token: string) => {
+    const cleaned = String(token).replace(/[^a-z0-9]/gi, '');
+    if (!cleaned) throw new Error('Invalid share link.');
+    const dispatcher = await buildDispatcher();
+    const res = await fetch(CLOUD_ENDPOINT + '/api/share/' + encodeURIComponent(cleaned), {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      dispatcher,
+    });
+    if (!res.ok) {
+      throw new Error(res.status === 404 || res.status === 410
+        ? 'This share link is invalid or has expired.'
+        : `Could not fetch the shared item (HTTP ${res.status}).`);
+    }
+    return res.json() as Promise<{ type: 'collection' | 'request'; name: string; payload: unknown }>;
   });
 
   // Push a request as a monitor. The URL is resolved to a concrete value here

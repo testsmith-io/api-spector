@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../../store';
-import type { GitStatus, GitCommit, GitBranch, GitRemote, GitFile, CiPlatform } from '../../../../shared/types';
+import type { GitStatus, GitCommit, GitBranch, GitRemote, GitStash, GitFile, CiPlatform } from '../../../../shared/types';
 import { Toast, useToast } from '../common/Toast';
 import { detectPlatform, generateCiContent, ciFilePath, secretManagerOf, requestSecretManagers, type SecretManagerKind } from '../../lib/ci-templates';
 import { ConflictEditor } from './ConflictEditor';
@@ -113,6 +113,15 @@ function ChangesTab({ status, onRefresh }: { readonly status: GitStatus; readonl
     } catch (e) { setError(String(e)); }
   }
 
+  async function stash() {
+    try {
+      setError(null);
+      await electron.gitStash();
+      showToast(t('Changes stashed - restore them from the Branches tab'), true);
+      onRefresh();
+    } catch (e) { setError(String(e)); }
+  }
+
   async function fetch() {
     setFetching(true);
     try {
@@ -166,6 +175,8 @@ function ChangesTab({ status, onRefresh }: { readonly status: GitStatus; readonl
 
   const allUnstaged = [...status.unstaged, ...status.untracked];
   const hasStaged   = status.staged.length > 0;
+  // Anything git would park: staged, unstaged, or untracked (stash runs -u).
+  const isDirty     = hasStaged || status.unstaged.length > 0 || status.untracked.length > 0;
   const needsPush   = status.ahead > 0;
   const needsPull   = status.behind > 0;
 
@@ -389,13 +400,23 @@ function ChangesTab({ status, onRefresh }: { readonly status: GitStatus; readonl
           rows={2}
           className="w-full bg-surface-800 border border-surface-700 rounded px-2 py-1.5 text-xs resize-none focus:outline-none focus:border-blue-500 placeholder-surface-600"
         />
-        <button
-          onClick={commit}
-          disabled={!message.trim() || !hasStaged}
-          className="w-full py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
-        >
-          {hasStaged ? t('Commit (:count)', { count: status.staged.length }) : t('Commit')}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={commit}
+            disabled={!message.trim() || !hasStaged}
+            className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
+          >
+            {hasStaged ? t('Commit (:count)', { count: status.staged.length }) : t('Commit')}
+          </button>
+          <button
+            onClick={stash}
+            disabled={!isDirty}
+            title={t('Park all uncommitted changes - restore them later from the Branches tab')}
+            className="px-3 py-1.5 bg-surface-800 hover:bg-surface-700 border border-surface-700 disabled:opacity-40 disabled:cursor-not-allowed rounded text-xs font-medium text-surface-200 transition-colors"
+          >
+            {t('Stash')}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -442,6 +463,8 @@ function BranchesTab({ onRefresh }: { readonly onRefresh: () => void }) {
   const t = useT();
   const [branches,     setBranches]     = useState<GitBranch[]>([]);
   const [remotes,      setRemotes]      = useState<GitRemote[]>([]);
+  const [stashes,      setStashes]      = useState<GitStash[]>([]);
+  const [info,         setInfo]         = useState<string | null>(null);
   const [loading,      setLoading]      = useState(true);
   const [newBranch,    setNewBranch]    = useState('');
   const [creating,     setCreating]     = useState(false);
@@ -456,8 +479,8 @@ function BranchesTab({ onRefresh }: { readonly onRefresh: () => void }) {
 
   const load = useCallback(() => {
     setLoadError(null);
-    Promise.all([electron.gitBranches(), electron.gitRemotes()])
-      .then(([b, r]) => { setBranches(b); setRemotes(r); })
+    Promise.all([electron.gitBranches(), electron.gitRemotes(), electron.gitStashList()])
+      .then(([b, r, s]) => { setBranches(b); setRemotes(r); setStashes(s); })
       .catch(err => {
         console.warn('GitPanel: failed to load branches/remotes', err);
         setLoadError(err instanceof Error ? err.message : String(err));
@@ -467,22 +490,64 @@ function BranchesTab({ onRefresh }: { readonly onRefresh: () => void }) {
 
   useEffect(() => { load(); }, [load]);
 
+  // git aborts a checkout when the switch would clobber uncommitted work; the
+  // exact wording varies ("overwritten by checkout/merge", "commit your changes
+  // or stash them"). On that specific failure, offer to stash and retry so the
+  // user isn't stuck. Any other error propagates to the caller untouched.
+  function isDirtyTreeError(msg: string): boolean {
+    return /overwritten by (checkout|merge)|commit your changes or stash/i.test(msg);
+  }
+
+  async function checkoutOrStash(localName: string, create: boolean): Promise<boolean> {
+    try {
+      await electron.gitCheckout(localName, create);
+      return true;
+    } catch (e) {
+      const msg = String(e);
+      if (!isDirtyTreeError(msg)) throw e;
+      if (!confirm(t('You have uncommitted changes that would be lost switching to ":name". Stash them and switch?', { name: localName }))) {
+        return false;
+      }
+      await electron.gitStash(t('Auto-stash before switching to :name', { name: localName }));
+      await electron.gitCheckout(localName, create);
+      setInfo(t('Your changes were stashed. Restore them from the Stashes list below when you return.'));
+      return true;
+    }
+  }
+
   async function checkout(name: string, remote: boolean) {
     try {
-      setError(null);
+      setError(null); setInfo(null);
       const localName = remote ? name.replace(/^origin\//, '') : name;
-      await electron.gitCheckout(localName, false);
-      load(); onRefresh();
+      if (await checkoutOrStash(localName, false)) { load(); onRefresh(); }
     } catch (e) { setError(String(e)); }
   }
 
   async function createBranch() {
     if (!newBranch.trim()) return;
     try {
-      setError(null);
-      await electron.gitCheckout(newBranch.trim(), true);
-      setNewBranch(''); setCreating(false);
+      setError(null); setInfo(null);
+      if (await checkoutOrStash(newBranch.trim(), true)) {
+        setNewBranch(''); setCreating(false);
+        load(); onRefresh();
+      }
+    } catch (e) { setError(String(e)); }
+  }
+
+  async function popStash(ref: string) {
+    try {
+      setError(null); setInfo(null);
+      await electron.gitStashPop(ref);
       load(); onRefresh();
+    } catch (e) { setError(String(e)); }
+  }
+
+  async function dropStash(ref: string) {
+    if (!confirm(t('Discard stashed changes (:ref)? This cannot be undone.', { ref }))) return;
+    try {
+      setError(null); setInfo(null);
+      await electron.gitStashDrop(ref);
+      load();
     } catch (e) { setError(String(e)); }
   }
 
@@ -542,7 +607,10 @@ function BranchesTab({ onRefresh }: { readonly onRefresh: () => void }) {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-y-auto">
-      {error && <p className="text-[11px] text-red-400 px-3 py-1 truncate">{error}</p>}
+      {error && <p className="text-[11px] text-red-400 px-3 py-1 truncate" title={error}>{error}</p>}
+      {info && (
+        <p className="text-[11px] text-blue-300 px-3 py-1 bg-blue-900/20 border-b border-surface-800">{info}</p>
+      )}
       {loadError && (
         <p className="text-[11px] text-amber-400 px-3 py-1 truncate" title={loadError}>
           {t('Couldn\'t load git state:')} {loadError}
@@ -646,6 +714,38 @@ function BranchesTab({ onRefresh }: { readonly onRefresh: () => void }) {
       {/* Empty filter result */}
       {q && local.length === 0 && remote.length === 0 && (
         <p className="px-3 py-3 text-[11px] text-surface-500">{t('No branches match ":filter".', { filter })}</p>
+      )}
+
+      {/* Stashes — parked working-tree snapshots (e.g. an auto-stash from
+          switching branches with uncommitted changes). Pop restores them onto
+          the current branch; drop discards them permanently. */}
+      {stashes.length > 0 && (
+        <section className="border-t border-surface-800 mt-1">
+          <p className="px-3 py-1.5 text-[10px] uppercase tracking-widest text-surface-500 font-semibold">{t('Stashes')}</p>
+          {stashes.map(s => (
+            <div key={s.ref} className="group flex items-center gap-2 px-3 py-1.5 text-xs text-surface-300 hover:bg-surface-800/50">
+              <span className="font-mono text-[10px] text-surface-500 shrink-0">{s.ref}</span>
+              <span className="truncate flex-1" title={s.branch ? t('on :branch: :message', { branch: s.branch, message: s.message }) : s.message}>
+                {s.message}
+                {s.branch && <span className="text-surface-600"> {t('(on :branch)', { branch: s.branch })}</span>}
+              </span>
+              <button
+                onClick={() => popStash(s.ref)}
+                className="opacity-0 group-hover:opacity-100 text-[10px] text-blue-400 hover:text-blue-300 transition-all shrink-0"
+                title={t('Restore these changes onto the current branch')}
+              >
+                {t('Pop')}
+              </button>
+              <button
+                onClick={() => dropStash(s.ref)}
+                className="opacity-0 group-hover:opacity-100 text-[10px] text-surface-500 hover:text-red-400 transition-all shrink-0"
+                title={t('Discard this stash')}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </section>
       )}
 
       {/* Remotes */}

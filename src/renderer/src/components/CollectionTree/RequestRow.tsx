@@ -12,7 +12,9 @@ import { onActivateKey } from '../../lib/a11y';
 import { PencilIcon, CopyIcon, TagIcon, SyncIcon, TrashIcon, ShieldIcon, BanIcon, SortAzIcon, FileCodeIcon, KeyIcon } from '../common/icons';
 import { useStore } from '../../store';
 import { useToast, Toast } from '../common/Toast';
-import { pushRequestAsMonitor, cloudEnabled } from '../../lib/cloud-push';
+import { CloudRequiredModal } from '../common/CloudRequiredModal';
+import { ShareModal } from '../common/ShareModal';
+import { pushRequestAsMonitor, shareRequestToCloud, cloudEnabled } from '../../lib/cloud-push';
 import { useT } from '../../i18n';
 
 /** The path portion of a request URL, for showing under the name in the tree.
@@ -118,6 +120,9 @@ export function RequestRow({
   const groupIndent = indent + 14;
   const { toast, show } = useToast();
   const addSecurityTests = useStore(s => s.addSecurityTests);
+  const openWorkspaceSettings = useStore(s => s.openWorkspaceSettings);
+  const [showCloudRequired, setShowCloudRequired] = useState(false);
+  const [showShare, setShowShare] = useState(false);
 
   // Cmd/Ctrl+click toggles this request into the multi-selection instead of
   // opening it; a plain click clears any selection and opens as before.
@@ -136,6 +141,13 @@ export function RequestRow({
     } catch (e) {
       show((e as Error).message, false);
     }
+  }
+
+  // Open the share dialog (create / view / restrict / revoke the public link).
+  // Sharing needs the cloud; without it we invite the user to connect instead.
+  function openShare() {
+    if (!cloudEnabled()) { setShowCloudRequired(true); return; }
+    setShowShare(true);
   }
 
   const hookMenuItems: MenuItem[] = (['beforeAll', 'before', 'after', 'afterAll'] as const).map(ht => ({
@@ -300,6 +312,7 @@ export function RequestRow({
             ...(cloudEnabled()
               ? [{ type: 'item' as const, label: t('Push as monitor to cloud'), icon: <SyncIcon />, onClick: pushMonitor }]
               : []),
+            { type: 'item', label: t('Share request (public link)'), icon: <CopyIcon />, onClick: openShare },
             { type: 'item', label: disabled ? t('Enable') : t('Disable'), icon: <BanIcon />, onClick: onToggleDisabled },
             { type: 'separator' },
             { type: 'header', label: t('Hook type') },
@@ -309,6 +322,26 @@ export function RequestRow({
           ]} />
         </div>
         {toast && <div className="fixed bottom-4 right-4 z-[100] w-96"><Toast toast={toast} /></div>}
+        {showCloudRequired && (
+          <CloudRequiredModal
+            action={t('share this request')}
+            onConnect={() => { setShowCloudRequired(false); openWorkspaceSettings('cloud'); }}
+            onClose={() => setShowCloudRequired(false)}
+          />
+        )}
+        {showShare && (
+          <ShareModal
+            title={useStore.getState().collections[collectionId]?.data.requests[reqId]?.name ?? ''}
+            type="request"
+            sourceId={reqId}
+            onCreate={() => {
+              const r = useStore.getState().collections[collectionId]?.data.requests[reqId];
+              if (!r) throw new Error(t('Request not found'));
+              return shareRequestToCloud(r);
+            }}
+            onClose={() => setShowShare(false)}
+          />
+        )}
       </div>
       {/* Examples under the request: a plain, compact indented list (no card,
           no header, no connector line). Marked with a neutral icon and their

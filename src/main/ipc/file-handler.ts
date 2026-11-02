@@ -4,7 +4,7 @@
 import { type IpcMain, dialog, app } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
-import { readFile, writeFile, mkdir, readdir, unlink } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir, unlink, cp } from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
 import { join, dirname, resolve, basename, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -251,6 +251,77 @@ function defaultWorkspaceName(): string {
   return 'my-workspace.spector';
 }
 
+// ─── Cloud workspace sync: serialize / apply helpers ─────────────────────────
+
+const SYNC_SKIP_DIRS = new Set(['.git', 'node_modules']);
+const SYNC_SKIP_FILES = new Set(['history.json']);
+
+/** Drop resolved secret material from an environment before it leaves the
+ *  machine: remove the encrypted blob + salt/iv/hash and blank the value of any
+ *  secret variable. Plain values (baseUrl, …) and references (envRef/secretRef)
+ *  are kept so the workspace still works for teammates. */
+function stripEnvSecrets(text: string): string {
+  try {
+    const env = JSON.parse(text) as { variables?: Record<string, unknown>[] };
+    if (Array.isArray(env.variables)) {
+      env.variables = env.variables.map(v => {
+        const rest: Record<string, unknown> = { ...v };
+        delete rest['secretEncrypted'];
+        delete rest['secretSalt'];
+        delete rest['secretIv'];
+        delete rest['secretHash'];
+        if (rest['secret']) rest['value'] = '';
+        return rest;
+      });
+    }
+    return JSON.stringify(env, null, 2);
+  } catch {
+    return text;
+  }
+}
+
+/** When applying a pulled environment, keep THIS machine's secret values for
+ *  variables that still exist (matched by key), so a pull never wipes local
+ *  secrets. Structure/order come from the remote. */
+function mergeEnvSecrets(remoteText: string, localText: string | null): string {
+  if (!localText) return remoteText;
+  try {
+    const remote = JSON.parse(remoteText) as { variables?: Record<string, unknown>[] };
+    const local = JSON.parse(localText) as { variables?: Record<string, unknown>[] };
+    const byKey = new Map<string, Record<string, unknown>>();
+    for (const lv of local.variables ?? []) byKey.set(String(lv['key']), lv);
+    remote.variables = (remote.variables ?? []).map(rv => {
+      const lv = byKey.get(String(rv['key']));
+      if (!lv) return rv;
+      const merged: Record<string, unknown> = { ...rv };
+      for (const f of ['secretEncrypted', 'secretSalt', 'secretIv', 'secretHash']) {
+        if (lv[f] !== undefined) merged[f] = lv[f];
+      }
+      if (rv['secret'] && lv['value']) merged['value'] = lv['value'];
+      return merged;
+    });
+    return JSON.stringify(remote, null, 2);
+  } catch {
+    return remoteText;
+  }
+}
+
+/** Recursively list workspace files (relative path, forward-slash), skipping
+ *  git / node_modules and the gitignored session history. */
+async function walkWorkspaceFiles(dir: string, base: string, out: Record<string, string>): Promise<void> {
+  const entries: Dirent[] = await readdir(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (SYNC_SKIP_DIRS.has(entry.name)) continue;
+      await walkWorkspaceFiles(join(dir, entry.name), base, out);
+    } else if (entry.isFile()) {
+      if (SYNC_SKIP_FILES.has(entry.name)) continue;
+      const full = join(dir, entry.name);
+      out[full.slice(base.length + 1).split(sep).join('/')] = await readFile(full, 'utf8');
+    }
+  }
+}
+
 export function registerFileHandlers(ipc: IpcMain): void {
   handleIpc(ipc, IPC.file.openWorkspace, async () => {
     const result = await dialog.showOpenDialog({
@@ -406,6 +477,78 @@ export function registerFileHandlers(ipc: IpcMain): void {
       // callers can fire-and-forget without worrying about double-deletes.
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     }
+  });
+
+  // Serialize the open workspace into a secret-free snapshot for cloud sync:
+  // the manifest's structural data (minus machine-local cloud/sync settings) and
+  // every workspace file, with environment secrets stripped.
+  handleIpc(ipc, IPC.file.serializeWorkspace, async () => {
+    if (!workspaceDir || !workspaceFile) throw new Error('No workspace open');
+    const manifest = JSON.parse(await readFile(workspaceFile, 'utf8')) as Workspace;
+    const files: Record<string, string> = {};
+    await walkWorkspaceFiles(workspaceDir, workspaceDir, files);
+    const manifestName = basename(workspaceFile);
+    delete files[manifestName];                       // the manifest travels separately
+    for (const rel of Object.keys(files)) {
+      if (rel.startsWith('environments/')) files[rel] = stripEnvSecrets(files[rel]);
+    }
+    const sharedSettings: Record<string, unknown> = { ...(manifest.settings ?? {}) };
+    delete sharedSettings['cloud'];
+    delete sharedSettings['sync'];
+    return { manifest: { ...manifest, settings: sharedSettings }, manifestName, files };
+  });
+
+  // Apply a pulled snapshot: back up the current workspace, write files (merging
+  // local env secrets so a pull never wipes them), then merge the manifest while
+  // keeping local cloud/sync settings. The renderer reloads from disk after.
+  handleIpc(ipc, IPC.file.applyWorkspaceSnapshot, async (_e, snap: { manifest: Workspace; files: Record<string, string> }) => {
+    if (!workspaceDir || !workspaceFile) throw new Error('No workspace open');
+
+    // Best-effort restore point (excludes .git / node_modules).
+    try {
+      const backupDir = join(app.getPath('userData'), 'sync-backups', basename(workspaceDir) + '-' + Date.now());
+      await cp(workspaceDir, backupDir, {
+        recursive: true,
+        filter: (src) => {
+          const rel = src.slice(workspaceDir!.length);
+          return !/[\\/](\.git|node_modules)([\\/]|$)/.test(rel);
+        },
+      });
+    } catch (err) {
+      console.warn('sync: workspace backup failed (continuing):', err);
+    }
+
+    const guard = resolve(workspaceDir) + (process.platform === 'win32' ? '\\' : '/');
+    let filesWritten = 0;
+    for (const [rel, content] of Object.entries(snap.files ?? {})) {
+      const full = resolve(workspaceDir, rel);
+      if (!full.startsWith(guard)) continue;          // never write outside the workspace
+      let out = content;
+      if (rel.startsWith('environments/')) {
+        let localText: string | null = null;
+        try { localText = await readFile(full, 'utf8'); } catch { /* new environment */ }
+        out = mergeEnvSecrets(content, localText);
+      }
+      await mkdir(dirname(full), { recursive: true });
+      await atomicWrite(full, out);
+      filesWritten++;
+    }
+
+    // Structural arrays come from remote; machine-local settings stay local.
+    const local = JSON.parse(await readFile(workspaceFile, 'utf8')) as Workspace;
+    const merged: Workspace = {
+      ...local,
+      ...snap.manifest,
+      settings: { ...(snap.manifest.settings ?? {}), ...(local.settings ?? {}) },
+    };
+    await atomicWrite(workspaceFile, JSON.stringify(merged, null, 2));
+    return {
+      ok: true,
+      filesWritten,
+      collections: Array.isArray(merged.collections) ? merged.collections.length : 0,
+      workspace: merged,
+      workspacePath: workspaceFile,
+    };
   });
 
   // Opt-in session-history persistence: a plain JSON array in the workspace

@@ -11,7 +11,9 @@ import { SchemaSyncModal } from './SchemaSyncModal';
 import { PushContractModal } from './PushContractModal';
 import { RequestRow, HOOK_LABELS, HOOK_COLORS } from './RequestRow';
 import { onActivateKey } from '../../lib/a11y';
-import { cloudEnabled } from '../../lib/cloud-push';
+import { cloudEnabled, shareCollectionToCloud, shareFolderToCloud } from '../../lib/cloud-push';
+import { CloudRequiredModal } from '../common/CloudRequiredModal';
+import { ShareModal } from '../common/ShareModal';
 import { isCollectionCollapsed, setCollectionCollapsed } from '../../lib/collapsed-collections';
 import { collectTagged } from '../../../../shared/request-collection';
 import { InlineEdit } from '../common/InlineEdit';
@@ -567,6 +569,16 @@ function CollectionNode ( {
   const [expandCtrl, setExpandCtrl] = useState<ExpandCtrl>( { value: true, seq: 0 } );
   const [dropOver, setDropOver] = useState( false );
   const dragCtx = useContext( DragCtx );
+  const openWorkspaceSettings = useStore( s => s.openWorkspaceSettings );
+  const [showCloudRequired, setShowCloudRequired] = useState( false );
+  const [showShare, setShowShare] = useState( false );
+
+  // Open the share dialog (create / view / restrict / revoke the public link).
+  // Sharing needs the cloud; without it we invite the user to connect instead.
+  function openShare () {
+    if ( !cloudEnabled() ) { setShowCloudRequired( true ); return; }
+    setShowShare( true );
+  }
 
   function expandAll () { setExpandCtrl( c => ( { value: true, seq: c.seq + 1, ids: null } ) ); }
   function collapseAll () { setExpandCtrl( c => ( { value: false, seq: c.seq + 1, ids: null } ) ); }
@@ -635,6 +647,7 @@ function CollectionNode ( {
             { type: 'item', label: t( 'Settings' ), icon: <GearIcon />, onClick: () => setShowSettings( true ) },
             { type: 'item', label: t( 'Sync schemas' ), icon: <SyncIcon />, onClick: () => setShowSchemaSync( true ) },
             ...( cloudEnabled() ? [{ type: 'item' as const, label: t( 'Push contract to cloud' ), icon: <SyncIcon />, onClick: () => setShowPushContract( true ) }] : [] ),
+            { type: 'item', label: t( 'Share collection (public link)' ), icon: <CopyIcon />, onClick: openShare },
             { type: 'item', label: col.disabled ? t( 'Enable' ) : t( 'Disable' ), icon: <BanIcon />, onClick: onToggleCollectionDisabled },
             { type: 'separator' },
             { type: 'item', label: t( 'Delete collection' ), icon: <TrashIcon />, danger: true, onClick: onDeleteCollection },
@@ -681,6 +694,22 @@ function CollectionNode ( {
       )}
       {showSchemaSync && (
         <SchemaSyncModal collectionId={col.id} scope={{ type: 'collection' }} onClose={() => setShowSchemaSync( false )} />
+      )}
+      {showCloudRequired && (
+        <CloudRequiredModal
+          action={t( 'share this collection' )}
+          onConnect={() => { setShowCloudRequired( false ); openWorkspaceSettings( 'cloud' ); }}
+          onClose={() => setShowCloudRequired( false )}
+        />
+      )}
+      {showShare && (
+        <ShareModal
+          title={col.name}
+          type="collection"
+          sourceId={col.id}
+          onCreate={() => shareCollectionToCloud( col )}
+          onClose={() => setShowShare( false )}
+        />
       )}
     </div>
   );
@@ -747,6 +776,13 @@ function FolderRow ( {
   // between siblings is handled by the DropLine elements around each row.
   const [dropInside, setDropInside] = useState( false );
   const dragCtx = useContext( DragCtx );
+  const openWorkspaceSettings = useStore( s => s.openWorkspaceSettings );
+  const [showCloudRequired, setShowCloudRequired] = useState( false );
+  const [showShare, setShowShare] = useState( false );
+  function openShare () {
+    if ( !cloudEnabled() ) { setShowCloudRequired( true ); return; }
+    setShowShare( true );
+  }
   const tags = folder.tags ?? [];
   const indent = indentPx( depth );
   const hasInheritedConfig = ( folder.auth && folder.auth.type !== 'none' ) || ( folder.headers && folder.headers.length > 0 );
@@ -844,6 +880,7 @@ function FolderRow ( {
             { type: 'item', label: t( 'Settings' ), icon: <GearIcon />, onClick: () => setShowSettings( true ) },
             { type: 'item', label: t( 'Sync schemas' ), icon: <SyncIcon />, onClick: () => setShowSchemaSync( true ) },
             ...( cloudEnabled() ? [{ type: 'item' as const, label: t( 'Push contract to cloud' ), icon: <SyncIcon />, onClick: () => setShowPushContract( true ) }] : [] ),
+            { type: 'item', label: t( 'Share folder (public link)' ), icon: <CopyIcon />, onClick: openShare },
             { type: 'item', label: folder.disabled ? t( 'Enable' ) : t( 'Disable' ), icon: <BanIcon />, onClick: onToggleDisabled },
             { type: 'separator' },
             { type: 'header', label: t( 'Run folder as hook' ) },
@@ -875,6 +912,22 @@ function FolderRow ( {
           collectionId={collectionId}
           scope={{ type: 'folder', folderId: folder.id }}
           onClose={() => setShowSchemaSync( false )}
+        />
+      )}
+      {showCloudRequired && (
+        <CloudRequiredModal
+          action={t( 'share this folder' )}
+          onConnect={() => { setShowCloudRequired( false ); openWorkspaceSettings( 'cloud' ); }}
+          onClose={() => setShowCloudRequired( false )}
+        />
+      )}
+      {showShare && folderCollection && (
+        <ShareModal
+          title={folder.name}
+          type="folder"
+          sourceId={folder.id}
+          onCreate={() => shareFolderToCloud( folderCollection, folder )}
+          onClose={() => setShowShare( false )}
         />
       )}
     </div>

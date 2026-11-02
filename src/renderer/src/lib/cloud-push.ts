@@ -8,7 +8,7 @@
 import { useStore } from '../store';
 import { resolveEnvironmentById } from '../hooks/useActiveEnvironment';
 import { authIsConfigured, getHooksForRequest } from '../../../shared/request-collection';
-import type { ApiRequest } from '../../../shared/types/collection';
+import type { ApiRequest, Collection, Folder } from '../../../shared/types/collection';
 import type { Flow } from '../../../shared/types/flow';
 import type { MockServer } from '../../../shared/types/mock';
 import type { KeyValuePair } from '../../../shared/types/http';
@@ -110,6 +110,79 @@ export async function runFlowInCloud(
 /** Open the flow's page in the cloud UI. */
 export function openCloudFlow(flow: Flow): void {
   void electron.cloudOpenFlow(flow.name);
+}
+
+// ─── Share collections / requests (public read-only links) ──────────────────
+
+export type ShareResult = { token: string; url: string; deep_link: string; expires_at?: string | null };
+export type ShareLookup = { exists: boolean; token?: string; url?: string; deep_link?: string; expires_at?: string | null };
+
+/** Share a whole collection as a public read-only link. The main process strips
+ *  data sets / saved examples; the definition carries only {{variable}} refs.
+ *  Idempotent: re-sharing the same collection refreshes its one link. */
+export async function shareCollectionToCloud(collection: Collection): Promise<ShareResult> {
+  assertEnabled();
+  return electron.cloudShareCollection(collection);
+}
+
+/** Share a single request as a public read-only link. */
+export async function shareRequestToCloud(request: ApiRequest): Promise<ShareResult> {
+  assertEnabled();
+  return electron.cloudShareRequest(request);
+}
+
+/** All request ids under a folder, including nested folders. */
+function collectFolderRequestIds(folder: Folder): string[] {
+  return [...folder.requestIds, ...folder.folders.flatMap(collectFolderRequestIds)];
+}
+
+/** Share a folder subtree as a public read-only link. Assembled as a
+ *  collection-shaped payload (the folder as its root + the subtree's requests)
+ *  so the viewer and importer reuse the collection path. */
+export async function shareFolderToCloud(collection: Collection, folder: Folder): Promise<ShareResult> {
+  assertEnabled();
+  const ids = new Set(collectFolderRequestIds(folder));
+  const requests: Record<string, ApiRequest> = {};
+  for (const id of ids) {
+    const r = collection.requests[id];
+    if (r) requests[id] = r;
+  }
+  const payload: Collection = {
+    version: '1.0',
+    id: folder.id,
+    name: folder.name,
+    rootFolder: folder,
+    requests,
+    collectionVariables: collection.collectionVariables,
+  };
+  return electron.cloudShareFolder({ sourceId: folder.id, name: folder.name, payload });
+}
+
+/** Whether a local collection/request/folder already has a public link. */
+export async function lookupShare(type: 'collection' | 'request' | 'folder', sourceId: string): Promise<ShareLookup> {
+  assertEnabled();
+  return electron.cloudShareLookup({ type, sourceId });
+}
+
+/** Restrict a share: set an expiry in days, or 0 for "never expires". */
+export async function restrictShare(token: string, expiresDays: number): Promise<ShareResult> {
+  assertEnabled();
+  return electron.cloudShareUpdate({ token, expiresDays });
+}
+
+/** Revoke a share link so it stops working. */
+export async function revokeShare(token: string): Promise<void> {
+  assertEnabled();
+  await electron.cloudShareRevoke(token);
+}
+
+/** Fetch a shared collection/request by token (from a spector://import link).
+ *  No cloud account needed on the receiving side, so this does NOT assert that
+ *  cloud is enabled. */
+export async function importShareFromCloud(
+  token: string,
+): Promise<{ type: 'collection' | 'request'; name: string; payload: unknown }> {
+  return electron.cloudImportShare(token);
 }
 
 /** The routes an existing cloud mock already has (for overwrite warnings), or
