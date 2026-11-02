@@ -46,4 +46,15 @@ export interface GitRemote {
   url: string
 }
 
+export interface GitStash {
+  /** Stash index (0 = most recent), i.e. the N in `stash@{N}`. */
+  index: number
+  /** Short ref used by git, e.g. "stash@{0}". */
+  ref: string
+  /** The branch the stash was created on. */
+  branch: string
+  /** Human-readable stash message. */
+  message: string
+}
+
 export type CiPlatform = 'github' | 'gitlab' | 'azure' | 'unknown'

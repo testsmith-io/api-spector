@@ -331,6 +331,16 @@ export interface Workspace {
       enabled: boolean
       tokenSet?: boolean
     }
+    /** Per-workspace sync backend. 'git' is the default collaboration model
+     *  (the workspace dir is a git repo); 'cloud' syncs through API Spector
+     *  Cloud for teams without git; 'local' is no sync. For 'cloud',
+     *  cloudWorkspaceId is the server workspace and baseVersion is the last
+     *  version this machine pulled/pushed (for conflict detection). */
+    sync?: {
+      mode: 'local' | 'git' | 'cloud'
+      cloudWorkspaceId?: number
+      baseVersion?: number
+    }
     /** External secret-manager connection config. Non-secret only (addresses,
      *  roles, mounts) — safe to commit. Tokens/secret-ids come from the
      *  environment (see docs/secrets-vault.md), never from here. Environment

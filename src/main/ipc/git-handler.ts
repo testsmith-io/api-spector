@@ -7,7 +7,7 @@ import { handleIpc } from './handle';
 import { simpleGit } from 'simple-git';
 import { writeFile, readFile, mkdir, stat } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
-import type { GitStatus, GitCommit, GitBranch, GitRemote } from '../../shared/types';
+import type { GitStatus, GitCommit, GitBranch, GitRemote, GitStash } from '../../shared/types';
 import { getWorkspaceDir, ensureGitignore } from './file-handler';
 import { BRANCH_REF_FORMAT, parseBranchRefs } from '../git-branch-parse';
 
@@ -173,6 +173,42 @@ export function registerGitHandlers(ipc: IpcMain): void {
   handleIpc(ipc, IPC.git.deleteBranch, async (_e, name: string, force: boolean = false) => {
     // simple-git's deleteLocalBranch wraps `git branch -d` (-D when force).
     await git().deleteLocalBranch(name, force);
+  });
+
+  handleIpc(ipc, IPC.git.stashList, async (): Promise<GitStash[]> => {
+    // `--format` with NUL-ish separators we can split safely. The branch name
+    // lives inside the subject ("WIP on <branch>: …" / "On <branch>: …"), so
+    // parse it out rather than relying on a dedicated field git doesn't expose.
+    const raw = await git().raw(['stash', 'list', '--format=%gd\u001f%gs']);
+    return raw.split('\n').filter(Boolean).map((line, index) => {
+      const [ref = `stash@{${index}}`, subject = ''] = line.split('\u001f');
+      const m = /^(?:WIP on|On) ([^:]+): (.*)$/.exec(subject);
+      return {
+        index,
+        ref,
+        branch:  m ? m[1] : '',
+        message: m ? m[2] : subject,
+      };
+    });
+  });
+
+  handleIpc(ipc, IPC.git.stash, async (_e, message?: string) => {
+    // `-u` includes untracked files so switching branches afterwards can't be
+    // blocked by an untracked path the target branch tracks. The whole working
+    // tree is parked and restored verbatim on pop.
+    const args = ['stash', 'push', '-u'];
+    if (message && message.trim()) args.push('-m', message.trim());
+    await git().raw(args);
+  });
+
+  handleIpc(ipc, IPC.git.stashPop, async (_e, ref?: string) => {
+    // No ref → most recent (stash@{0}). git refuses to pop onto a dirty path it
+    // would clobber; the error propagates to the panel so the user can resolve.
+    await git().raw(['stash', 'pop', ...(ref ? [ref] : [])]);
+  });
+
+  handleIpc(ipc, IPC.git.stashDrop, async (_e, ref?: string) => {
+    await git().raw(['stash', 'drop', ...(ref ? [ref] : [])]);
   });
 
   handleIpc(ipc, IPC.git.fetch, async () => {

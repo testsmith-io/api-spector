@@ -10,15 +10,16 @@ import { AI_OPENAI_TOKEN_REF, DEFAULT_AI_MODEL } from '../../../../shared/types'
 import { getAiConfig, setAiConfig, invalidateAiAvailable } from '../../lib/ai';
 import { labelCls, inputCls } from '../../lib/ui-classes';
 import { useConfirm } from './useConfirm';
+import { SyncSettingsPanel } from './SyncSettingsPanel';
 
 const { electron } = window;
 
 const DEFAULT_PII_PATTERNS = ['authorization', 'password', 'token', 'secret', 'api-key', 'x-api-key'];
 const ZOOM_STEPS = [0.75, 0.90, 1.0, 1.10, 1.25, 1.50];
 
-type SettingsTab = 'general' | 'appearance' | 'proxy' | 'tls' | 'privacy' | 'cloud' | 'ai' | 'secrets'
+type SettingsTab = 'general' | 'appearance' | 'proxy' | 'tls' | 'privacy' | 'cloud' | 'sync' | 'ai' | 'secrets'
 
-const SETTINGS_TABS: SettingsTab[] = ['general', 'appearance', 'proxy', 'tls', 'privacy', 'cloud', 'ai', 'secrets'];
+const SETTINGS_TABS: SettingsTab[] = ['general', 'appearance', 'proxy', 'tls', 'privacy', 'cloud', 'sync', 'ai', 'secrets'];
 
 export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClose: () => void; readonly initialTab?: string | null }) {
   const workspace = useStore(s => s.workspace);
@@ -279,6 +280,7 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
     { id: 'privacy',    label: t('Privacy') },
     { id: 'secrets',    label: t('Secrets') },
     { id: 'cloud',      label: t('Cloud') },
+    { id: 'sync',       label: t('Sync') },
     { id: 'ai',         label: t('AI') },
   ];
 
@@ -628,6 +630,10 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
                 <span>{t('Reject unauthorized / self-signed certificates')}</span>
               </label>
             </>
+          )}
+
+          {activeTab === 'sync' && (
+            <SyncSettingsPanel />
           )}
 
           {activeTab === 'ai' && (

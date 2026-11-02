@@ -41,6 +41,7 @@ import type {
   GitCommit,
   GitBranch,
   GitRemote,
+  GitStash,
   RecorderConfig,
   RecordedEntry,
   RecordingSession,
@@ -82,8 +83,18 @@ const api = {
   offOpenFromGit: (): void => {
     ipcRenderer.removeAllListeners(IPC.file.openFromGitDeepLink);
   },
+  onImportShare: (cb: (token: string) => void): void => {
+    ipcRenderer.on(IPC.file.importShareDeepLink, (_e, token: string) => cb(token));
+  },
+  offImportShare: (): void => {
+    ipcRenderer.removeAllListeners(IPC.file.importShareDeepLink);
+  },
   saveWorkspace: (ws: Workspace): Promise<void> =>
     ipcRenderer.invoke(IPC.file.saveWorkspace, ws),
+  serializeWorkspace: (): Promise<{ manifest: Workspace; manifestName: string; files: Record<string, string> }> =>
+    ipcRenderer.invoke(IPC.file.serializeWorkspace),
+  applyWorkspaceSnapshot: (snap: { manifest: Workspace; files: Record<string, string> }): Promise<{ ok: boolean; filesWritten: number; collections: number; workspace: Workspace; workspacePath: string }> =>
+    ipcRenderer.invoke(IPC.file.applyWorkspaceSnapshot, snap),
   newWorkspace: (): Promise<{ workspace: Workspace; workspacePath: string } | null> =>
     ipcRenderer.invoke(IPC.file.newWorkspace),
   closeWorkspace: (): Promise<void> =>
@@ -259,6 +270,32 @@ const api = {
   cloudGetFlowRun: (arg: { name: string; runId: number | string }): Promise<{ id: number | string; status: string; summary?: FlowRunSummary }> =>
     ipcRenderer.invoke(IPC.cloud.getFlowRun, arg),
   cloudOpenFlow: (name: string): Promise<void> => ipcRenderer.invoke(IPC.cloud.openFlow, name),
+  cloudShareCollection: (collection: Collection): Promise<{ token: string; url: string; deep_link: string }> =>
+    ipcRenderer.invoke(IPC.cloud.shareCollection, collection),
+  cloudShareRequest: (request: ApiRequest): Promise<{ token: string; url: string; deep_link: string }> =>
+    ipcRenderer.invoke(IPC.cloud.shareRequest, request),
+  cloudShareFolder: (arg: { sourceId: string; name: string; payload: Collection }): Promise<{ token: string; url: string; deep_link: string }> =>
+    ipcRenderer.invoke(IPC.cloud.shareFolder, arg),
+  cloudImportShare: (token: string): Promise<{ type: 'collection' | 'request' | 'folder'; name: string; payload: unknown }> =>
+    ipcRenderer.invoke(IPC.cloud.importShare, token),
+  cloudShareLookup: (arg: { type: 'collection' | 'request' | 'folder'; sourceId: string }): Promise<{ exists: boolean; token?: string; url?: string; deep_link?: string; expires_at?: string | null }> =>
+    ipcRenderer.invoke(IPC.cloud.shareLookup, arg),
+  cloudShareUpdate: (arg: { token: string; expiresDays?: number }): Promise<{ token: string; url: string; deep_link: string; expires_at: string | null }> =>
+    ipcRenderer.invoke(IPC.cloud.shareUpdate, arg),
+  cloudShareRevoke: (token: string): Promise<{ revoked: boolean }> =>
+    ipcRenderer.invoke(IPC.cloud.shareRevoke, token),
+  cloudWorkspaceList: (): Promise<{ workspaces: { id: number; name: string; version: number; updated_by_name: string | null; updated_at: string }[] }> =>
+    ipcRenderer.invoke(IPC.cloud.workspaceList),
+  cloudWorkspaceCreate: (arg: { name: string; payload: unknown; author?: string }): Promise<{ id: number; name: string; version: number }> =>
+    ipcRenderer.invoke(IPC.cloud.workspaceCreate, arg),
+  cloudWorkspacePull: (id: number): Promise<{ id: number; name: string; version: number; payload: unknown }> =>
+    ipcRenderer.invoke(IPC.cloud.workspacePull, id),
+  cloudWorkspacePush: (arg: { id: number; baseVersion: number; payload: unknown; author?: string }): Promise<{ conflict: boolean; version?: number; currentVersion?: number }> =>
+    ipcRenderer.invoke(IPC.cloud.workspacePush, arg),
+  cloudWorkspaceVersions: (id: number): Promise<{ versions: { version: number; author_name: string | null; created_at: string }[] }> =>
+    ipcRenderer.invoke(IPC.cloud.workspaceVersions, id),
+  cloudWorkspaceRestore: (arg: { id: number; version: number }): Promise<{ version: number; payload: unknown }> =>
+    ipcRenderer.invoke(IPC.cloud.workspaceRestore, arg),
 
   // ─── Mock servers ─────────────────────────────────────────────────────────────
   mockStart:    (server: MockServer): Promise<void> =>
@@ -574,6 +611,14 @@ const api = {
     ipcRenderer.invoke(IPC.git.checkout, branch, create),
   gitDeleteBranch: (name: string, force = false): Promise<void> =>
     ipcRenderer.invoke(IPC.git.deleteBranch, name, force),
+  gitStashList:  (): Promise<GitStash[]> =>
+    ipcRenderer.invoke(IPC.git.stashList),
+  gitStash:      (message?: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.git.stash, message),
+  gitStashPop:   (ref?: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.git.stashPop, ref),
+  gitStashDrop:  (ref?: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.git.stashDrop, ref),
   gitFetch:      (): Promise<void> =>
     ipcRenderer.invoke(IPC.git.fetch),
   gitPull:       (rebase = false): Promise<void> =>

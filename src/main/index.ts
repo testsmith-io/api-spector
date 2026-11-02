@@ -40,6 +40,7 @@ const PROTOCOL = 'spector';
 // A deep link can arrive before the window (or app) is ready. Hold the latest
 // pending repo URL until a renderer is loaded, then flush it.
 let pendingRepoUrl: string | null = null;
+let pendingImportToken: string | null = null;
 
 /** Pull the first `spector://` argument out of a process argv list (Windows/
  *  Linux deliver deep links this way, both on cold start and second-instance). */
@@ -65,14 +66,32 @@ function parseOpenFromGit(deepLink: string): string | null {
   return repo?.trim() ? repo.trim() : null;
 }
 
+/** Parse `spector://import?token=<token>` into the share token it carries.
+ *  Returns null for any other action or a malformed link. */
+function parseImportShare(deepLink: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(deepLink);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== `${PROTOCOL}:`) return null;
+  const action = u.hostname || u.pathname.replace(/^\/+/, '').split('/')[0];
+  if (action !== 'import') return null;
+  const token = u.searchParams.get('token');
+  return token?.trim() ? token.trim() : null;
+}
+
 /** Route a deep link to the renderer, focusing an existing window or creating
- *  one. If no window is loaded yet, stash the repo URL for flushDeepLink(). */
+ *  one. If no window is loaded yet, stash it for flushDeepLink(). */
 function handleDeepLink(deepLink: string): void {
   const repo = parseOpenFromGit(deepLink);
-  if (!repo) return;
+  const token = repo ? null : parseImportShare(deepLink);
+  if (!repo && !token) return;
   const win = BrowserWindow.getAllWindows()[0];
   if (!win) {
     pendingRepoUrl = repo;
+    pendingImportToken = token;
     if (app.isReady()) createWindow();
     return;
   }
@@ -80,17 +99,25 @@ function handleDeepLink(deepLink: string): void {
   win.focus();
   if (win.webContents.isLoading()) {
     pendingRepoUrl = repo;
+    pendingImportToken = token;
   } else {
-    win.webContents.send(IPC.file.openFromGitDeepLink, repo);
+    if (repo) win.webContents.send(IPC.file.openFromGitDeepLink, repo);
+    if (token) win.webContents.send(IPC.file.importShareDeepLink, token);
   }
 }
 
 /** After a window finishes loading, deliver any deep link that arrived early. */
 function flushDeepLink(win: BrowserWindow): void {
-  if (!pendingRepoUrl) return;
-  const repo = pendingRepoUrl;
-  pendingRepoUrl = null;
-  win.webContents.send(IPC.file.openFromGitDeepLink, repo);
+  if (pendingRepoUrl) {
+    const repo = pendingRepoUrl;
+    pendingRepoUrl = null;
+    win.webContents.send(IPC.file.openFromGitDeepLink, repo);
+  }
+  if (pendingImportToken) {
+    const token = pendingImportToken;
+    pendingImportToken = null;
+    win.webContents.send(IPC.file.importShareDeepLink, token);
+  }
 }
 
 function createSplashWindow(): BrowserWindow {

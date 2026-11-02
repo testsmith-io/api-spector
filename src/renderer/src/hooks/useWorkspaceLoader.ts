@@ -108,5 +108,14 @@ export function useWorkspaceLoader() {
     }
   }, [loadCollection, loadEnvironment, loadMock, loadFlow, loadContractSnapshot, setActiveCollection, setTheme, setZoom]);
 
-  return { applyWorkspace };
+  // Re-read the current workspace from disk and repopulate the store. Used after
+  // a cloud sync writes new files into the workspace dir.
+  const reloadWorkspace = useCallback(async () => {
+    const path = useStore.getState().workspacePath;
+    if (!path) return;
+    const result = await electron.openWorkspacePath(path);
+    if (result) await applyWorkspace(result.workspace, result.workspacePath);
+  }, [applyWorkspace]);
+
+  return { applyWorkspace, reloadWorkspace };
 }

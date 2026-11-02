@@ -23,6 +23,13 @@ export const IPC = {
     /** Event (main→renderer): a `spector://open-from-git?url=…` deep link was
      *  received; the renderer runs the same open-from-Git flow as the button. */
     openFromGitDeepLink: 'file:openFromGitDeepLink',
+    /** Event (main→renderer): a `spector://import?token=…` deep link was
+     *  received; the renderer imports the shared collection/request. */
+    importShareDeepLink: 'file:importShareDeepLink',
+    /** Serialize the open workspace to a secret-free snapshot for cloud sync. */
+    serializeWorkspace: 'file:serializeWorkspace',
+    /** Apply a pulled snapshot to disk (backs up first; merges local secrets). */
+    applyWorkspaceSnapshot: 'file:applyWorkspaceSnapshot',
     getLastWorkspace:    'file:getLastWorkspace',
     getRecentWorkspaces: 'file:getRecentWorkspaces',
     saveWorkspace:       'file:saveWorkspace',
@@ -281,6 +288,10 @@ export const IPC = {
     branches:       'git:branches',
     checkout:       'git:checkout',
     deleteBranch:   'git:deleteBranch',
+    stashList:      'git:stashList',
+    stash:          'git:stash',
+    stashPop:       'git:stashPop',
+    stashDrop:      'git:stashDrop',
     fetch:          'git:fetch',
     pull:           'git:pull',
     push:           'git:push',
@@ -354,5 +365,26 @@ export const IPC = {
     openFlow:    'cloud:openFlow',
     /** Open the cloud deployment matrix in the browser. */
     openMatrix:  'cloud:openMatrix',
+    /** Share a collection as a public read-only link (POST /api/share). */
+    shareCollection: 'cloud:shareCollection',
+    /** Share a single request as a public read-only link (POST /api/share). */
+    shareRequest: 'cloud:shareRequest',
+    /** Share a folder subtree as a public read-only link (POST /api/share). */
+    shareFolder: 'cloud:shareFolder',
+    /** Fetch a shared collection/request by token for import (GET /api/share/{token}). */
+    importShare: 'cloud:importShare',
+    /** Look up an existing share for a local collection/request (GET /api/share-lookup). */
+    shareLookup: 'cloud:shareLookup',
+    /** Restrict a share: set/clear its expiry (PATCH /api/share/{token}). */
+    shareUpdate: 'cloud:shareUpdate',
+    /** Revoke a share link (DELETE /api/share/{token}). */
+    shareRevoke: 'cloud:shareRevoke',
+    /** Cloud-synced workspaces (collaborate without git). */
+    workspaceList:     'cloud:workspaceList',
+    workspaceCreate:   'cloud:workspaceCreate',
+    workspacePull:     'cloud:workspacePull',
+    workspacePush:     'cloud:workspacePush',
+    workspaceVersions: 'cloud:workspaceVersions',
+    workspaceRestore:  'cloud:workspaceRestore',
   },
 } as const;

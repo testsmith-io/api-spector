@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import type { ApiRequest } from '../../shared/types';
+import type { ApiRequest, Collection } from '../../shared/types';
 import { findFolder } from '../../shared/folder-tree';
 import { useStore } from './store';
 import { useAutoSave } from './hooks/useAutoSave';
@@ -334,6 +334,53 @@ export default function App () {
     } );
     return () => electron.offOpenFromGit();
   }, [applyWorkspace] );
+
+  // "Open in API Spector" deep link (spector://import?token=…) from a shared
+  // collection/request link: fetch the definition and import it as a new
+  // collection, then switch the sidebar to show it.
+  useEffect( () => {
+    electron.onImportShare( async ( token: string ) => {
+      try {
+        const { type, name, payload } = await electron.cloudImportShare( token );
+        let collection: Collection;
+        if ( type === 'request' ) {
+          const r = payload as ApiRequest;
+          const reqId = r.id || crypto.randomUUID();
+          const req: ApiRequest = { ...r, id: reqId };
+          collection = {
+            version: '1.0',
+            id: crypto.randomUUID(),
+            name: name || req.name || 'Shared request',
+            rootFolder: { id: crypto.randomUUID(), name: '', folders: [], requestIds: [reqId] },
+            requests: { [reqId]: req },
+          };
+        } else {
+          // A fresh collection id so it can't collide with / overwrite an existing one.
+          collection = { ...( payload as Collection ), id: crypto.randomUUID() };
+        }
+
+        const store = useStore.getState();
+        const id = store.addCollectionObject( collection );
+
+        // Persist to disk + workspace when a workspace is open (best-effort;
+        // the collection is already in memory regardless).
+        try {
+          const entry = useStore.getState().collections[id];
+          if ( entry && useStore.getState().workspace ) {
+            await electron.saveCollection( entry.relPath, entry.data );
+            await electron.saveWorkspace( useStore.getState().workspace! );
+          }
+        } catch ( persistErr ) {
+          console.error( 'Imported shared collection but could not save it yet:', persistErr );
+        }
+
+        setSidebarTab( 'collections' );
+      } catch ( err ) {
+        console.error( 'Import from share link failed:', err );
+      }
+    } );
+    return () => electron.offImportShare();
+  }, [setSidebarTab] );
 
   useEffect( () => {
     electron.onMockHit( addMockHit );
