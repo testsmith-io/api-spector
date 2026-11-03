@@ -37,6 +37,10 @@ export interface AppTab {
   lastHookResults: RunRequestResult[] | null
   isSending: boolean
   requestTab: 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'schema' | 'contract' | 'stream' | 'docs' | 'variables'
+  /** jq filter applied to this tab's JSON response. Kept per tab (not local to
+   *  the response view) so it survives re-sends and tab switches, which remount
+   *  the response pane. */
+  jqExpr: string
 }
 
 function baseTab(collectionId: string | null): Omit<AppTab, 'kind' | 'requestId' | 'folderId' | 'exampleId' | 'requestTab'> {
@@ -49,6 +53,7 @@ function baseTab(collectionId: string | null): Omit<AppTab, 'kind' | 'requestId'
     lastHookResults: null,
     isSending: false,
     scriptTab: 'post',
+    jqExpr: '',
   };
 }
 
@@ -138,6 +143,7 @@ export interface TabsSliceActions {
   setTabSending: (tabId: string, sending: boolean) => void
   setTabRequestTab: (tabId: string, tab: AppTab['requestTab']) => void
   setTabScriptTab: (tabId: string, scriptTab: 'pre' | 'post') => void
+  setTabJqExpr: (tabId: string, jqExpr: string) => void
 
   // Navigation
   setActiveCollection: (id: string) => void
@@ -251,6 +257,11 @@ export const createTabsSlice: StateCreator<
   setTabScriptTab: (tabId, scriptTab) => set(s => {
     const t = s.tabs.find(x => x.id === tabId);
     if (t) t.scriptTab = scriptTab;
+  }),
+
+  setTabJqExpr: (tabId, jqExpr) => set(s => {
+    const t = s.tabs.find(x => x.id === tabId);
+    if (t) t.jqExpr = jqExpr;
   }),
 
   // ── Navigation ──────────────────────────────────────────────────────────────
