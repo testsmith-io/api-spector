@@ -9,6 +9,7 @@ import { detectPlatform, generateCiContent, ciFilePath, secretManagerOf, request
 import { ConflictEditor } from './ConflictEditor';
 import { STORAGE_KEYS } from '../../lib/storage-keys';
 import { onActivateKey } from '../../lib/a11y';
+import { useWorkspaceLoader } from '../../hooks/useWorkspaceLoader';
 import { useT } from '../../i18n';
 
 const { electron } = window;
@@ -459,7 +460,7 @@ function LogTab() {
 
 // ─── Branches tab ─────────────────────────────────────────────────────────────
 
-function BranchesTab({ onRefresh }: { readonly onRefresh: () => void }) {
+function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () => void; readonly reloadWorkspace: () => Promise<void> }) {
   const t = useT();
   const [branches,     setBranches]     = useState<GitBranch[]>([]);
   const [remotes,      setRemotes]      = useState<GitRemote[]>([]);
@@ -519,7 +520,10 @@ function BranchesTab({ onRefresh }: { readonly onRefresh: () => void }) {
     try {
       setError(null); setInfo(null);
       const localName = remote ? name.replace(/^origin\//, '') : name;
-      if (await checkoutOrStash(localName, false)) { load(); onRefresh(); }
+      // A checkout swaps the working-tree files to the other branch, so the
+      // in-memory workspace (collections, environments, flows, open tabs) is now
+      // stale — reload it from disk before refreshing the git views.
+      if (await checkoutOrStash(localName, false)) { await reloadWorkspace(); load(); onRefresh(); }
     } catch (e) { setError(String(e)); }
   }
 
@@ -529,7 +533,9 @@ function BranchesTab({ onRefresh }: { readonly onRefresh: () => void }) {
       setError(null); setInfo(null);
       if (await checkoutOrStash(newBranch.trim(), true)) {
         setNewBranch(''); setCreating(false);
-        load(); onRefresh();
+        // Creating a branch keeps the same files, but checkoutOrStash may have
+        // auto-stashed dirty work (removing it from the tree), so reload to match.
+        await reloadWorkspace(); load(); onRefresh();
       }
     } catch (e) { setError(String(e)); }
   }
@@ -538,7 +544,9 @@ function BranchesTab({ onRefresh }: { readonly onRefresh: () => void }) {
     try {
       setError(null); setInfo(null);
       await electron.gitStashPop(ref);
-      load(); onRefresh();
+      // Popping a stash writes the parked changes back into the working tree,
+      // so the workspace on disk changed — reload it into the store.
+      await reloadWorkspace(); load(); onRefresh();
     } catch (e) { setError(String(e)); }
   }
 
@@ -839,6 +847,7 @@ function CiTab() {
   const [envId,        setEnvId]        = useState('');
   const [tags,         setTags]         = useState('');
   const [preview,      setPreview]      = useState('');
+  const [edited,       setEdited]       = useState(false);
   const [written,      setWritten]      = useState(false);
   const [error,        setError]        = useState<string | null>(null);
 
@@ -855,8 +864,12 @@ function CiTab() {
     });
   }, []);
 
-  useEffect(() => {
-    const env = envList.find(e => e.data.id === envId);
+  // Build the pipeline from the current platform/env/tags + detected secrets.
+  // Kept as a callable (not an effect side effect) so we can regenerate on a
+  // deliberate settings change or an explicit "Regenerate", without clobbering
+  // the user's manual edits whenever an unrelated store update re-renders.
+  const buildGenerated = useCallback(() => {
+    const env = Object.values(environments).find(e => e.data.id === envId);
     const secretVars = env
       ? env.data.variables.filter(v => v.secret && v.enabled).map(v => v.key)
       : [];
@@ -874,9 +887,38 @@ function CiTab() {
       Object.values(c.data.requests).flatMap(requestSecretManagers));
     const secretManagers = [...new Set([...envRefManagers, ...inlineManagers])];
     const envName = env?.data.name ?? '';
-    setPreview(generateCiContent(platform, envName, tags, secretVars, secretManagers));
-    setWritten(false);
+    return generateCiContent(platform, envName, tags, secretVars, secretManagers);
   }, [platform, envId, tags, environments, collections]);
+
+  // Regenerate only when a SETTING changes (platform/env/tags) — a deliberate
+  // "give me a fresh pipeline for these options" — which discards manual edits.
+  // Incidental store updates (a background autosave touching collections) no
+  // longer overwrite what the user has typed.
+  useEffect(() => {
+    setPreview(buildGenerated());
+    setEdited(false);
+    setWritten(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platform, envId, tags]);
+
+  // Keep the pipeline in sync with background changes (e.g. adding a secret
+  // variable, which changes buildGenerated) ONLY while the user hasn't edited
+  // it by hand — manual edits are never silently overwritten.
+  useEffect(() => {
+    if (!edited) { setPreview(buildGenerated()); setWritten(false); }
+  }, [buildGenerated, edited]);
+
+  function regenerate() {
+    setPreview(buildGenerated());
+    setEdited(false);
+    setWritten(false);
+  }
+
+  function editPreview(value: string) {
+    setPreview(value);
+    setEdited(true);
+    setWritten(false);
+  }
 
   async function write() {
     try {
@@ -962,10 +1004,32 @@ function CiTab() {
         </div>
       </div>
 
-      {/* Preview */}
-      <div className="flex-1 overflow-auto">
-        <p className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-widest text-surface-600 font-semibold">{t('Preview')}</p>
-        <pre className="px-3 pb-3 text-[10px] font-mono text-surface-400 leading-relaxed whitespace-pre-wrap">{preview}</pre>
+      {/* Pipeline (editable). Edits are written to disk as-is; changing a
+          setting above regenerates and discards them. */}
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="px-3 pt-2 pb-1 flex items-center justify-between">
+          <p className="text-[10px] uppercase tracking-widest text-surface-600 font-semibold">
+            {t('Pipeline')}
+            {edited && <span className="ml-2 text-amber-400/80 normal-case tracking-normal font-normal">{t('(edited)')}</span>}
+          </p>
+          <button
+            onClick={regenerate}
+            disabled={!edited}
+            title={t('Discard edits and regenerate from the settings above')}
+            className="text-[10px] text-surface-400 hover:text-white disabled:opacity-40 disabled:cursor-default transition-colors"
+          >
+            {t('↺ Regenerate')}
+          </button>
+        </div>
+        <textarea
+          value={preview}
+          onChange={e => editPreview(e.target.value)}
+          spellCheck={false}
+          autoCapitalize="off"
+          autoCorrect="off"
+          aria-label={t('Pipeline file contents')}
+          className="flex-1 min-h-0 mx-3 mb-3 resize-none bg-surface-900 border border-surface-800 rounded px-3 py-2 text-[10px] font-mono text-surface-300 leading-relaxed focus:outline-none focus:border-blue-500 whitespace-pre"
+        />
       </div>
     </div>
   );
@@ -975,6 +1039,7 @@ function CiTab() {
 
 export function GitPanel() {
   const t = useT();
+  const { reloadWorkspace } = useWorkspaceLoader();
   const [isRepo,  setIsRepo]  = useState<boolean | null>(null);
   const [status,  setStatus]  = useState<GitStatus | null>(null);
   const [tab,     setTab]     = useState<Tab>('changes');
@@ -1040,7 +1105,7 @@ export function GitPanel() {
 
       {tab === 'changes'  && status && <ChangesTab status={status} onRefresh={refresh} />}
       {tab === 'log'      && <LogTab />}
-      {tab === 'branches' && <BranchesTab onRefresh={refresh} />}
+      {tab === 'branches' && <BranchesTab onRefresh={refresh} reloadWorkspace={reloadWorkspace} />}
       {tab === 'ci'       && <CiTab />}
     </div>
   );
