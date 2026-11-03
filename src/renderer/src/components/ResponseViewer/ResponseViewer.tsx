@@ -149,6 +149,7 @@ export function ResponseViewer() {
   const setTabRequestTab = useStore(s => s.setTabRequestTab);
   const openContractDesigner = useStore(s => s.openContractDesigner);
   const setTabScriptTab = useStore(s => s.setTabScriptTab);
+  const setTabJqExpr = useStore(s => s.setTabJqExpr);
   const isSending = activeTab?.isSending ?? false;
   const liveStream = useStore(s => s.liveStream);
   const streamForTab = liveStream?.tabId === activeTabId ? liveStream : null;
@@ -251,8 +252,11 @@ export function ResponseViewer() {
   const [bodyView, setBodyView] = useState<'tree' | 'raw' | 'table'>('raw');
 
   // jq filter over a JSON response body. Runs the real jq (wasm) in main,
-  // debounced; an empty expression shows the normal body views.
-  const [jqExpr, setJqExpr] = useState('');
+  // debounced; an empty expression shows the normal body views. The expression
+  // lives on the tab (store), not in local state, so it survives the response
+  // pane remounting on each re-send and tab switch. The result/error below stay
+  // local and are recomputed from the restored expression by the effect.
+  const jqExpr = activeTab?.jqExpr ?? '';
   const [jqResult, setJqResult] = useState<string | null>(null);
   const [jqError, setJqError] = useState<string | null>(null);
   useEffect(() => {
@@ -554,7 +558,7 @@ export function ResponseViewer() {
             {tab === 'body' && isJson && !response.streamed && (
               <input
                 value={jqExpr}
-                onChange={e => setJqExpr(e.target.value)}
+                onChange={e => { if (activeTabId) setTabJqExpr(activeTabId, e.target.value); }}
                 spellCheck={false}
                 placeholder={t('jq filter, e.g. .data | map(.id)')}
                 title={t('Filter this JSON response with a jq expression')}
