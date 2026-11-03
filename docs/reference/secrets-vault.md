@@ -207,82 +207,88 @@ let API Spector do the JWT login itself with `VAULT_JWT` / `VAULT_JWT_PATH` +
 `VAULT_JWT_ROLE`. Resolution and redaction are identical to the UI: per-run,
 in-memory, and scrubbed from the JSON / JUnit report.
 
-#### Two ways to do secrets in CI
+#### Keeping one `vault:` reference, resolving it two ways
 
-There are two supported models, and they differ only in **who talks to Vault**.
-Pick one per variable.
+The same `{{vault:path#key}}` reference can run locally against real Vault and in
+CI against a value your pipeline already fetched, **with no change to the
+collection**. You never rewrite the reference; you only change what the
+environment offers at run time.
 
-**Model A: API Spector resolves the reference.** The variable is a `vault:` (or
-`aws:` / `azure:` / `op:`) reference, and API Spector connects to the secret
-manager in the job using `VAULT_ADDR` + token / AppRole / OIDC (as above). One
-source of truth, no extra pipeline step, and the same reference works locally.
+**Local and whenever the runner may reach Vault: API Spector resolves it.**
+Provide `VAULT_ADDR` plus a credential (OIDC/JWT, AppRole, or a token) and API
+Spector performs the lookup itself (the default behaviour described above). This
+is the normal local path and works in CI too when the job is allowed to talk to
+Vault.
 
-**Model B: the pipeline resolves Vault and injects the value.** A separate step,
-such as a shared GitLab CI/CD component that authenticates with a Vault role,
-reads the secret and exports it as a **job environment variable** (for example
-`DB_PASSWORD`). The value is already in `process.env` by the time the test step
-runs, so API Spector must reference it **as an environment variable, not as a
-`vault:` reference**. Two ways to do that, both resolved at send time and never
-stored:
+**CI where a pipeline step resolves Vault for you: inject the value.** This fits
+the common GitLab pattern where a shared CI/CD component logs in to Vault with
+its role and exports the secrets as job variables. Here API Spector must **not**
+call Vault; it should use the value the component already fetched. Keep the
+`vault:` reference in the collection and point API Spector at the injected values
+through one of these environment inputs. All are optional (absent by default, so
+local runs are unaffected) and keyed by the **full reference string exactly as
+written**, for example `vault:secret/data/payments-api#api_key`:
 
-- Set the environment variable's **`envRef`** to the injected name (for example
-  `envRef: "DB_PASSWORD"`). This is the recommended, explicit option and works
-  for any variable. See [OS environment reference](../gui/environments.md).
-- Or mark the variable **secret** with no stored value and name its key exactly
-  the injected name (`DB_PASSWORD`). Headless runs fall back to `process.env` of
-  the same name, the same mechanism used for GitHub Secrets.
+| Environment input | Shape | Use when |
+|---|---|---|
+| `API_SPECTOR_SECRET_ENV_MAP` | JSON `{ "<ref>": "<ENV_VAR_NAME>" }` | the component exports each secret under a name of its choosing; map the reference to that name |
+| `API_SPECTOR_SECRETS` | JSON `{ "<ref>": "<value>" }` | the component or a small step can emit one JSON blob of values |
+| `API_SPECTOR_SECRETS_FILE` | path to a JSON file of the same shape | the values are written to a file in the job |
 
-> **Do not mix the two on one variable.** If a variable is a `vault:` reference,
-> API Spector connects to Vault itself and ignores any plain environment variable
-> of that name. If the pipeline already injected the resolved value, reference it
-> with `envRef` (or a matching secret key name), not a `vault:` reference.
+When one of these covers a reference, API Spector returns that value and skips
+the Vault call. Any reference not covered still falls through to a real lookup,
+so the two can be mixed. The injected value is redacted from reports exactly like
+any resolved secret. The `ENV_VAR_NAME` map holds names only, not secrets, so it
+is safe to commit.
 
-GitLab example, where a component has populated `DB_PASSWORD` and `API_TOKEN`
-from Vault as job variables:
+GitLab example. A shared component has logged in to Vault with its role and
+exported `PAYMENTS_API_KEY` and `DB_PASSWORD` as job variables. The collection is
+untouched: it still uses `{{vault:secret/data/payments-api#api_key}}` and an
+environment variable whose secret reference is `vault:secret/data/db#password`.
 
 ```yaml
 api-tests:
   image: node:22
-  # A shared component authenticated to Vault with its role and exported
-  # DB_PASSWORD and API_TOKEN into the job environment before this step.
+  variables:
+    # Tell API Spector which injected job variable backs each vault reference.
+    # Names only, no secrets, so this is safe to keep in the repo.
+    API_SPECTOR_SECRET_ENV_MAP: >-
+      {
+        "vault:secret/data/payments-api#api_key": "PAYMENTS_API_KEY",
+        "vault:secret/data/db#password": "DB_PASSWORD"
+      }
   script:
     - npm install -g @testsmith/api-spector
     - api-spector run --workspace ./ws.spector --env prod
 ```
 
-In the workspace, the matching environment variables carry an `envRef` (no value
-on disk):
+If your component can emit a single JSON object of resolved values instead, set
+`API_SPECTOR_SECRETS` (or write it to a file and set `API_SPECTOR_SECRETS_FILE`)
+and you do not need the name map:
 
-```jsonc
-// ws.spector  ->  the "prod" environment
-{
-  "variables": [
-    { "key": "DB_PASSWORD", "envRef": "DB_PASSWORD", "enabled": true },
-    { "key": "API_TOKEN",   "envRef": "API_TOKEN",   "enabled": true }
-  ]
-}
+```yaml
+  variables:
+    API_SPECTOR_SECRETS: >-
+      { "vault:secret/data/db#password": "$DB_PASSWORD" }
 ```
 
-Requests then use them like any variable (`{{API_TOKEN}}`), and the values are
-redacted from the report.
+**Testing the CI path locally.** Export the same inputs in the shell that
+launches the app or the CLI, for example
+`export API_SPECTOR_SECRETS='{"vault:secret/data/db#password":"local-test"}'`,
+and the reference resolves from there instead of Vault. Unset it to go back to a
+real Vault lookup. The collection is identical in both cases.
 
-**Which to choose.** Use Model A when you want API Spector to own the Vault
-lookup and the same reference to work on your laptop and in CI. Use Model B when
-your platform already standardizes Vault access through a shared
-component or template, which is common on GitLab: API Spector just consumes the
-environment variable the component provides, exactly as it reads any CI secret.
-
-**Local testing of each.** Model A runs locally as-is: configure
-**Workspace Settings > Secrets** (or export `VAULT_*` in your shell) and use
-`vault:` references. To exercise Model B locally, export the variable in the
-shell that launches the app or the CLI (for example `export API_TOKEN=...`) and
-reference it with `envRef`.
+> If you would rather not keep a `vault:` reference at all, a variable can instead
+> read straight from an OS environment variable via `envRef`
+> (see [OS environment reference](../gui/environments.md)). The injected-value
+> inputs above exist precisely so you do **not** have to do that, and your
+> collection stays the same for local Vault use and for every teammate.
 
 > **Generated pipeline:** the **Git** panel's "Generate CI" writes this file for
 > you (GitHub Actions, GitLab CI, or Azure Pipelines). It detects the secret
-> managers a run uses — from environment-variable references **and** from inline
-> `{{vault:...}}` anywhere in a request (URL, headers, params, body, auth, or the
-> pre/post-request scripts) — and includes the right plumbing automatically. For
+> managers a run uses (from environment-variable references **and** from inline
+> `{{vault:...}}` anywhere in a request: URL, headers, params, body, auth, or the
+> pre/post-request scripts) and includes the right plumbing automatically. For
 > Vault on GitHub that is the
 > `hashicorp/vault-action` OIDC step, the `id-token: write` permission, and
 > `VAULT_ADDR`; GitLab/Azure get AppRole variables instead. It adds

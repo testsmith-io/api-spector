@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import type { SecretProvider, SecretResolveContext } from './types';
+import { injectedSecret } from './injected';
 
 // Registry of external-secret providers, keyed by reference scheme. New backends
 // register here; the resolver dispatches by the scheme prefix of a reference.
@@ -38,6 +39,13 @@ export async function resolveExternalSecret(
 ): Promise<string | null> {
   const scheme = schemeOf(ref);
   if (!scheme) return null;
+
+  // CI / injected override: if the value was pre-resolved into the environment
+  // (e.g. a pipeline step that read it from the manager and exported it), use it
+  // and skip the backend call. This lets the collection keep its `vault:...`
+  // reference unchanged: real Vault locally, the injected value in CI.
+  const injected = injectedSecret(ref);
+  if (injected !== undefined) return injected;
 
   const provider = providers.get(scheme)!;
   const refBody = ref.slice(scheme.length + 1);
