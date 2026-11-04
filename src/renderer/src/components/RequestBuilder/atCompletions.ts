@@ -417,21 +417,28 @@ export function varHoverTooltipExtension(varValues: Record<string, string>) {
           create() {
             const dom = document.createElement('div');
             dom.style.cssText =
-              'display:flex;align-items:center;gap:6px;padding:4px 10px;' +
-              'font-size:11px;font-family:monospace;white-space:nowrap;';
+              'display:flex;align-items:flex-start;gap:6px;padding:4px 10px;' +
+              'font-size:11px;font-family:monospace;' +
+              'max-width:min(32rem,90vw);max-height:60vh;overflow:auto;';
 
             const nameEl = document.createElement('span');
             nameEl.style.color = '#60a5fa';
+            nameEl.style.cssText += 'flex:0 0 auto;white-space:nowrap;';
             nameEl.textContent = `{{${name}}}`;
 
             const arrow = document.createElement('span');
             arrow.style.color = '#6b7280';
+            arrow.style.cssText += 'flex:0 0 auto;';
             arrow.textContent = '→';
 
             const valEl = document.createElement('span');
+            // Long values (tokens, URLs, JWTs) wrap and break so the whole value
+            // stays readable instead of being cut off at 60 chars; the container
+            // scrolls for very large values.
+            valEl.style.cssText = 'flex:1 1 auto;min-width:0;white-space:pre-wrap;word-break:break-all;';
             if (resolved !== undefined) {
               valEl.style.color = '#34d399';
-              valEl.textContent = resolved.length > 60 ? resolved.slice(0, 60) + '…' : resolved;
+              valEl.textContent = resolved;
             } else if (DYNAMIC_VAR_INFO[name]) {
               valEl.style.color = '#a78bfa';
               valEl.style.fontStyle = 'italic';

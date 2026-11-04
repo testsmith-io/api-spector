@@ -353,7 +353,7 @@ export async function fetchOAuth2Token(
   params.set('grant_type', flow === 'password' ? 'password' : 'client_credentials');
   params.set('client_id', clientId);
   params.set('client_secret', clientSecret);
-  if (auth.oauth2Scopes) params.set('scope', auth.oauth2Scopes);
+  if (auth.oauth2Scopes) params.set('scope', interpolate(auth.oauth2Scopes, vars));
 
   if (flow === 'password') {
     let password = auth.password ?? '';
