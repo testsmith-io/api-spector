@@ -611,6 +611,12 @@ const api = {
     ipcRenderer.invoke(IPC.git.checkout, branch, create),
   gitDeleteBranch: (name: string, force = false): Promise<void> =>
     ipcRenderer.invoke(IPC.git.deleteBranch, name, force),
+  gitRebase:         (onto: string): Promise<{ conflict: boolean }> =>
+    ipcRenderer.invoke(IPC.git.rebase, onto),
+  gitRebaseContinue: (): Promise<{ conflict: boolean }> =>
+    ipcRenderer.invoke(IPC.git.rebaseContinue),
+  gitRebaseAbort:    (): Promise<void> =>
+    ipcRenderer.invoke(IPC.git.rebaseAbort),
   gitStashList:  (): Promise<GitStash[]> =>
     ipcRenderer.invoke(IPC.git.stashList),
   gitStash:      (message?: string): Promise<void> =>

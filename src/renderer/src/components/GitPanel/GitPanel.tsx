@@ -54,7 +54,7 @@ export function DiffViewer({ diff }: { readonly diff: string }) {
 
 // ─── Changes tab ─────────────────────────────────────────────────────────────
 
-function ChangesTab({ status, onRefresh }: { readonly status: GitStatus; readonly onRefresh: () => void }) {
+function ChangesTab({ status, onRefresh, reloadWorkspace }: { readonly status: GitStatus; readonly onRefresh: () => void; readonly reloadWorkspace: () => Promise<void> }) {
   const t = useT();
   const [message,    setMessage]    = useState('');
   const [diffFile,   setDiffFile]   = useState<string | null>(null);
@@ -174,6 +174,29 @@ function ChangesTab({ status, onRefresh }: { readonly status: GitStatus; readonl
     } catch (e) { setError(String(e)); }
   }
 
+  // Continue a rebase that stopped on conflicts (once they are staged/resolved).
+  // A rebase rewrites the working tree, so the workspace is reloaded on success.
+  async function rebaseContinue() {
+    try {
+      setError(null);
+      const r = await electron.gitRebaseContinue();
+      if (r.conflict) { showToast(t('Still conflicts - resolve the files below, then continue'), false); onRefresh(); return; }
+      await reloadWorkspace();
+      showToast(t('Rebase complete'), true);
+      onRefresh();
+    } catch (e) { setError(String(e)); }
+  }
+
+  async function rebaseAbort() {
+    try {
+      setError(null);
+      await electron.gitRebaseAbort();
+      await reloadWorkspace();
+      showToast(t('Rebase aborted'), true);
+      onRefresh();
+    } catch (e) { setError(String(e)); }
+  }
+
   const allUnstaged = [...status.unstaged, ...status.untracked];
   const hasStaged   = status.staged.length > 0;
   // Anything git would park: staged, unstaged, or untracked (stash runs -u).
@@ -244,6 +267,25 @@ function ChangesTab({ status, onRefresh }: { readonly status: GitStatus; readonl
             ✓ {t('Nothing to push')}
           </div>
         )
+      )}
+
+      {status.rebasing && (
+        <div className="mx-3 mt-2 px-2 py-1.5 rounded text-[11px] bg-amber-900/20 text-amber-200 border border-amber-800/40 flex items-center justify-between gap-2 flex-shrink-0">
+          <span>⟳ {status.conflicted.length > 0 ? t('Rebase paused - resolve conflicts below, then continue') : t('Rebase in progress')}</span>
+          <span className="flex gap-1 flex-shrink-0">
+            <button
+              onClick={rebaseContinue}
+              disabled={status.conflicted.length > 0}
+              title={status.conflicted.length > 0 ? t('Resolve all conflicts first') : t('Continue the rebase')}
+              className="px-1.5 py-0.5 rounded bg-amber-800/40 hover:bg-amber-700/50 text-amber-100 disabled:opacity-40 disabled:cursor-default"
+            >{t('Continue')}</button>
+            <button
+              onClick={rebaseAbort}
+              title={t('Abort the rebase and restore the branch')}
+              className="px-1.5 py-0.5 rounded border border-surface-600 text-surface-300 hover:bg-surface-800"
+            >{t('Abort')}</button>
+          </span>
+        </div>
       )}
 
       {status.conflicted.length > 0 && (
@@ -540,6 +582,22 @@ function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () =>
     } catch (e) { setError(String(e)); }
   }
 
+  // Rebase the current branch onto `onto`. A rebase rewrites the working tree,
+  // so reload the workspace afterwards (same as checkout). When it stops on
+  // conflicts, leave the user in the Changes tab to resolve and continue.
+  async function rebaseOnto(onto: string) {
+    if (!confirm(t('Rebase the current branch onto ":name"? Your commits are replayed on top of it.', { name: onto }))) return;
+    try {
+      setError(null); setInfo(null);
+      const r = await electron.gitRebase(onto);
+      await reloadWorkspace();
+      setInfo(r.conflict
+        ? t('Rebase paused on conflicts. Open the Changes tab to resolve them, then Continue.')
+        : t('Rebased onto :name.', { name: onto }));
+      load(); onRefresh();
+    } catch (e) { setError(String(e)); }
+  }
+
   async function popStash(ref: string) {
     try {
       setError(null); setInfo(null);
@@ -687,6 +745,15 @@ function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () =>
                   ↑{b.ahead}
                 </span>
               ) : null}
+              {!b.current && (
+                <button
+                  onClick={() => rebaseOnto(b.name)}
+                  className="opacity-0 group-hover:opacity-100 text-surface-500 hover:text-blue-300 transition-all text-[10px] leading-none"
+                  title={t('Rebase the current branch onto :name', { name: b.name })}
+                >
+                  {t('rebase')}
+                </button>
+              )}
               {!b.current && (
                 <button
                   onClick={() => deleteBranch(b.name)}
@@ -1103,7 +1170,7 @@ export function GitPanel() {
         >↺</button>
       </div>
 
-      {tab === 'changes'  && status && <ChangesTab status={status} onRefresh={refresh} />}
+      {tab === 'changes'  && status && <ChangesTab status={status} onRefresh={refresh} reloadWorkspace={reloadWorkspace} />}
       {tab === 'log'      && <LogTab />}
       {tab === 'branches' && <BranchesTab onRefresh={refresh} reloadWorkspace={reloadWorkspace} />}
       {tab === 'ci'       && <CiTab />}
