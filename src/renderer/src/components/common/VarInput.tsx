@@ -346,13 +346,16 @@ export function VarInput({ value, onChange, className, wrapperClassName, staticS
 
       {/* Variable hover preview */}
       {showPreview && suggestions.length === 0 && previewItems.length > 0 && (
-        <div className="absolute left-0 top-full mt-0.5 z-50 bg-surface-800 border border-surface-600 rounded shadow-xl text-xs min-w-[220px] max-w-[420px]">
+        <div className="absolute left-0 top-full mt-0.5 z-50 bg-surface-800 border border-surface-600 rounded shadow-xl text-xs min-w-[220px] max-w-[min(32rem,90vw)] max-h-[70vh] overflow-y-auto">
           {previewItems.map(({ display, resolved }) => (
-            <div key={display} className="flex items-baseline gap-2 px-3 py-1.5 border-b border-surface-700 last:border-0">
+            <div key={display} className="flex items-start gap-2 px-3 py-1.5 border-b border-surface-700 last:border-0">
               <span className="font-mono text-blue-400 shrink-0">{display}</span>
-              <span className="text-surface-500 mx-0.5">→</span>
+              <span className="text-surface-500 shrink-0">→</span>
               {resolved !== null
-                ? <span className="font-mono text-emerald-400 truncate">{resolved}</span>
+                // Long values (tokens, URLs, JWTs) wrap and break instead of
+                // truncating, so the whole value stays readable; min-w-0 lets it
+                // wrap inside the flex row rather than overflow.
+                ? <span className="font-mono text-emerald-400 flex-1 min-w-0 break-all whitespace-pre-wrap">{resolved}</span>
                 : <span className="text-orange-400 italic">{t('undefined')}</span>
               }
             </div>
