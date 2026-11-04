@@ -13,7 +13,7 @@
 // behaves like the rest of the contract stack.
 
 import Ajv from 'ajv';
-import type { ProxyAgent, Agent } from 'undici';
+import type { Dispatcher } from 'undici';
 import type {
   ApiRequest, FuzzReport, FuzzTargetResult, FuzzFinding, FuzzOracle, FuzzCaseTrace, KeyValuePair,
 } from '../../shared/types';
@@ -180,7 +180,7 @@ export async function runFuzz(opts: FuzzOptions): Promise<FuzzRunResult> {
   const level: FuzzLevel = opts.level ?? 'standard';
   const vars = mergeVars(opts.envVars, opts.collectionVars ?? {}, {}, {}, await buildDynamicVars());
 
-  const dispatcher: ProxyAgent | Agent | undefined = await buildDispatcher();
+  const dispatcher: Dispatcher | undefined = await buildDispatcher();
 
   const start = Date.now();
   const results: FuzzTargetResult[] = [];

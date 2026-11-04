@@ -12,7 +12,7 @@
  * (the CLI used to support only bearer auth because its copy fell behind).
  */
 
-import { fetch, Headers, ProxyAgent, Agent } from 'undici';
+import { fetch, Headers, ProxyAgent, Agent, Pool, type Dispatcher } from 'undici';
 import { readFile } from 'fs/promises';
 import * as nodeTls from 'tls';
 import type {
@@ -283,11 +283,43 @@ function defaultAgent(): Agent {
   return _defaultAgent;
 }
 
+// Loopback / local hosts a proxy must never be used for: a configured HTTP
+// proxy almost never has a route back to the user's own machine, so sending
+// localhost traffic through it fails even though the URL is reachable directly
+// (the exact "works in the browser, fails here with a proxy on" report). This
+// mirrors what curl and browsers do automatically.
+function isLoopbackHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, '');   // strip IPv6 brackets
+  return h === 'localhost' || h.endsWith('.localhost')
+    || h === '::1' || h === '0.0.0.0'
+    || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h);
+}
+
+// Honour the standard NO_PROXY / no_proxy env list too (comma-separated hosts
+// or domain suffixes; `*` disables the proxy entirely).
+function noProxyList(): string[] {
+  return (process.env['NO_PROXY'] ?? process.env['no_proxy'] ?? '')
+    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+}
+function matchesNoProxy(host: string, list: string[]): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, '');
+  for (const entry of list) {
+    if (entry === '*') return true;
+    const e = entry.replace(/^\*?\.?/, '');               // normalize "*." / "." prefix
+    if (h === e || h.endsWith('.' + e)) return true;
+  }
+  return false;
+}
+
+function shouldBypassProxy(host: string, noProxy: string[]): boolean {
+  return isLoopbackHost(host) || matchesNoProxy(host, noProxy);
+}
+
 export async function buildDispatcher(
   proxy?: ProxyConfig,
   tls?: TlsConfig,
 
-): Promise<ProxyAgent | Agent | undefined> {
+): Promise<Dispatcher | undefined> {
   if (proxy?.url?.trim()) trustSystemCertificateStore();
   
   const connectOpts: Record<string, unknown> = {};
@@ -310,12 +342,32 @@ export async function buildDispatcher(
   }
 
   if (proxy?.url?.trim()) {
-    return new ProxyAgent({
-      uri: buildProxyUri({ url: proxy.url, auth: proxy.auth }),
-      requestTls: hasTls ? connectOpts : undefined,
-      proxyTls: hasTls ? connectOpts : undefined,
+    const uri = buildProxyUri({ url: proxy.url, auth: proxy.auth });
+    const noProxy = noProxyList();
+    // undici's ProxyAgent has no bypass list, so route per origin via Agent's
+    // factory hook: loopback / NO_PROXY hosts get a direct Pool (a configured
+    // proxy almost never has a route back to the user's own machine), every
+    // other origin goes through a ProxyAgent. Same TLS options on both so a
+    // local HTTPS target still works. Agent caches one dispatcher per origin.
+    return new Agent({
       allowH2: true,
-    } as ConstructorParameters<typeof ProxyAgent>[0]);
+      factory: (origin: string | URL) => {
+        let host = '';
+        try { host = (typeof origin === 'string' ? new URL(origin) : origin).hostname; } catch { /* treat as proxied */ }
+        if (shouldBypassProxy(host, noProxy)) {
+          return new Pool(origin, {
+            allowH2: true,
+            ...(hasTls ? { connect: connectOpts } : {}),
+          } as ConstructorParameters<typeof Pool>[1]);
+        }
+        return new ProxyAgent({
+          uri,
+          requestTls: hasTls ? connectOpts : undefined,
+          proxyTls: hasTls ? connectOpts : undefined,
+          allowH2: true,
+        } as ConstructorParameters<typeof ProxyAgent>[0]);
+      },
+    } as ConstructorParameters<typeof Agent>[0]);
   }
 
   if (hasTls) {
@@ -380,7 +432,7 @@ export interface ExchangeOptions {
   req: ApiRequest
   vars: Record<string, string>
   resolvedUrl: string
-  dispatcher: ProxyAgent | Agent | undefined
+  dispatcher: Dispatcher | undefined
   proxy?: ProxyConfig
   tls?: TlsConfig
   /** Called with the outgoing request snapshot just before dispatch, so the
@@ -592,7 +644,7 @@ export interface RunnerExecOptions {
   /** Variables from the request's folder chain (innermost wins). Readable and
    *  writable in scripts as `sp.folder`. */
   folderVars?: Record<string, string>
-  dispatcher: ProxyAgent | Agent | undefined
+  dispatcher: Dispatcher | undefined
   piiMaskPatterns: string[]
   proxy?: ProxyConfig
   tls?: TlsConfig

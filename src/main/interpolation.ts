@@ -100,9 +100,9 @@ export function buildUrl(
     templateTokens.add(String(name).trim());
     return '';
   });
-  // `[name]` / `{name}` path placeholders route their row to the path.
-  baseUrl.replaceAll(PATH_PARAM_RE, (_m, g1, g2) => {
-    templateTokens.add(g1 ?? g2);
+  // `[name]` / `{name}` / `:name` path placeholders route their row to the path.
+  baseUrl.replaceAll(PATH_PARAM_RE, (_m, g1, g2, g3) => {
+    templateTokens.add(g1 ?? g2 ?? g3);
     return '';
   });
 
@@ -125,11 +125,11 @@ export function buildUrl(
     }
     : vars;
 
-  // Substitute `{{name}}` (via interpolate) then `[name]` / `{name}` path
+  // Substitute `{{name}}` (via interpolate) then `[name]` / `{name}` / `:name` path
   // placeholders. A placeholder with no resolvable value is left as-is.
   let url = interpolate(baseUrl, mergedVars);
-  url = url.replaceAll(PATH_PARAM_RE, (m, g1, g2) => {
-    const name = g1 ?? g2;
+  url = url.replaceAll(PATH_PARAM_RE, (m, g1, g2, g3) => {
+    const name = g1 ?? g2 ?? g3;
     return name in mergedVars ? mergedVars[name] : m;
   });
 

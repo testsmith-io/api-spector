@@ -54,13 +54,16 @@ export function extractQueryParams(rawUrl: string, existing: KeyValuePair[]): Sp
   return { url: nextUrl, params: [...kept, ...parsed], changed: true };
 }
 
-// Path-parameter placeholders in a URL: `[name]` (API Spector style) and
-// `{name}` (OpenAPI/Swagger style). Deliberately not Bruno's `:id`, and never
-// the `{{var}}` used for variables. The name must start with a letter or
-// underscore, so an IPv6 host literal like `[::1]` never matches; the `{name}`
-// branch uses look-around so it never matches inside a `{{variable}}` token.
-// The matched name is capture group 1 (`[name]`) or group 2 (`{name}`).
-export const PATH_PARAM_PATTERN = String.raw`\[([A-Za-z_]\w*)\]|(?<!\{)\{([A-Za-z_]\w*)\}(?!\})`;
+// Path-parameter placeholders in a URL: `[name]` (API Spector style),
+// `{name}` (OpenAPI/Swagger style), and `:name` (Postman/Express style, so a
+// `{{baseUrl}}/products/:productId` imported from Postman resolves without
+// hand-editing). Never the `{{var}}` used for variables. The name must start
+// with a letter or underscore, so an IPv6 host literal like `[::1]` never
+// matches; the `:name` branch can't swallow the scheme (`://` is followed by
+// `/`) or the port (`:3900` starts with a digit); the `{name}` branch uses
+// look-around so it never matches inside a `{{variable}}` token. The matched
+// name is capture group 1 (`[name]`), 2 (`{name}`), or 3 (`:name`).
+export const PATH_PARAM_PATTERN = String.raw`\[([A-Za-z_]\w*)\]|(?<!\{)\{([A-Za-z_]\w*)\}(?!\})|:([A-Za-z_]\w*)`;
 const PATH_PARAM_RE = new RegExp(PATH_PARAM_PATTERN, 'g');
 
 // Resolve `{{name}}` tokens from a value map, leaving unknown tokens as-is.
@@ -89,7 +92,7 @@ export function buildPreviewUrl(
 ): string {
   const templateTokens = new Set<string>();
   for (const m of baseUrl.matchAll(/\{\{([^}]+)\}\}/g)) templateTokens.add(m[1].trim());
-  for (const m of baseUrl.matchAll(PATH_PARAM_RE)) templateTokens.add(m[1] ?? m[2]);
+  for (const m of baseUrl.matchAll(PATH_PARAM_RE)) templateTokens.add(m[1] ?? m[2] ?? m[3]);
 
   const enabled = (params ?? []).filter(p => p.enabled && p.key);
   const pathRows  = enabled.filter(p => p.paramType === 'path' || templateTokens.has(p.key));
@@ -99,7 +102,7 @@ export function buildPreviewUrl(
   for (const p of pathRows) scope[p.key] = interpTokens(p.value, varValues);
 
   let url = interpTokens(baseUrl, scope);
-  url = url.replaceAll(PATH_PARAM_RE, (m, g1, g2) => { const name = g1 ?? g2; return name in scope ? scope[name] : m; });
+  url = url.replaceAll(PATH_PARAM_RE, (m: string, g1?: string, g2?: string, g3?: string) => { const name = g1 ?? g2 ?? g3 ?? ''; return name in scope ? scope[name] : m; });
 
   if (!queryRows.length) return url;
   const sep = url.includes('?') ? '&' : '?';
@@ -109,11 +112,11 @@ export function buildPreviewUrl(
   return url + sep + qs;
 }
 
-/** Names of the `[name]` / `{name}` path placeholders in a URL, in order, de-duplicated. */
+/** Names of the `[name]` / `{name}` / `:name` path placeholders in a URL, in order, de-duplicated. */
 export function extractPathParamNames(url: string): string[] {
   const names: string[] = [];
   for (const m of url.matchAll(PATH_PARAM_RE)) {
-    const name = m[1] ?? m[2];
+    const name = m[1] ?? m[2] ?? m[3];
     if (!names.includes(name)) names.push(name);
   }
   return names;
