@@ -17,6 +17,23 @@ function git() {
   return simpleGit(dir);
 }
 
+// True when a rebase is mid-flight (stopped on conflicts, or otherwise paused).
+// git keeps its state in `rebase-merge` / `rebase-apply` inside the git dir;
+// `rev-parse --git-path` resolves those correctly even for linked worktrees.
+async function isRebasing(): Promise<boolean> {
+  const dir = getWorkspaceDir();
+  if (!dir) return false;
+  const g = git();
+  for (const name of ['rebase-merge', 'rebase-apply']) {
+    try {
+      const rel = (await g.raw(['rev-parse', '--git-path', name])).trim();
+      await stat(join(dir, rel));
+      return true;
+    } catch { /* not present — check the next marker */ }
+  }
+  return false;
+}
+
 export function registerGitHandlers(ipc: IpcMain): void {
 
   handleIpc(ipc, IPC.git.isRepo, async () => {
@@ -57,6 +74,7 @@ export function registerGitHandlers(ipc: IpcMain): void {
       ahead:      result.ahead,
       behind:     result.behind,
       remote:     result.tracking ?? null,
+      rebasing:   await isRebasing(),
     };
   });
 
@@ -173,6 +191,37 @@ export function registerGitHandlers(ipc: IpcMain): void {
   handleIpc(ipc, IPC.git.deleteBranch, async (_e, name: string, force: boolean = false) => {
     // simple-git's deleteLocalBranch wraps `git branch -d` (-D when force).
     await git().deleteLocalBranch(name, force);
+  });
+
+  // Rebase the current branch onto `onto` (another local or remote branch).
+  // A clean rebase returns { conflict: false }. When it stops on conflicts we
+  // return { conflict: true } instead of throwing, so the panel can send the
+  // user to the Changes tab to resolve and then continue. Any other failure
+  // (unknown branch, unexpected git error) propagates so it surfaces as an error.
+  handleIpc(ipc, IPC.git.rebase, async (_e, onto: string): Promise<{ conflict: boolean }> => {
+    try {
+      await git().raw(['rebase', onto]);
+      return { conflict: false };
+    } catch (e) {
+      if (await isRebasing()) return { conflict: true };
+      throw e;
+    }
+  });
+
+  // Continue a conflicted rebase once the working tree is clean / staged.
+  // GIT_EDITOR=true stops git from opening an editor for the commit message.
+  handleIpc(ipc, IPC.git.rebaseContinue, async (): Promise<{ conflict: boolean }> => {
+    try {
+      await git().env({ ...process.env, GIT_EDITOR: 'true' }).raw(['rebase', '--continue']);
+      return { conflict: false };
+    } catch (e) {
+      if (await isRebasing()) return { conflict: true };
+      throw e;
+    }
+  });
+
+  handleIpc(ipc, IPC.git.rebaseAbort, async () => {
+    await git().raw(['rebase', '--abort']);
   });
 
   handleIpc(ipc, IPC.git.stashList, async (): Promise<GitStash[]> => {

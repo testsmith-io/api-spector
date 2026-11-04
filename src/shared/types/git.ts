@@ -19,6 +19,7 @@ export interface GitStatus {
   ahead: number
   behind: number
   remote: string | null
+  rebasing: boolean      // a rebase is in progress (resolve conflicts, then continue/abort)
 }
 
 export interface GitCommit {
