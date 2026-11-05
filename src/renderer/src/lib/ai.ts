@@ -32,7 +32,7 @@ async function checkAvailable(): Promise<boolean> {
   if (availableCache != null) return availableCache;
   try { availableCache = (await electron.hasSecret(AI_OPENAI_TOKEN_REF)).has; }
   catch { availableCache = false; }
-  return availableCache;
+  return availableCache ?? false;
 }
 
 /** Whether an OpenAI key is configured (drives the "Generate with AI" button). */

@@ -315,13 +315,31 @@ function shouldBypassProxy(host: string, noProxy: string[]): boolean {
   return isLoopbackHost(host) || matchesNoProxy(host, noProxy);
 }
 
+// Proxied / TLS dispatchers are cached per unique {proxy, tls} configuration.
+// Each one owns a keep-alive socket pool, so building a fresh one on every send
+// (the old behaviour) leaked sockets and native memory for the whole session —
+// invisible on the default path but unbounded for proxy / client-cert users.
+// Caching gives them the same process-lifetime reuse as defaultAgent(), so no
+// caller needs to destroy anything.
+const _dispatcherCache = new Map<string, Dispatcher>();
+
 export async function buildDispatcher(
   proxy?: ProxyConfig,
   tls?: TlsConfig,
-
 ): Promise<Dispatcher | undefined> {
-  if (proxy?.url?.trim()) trustSystemCertificateStore();
-  
+  const hasProxy = !!proxy?.url?.trim();
+  // Plain requests share one process-lifetime, HTTP/2-capable Agent.
+  if (!hasProxy && !tls) return defaultAgent();
+
+  const key = JSON.stringify({
+    proxy: hasProxy ? { url: proxy!.url, auth: proxy!.auth } : null,
+    tls: tls ?? null,
+  });
+  const cached = _dispatcherCache.get(key);
+  if (cached) return cached;
+
+  if (hasProxy) trustSystemCertificateStore();
+
   const connectOpts: Record<string, unknown> = {};
   let hasTls = false;
 
@@ -330,26 +348,33 @@ export async function buildDispatcher(
     if (tls.rejectUnauthorized !== undefined) {
       connectOpts['rejectUnauthorized'] = tls.rejectUnauthorized;
     }
-    if (tls.caCertPath) {
-      try { connectOpts['ca'] = await readFile(tls.caCertPath); } catch { /* ignore missing */ }
-    }
-    if (tls.clientCertPath) {
-      try { connectOpts['cert'] = await readFile(tls.clientCertPath); } catch { /* ignore missing */ }
-    }
-    if (tls.clientKeyPath) {
-      try { connectOpts['key'] = await readFile(tls.clientKeyPath); } catch { /* ignore missing */ }
+    // Surface an unreadable cert/key path instead of silently dropping it and
+    // failing later with an opaque TLS handshake error that gives no hint which
+    // configured path was at fault.
+    const unreadable: string[] = [];
+    const readInto = async (field: string, path?: string): Promise<void> => {
+      if (!path) return;
+      try { connectOpts[field] = await readFile(path); }
+      catch { unreadable.push(path); }
+    };
+    await readInto('ca', tls.caCertPath);
+    await readInto('cert', tls.clientCertPath);
+    await readInto('key', tls.clientKeyPath);
+    if (unreadable.length) {
+      throw new Error(`TLS certificate file(s) not readable: ${unreadable.join(', ')}`);
     }
   }
 
-  if (proxy?.url?.trim()) {
-    const uri = buildProxyUri({ url: proxy.url, auth: proxy.auth });
+  let dispatcher: Dispatcher;
+  if (hasProxy) {
+    const uri = buildProxyUri({ url: proxy!.url, auth: proxy!.auth });
     const noProxy = noProxyList();
     // undici's ProxyAgent has no bypass list, so route per origin via Agent's
     // factory hook: loopback / NO_PROXY hosts get a direct Pool (a configured
     // proxy almost never has a route back to the user's own machine), every
     // other origin goes through a ProxyAgent. Same TLS options on both so a
     // local HTTPS target still works. Agent caches one dispatcher per origin.
-    return new Agent({
+    dispatcher = new Agent({
       allowH2: true,
       factory: (origin: string | URL) => {
         let host = '';
@@ -368,13 +393,13 @@ export async function buildDispatcher(
         } as ConstructorParameters<typeof ProxyAgent>[0]);
       },
     } as ConstructorParameters<typeof Agent>[0]);
+  } else {
+    // TLS-only (no proxy); we returned early when neither was set.
+    dispatcher = new Agent({ connect: connectOpts, allowH2: true } as ConstructorParameters<typeof Agent>[0]);
   }
 
-  if (hasTls) {
-    return new Agent({ connect: connectOpts, allowH2: true } as ConstructorParameters<typeof Agent>[0]);
-  }
-
-  return defaultAgent();
+  _dispatcherCache.set(key, dispatcher);
+  return dispatcher;
 }
 
 // ─── Body serialization ───────────────────────────────────────────────────────
@@ -524,7 +549,7 @@ export async function performHttpExchange(opts: ExchangeOptions): Promise<Exchan
     method: req.method,
     headers: h,
     body: effectiveBody,
-    dispatcher: dispatcher as Parameters<typeof fetch>[1] extends { dispatcher?: infer D } ? D : never,
+    dispatcher,
   } as Parameters<typeof fetch>[1]);
 
   let sentHeaders: Record<string, string>;
@@ -548,7 +573,7 @@ export async function performHttpExchange(opts: ExchangeOptions): Promise<Exchan
   else if (req.auth.type === 'digest') {
     const probeFetch = (url: string, init: Record<string, unknown>) => fetch(url, {
       ...(init as object),
-      dispatcher: dispatcher as Parameters<typeof fetch>[1] extends { dispatcher?: infer D } ? D : never,
+      dispatcher,
     } as Parameters<typeof fetch>[1]);
 
     const digestHeader = await performDigestAuth(finalUrl, req.method, req.auth, vars, probeFetch);

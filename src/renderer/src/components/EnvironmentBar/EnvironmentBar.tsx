@@ -69,7 +69,7 @@ export function EnvironmentBar({ inline = false }: { readonly inline?: boolean }
       </select>
 
       {activeEnv && (
-        <span className="text-surface-400 text-xs">
+        <span className="text-[var(--text-muted)] text-xs">
           {t(':count var|:count vars', { count: varCount })}
         </span>
       )}
@@ -90,7 +90,7 @@ export function EnvironmentBar({ inline = false }: { readonly inline?: boolean }
 
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 border-b border-surface-800 bg-surface-950 flex-shrink-0">
-      <span className="text-surface-400 font-medium text-xs">{t('Env:')}</span>
+      <span className="text-[var(--text-muted)] font-medium text-xs">{t('Env:')}</span>
       {controls}
     </div>
   );

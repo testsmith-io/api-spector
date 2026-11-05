@@ -1,7 +1,7 @@
 {
   "name": "@testsmith/api-spector",
   "productName": "API Spector",
-  "version": "0.9.9",
+  "version": "0.9.10",
   "description": "Local-first API testing tool to inspect, test and mock APIs",
   "repository": {
     "type": "git",
@@ -67,7 +67,6 @@
     "@vitejs/plugin-react": "^4.3.1",
     "@vitest/coverage-v8": "^5.0.5",
     "aedes": "^0.51.3",
-    "autoprefixer": "^10.4.27",
     "electron-builder": "^26.8.1",
     "electron-vite": "^5.0.0",
     "esbuild": "0.21.5",

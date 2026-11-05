@@ -139,6 +139,34 @@ npm run build
 npm run package
 ```
 
+## Code review agents
+
+Two read-only review agents live in [`.claude/agents/`](.claude/agents/) and run inside Claude Code. They audit the codebase and write a markdown report; they never edit source, so you stay in control of what gets changed.
+
+| Agent | What it reviews |
+| --- | --- |
+| `ts-reviewer` | TypeScript/React best practices and maintainability: type safety, the main/preload/renderer boundary, React 19 and zustand patterns, async/resource handling, and oversized files, functions, components, and slices. |
+| `a11y-reviewer` | Accessibility and colour contrast against WCAG 2.1 AA, checked in both the dark and light themes: contrast ratios, keyboard operability, semantics/ARIA, state announced to assistive tech, and reduced-motion. |
+
+### How to use them
+
+1. In a Claude Code session, invoke an agent and give it a scope:
+
+   ```
+   use ts-reviewer on the recent diff
+   use a11y-reviewer on src/renderer/src/components/GitPanel
+   ```
+
+   Scope is optional. Name files, a directory, or "the recent diff"; leave it out and the agent reviews recent changes plus the code they touch.
+
+2. The agent writes a report to `reviews/<agent>-<date>.md` (or a path you give it) and prints the file path. `reviews/` is gitignored, so these audits are not committed.
+
+3. Read the report and decide which findings to act on. Each finding has a location, severity, suggested change, and effort estimate.
+
+4. Apply the changes you picked as a separate, deliberate step. Implementing the fixes is never done by the review agent.
+
+The agents default to the `opus` model for depth; switch the `model:` line in the agent file to `sonnet` for faster, cheaper runs.
+
 ## License
 
 API Spector is released under the [MIT License](LICENSE): free to use, modify, and distribute, including for commercial purposes.

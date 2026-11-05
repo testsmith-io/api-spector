@@ -4,6 +4,7 @@
 import { readFile } from 'node:fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import type { Collection, ApiRequest, AuthConfig, RequestBody, KeyValuePair, Folder, RequestExample } from '../../shared/types';
+import { normalizeHttpMethod } from '../../shared/types';
 import { translateScript } from './script-translator';
 
 // ─── Postman v2.1 importer ────────────────────────────────────────────────────
@@ -125,7 +126,7 @@ function parseRequest(item: any, collectionAuth: any): ApiRequest {
   return {
     id: uuidv4(),
     name: item.name ?? 'Request',
-    method: method as any,
+    method: normalizeHttpMethod(method),
     url,
     headers,
     params,

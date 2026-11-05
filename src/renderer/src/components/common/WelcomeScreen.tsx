@@ -186,7 +186,7 @@ export function WelcomeScreen() {
                 title={r.path}
                 className="flex flex-col items-start px-2 py-1.5 rounded hover:bg-surface-800 transition-colors text-left group shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span className="text-xs text-surface-200 group-hover:text-white truncate max-w-full">{r.name}</span>
+                <span className="text-xs text-surface-200 group-hover:text-[var(--text-primary)] truncate max-w-full">{r.name}</span>
                 <span className="text-[10px] text-surface-500 truncate max-w-full">{r.path}</span>
               </button>
             ))}

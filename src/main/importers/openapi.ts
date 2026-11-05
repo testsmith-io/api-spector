@@ -6,6 +6,7 @@ import { load as yamlLoad } from 'js-yaml';
 import { fetch } from 'undici';
 import { v4 as uuidv4 } from 'uuid';
 import type { Collection, ApiRequest, AuthConfig, RequestBody, KeyValuePair, Folder, RequestExample } from '../../shared/types';
+import { normalizeHttpMethod } from '../../shared/types';
 
 // ─── OpenAPI 3.x importer ─────────────────────────────────────────────────────
 
@@ -409,7 +410,7 @@ function buildCollection(spec: any): Collection {
       const req: ApiRequest = {
         id: uuidv4(),
         name: operation.summary ?? operation.operationId ?? `${method.toUpperCase()} ${pathStr}`,
-        method: method.toUpperCase() as any,
+        method: normalizeHttpMethod(method),
         url: rewritePathTemplate(`${baseUrl}${pathStr}`),
         headers,
         params,

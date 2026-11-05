@@ -162,6 +162,14 @@ export function RequestRow({
         data-row
         draggable
         tabIndex={0}
+        // Accessible name so a screen reader announces "GET Pets" rather than the
+        // raw concatenation of badges/name, and the open request is marked current.
+        // NOTE: a full role="treeitem" is deliberately NOT set here — the row has
+        // independently tabbable children (select checkbox, chevron, dots menu), so
+        // a widget role would create a nested-interactive violation without a
+        // roving-tabindex keyboard model. That is tracked as a separate task.
+        aria-label={`${protocol && protocol !== 'http' ? protocol.toUpperCase() : method} ${name}`}
+        aria-current={isActive && !exampleActive ? 'true' : undefined}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRowClick(e as unknown as React.MouseEvent); } }}
         className={`group relative flex items-start gap-1.5 py-1 pr-1 rounded-sm cursor-pointer transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${
           disabled ? 'opacity-40' : ''
@@ -208,9 +216,10 @@ export function RequestRow({
             <button
               onClick={e => { e.stopPropagation(); setExamplesOpen(o => !o); }}
               aria-expanded={examplesOpen}
+              aria-label={examplesOpen ? t('Hide examples') : t('Show :count example(s)', { count: examples.length })}
               className="w-4 h-4 inline-flex items-center justify-center text-surface-500 hover:text-white leading-none text-[22px] outline-none focus-visible:ring-1 focus-visible:ring-blue-400 rounded-sm"
               title={examplesOpen ? t('Hide examples') : t('Show :count example(s)', { count: examples.length })}
-            >{examplesOpen ? '▾' : '▸'}</button>
+            ><span aria-hidden="true">{examplesOpen ? '▾' : '▸'}</span></button>
           )}
         </span>
 

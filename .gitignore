@@ -35,3 +35,6 @@ npm-debug.log*
 
 # Test-coverage output (repo root only, so it doesn't match the Coverage/ UI folder)
 /coverage
+
+# Local code-review agent reports (.claude/agents)
+reviews/
