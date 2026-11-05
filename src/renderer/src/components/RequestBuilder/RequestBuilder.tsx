@@ -798,12 +798,18 @@ export function RequestBuilder({ request }: Props) {
                 className={`px-3 py-1.5 text-xs transition-colors border-b-2 -mb-px ${
                   activeTab === tab.id
                     ? 'border-blue-500 text-white'
-                    : 'border-transparent text-surface-400 hover:text-white'
+                    // An inactive tab that HAS content reads brighter than an empty
+                    // one, so populated sections stand out at a glance.
+                    : tab.count > 0
+                      ? 'border-transparent text-surface-200 hover:text-white'
+                      : 'border-transparent text-surface-400 hover:text-white'
                 }`}
               >
                 {t(tab.label)}
                 {tab.count > 0 && (
-                  <span className="ml-1 text-[10px] bg-surface-600 text-white rounded px-1 font-medium">{tab.count}</span>
+                  // Brand-blue count pill (white text stays AA on blue in both
+                  // themes via the light-mode remap) so a populated tab is obvious.
+                  <span className="ml-1 text-[10px] bg-blue-600 text-white rounded px-1 font-medium">{tab.count}</span>
                 )}
               </button>
             ))}

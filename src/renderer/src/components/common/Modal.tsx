@@ -105,6 +105,49 @@ export function Modal({
   // Safety: drop listeners if the modal unmounts mid-drag.
   useEffect(() => endDrag, [endDrag]);
 
+  // ── Focus management (WCAG 2.4.3 Focus Order / 2.1.2 no keyboard trap) ──────
+  // With aria-modal="true" set, focus must actually be moved into the dialog,
+  // contained while it is open, and returned to the opener on close — otherwise
+  // Tab walks out into the inert content the dialog covers. Runs once per open.
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const opener = document.activeElement as HTMLElement | null;
+
+    const FOCUSABLE =
+      'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const tabbables = (): HTMLElement[] =>
+      Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(el => el.offsetParent !== null);
+
+    // Move focus in — unless a child (e.g. CommandPalette, MasterKeyModal) has
+    // already focused its own field, in which case leave that choice alone.
+    if (!panel.contains(document.activeElement)) {
+      const first = tabbables()[0];
+      if (first) first.focus();
+      else panel.focus();
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Tab') return;
+      const els = tabbables();
+      if (els.length === 0) { e.preventDefault(); panel?.focus(); return; }
+      const firstEl = els[0];
+      const lastEl = els[els.length - 1];
+      const active = document.activeElement as HTMLElement;
+      if (e.shiftKey && (active === firstEl || !panel?.contains(active))) {
+        e.preventDefault(); lastEl.focus();
+      } else if (!e.shiftKey && (active === lastEl || !panel?.contains(active))) {
+        e.preventDefault(); firstEl.focus();
+      }
+    }
+
+    panel.addEventListener('keydown', onKeyDown);
+    return () => {
+      panel.removeEventListener('keydown', onKeyDown);
+      if (opener && document.contains(opener)) opener.focus();
+    };
+  }, []);
+
   // Every dialog needs an accessible name (WCAG / axe aria-dialog-name): point at
   // the title heading when there is one, else a generic label so it's never nameless.
   const titleId = useId();
@@ -124,6 +167,7 @@ export function Modal({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
         aria-labelledby={title !== undefined ? titleId : undefined}
         aria-label={title === undefined ? 'Dialog' : undefined}
         className={panelClassName}
@@ -138,7 +182,7 @@ export function Modal({
             <div>
               <h2 id={titleId} className="text-sm font-semibold">{title}</h2>
               {subtitle !== undefined && (
-                <p className="text-[10px] text-surface-400 mt-0.5">{subtitle}</p>
+                <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{subtitle}</p>
               )}
             </div>
             <button onClick={onClose} aria-label="Close" title="Close" className="text-surface-400 hover:text-[var(--text-primary)] text-lg leading-none cursor-pointer">×</button>

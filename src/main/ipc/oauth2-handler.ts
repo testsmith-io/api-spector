@@ -184,14 +184,12 @@ export function registerOAuth2Handlers(ipc: IpcMain): void {
     ctx: VarResolveContext,
     refreshToken: string,
   ): Promise<{ accessToken: string; expiresAt: number; refreshToken?: string }> => {
-    const vars       = await resolveVars(ctx, auth);
-    const tokenUrl   = interpolate(auth.oauth2TokenUrl ?? '', vars);
-    const clientId   = interpolate(auth.oauth2ClientId ?? '', vars);
-    let clientSecret = auth.oauth2ClientSecret ?? '';
-    if (!clientSecret && auth.oauth2ClientSecretRef) {
-      clientSecret = (await getSecret(auth.oauth2ClientSecretRef)) ?? '';
-    }
-    clientSecret = interpolate(clientSecret, vars);
+    if (auth.type !== 'oauth2') throw new Error('OAuth 2.0: auth is not an oauth2 config.');
+
+    const vars         = await resolveVars(ctx, auth);
+    const tokenUrl     = interpolate(auth.oauth2TokenUrl ?? '', vars);
+    const clientId     = interpolate(auth.oauth2ClientId ?? '', vars);
+    const clientSecret = await resolveClientSecret(auth, vars);
 
     if (!tokenUrl) throw new Error('OAuth 2.0: tokenUrl is required for refresh.');
 

@@ -4,6 +4,7 @@
 import { readFile } from 'node:fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import type { Collection, ApiRequest, AuthConfig, RequestBody, KeyValuePair, Folder } from '../../shared/types';
+import { normalizeHttpMethod } from '../../shared/types';
 import { translateScript } from './script-translator';
 
 // ─── Insomnia v4 export importer ──────────────────────────────────────────────
@@ -125,7 +126,7 @@ export async function importInsomnia(filePath: string): Promise<Collection> {
     const req: ApiRequest = {
       id:          uuidv4(),
       name:        r.name        ?? 'Request',
-      method:      (r.method     ?? 'GET').toUpperCase() as any,
+      method:      normalizeHttpMethod(r.method),
       url:         r.url         ?? '',
       headers:     parseHeaders(r.headers),
       params:      parseParams(r.parameters),

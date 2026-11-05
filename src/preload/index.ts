@@ -333,6 +333,13 @@ const api = {
   wsDisconnect: (requestId: string): Promise<void> =>
     ipcRenderer.invoke(IPC.ws.disconnect, requestId),
 
+  // INVARIANT for every on*/off* event pair below: each realtime channel has at
+  // most ONE subscriber at a time (currently always App.tsx). The off* helpers
+  // call removeAllListeners(channel), which tears down every listener on that
+  // channel, so a second concurrent subscriber would unsubscribe the first. If a
+  // channel ever needs multiple subscribers, change on* to return a disposer that
+  // removes only its own listener (and drop the no-arg off*), rather than adding
+  // a second subscriber under this API.
   onWsMessage: (cb: (event: { requestId: string; message: WsMessage }) => void): void => {
     ipcRenderer.on(IPC.ws.message, (_e, payload) => cb(payload));
   },

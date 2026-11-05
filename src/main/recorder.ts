@@ -108,7 +108,8 @@ export async function startRecorder(config: RecorderConfig): Promise<void> {
     forwardHeaders.set('host', upstreamUrl.host);
 
     const targetUrl = `${upstream}${rawUrl}`;
-    let upstreamResp: Response;
+    // undici's fetch returns undici's Response, not the DOM global Response.
+    let upstreamResp: Awaited<ReturnType<typeof fetch>>;
     let respBodyBuf: Buffer;
     let timedOut = false;
     const timeoutMs = 30_000;

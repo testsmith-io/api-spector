@@ -9,7 +9,10 @@
 export const labelCls = 'text-[10px] uppercase tracking-wider text-surface-600 font-medium';
 
 /** Standard text input / select. */
-export const inputCls = 'bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono';
+// Border uses surface-500 (3:1 on the panel surface, WCAG 1.4.11) rather than the
+// too-faint surface-700 (2.08:1). Keyboard focus adds a visible ring globally
+// (see index.css :focus-visible fallback) on top of the blue border swap.
+export const inputCls = 'bg-surface-800 border border-surface-500 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500 font-mono';
 
 /** Neutral secondary button. */
 export const btnSecondaryCls = 'px-3 py-1.5 text-xs bg-surface-800 hover:bg-surface-700 rounded transition-colors';

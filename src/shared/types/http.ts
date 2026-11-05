@@ -14,6 +14,13 @@ export type HttpMethod =
 /** The well-known verbs, for menus and iteration. */
 export const KNOWN_HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'QUERY'] as const;
 
+/** Normalise a raw method string from an import (trim + upper-case, GET when
+ *  blank), so a malformed spec can't put `"get "` or `""` on the wire. HttpMethod
+ *  intentionally accepts any string, so this is hygiene rather than validation. */
+export function normalizeHttpMethod(raw: string | null | undefined): HttpMethod {
+  return (raw ?? '').trim().toUpperCase() || 'GET';
+}
+
 export interface KeyValuePair {
   key: string
   value: string

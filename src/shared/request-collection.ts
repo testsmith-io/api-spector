@@ -461,10 +461,16 @@ export function buildRunPlan(
   const result: RunnerItem[] = [];
   const ancestorWrappers: ScopeWrapper[] = [];
   const ancestorIds: string[] = [];
+  // Folder variables accumulate down the ancestor chain (outer → inner), the same
+  // way buildFolderPlan merges `{ ...inherited, ...folder.variables }`. Each
+  // wrapper gets its own snapshot so an ancestor's before/after hooks resolve with
+  // that ancestor's folder vars (previously omitted, which dropped them silently).
+  let ancestorFolderVars: Record<string, string> = {};
 
   // Walk root → target's parent: emit each ancestor's beforeAll once, and
   // build a wrapper carrying its before/after hooks for nested requests.
   for (const f of ancestors) {
+    ancestorFolderVars = { ...ancestorFolderVars, ...(f.variables ?? {}) };
     const reqs       = f.requestIds.map(id => collection.requests[id]).filter(r => r && !r.disabled) as ApiRequest[];
     const beforeAllH = reqs.filter(r => r.hookType === 'beforeAll');
     const beforeH    = reqs.filter(r => r.hookType === 'before');
@@ -479,6 +485,8 @@ export function buildRunPlan(
       scopePath: [],   // ancestor hooks render with no folder heading
       before: beforeH,
       after: afterH,
+      folderVars: ancestorFolderVars,
+      folderId: f.id,
     });
     ancestorIds.push(f.id);
   }

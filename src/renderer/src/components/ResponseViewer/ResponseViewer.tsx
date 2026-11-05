@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useId } from 'react';
 import { useStore } from '../../store';
 import CodeMirror from '@uiw/react-codemirror';
 import { cmLabel } from '../../lib/cmA11y';
@@ -143,6 +143,8 @@ export function ResponseViewer() {
   const t = useT();
   const activeTab = useStore(s => s.tabs.find(t => t.id === s.activeTabId));
   const activeTabId = useStore(s => s.activeTabId);
+  // Stable ids tying each role="tab" to the single role="tabpanel" (WCAG 1.3.1/4.1.2).
+  const panelId = useId();
   const pinnedResponse = useStore(s => s.pinnedResponse);
   const setPinned = useStore(s => s.setPinnedResponse);
   const updateRequest = useStore(s => s.updateRequest);
@@ -465,8 +467,10 @@ export function ResponseViewer() {
     return (
       <button
         key={def.id}
+        id={`${panelId}-tab-${def.id}`}
         role="tab"
         aria-selected={active}
+        aria-controls={panelId}
         onClick={() => setTab(def.id)}
         className={`${active ? 'flex' : TAB_INLINE_VIS[def.id]} px-3 py-1 text-xs rounded transition-colors items-center gap-1 ${active ? 'bg-surface-800 text-white' : 'text-surface-400 hover:text-white'}`}
       >
@@ -506,8 +510,8 @@ export function ResponseViewer() {
             <span className={`text-sm font-bold ${getStatusColor(response.status)}`}>
               {response.status}<span className="hidden @min-[440px]:inline"> {response.statusText}</span>
             </span>
-            <span className="text-xs text-surface-400">{response.durationMs}ms</span>
-            <span className="text-xs text-surface-400">{(response.bodySize / 1024).toFixed(1)} KB</span>
+            <span className="text-xs text-[var(--text-muted)]">{response.durationMs}ms</span>
+            <span className="text-xs text-[var(--text-muted)]">{(response.bodySize / 1024).toFixed(1)} KB</span>
           </div>
 
           {/* The overflow menu is a SIBLING of the tablist, not a child: a
@@ -695,7 +699,7 @@ export function ResponseViewer() {
       {showMockModal && <SaveAsMockModal onClose={() => setShowMockModal(false)} />}
 
       {/* Content — flex-col so each panel can fill remaining height cleanly */}
-      <div role="tabpanel" aria-label={tabList.find(x => x.id === tab)?.label} className="flex-1 min-h-0 flex flex-col overflow-y-auto">
+      <div id={panelId} role="tabpanel" aria-labelledby={`${panelId}-tab-${tab}`} aria-label={tabList.find(x => x.id === tab)?.label} className="flex-1 min-h-0 flex flex-col overflow-y-auto">
         {response.error ? (
           tab === 'request' ? (
             <RequestPanel sentRequest={sentRequest} />
