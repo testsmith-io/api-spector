@@ -59,8 +59,21 @@ async function readLastWorkspacePath(): Promise<string | null> {
 let workspaceDir: string | null = null;
 let workspaceFile: string | null = null;
 
-function atomicWrite(path: string, data: string): Promise<void> {
-  return writeFile(path, data, 'utf8');
+async function atomicWrite(path: string, data: string): Promise<void> {
+  // Skip the write when nothing actually changed, so re-serializing an unchanged
+  // file (e.g. the workspace manifest the moment it is opened) does not rewrite
+  // it on disk and show up as a phantom git modification.
+  try {
+    if (await readFile(path, 'utf8') === data) return;
+  } catch { /* file does not exist yet */ }
+  await writeFile(path, data, 'utf8');
+}
+
+/** Serialize a workspace / collection / environment / flow to pretty JSON with a
+ *  trailing newline, the convention editors and git expect, so a save never
+ *  fights an editor's "insert final newline" and churn the file. */
+function writeJson(path: string, value: unknown): Promise<void> {
+  return atomicWrite(path, JSON.stringify(value, null, 2) + '\n');
 }
 
 /** Default `.gitignore` for an API Spector workspace. Excludes:
@@ -401,7 +414,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
       environments: [],
       activeEnvironmentId: null
     };
-    await atomicWrite(result.filePath, JSON.stringify(ws, null, 2));
+    await writeJson(result.filePath, ws);
     await saveLastWorkspacePath(result.filePath);
     return { workspace: ws, workspacePath: result.filePath };
   });
@@ -409,7 +422,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
   handleIpc(ipc, IPC.file.saveWorkspace, async (_e, ws: Workspace) => {
     if (!workspaceFile) return;
     setSecretsConfig(ws.settings?.secrets); // apply edited connection config at once
-    await atomicWrite(workspaceFile, JSON.stringify(ws, null, 2));
+    await writeJson(workspaceFile, ws);
     // Backfill the editor file-association for workspaces created before this
     // helper existed. Idempotent — no-op if the file already maps *.spector.
     if (workspaceDir) await ensureVscodeFileAssociation(workspaceDir);
@@ -429,7 +442,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     await mkdir(dirname(fullPath), { recursive: true });
     // Data tables are written to separate CSVs under data/, not inline.
     const toWrite = await externalizeDataSets(col, dirname(fullPath));
-    await atomicWrite(fullPath, JSON.stringify(toWrite, null, 2));
+    await writeJson(fullPath, toWrite);
   });
 
   handleIpc(ipc, IPC.file.loadEnvironment, async (_e, relPath: string) => {
@@ -442,7 +455,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     if (!workspaceDir) throw new Error('No workspace open');
     const fullPath = resolve(workspaceDir, relPath);
     await mkdir(dirname(fullPath), { recursive: true });
-    await atomicWrite(fullPath, JSON.stringify(env, null, 2));
+    await writeJson(fullPath, env);
   });
 
   handleIpc(ipc, IPC.file.loadFlow, async (_e, relPath: string) => {
@@ -456,7 +469,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     const fullPath = resolve(workspaceDir, relPath);
     // Older workspaces predate the flows/ dir; create it on first save.
     await mkdir(dirname(fullPath), { recursive: true });
-    await atomicWrite(fullPath, JSON.stringify(flow, null, 2));
+    await writeJson(fullPath, flow);
   });
 
   /** Delete a workspace-relative file (collection, environment, mock, …).
@@ -541,7 +554,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
       ...snap.manifest,
       settings: { ...(snap.manifest.settings ?? {}), ...(local.settings ?? {}) },
     };
-    await atomicWrite(workspaceFile, JSON.stringify(merged, null, 2));
+    await writeJson(workspaceFile, merged);
     return {
       ok: true,
       filesWritten,
@@ -918,7 +931,7 @@ async function wrapCollectionAsWorkspace(
 
   if (!collection.id) collection.id = randomUUID();
   await mkdir(join(dir, 'collections'), { recursive: true });
-  await atomicWrite(join(dir, collRel), JSON.stringify(collection, null, 2));
+  await writeJson(join(dir, collRel), collection);
 
   const ws: Workspace = { version: '1.0', collections: [collRel], environments: [], activeEnvironmentId: null };
   await ensureGitignore(dir);
@@ -926,7 +939,7 @@ async function wrapCollectionAsWorkspace(
   await ensureReadme(dir, basename(collFilePath));
   // Replace the picked collection file with the manifest (content is safe in
   // collections/ already). The file the user opened becomes the workspace.
-  await atomicWrite(collFilePath, JSON.stringify(ws, null, 2));
+  await writeJson(collFilePath, ws);
 
   workspaceDir = dir;
   workspaceFile = collFilePath;

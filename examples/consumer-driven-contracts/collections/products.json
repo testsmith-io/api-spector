@@ -1,0 +1,80 @@
+{
+  "version": "1.0",
+  "id": "products",
+  "name": "Products API contract (consumer-driven)",
+  "description": "A consumer-driven contract for the Practice Software Testing products endpoints. The consumer (a storefront web app) states what it needs from the provider: a product id that is a string, an in_stock boolean, a name string and a numeric price. Run this against the good environment and every expectation passes. Run it against the bugs environment and the id type and the missing in_stock field fail, which is the drift a contract is meant to catch.",
+  "rootFolder": {
+    "id": "root",
+    "name": "root",
+    "description": "",
+    "folders": [],
+    "requestIds": [
+      "list-products",
+      "get-product"
+    ],
+    "childOrder": [
+      {
+        "type": "request",
+        "id": "list-products"
+      },
+      {
+        "type": "request",
+        "id": "get-product"
+      }
+    ]
+  },
+  "requests": {
+    "list-products": {
+      "id": "list-products",
+      "name": "List products",
+      "method": "GET",
+      "url": "{{PRODUCTS_URL}}/products",
+      "headers": [
+        {
+          "key": "Accept",
+          "value": "application/json",
+          "enabled": true
+        }
+      ],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "protocol": "http",
+      "description": "The storefront lists products. It needs a paginated envelope with a data array, and each product must carry a string id and an in_stock boolean so the UI can link to the detail page and show stock state.",
+      "contract": {
+        "statusCode": 200,
+        "bodyMatcher": "{\n  \"current_page\": { \"__match\": \"integer\", \"value\": 1 },\n  \"data\": {\n    \"__match\": \"eachLike\",\n    \"min\": 1,\n    \"value\": {\n      \"id\":       { \"__match\": \"regex\", \"regex\": \"^[0-9A-HJKMNP-TV-Z]{26}$\", \"value\": \"01M6PHARK38BS3T6TWQFDKWYAP\" },\n      \"name\":     { \"__match\": \"string\", \"value\": \"Combination Pliers\" },\n      \"price\":    { \"__match\": \"number\", \"value\": 14.15 },\n      \"in_stock\": { \"__match\": \"boolean\", \"value\": true }\n    }\n  }\n}"
+      }
+    },
+    "get-product": {
+      "id": "get-product",
+      "name": "Get product",
+      "method": "GET",
+      "url": "{{PRODUCTS_URL}}/products/{{productId}}",
+      "headers": [
+        {
+          "key": "Accept",
+          "value": "application/json",
+          "enabled": true
+        }
+      ],
+      "params": [],
+      "auth": {
+        "type": "none"
+      },
+      "body": {
+        "mode": "none"
+      },
+      "protocol": "http",
+      "description": "The product detail page reads one product. The id in the path comes from the environment, because the good provider uses string ids and the bugs provider uses integer ids. The body expectations are the same as a list item.",
+      "contract": {
+        "statusCode": 200,
+        "bodyMatcher": "{\n  \"id\":       { \"__match\": \"regex\", \"regex\": \"^[0-9A-HJKMNP-TV-Z]{26}$\", \"value\": \"01M6PHARK38BS3T6TWQFDKWYAP\" },\n  \"name\":     { \"__match\": \"string\", \"value\": \"Combination Pliers\" },\n  \"price\":    { \"__match\": \"number\", \"value\": 14.15 },\n  \"in_stock\": { \"__match\": \"boolean\", \"value\": true }\n}"
+      }
+    }
+  }
+}

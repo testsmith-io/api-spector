@@ -1,0 +1,144 @@
+{
+  "consumer": {
+    "name": "pst-web"
+  },
+  "provider": {
+    "name": "products-api"
+  },
+  "interactions": [
+    {
+      "description": "a list of products is requested",
+      "request": {
+        "method": "GET",
+        "path": "/products"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "current_page": 1,
+          "data": [
+            {
+              "id": "01M6PHARK38BS3T6TWQFDKWYAP",
+              "name": "Combination Pliers",
+              "price": 14.15,
+              "in_stock": true
+            }
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.current_page": {
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            },
+            "$.data": {
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.data[*].id": {
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^[0-9A-HJKMNP-TV-Z]{26}$"
+                }
+              ]
+            },
+            "$.data[*].name": {
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.data[*].price": {
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.data[*].in_stock": {
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "a single product is requested",
+      "providerState": "a product with id 01M6PHARK38BS3T6TWQFDKWYAP exists",
+      "request": {
+        "method": "GET",
+        "path": "/products/01M6PHARK38BS3T6TWQFDKWYAP"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "id": "01M6PHARK38BS3T6TWQFDKWYAP",
+          "name": "Combination Pliers",
+          "price": 14.15,
+          "in_stock": true
+        },
+        "matchingRules": {
+          "body": {
+            "$.id": {
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^[0-9A-HJKMNP-TV-Z]{26}$"
+                }
+              ]
+            },
+            "$.name": {
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.price": {
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.in_stock": {
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    },
+    "client": {
+      "name": "api-spector",
+      "designFirst": true
+    }
+  }
+}
