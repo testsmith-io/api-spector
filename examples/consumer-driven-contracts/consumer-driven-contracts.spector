@@ -1,0 +1,62 @@
+{
+  "version": "1.0",
+  "collections": [
+    "collections/products.json"
+  ],
+  "environments": [
+    "environments/good.env.json",
+    "environments/bugs.env.json"
+  ],
+  "activeEnvironmentId": "env-good",
+  "mocks": [],
+  "contracts": [],
+  "flows": [],
+  "designContracts": [
+    {
+      "id": "pst-web-products-api",
+      "consumer": "pst-web",
+      "provider": "products-api",
+      "updatedAt": "2026-11-05T09:30:00.000Z",
+      "interactions": [
+        {
+          "id": "list-products",
+          "description": "a list of products is requested",
+          "request": {
+            "method": "GET",
+            "path": "/products"
+          },
+          "response": {
+            "status": 200,
+            "body": "{\n  \"current_page\": 1,\n  \"data\": [\n    { \"id\": \"01M6PHARK38BS3T6TWQFDKWYAP\", \"name\": \"Combination Pliers\", \"price\": 14.15, \"in_stock\": true }\n  ]\n}"
+          },
+          "looseMatch": true
+        },
+        {
+          "id": "get-product",
+          "description": "a single product is requested",
+          "providerState": "a product with id 01M6PHARK38BS3T6TWQFDKWYAP exists",
+          "request": {
+            "method": "GET",
+            "path": "/products/01M6PHARK38BS3T6TWQFDKWYAP"
+          },
+          "response": {
+            "status": 200,
+            "body": "{\n  \"id\": \"01M6PHARK38BS3T6TWQFDKWYAP\", \"name\": \"Combination Pliers\", \"price\": 14.15, \"in_stock\": true\n}"
+          },
+          "looseMatch": true
+        }
+      ]
+    }
+  ],
+  "perfPlans": [],
+  "settings": {
+    "theme": "light",
+    "cloud": {
+      "enabled": false,
+      "tokenSet": false
+    },
+    "sync": {
+      "mode": "git"
+    }
+  }
+}
