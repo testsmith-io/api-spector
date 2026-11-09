@@ -6,10 +6,11 @@ import { useT } from '../../i18n';
 
 // ─── Confirm dialog ───────────────────────────────────────────────────────────
 
-export function ConfirmDialog ( { message, onConfirm, onCancel }: {
+export function ConfirmDialog ( { message, onConfirm, onCancel, confirmLabel }: {
   readonly message: string
   readonly onConfirm: () => void
   readonly onCancel: () => void
+  readonly confirmLabel?: string
 } ) {
   const t = useT();
   return (
@@ -30,7 +31,7 @@ export function ConfirmDialog ( { message, onConfirm, onCancel }: {
           onClick={onConfirm}
           className="px-3 py-1.5 text-xs bg-red-700 hover:bg-red-600 rounded transition-colors"
         >
-          {t('Delete')}
+          {confirmLabel ?? t('Delete')}
         </button>
       </div>
     </Modal>

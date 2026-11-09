@@ -15,15 +15,16 @@ import { ConfirmDialog } from './ConfirmDialog';
  *   {dialog}
  */
 export function useConfirm() {
-  const [pending, setPending] = useState<{ message: string; onConfirm: () => void } | null>(null);
+  const [pending, setPending] = useState<{ message: string; onConfirm: () => void; confirmLabel?: string } | null>(null);
 
-  const confirm = useCallback((message: string, onConfirm: () => void) => {
-    setPending({ message, onConfirm });
+  const confirm = useCallback((message: string, onConfirm: () => void, confirmLabel?: string) => {
+    setPending({ message, onConfirm, confirmLabel });
   }, []);
 
   const dialog = pending ? (
     <ConfirmDialog
       message={pending.message}
+      confirmLabel={pending.confirmLabel}
       onConfirm={() => { pending.onConfirm(); setPending(null); }}
       onCancel={() => setPending(null)}
     />

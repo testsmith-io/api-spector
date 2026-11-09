@@ -72,7 +72,7 @@ export function renderMarkdown(md: string): React.ReactNode {
       // graph canvas instead of showing the source as text.
       if (lang === 'flow' || lang === 'flowchart') {
         blocks.push(
-          <div key={k()} className="h-72 border border-surface-700 rounded overflow-hidden bg-surface-900">
+          <div key={k()} className="border border-surface-700 rounded overflow-hidden bg-surface-900 p-2">
             <FlowchartPreview code={buf.join('\n')} />
           </div>,
         );

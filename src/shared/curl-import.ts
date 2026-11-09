@@ -153,9 +153,26 @@ export function parseCurl(command: string): ParsedCurl {
   // Body.
   let body: RequestBody = { mode: 'none' };
   if (isForm) {
+    // curl -F sends multipart/form-data. `name=@path` (or `<path`) is a file
+    // part; curl options after the path (`;type=`, `;filename=`) are honored.
     body = {
-      mode: 'form',
-      form: formParts.map(kv => { const idx = kv.indexOf('='); return { key: idx === -1 ? kv : kv.slice(0, idx), value: idx === -1 ? '' : kv.slice(idx + 1), enabled: true }; }),
+      mode: 'multipart',
+      multipart: formParts.map(kv => {
+        const idx = kv.indexOf('=');
+        const key = idx === -1 ? kv : kv.slice(0, idx);
+        const rhs = idx === -1 ? '' : kv.slice(idx + 1);
+        if (rhs.startsWith('@') || rhs.startsWith('<')) {
+          const [rawPath, ...opts] = rhs.slice(1).split(';');
+          const typeOpt = opts.find(o => o.trim().startsWith('type='))?.split('=')[1];
+          const nameOpt = opts.find(o => o.trim().startsWith('filename='))?.split('=')[1];
+          return {
+            key, enabled: true, type: 'file' as const, filePath: rawPath,
+            ...(nameOpt ? { fileName: nameOpt } : {}),
+            ...(typeOpt ? { contentType: typeOpt } : {}),
+          };
+        }
+        return { key, enabled: true, type: 'text' as const, value: rhs };
+      }),
     };
   } else if (hasData) {
     const data = dataParts.join('&');

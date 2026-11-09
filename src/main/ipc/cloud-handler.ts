@@ -182,6 +182,13 @@ function resolveBody(body: ApiRequest['body'] | undefined, vars: Record<string, 
   else if (body.mode === 'raw' && body.raw != null) b.raw = interpolateStatic(body.raw, vars);
   else if (body.mode === 'form' && body.form) {
     b.form = body.form.map(f => ({ ...f, key: interpolateStatic(f.key, vars), value: interpolateStatic(f.value ?? '', vars) }));
+  } else if (body.mode === 'multipart' && body.multipart) {
+    b.multipart = body.multipart.map(p => ({
+      ...p,
+      key: interpolateStatic(p.key, vars),
+      ...(p.value != null ? { value: interpolateStatic(p.value, vars) } : {}),
+      ...(p.filePath != null ? { filePath: interpolateStatic(p.filePath, vars) } : {}),
+    }));
   } else if (body.mode === 'graphql' && body.graphql) {
     b.graphql = {
       ...body.graphql,

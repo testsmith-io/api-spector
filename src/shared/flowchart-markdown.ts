@@ -209,12 +209,46 @@ export function layoutFlowchart(parsed: ParsedFlowchart, opts?: {
     layer.set(id, best);
   }
 
-  // Bucket by layer, preserving the order nodes were declared in.
+  // Bucket by layer, initially in declaration order.
   const buckets = new Map<number, string[]>();
   for (const id of ids) {
     const l = layer.get(id) ?? 0;
     if (!buckets.has(l)) buckets.set(l, []);
     buckets.get(l)!.push(id);
+  }
+
+  // Reduce edge crossings with the classic barycenter/median heuristic: sweep
+  // the layers a few times, reordering each layer's nodes by the median slot of
+  // their neighbours in the adjacent layer. Without this, siblings keep their
+  // declaration order and edges cross whenever children are declared out of
+  // their parents' order (the usual "lines crossing" complaint). Nodes with no
+  // neighbour on the side being swept keep their current slot, so the result is
+  // stable and declaration order still breaks ties.
+  const ins = new Map<string, string[]>(ids.map(id => [id, []]));
+  for (const e of parsed.edges) {
+    if (!index.has(e.from) || !index.has(e.to) || e.from === e.to) continue;
+    ins.get(e.to)!.push(e.from);
+  }
+  const layersSorted = [...buckets.keys()].sort((a, b) => a - b);
+  const slot = new Map<string, number>();
+  const refreshSlots = () => { for (const l of layersSorted) buckets.get(l)!.forEach((id, i) => slot.set(id, i)); };
+  refreshSlots();
+  const median = (neighbours: string[], fallback: number): number => {
+    const xs = neighbours.map(n => slot.get(n)).filter((v): v is number => v !== undefined).sort((a, b) => a - b);
+    if (!xs.length) return fallback;
+    const m = Math.floor(xs.length / 2);
+    return xs.length % 2 ? xs[m] : (xs[m - 1] + xs[m]) / 2;
+  };
+  for (let sweep = 0; sweep < 4; sweep++) {
+    const downward = sweep % 2 === 0; // down: order by parents; up: order by children
+    const seq = downward ? layersSorted : [...layersSorted].reverse();
+    for (const l of seq) {
+      const members = buckets.get(l)!;
+      const keyed = members.map((id, i) => ({ id, i, key: median(downward ? ins.get(id)! : outs.get(id)!, i) }));
+      keyed.sort((a, b) => a.key - b.key || a.i - b.i);
+      buckets.set(l, keyed.map(k => k.id));
+      refreshSlots();
+    }
   }
 
   const horizontal = parsed.direction === 'LR' || parsed.direction === 'RL';

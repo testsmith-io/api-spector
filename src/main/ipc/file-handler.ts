@@ -6,7 +6,7 @@ import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
 import { readFile, writeFile, mkdir, readdir, unlink, cp } from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
-import { join, dirname, resolve, basename, sep } from 'node:path';
+import { join, dirname, resolve, relative, basename, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import JSZip from 'jszip';
 import { simpleGit } from 'simple-git';
@@ -14,6 +14,7 @@ import type { Collection, Environment, Workspace, Flow } from '../../shared/type
 import { externalizeDataSets, inlineDataSets } from '../data-files';
 import { loadGlobals, getGlobals, setGlobals, persistGlobals } from '../globals-store';
 import { setSecretsConfig } from '../secrets';
+import { clearGitScopeCache } from './git-scope';
 
 const LAST_WS_FILE = join(app.getPath('userData'), 'last-workspace.json');
 const RECENTS_FILE = join(app.getPath('userData'), 'recent-workspaces.json');
@@ -58,6 +59,21 @@ async function readLastWorkspacePath(): Promise<string | null> {
 
 let workspaceDir: string | null = null;
 let workspaceFile: string | null = null;
+
+// Whether the built-in git client should operate on an enclosing repository and
+// scope to this workspace's subtree (see settings.git.useEnclosingRepo and
+// git-scope.ts). Mirrored from the active workspace's settings at open/save so
+// the git handlers can read it synchronously without the manifest in hand.
+let gitScopePref = false;
+export function getGitScopePref(): boolean { return gitScopePref; }
+
+/** Apply a freshly opened/created/saved workspace's git preference and drop any
+ *  cached repo-root lookup (the workspace dir, and so its repo situation, may
+ *  have changed). */
+function applyGitPref(ws: Workspace | null | undefined): void {
+  gitScopePref = ws?.settings?.git?.useEnclosingRepo === true;
+  clearGitScopeCache();
+}
 
 async function atomicWrite(path: string, data: string): Promise<void> {
   // Skip the write when nothing actually changed, so re-serializing an unchanged
@@ -368,6 +384,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     await loadGlobals(workspaceDir);
     await saveLastWorkspacePath(wsPath);
     setSecretsConfig((parsed as Workspace).settings?.secrets);
+    applyGitPref(parsed as Workspace);
     return { workspace: parsed as Workspace, workspacePath: wsPath };
   });
 
@@ -387,41 +404,19 @@ export function registerFileHandlers(ipc: IpcMain): void {
       filters: [{ name: 'API Spector Workspace', extensions: ['spector', 'json'] }]
     });
     if (result.canceled || !result.filePath) return null;
-    workspaceDir = dirname(result.filePath);
-    workspaceFile = result.filePath;
-    await loadGlobals(workspaceDir);
-
-    // Create data dirs
-    await mkdir(join(workspaceDir, 'collections'), { recursive: true });
-    await mkdir(join(workspaceDir, 'environments'), { recursive: true });
-    await mkdir(join(workspaceDir, 'flows'), { recursive: true });
-
-    // Write .gitignore (covers secrets, generated docs, run reports, etc.)
-    await ensureGitignore(workspaceDir);
-
-    // Write .vscode/settings.json so editors treat .spector as JSON without
-    // the user having to map it manually each clone. Only writes if absent —
-    // we never overwrite an existing project-level VS Code config.
-    await ensureVscodeFileAssociation(workspaceDir);
-
-    // Write a README so anyone who clones the workspace immediately knows
-    // what's in it and how to run the tests.
-    await ensureReadme(workspaceDir, basename(result.filePath));
-
-    const ws: Workspace = {
-      version: '1.0',
-      collections: [],
-      environments: [],
-      activeEnvironmentId: null
-    };
-    await writeJson(result.filePath, ws);
-    await saveLastWorkspacePath(result.filePath);
-    return { workspace: ws, workspacePath: result.filePath };
+    // If the chosen location sits inside an existing repository, auto-enable
+    // scoped git mode so the panel versions only this folder, not the whole
+    // project (see git-scope.ts). A location that IS a repo root, or no repo
+    // at all, scaffolds a plain standalone workspace.
+    const dir = dirname(result.filePath);
+    const enclosing = await detectEnclosingRepo(dir);
+    return scaffoldWorkspace(dir, basename(result.filePath), enclosing ?? undefined);
   });
 
   handleIpc(ipc, IPC.file.saveWorkspace, async (_e, ws: Workspace) => {
     if (!workspaceFile) return;
     setSecretsConfig(ws.settings?.secrets); // apply edited connection config at once
+    applyGitPref(ws); // pick up a scoped-mode toggle saved from the panel
     await writeJson(workspaceFile, ws);
     // Backfill the editor file-association for workspaces created before this
     // helper existed. Idempotent — no-op if the file already maps *.spector.
@@ -590,6 +585,14 @@ export function registerFileHandlers(ipc: IpcMain): void {
     return result.canceled ? null : result.filePaths[0];
   });
 
+  handleIpc(ipc, IPC.dialog.pickFile, async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select File',
+      properties: ['openFile']
+    });
+    return result.canceled ? null : result.filePaths[0];
+  });
+
   handleIpc(ipc, IPC.results.save, async (_e, content: string, defaultName: string) => {
     const ext = defaultName.endsWith('.xml') ? 'xml' : defaultName.endsWith('.html') ? 'html' : 'json';
     const allFilters = [
@@ -620,6 +623,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
   handleIpc(ipc, IPC.file.closeWorkspace, async () => {
     workspaceDir  = null;
     workspaceFile = null;
+    applyGitPref(null);
     // Clear so the app shows the welcome screen on next launch. If the user-data
     // directory is read-only the next launch will simply auto-load the previous
     // workspace again — non-fatal but log so it shows up in diagnostics.
@@ -659,6 +663,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
       workspaceFile = wsPath;
       await loadGlobals(workspaceDir);
       setSecretsConfig(workspace.settings?.secrets);
+      applyGitPref(workspace);
       return { workspace, workspacePath: wsPath };
     } catch {
       return null;
@@ -690,6 +695,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     await loadGlobals(workspaceDir);
     await saveLastWorkspacePath(wsPath);
     setSecretsConfig((parsed as Workspace).settings?.secrets);
+    applyGitPref(parsed as Workspace);
     return { workspace: parsed as Workspace, workspacePath: wsPath };
   });
 
@@ -744,14 +750,35 @@ export function registerFileHandlers(ipc: IpcMain): void {
       }
     }
 
-    const wsPath = await findWorkspaceSpector(destDir);
+    const found = await findWorkspaceSpectors(destDir);
+    if (found.length === 0) {
+      // A regular project with no API Spector workspace yet: let the user pick
+      // or create a subfolder and scaffold one there (scoped to that folder).
+      return addWorkspaceIntoProject(destDir);
+    }
+    if (found.length > 1) throw new Error('multiple workspace files found — open the folder and pick one');
+    const wsPath = found[0];
     const parsed = JSON.parse(await readFile(wsPath, 'utf8')) as Workspace;
     workspaceDir = dirname(wsPath);
     workspaceFile = wsPath;
     await loadGlobals(workspaceDir);
     await saveLastWorkspacePath(wsPath);
     setSecretsConfig(parsed.settings?.secrets);
+    applyGitPref(parsed);
     return { workspace: parsed, workspacePath: wsPath };
+  });
+
+  // Add API Spector tests to an existing LOCAL project: pick the project folder,
+  // then pick or create a subfolder for the tests, and scaffold a workspace
+  // there. Scoped git mode is auto-enabled when the folder is inside a repo.
+  handleIpc(ipc, IPC.file.addToProject, async () => {
+    const projPick = await dialog.showOpenDialog({
+      title: 'Select the project to add API Spector tests to',
+      properties: ['openDirectory'],
+      buttonLabel: 'Select project',
+    });
+    if (projPick.canceled || projPick.filePaths.length === 0) return null;
+    return addWorkspaceIntoProject(projPick.filePaths[0]);
   });
 }
 
@@ -777,6 +804,7 @@ async function tryOpenWorkspaceInDir(dir: string): Promise<{ workspace: Workspac
     workspaceFile = wsPath;
     await loadGlobals(workspaceDir);
     setSecretsConfig(workspace.settings?.secrets);
+    applyGitPref(workspace);
     return { workspace, workspacePath: wsPath };
   } catch {
     return null;
@@ -889,7 +917,10 @@ async function extractZip(buf: Buffer, destDir: string): Promise<void> {
 /** Recursively find the single workspace `.spector` file under `dir`.
  *  Skips collection `.spector` files. Returns the path, or throws when zero
  *  or more than one workspace is present (ambiguous — the user should pick). */
-async function findWorkspaceSpector(dir: string): Promise<string> {
+/** Find every workspace (`*.spector`, not a bare collection) under `dir`,
+ *  skipping node_modules and .git. Returns all matches so the caller can decide
+ *  how to treat zero (scaffold a new one) vs one (open) vs many (ambiguous). */
+async function findWorkspaceSpectors(dir: string): Promise<string[]> {
   const found: string[] = [];
   async function walk(d: string): Promise<void> {
     let entries: Dirent[];
@@ -912,9 +943,83 @@ async function findWorkspaceSpector(dir: string): Promise<string> {
     }
   }
   await walk(dir);
-  if (found.length === 0) throw new Error('no workspace (.spector) file found in the repository');
-  if (found.length > 1) throw new Error('multiple workspace files found — open the folder and pick one');
-  return found[0];
+  return found;
+}
+
+/** If `dir` sits inside a git repository whose root is an ANCESTOR of it (i.e.
+ *  `dir` is a subfolder, not the repo root itself), describe that enclosing
+ *  repo. Returns null when `dir` is the repo root or not in a repo at all — in
+ *  both cases there is no "scope to a subtree" to opt into. */
+async function detectEnclosingRepo(
+  dir: string,
+): Promise<{ name: string; scope: string } | null> {
+  try {
+    const top = (await simpleGit(dir).revparse(['--show-toplevel'])).trim();
+    if (!top) return null;
+    const rel = relative(top, dir);
+    if (rel === '' || rel.startsWith('..')) return null;
+    return { name: basename(top), scope: rel.split(sep).join('/') };
+  } catch {
+    return null;
+  }
+}
+
+/** Create the on-disk skeleton of a new workspace in `dir` (collections/,
+ *  environments/, flows/, .gitignore, .vscode, README) plus a `<name>` manifest,
+ *  make it the active workspace, and return it. When `enclosing` is given the
+ *  manifest opts into scoped git mode and the result carries the repo/scope so
+ *  the renderer can confirm what will be versioned. */
+async function scaffoldWorkspace(
+  dir: string,
+  wsFileName: string,
+  enclosing?: { name: string; scope: string },
+): Promise<{ workspace: Workspace; workspacePath: string; enclosingRepo?: { name: string; scope: string } }> {
+  await mkdir(join(dir, 'collections'), { recursive: true });
+  await mkdir(join(dir, 'environments'), { recursive: true });
+  await mkdir(join(dir, 'flows'), { recursive: true });
+  await ensureGitignore(dir);
+  await ensureVscodeFileAssociation(dir);
+  await ensureReadme(dir, wsFileName);
+
+  const ws: Workspace = {
+    version: '1.0',
+    collections: [],
+    environments: [],
+    activeEnvironmentId: null,
+    ...(enclosing ? { settings: { git: { useEnclosingRepo: true } } } : {}),
+  };
+  const wsPath = join(dir, wsFileName);
+  await writeJson(wsPath, ws);
+
+  workspaceDir = dir;
+  workspaceFile = wsPath;
+  await loadGlobals(dir);
+  await saveLastWorkspacePath(wsPath);
+  setSecretsConfig(ws.settings?.secrets);
+  applyGitPref(ws);
+  return { workspace: ws, workspacePath: wsPath, enclosingRepo: enclosing };
+}
+
+/** Shared by "Open from Git" (when the clone has no workspace) and "Add to a
+ *  project folder": pick or create a subfolder inside `projectDir`, then
+ *  scaffold a workspace there. Returns null if the user cancels the picker. */
+async function addWorkspaceIntoProject(
+  projectDir: string,
+): Promise<{ workspace: Workspace; workspacePath: string; enclosingRepo?: { name: string; scope: string } } | null> {
+  const sub = await dialog.showOpenDialog({
+    title: 'Choose or create a folder for API Spector tests',
+    defaultPath: projectDir,
+    properties: ['openDirectory', 'createDirectory'],
+    buttonLabel: 'Add here',
+  });
+  if (sub.canceled || sub.filePaths.length === 0) return null;
+  const targetDir = sub.filePaths[0];
+  const within = targetDir === projectDir || targetDir.startsWith(projectDir + sep);
+  if (!within) throw new Error('Choose a folder inside the selected project');
+
+  const enclosing = await detectEnclosingRepo(targetDir);
+  const name = `${basename(targetDir) || 'api-tests'}.spector`;
+  return scaffoldWorkspace(targetDir, name, enclosing ?? undefined);
 }
 
 /** Turn a collection file into a proper workspace: write the collection under
@@ -945,5 +1050,6 @@ async function wrapCollectionAsWorkspace(
   workspaceFile = collFilePath;
   await loadGlobals(dir);
   await saveLastWorkspacePath(collFilePath);
+  applyGitPref(ws);
   return { workspace: ws, workspacePath: collFilePath };
 }

@@ -72,10 +72,20 @@ function FlowchartNode({ data }: NodeProps) {
 const NODE_TYPES = { flowchart: FlowchartNode };
 
 export function FlowchartPreview({ code, className }: { readonly code: string; readonly className?: string }) {
-  const { nodes, edges } = useMemo(() => {
+  const { nodes, edges, naturalW, naturalH } = useMemo(() => {
     const g = flowchartFromMarkdown(code);
     const sp = posFor(g.direction, 'source');
     const tp = posFor(g.direction, 'target');
+    // Natural pixel extent of the laid-out graph, so the box can match the
+    // diagram's shape instead of squeezing a tall chart into a fixed strip.
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of g.nodes) {
+      minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
+      maxX = Math.max(maxX, n.x + g.nodeWidth); maxY = Math.max(maxY, n.y + g.nodeHeight);
+    }
+    const pad = 48;
+    const naturalW = g.nodes.length ? (maxX - minX) + pad : 0;
+    const naturalH = g.nodes.length ? (maxY - minY) + pad : 0;
     const nodes: Node[] = g.nodes.map(n => ({
       id: n.id,
       type: 'flowchart',
@@ -99,22 +109,35 @@ export function FlowchartPreview({ code, className }: { readonly code: string; r
       labelBgStyle: { fill: 'var(--surface-900)' },
       labelBgPadding: [4, 2] as [number, number],
     }));
-    return { nodes, edges };
+    return { nodes, edges, naturalW, naturalH };
   }, [code]);
 
   if (!nodes.length) {
     return <div className={`text-xs text-surface-500 p-4 ${className ?? ''}`}>Nothing to diagram.</div>;
   }
 
+  // Size the box to the diagram's own aspect ratio, centred, and capped at the
+  // available width and a sensible max height. A tall top-down chart then gets
+  // vertical room (readable nodes) instead of being shrunk into a thin strip,
+  // and a wide chart scales down uniformly without overflowing.
   return (
-    <div className={`w-full h-full min-h-[200px] ${className ?? ''}`}>
+    <div
+      className={`mx-auto ${className ?? ''}`}
+      style={{
+        width: naturalW,
+        maxWidth: '100%',
+        aspectRatio: `${naturalW} / ${naturalH}`,
+        maxHeight: 560,
+        minHeight: 160,
+      }}
+    >
       <ReactFlowProvider>
         <ReactFlow
           nodes={nodes}
           edges={edges}
           nodeTypes={NODE_TYPES}
           fitView
-          fitViewOptions={{ padding: 0.2 }}
+          fitViewOptions={{ padding: 0.12 }}
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable={false}

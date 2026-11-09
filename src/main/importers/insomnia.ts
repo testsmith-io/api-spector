@@ -50,6 +50,22 @@ function parseBody(body: any): RequestBody {
       })),
     };
   }
+  if (mime === 'multipart/form-data') {
+    // Insomnia multipart: a param with `type: 'file'` carries `fileName` (the
+    // path on the exporting machine); everything else is a text field.
+    return {
+      mode: 'multipart',
+      multipart: (body.params ?? []).map((p: any) => {
+        const isFile = p.type === 'file';
+        return {
+          key: p.name ?? '',
+          enabled: !p.disabled,
+          type: isFile ? 'file' as const : 'text' as const,
+          ...(isFile ? { filePath: p.fileName ?? '' } : { value: p.value ?? '' }),
+        };
+      }),
+    };
+  }
   if (body.text) {
     return { mode: 'raw', raw: body.text, rawContentType: mime || 'text/plain' };
   }

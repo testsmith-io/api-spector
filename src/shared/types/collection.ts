@@ -350,6 +350,17 @@ export interface Workspace {
      *  test coverage. Lets `api-spector coverage` and the UI default without a
      *  --spec flag each time. */
     coverageSpec?: string
+    /** Git integration. When the workspace lives in a SUBFOLDER of an existing
+     *  repository, `useEnclosingRepo` opts into "scoped mode": the built-in git
+     *  client operates on the enclosing repo but limits status/diff/stage/
+     *  commit/stash/log to this workspace's subtree. Off (or absent) means the
+     *  workspace is treated as its own standalone repo (the historical
+     *  behavior). Scoped mode is never auto-detected at runtime — only this
+     *  flag enables it — so a workspace sitting under an unrelated ancestor
+     *  repo (e.g. `~/.git` dotfiles) is never silently operated on. */
+    git?: {
+      useEnclosingRepo?: boolean
+    }
   }
 }
 
@@ -405,4 +416,18 @@ export interface SecretsSettings {
   azure?: AzureKeyVaultSettings
   onePassword?: OnePasswordSettings
   gcp?: GcpSecretManagerSettings
+}
+
+/** Summary of a SoapUI / ReadyAPI import: structure counts, how many Groovy
+ *  artefacts converted at each confidence level, and anything skipped or
+ *  needing attention. Surfaced by the import summary screen. */
+export interface SoapUiImportReport {
+  project: string
+  testSuites: number
+  testCases: number
+  requests: number
+  scripts: { total: number; clean: number; partial: number; unsupported: number }
+  /** Items skipped or needing a look (non-Groovy assertions, unsupported
+   *  step types, property transfers, auth that could not be mapped, …). */
+  warnings: string[]
 }

@@ -60,6 +60,20 @@ export function WelcomeScreen() {
     }
   }
 
+  async function addToProject() {
+    if (busyRef.current) return;
+    busyRef.current = true; setBusy(true);
+    try {
+      // Pick an existing project folder, then a subfolder for the tests; the
+      // main process scaffolds a workspace there (scoped to that folder when
+      // it is inside a git repo). The git panel's badge then shows the scope.
+      const result = await electron.addToProject();
+      if (result) await applyWorkspace(result.workspace, result.workspacePath);
+    } finally {
+      busyRef.current = false; setBusy(false);
+    }
+  }
+
   async function openFromGit() {
     const url = gitUrl.trim();
     if (!url || busyRef.current) return;
@@ -139,6 +153,14 @@ export function WelcomeScreen() {
           className="px-4 py-2 bg-surface-800 hover:bg-surface-700 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {t('New Workspace')}
+        </button>
+        <button
+          onClick={addToProject}
+          disabled={busy || gitBusy}
+          title={t('Add API Spector tests into a subfolder of an existing project')}
+          className="px-4 py-2 bg-surface-800 hover:bg-surface-700 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {t('Add to a project folder…')}
         </button>
         {gitOpen ? (
           <div className="flex flex-col gap-2">

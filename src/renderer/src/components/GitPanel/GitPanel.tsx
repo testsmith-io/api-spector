@@ -3,8 +3,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../../store';
-import type { GitStatus, GitCommit, GitBranch, GitRemote, GitStash, GitFile, CiPlatform } from '../../../../shared/types';
+import type { GitStatus, GitRepoInfo, GitCommit, GitBranch, GitRemote, GitStash, GitTag, GitFile, CiPlatform } from '../../../../shared/types';
 import { Toast, useToast } from '../common/Toast';
+import { useConfirm } from '../common/useConfirm';
 import { detectPlatform, generateCiContent, ciFilePath, secretManagerOf, requestSecretManagers, type SecretManagerKind } from '../../lib/ci-templates';
 import { ConflictEditor } from './ConflictEditor';
 import { STORAGE_KEYS } from '../../lib/storage-keys';
@@ -54,7 +55,7 @@ export function DiffViewer({ diff }: { readonly diff: string }) {
 
 // ─── Changes tab ─────────────────────────────────────────────────────────────
 
-function ChangesTab({ status, onRefresh, reloadWorkspace }: { readonly status: GitStatus; readonly onRefresh: () => void; readonly reloadWorkspace: () => Promise<void> }) {
+function ChangesTab({ status, onRefresh, reloadWorkspace, scoped }: { readonly status: GitStatus; readonly onRefresh: () => void; readonly reloadWorkspace: () => Promise<void>; readonly scoped: boolean }) {
   const t = useT();
   const [message,    setMessage]    = useState('');
   const [diffFile,   setDiffFile]   = useState<string | null>(null);
@@ -64,11 +65,17 @@ function ChangesTab({ status, onRefresh, reloadWorkspace }: { readonly status: G
   const [pushing,    setPushing]    = useState(false);
   const [pulling,    setPulling]    = useState(false);
   const [fetching,   setFetching]   = useState(false);
+  const [amend,      setAmend]      = useState(false);
+  const [pushRejected, setPushRejected] = useState(false);
+  // Non-null while the git author identity is missing: shows an inline form so
+  // the commit can proceed without dropping to a terminal.
+  const [identity,   setIdentity]   = useState<{ name: string; email: string } | null>(null);
   const [conflictFile, setConflictFile] = useState<string | null>(null);
   const [pullRebase, setPullRebase] = useState(() => {
     try { return localStorage.getItem(STORAGE_KEYS.gitPullRebase) === '1'; } catch { return false; }
   });
   const { toast, show: showToast }  = useToast();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   function toggleRebase() {
     setPullRebase(v => {
@@ -104,13 +111,72 @@ function ChangesTab({ status, onRefresh, reloadWorkspace }: { readonly status: G
     try { await electron.gitStageAll(); onRefresh(); } catch (e) { setError(String(e)); }
   }
 
+  // Throw away working-tree changes for the given files. Irreversible, so it
+  // always runs behind a confirmation. Tracked files revert to HEAD; untracked
+  // files are deleted. After discarding we reload the workspace from disk so
+  // the rest of the UI does not keep showing the now-reverted in-memory data.
+  function discard(files: GitFile[]) {
+    if (files.length === 0) return;
+    const message = files.length === 1
+      ? t('Discard changes to :file? This cannot be undone.', { file: files[0].path })
+      : t('Discard changes to :count files? This cannot be undone.', { count: files.length });
+    confirm(message, async () => {
+      try {
+        setError(null);
+        await electron.gitDiscard(files);
+        // Clear any diff of a file we just reverted so the pane is not stale.
+        if (diffFile && files.some(f => f.path === diffFile)) {
+          setDiffFile(null);
+          setDiff('');
+          useStore.getState().setActiveGitDiff(null);
+        }
+        await reloadWorkspace();
+        onRefresh();
+      } catch (e) { setError(String(e)); }
+    }, t('Discard'));
+  }
+
   async function commit() {
     if (!message.trim()) return;
     try {
       setError(null);
-      await electron.gitCommit(message.trim());
+      if (amend && !scoped) await electron.gitAmend(message.trim());
+      else await electron.gitCommit(message.trim());
       setMessage('');
+      setAmend(false);
       onRefresh();
+    } catch (e) {
+      const msg = String(e);
+      // git refuses to commit without an author identity — surface an inline
+      // form to set it rather than a cryptic error, then let the user retry.
+      if (/please tell me who you are|user\.name|user\.email|empty ident|auto-detect/i.test(msg)) {
+        const cur = await electron.gitGetIdentity().catch(() => ({ name: '', email: '' }));
+        setIdentity(cur);
+      } else {
+        setError(msg);
+      }
+    }
+  }
+
+  async function toggleAmend() {
+    const next = !amend;
+    setAmend(next);
+    // Prefill the last commit message when turning amend on (if the box is empty).
+    if (next && !message.trim()) {
+      try {
+        const [last] = await electron.gitLog(1);
+        if (last) setMessage(last.message);
+      } catch { /* leave empty */ }
+    }
+  }
+
+  async function saveIdentity() {
+    if (!identity || !identity.name.trim() || !identity.email.trim()) return;
+    try {
+      setError(null);
+      await electron.gitSetIdentity(identity.name.trim(), identity.email.trim());
+      setIdentity(null);
+      await commit(); // retry now that the identity is set
     } catch (e) { setError(String(e)); }
   }
 
@@ -148,18 +214,23 @@ function ChangesTab({ status, onRefresh, reloadWorkspace }: { readonly status: G
     finally { setPulling(false); }
   }
 
-  async function push() {
+  async function push(force = false) {
     setPushing(true);
     try {
-      await electron.gitPush(!status.remote);
-      showToast(t('Push successful'), true);
+      await electron.gitPush(!status.remote, force);
+      setPushRejected(false);
+      showToast(force ? t('Force pushed (with lease)') : t('Push successful'), true);
       onRefresh();
     } catch (e) {
       const msg = String(e);
-      // Remote moved ahead: guide the user to pull first instead of a raw error.
-      showToast(/non-fast-forward|rejected|fetch first/i.test(msg)
-        ? t('Push rejected - the remote has new commits. Pull first, then push.')
-        : msg, false);
+      // Remote moved ahead: offer a pull, or a lease-guarded force push for the
+      // rebase/amend case (where the local history legitimately diverged).
+      if (/non-fast-forward|rejected|fetch first|stale info/i.test(msg)) {
+        setPushRejected(true);
+        showToast(t('Push rejected - the remote has new commits. Pull first, or force push if you rebased.'), false);
+      } else {
+        showToast(msg, false);
+      }
     }
     finally { setPushing(false); }
   }
@@ -238,7 +309,7 @@ function ChangesTab({ status, onRefresh, reloadWorkspace }: { readonly status: G
           ↓{needsPull ? <span className="text-[10px]">{status.behind}</span> : null}
         </button>
         <button
-          onClick={push}
+          onClick={() => push()}
           disabled={pushing}
           title={needsPush ? t('Push (:count unpushed)', { count: status.ahead }) : status.remote ? t('Push') : t('Push & set upstream')}
           className={`flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded transition-colors disabled:opacity-40 ${
@@ -257,7 +328,7 @@ function ChangesTab({ status, onRefresh, reloadWorkspace }: { readonly status: G
           <div className="mx-3 mt-2 px-2 py-1.5 rounded text-[11px] bg-blue-900/20 text-blue-300 border border-blue-800/40 flex items-center justify-between flex-shrink-0">
             <span>{t(':count commit to push|:count commits to push', { count: status.ahead })}</span>
             <button
-              onClick={push}
+              onClick={() => push()}
               disabled={pushing}
               className="text-blue-400 hover:text-blue-200 font-medium disabled:opacity-40"
             >{t('Push')} ↑</button>
@@ -267,6 +338,18 @@ function ChangesTab({ status, onRefresh, reloadWorkspace }: { readonly status: G
             ✓ {t('Nothing to push')}
           </div>
         )
+      )}
+
+      {pushRejected && (
+        <div className="mx-3 mt-2 px-2 py-1.5 rounded text-[11px] bg-amber-900/20 text-amber-200 border border-amber-800/40 flex items-center justify-between gap-2 flex-shrink-0">
+          <span>{t('Remote diverged.')}</span>
+          <button
+            onClick={() => push(true)}
+            disabled={pushing}
+            title={t('Overwrite the remote branch with yours, but only if no new commits arrived since (--force-with-lease)')}
+            className="text-amber-300 hover:text-amber-100 font-medium disabled:opacity-40 flex-shrink-0"
+          >{t('Force push (lease)')}</button>
+        </div>
       )}
 
       {status.rebasing && (
@@ -295,6 +378,7 @@ function ChangesTab({ status, onRefresh, reloadWorkspace }: { readonly status: G
       )}
 
       <Toast toast={toast} />
+      {confirmDialog}
 
       {conflictFile && (
         <ConflictEditor
@@ -344,10 +428,16 @@ function ChangesTab({ status, onRefresh, reloadWorkspace }: { readonly status: G
               <span className="text-[10px] uppercase tracking-widest text-surface-500 font-semibold">
                 {t('Changes (:count)', { count: allUnstaged.length })}
               </span>
-              <button
-                onClick={stageAll}
-                className="text-[10px] text-surface-500 hover:text-white transition-colors"
-              >{t('Stage all')}</button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => discard(allUnstaged)}
+                  className="text-[10px] text-surface-500 hover:text-red-400 transition-colors"
+                >{t('Discard all')}</button>
+                <button
+                  onClick={stageAll}
+                  className="text-[10px] text-surface-500 hover:text-white transition-colors"
+                >{t('Stage all')}</button>
+              </div>
             </div>
             {allUnstaged.map(f => (
               <div
@@ -359,6 +449,11 @@ function ChangesTab({ status, onRefresh, reloadWorkspace }: { readonly status: G
               >
                 <StatusBadge status={f.status} />
                 <span className="flex-1 truncate text-surface-200">{f.path}</span>
+                <button
+                  onClick={e => { e.stopPropagation(); discard([f]); }}
+                  className="opacity-0 group-hover:opacity-100 text-surface-500 hover:text-red-400 transition-all text-xs leading-none"
+                  title={f.status === 'untracked' ? t('Discard (delete file)') : t('Discard changes')}
+                >↩</button>
                 <button
                   onClick={e => { e.stopPropagation(); stage([f.path]); }}
                   className="opacity-0 group-hover:opacity-100 text-surface-500 hover:text-emerald-400 transition-all text-[10px]"
@@ -435,6 +530,33 @@ function ChangesTab({ status, onRefresh, reloadWorkspace }: { readonly status: G
       {/* Commit */}
       <div className="border-t border-surface-800 p-3 flex-shrink-0 flex flex-col gap-2">
         {error && <p className="text-[11px] text-red-400 truncate" title={error}>{error}</p>}
+        {identity && (
+          <div className="flex flex-col gap-1.5 p-2 rounded bg-surface-800/60 border border-surface-700">
+            <p className="text-[11px] text-surface-300">{t('Set your git identity to commit:')}</p>
+            <input
+              type="text"
+              value={identity.name}
+              onChange={e => setIdentity({ ...identity, name: e.target.value })}
+              placeholder={t('Your name')}
+              className="w-full bg-surface-900 border border-surface-600 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
+            />
+            <input
+              type="email"
+              value={identity.email}
+              onChange={e => setIdentity({ ...identity, email: e.target.value })}
+              placeholder={t('you@example.com')}
+              className="w-full bg-surface-900 border border-surface-600 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
+            />
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setIdentity(null)} className="text-[11px] text-surface-400 hover:text-white px-2 py-1">{t('Cancel')}</button>
+              <button
+                onClick={saveIdentity}
+                disabled={!identity.name.trim() || !identity.email.trim()}
+                className="text-[11px] bg-blue-600 hover:bg-blue-500 disabled:opacity-40 rounded px-2 py-1"
+              >{t('Save & commit')}</button>
+            </div>
+          </div>
+        )}
         <textarea
           value={message}
           onChange={e => setMessage(e.target.value)}
@@ -443,13 +565,19 @@ function ChangesTab({ status, onRefresh, reloadWorkspace }: { readonly status: G
           rows={2}
           className="w-full bg-surface-800 border border-surface-700 rounded px-2 py-1.5 text-xs resize-none focus:outline-none focus:border-blue-500 placeholder-surface-600"
         />
+        {!scoped && (
+          <label className="flex items-center gap-1.5 text-[11px] text-surface-400 select-none cursor-pointer">
+            <input type="checkbox" checked={amend} onChange={toggleAmend} className="accent-blue-500" />
+            {t('Amend last commit')}
+          </label>
+        )}
         <div className="flex gap-2">
           <button
             onClick={commit}
-            disabled={!message.trim() || !hasStaged}
+            disabled={!message.trim() || (!hasStaged && !amend)}
             className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
           >
-            {hasStaged ? t('Commit (:count)', { count: status.staged.length }) : t('Commit')}
+            {amend ? t('Amend') : hasStaged ? t('Commit (:count)', { count: status.staged.length }) : t('Commit')}
           </button>
           <button
             onClick={stash}
@@ -467,35 +595,87 @@ function ChangesTab({ status, onRefresh, reloadWorkspace }: { readonly status: G
 
 // ─── Log tab ──────────────────────────────────────────────────────────────────
 
-function LogTab() {
+function LogTab({ onRefresh, scoped }: { readonly onRefresh: () => void; readonly scoped: boolean }) {
   const t = useT();
   const [commits, setCommits] = useState<GitCommit[]>([]);
   const [loading, setLoading] = useState(true);
+  const [openHash, setOpenHash] = useState<string | null>(null);
+  const [diff, setDiff] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
     electron.gitLog(100)
       .then(setCommits)
       .catch(() => setCommits([]))
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => { load(); }, [load]);
+
+  async function toggleCommit(c: GitCommit) {
+    if (openHash === c.hash) { setOpenHash(null); setDiff(''); return; }
+    setOpenHash(c.hash);
+    setDiff('');
+    try { setDiff(await electron.gitShow(c.hash)); } catch (e) { setDiff(String(e)); }
+  }
+
+  function undoLast() {
+    // reset --soft HEAD~1 keeps the changes staged, so it is recoverable; still
+    // confirm since it rewrites the branch tip. Repo-wide, so scoped mode hides it.
+    confirm(t('Undo the last commit? Its changes stay staged.'), async () => {
+      try {
+        setError(null);
+        await electron.gitUncommit();
+        load();
+        onRefresh();
+      } catch (e) { setError(String(e)); }
+    }, t('Undo commit'));
+  }
+
   if (loading) return <p className="text-xs text-surface-500 px-3 py-4">{t('Loading…')}</p>;
   if (commits.length === 0) return <p className="text-xs text-surface-500 px-3 py-4">{t('No commits yet.')}</p>;
 
   return (
     <div className="flex-1 overflow-y-auto">
+      {error && <p className="text-[11px] text-red-400 px-3 py-1">{error}</p>}
+      {!scoped && (
+        <div className="px-3 py-1.5 flex justify-end border-b border-surface-800/50">
+          <button
+            onClick={undoLast}
+            className="text-[10px] text-surface-500 hover:text-amber-400 transition-colors"
+            title={t('Soft-reset HEAD~1 (keeps changes staged)')}
+          >{t('Undo last commit')}</button>
+        </div>
+      )}
       {commits.map(c => (
-        <div key={c.hash} className="px-3 py-2 border-b border-surface-800/50 hover:bg-surface-800/30">
-          <div className="flex items-start gap-2">
-            <span className="text-[10px] font-mono text-surface-600 shrink-0 mt-0.5">{c.short}</span>
-            <span className="text-xs text-surface-200 flex-1 line-clamp-2">{c.message}</span>
+        <div key={c.hash} className="border-b border-surface-800/50">
+          <div
+            className="px-3 py-2 hover:bg-surface-800/30 cursor-pointer"
+            role="button"
+            tabIndex={0}
+            aria-expanded={openHash === c.hash}
+            onClick={() => toggleCommit(c)}
+            onKeyDown={onActivateKey(() => toggleCommit(c))}
+          >
+            <div className="flex items-start gap-2">
+              <span className="text-[10px] font-mono text-surface-600 shrink-0 mt-0.5">{c.short}</span>
+              <span className="text-xs text-surface-200 flex-1 line-clamp-2">{c.message}</span>
+            </div>
+            <div className="mt-0.5 pl-9 flex gap-2 text-[10px] text-surface-600">
+              <span>{c.author}</span>
+              <span>{new Date(c.date).toLocaleDateString()}</span>
+            </div>
           </div>
-          <div className="mt-0.5 pl-9 flex gap-2 text-[10px] text-surface-600">
-            <span>{c.author}</span>
-            <span>{new Date(c.date).toLocaleDateString()}</span>
-          </div>
+          {openHash === c.hash && (
+            <div className="max-h-80 overflow-auto border-t border-surface-800/50 bg-surface-900/40">
+              {diff ? <DiffViewer diff={diff} /> : <p className="text-[11px] text-surface-500 px-3 py-2">{t('Loading…')}</p>}
+            </div>
+          )}
         </div>
       ))}
+      {dialog}
     </div>
   );
 }
@@ -507,23 +687,31 @@ function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () =>
   const [branches,     setBranches]     = useState<GitBranch[]>([]);
   const [remotes,      setRemotes]      = useState<GitRemote[]>([]);
   const [stashes,      setStashes]      = useState<GitStash[]>([]);
+  const [tags,         setTags]         = useState<GitTag[]>([]);
   const [info,         setInfo]         = useState<string | null>(null);
   const [loading,      setLoading]      = useState(true);
   const [newBranch,    setNewBranch]    = useState('');
   const [creating,     setCreating]     = useState(false);
+  const [renaming,     setRenaming]     = useState(false);
+  const [renameValue,  setRenameValue]  = useState('');
   const [addingRemote, setAddingRemote] = useState(false);
   const [editingRemote, setEditingRemote] = useState<string | null>(null); // remote name being edited
   const [remoteName,   setRemoteName]   = useState('origin');
   const [remoteUrl,    setRemoteUrl]    = useState('');
   const [editUrl,      setEditUrl]      = useState('');
+  const [addingTag,    setAddingTag]    = useState(false);
+  const [tagName,      setTagName]      = useState('');
+  const [tagMessage,   setTagMessage]   = useState('');
+  const [openStash,    setOpenStash]    = useState<string | null>(null);
+  const [stashDiff,    setStashDiff]    = useState('');
   const [error,        setError]        = useState<string | null>(null);
   const [loadError,    setLoadError]    = useState<string | null>(null);
   const [filter,       setFilter]       = useState('');
 
   const load = useCallback(() => {
     setLoadError(null);
-    Promise.all([electron.gitBranches(), electron.gitRemotes(), electron.gitStashList()])
-      .then(([b, r, s]) => { setBranches(b); setRemotes(r); setStashes(s); })
+    Promise.all([electron.gitBranches(), electron.gitRemotes(), electron.gitStashList(), electron.gitTagList()])
+      .then(([b, r, s, tg]) => { setBranches(b); setRemotes(r); setStashes(s); setTags(tg); })
       .catch(err => {
         console.warn('GitPanel: failed to load branches/remotes', err);
         setLoadError(err instanceof Error ? err.message : String(err));
@@ -665,6 +853,90 @@ function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () =>
     } catch (e) { setError(String(e)); }
   }
 
+  async function renameCurrent() {
+    const name = renameValue.trim();
+    if (!name) return;
+    try {
+      setError(null); setInfo(null);
+      await electron.gitRenameBranch(name);
+      setRenaming(false); setRenameValue('');
+      load(); onRefresh();
+    } catch (e) { setError(String(e)); }
+  }
+
+  // Merge another branch into the current one. Repo-wide (the whole working tree
+  // changes), so reload the workspace afterwards; a conflict routes to Changes.
+  async function mergeBranch(name: string) {
+    if (!confirm(t('Merge ":name" into the current branch?', { name }))) return;
+    try {
+      setError(null); setInfo(null);
+      const r = await electron.gitMerge(name);
+      await reloadWorkspace();
+      setInfo(r.conflict
+        ? t('Merge stopped on conflicts. Open the Changes tab to resolve them.')
+        : t('Merged :name.', { name }));
+      load(); onRefresh();
+    } catch (e) { setError(String(e)); }
+  }
+
+  async function deleteRemoteBranch(fullName: string) {
+    // fullName is like "origin/feature-x"; split into remote + branch.
+    const slash = fullName.indexOf('/');
+    if (slash < 0) return;
+    const remoteName = fullName.slice(0, slash);
+    const branchName = fullName.slice(slash + 1);
+    if (!confirm(t('Delete ":branch" on remote ":remote"? This cannot be undone.', { branch: branchName, remote: remoteName }))) return;
+    try {
+      setError(null);
+      await electron.gitDeleteRemoteBranch(remoteName, branchName);
+      load(); onRefresh();
+    } catch (e) { setError(String(e)); }
+  }
+
+  async function applyStash(ref: string) {
+    try {
+      setError(null); setInfo(null);
+      await electron.gitStashApply(ref);
+      // Applying writes the parked changes back without removing the stash.
+      await reloadWorkspace(); load(); onRefresh();
+    } catch (e) { setError(String(e)); }
+  }
+
+  async function toggleStashDiff(ref: string) {
+    if (openStash === ref) { setOpenStash(null); setStashDiff(''); return; }
+    setOpenStash(ref);
+    setStashDiff('');
+    try { setStashDiff(await electron.gitStashShow(ref)); } catch (e) { setStashDiff(String(e)); }
+  }
+
+  async function createTag() {
+    const name = tagName.trim();
+    if (!name) return;
+    try {
+      setError(null);
+      await electron.gitCreateTag(name, tagMessage.trim() || undefined);
+      setTagName(''); setTagMessage(''); setAddingTag(false);
+      load();
+    } catch (e) { setError(String(e)); }
+  }
+
+  async function deleteTag(name: string) {
+    if (!confirm(t('Delete tag ":name"?', { name }))) return;
+    try {
+      setError(null);
+      await electron.gitDeleteTag(name);
+      load();
+    } catch (e) { setError(String(e)); }
+  }
+
+  async function pushTags() {
+    try {
+      setError(null); setInfo(null);
+      await electron.gitPushTags();
+      setInfo(t('Tags pushed to remote.'));
+    } catch (e) { setError(String(e)); }
+  }
+
   const q = filter.trim().toLowerCase();
   const local  = branches.filter(b => !b.remote && (!q || b.name.toLowerCase().includes(q)));
   const remote = branches.filter(b => b.remote  && (!q || b.name.toLowerCase().includes(q)));
@@ -715,6 +987,20 @@ function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () =>
       {local.length > 0 && (
         <section>
           <p className="px-3 py-1.5 text-[10px] uppercase tracking-widest text-surface-500 font-semibold">{t('Local')}</p>
+          {renaming && (
+            <div className="flex gap-1.5 px-3 py-1.5 bg-blue-900/20">
+              <input
+                autoFocus
+                value={renameValue}
+                onChange={e => setRenameValue(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') renameCurrent(); if (e.key === 'Escape') setRenaming(false); }}
+                placeholder={t('new branch name')}
+                className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-blue-500"
+              />
+              <button onClick={renameCurrent} className="text-xs text-blue-400 hover:text-blue-300 px-1">{t('Rename')}</button>
+              <button onClick={() => setRenaming(false)} className="text-xs text-surface-500 hover:text-white px-1">✕</button>
+            </div>
+          )}
           {local.map(b => (
             <div
               key={b.name}
@@ -733,6 +1019,15 @@ function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () =>
               >
                 {b.name}
               </button>
+              {b.current && (
+                <button
+                  onClick={() => { setRenaming(true); setRenameValue(b.name); }}
+                  className="opacity-0 group-hover:opacity-100 text-surface-500 hover:text-blue-300 transition-all text-[10px] leading-none"
+                  title={t('Rename this branch')}
+                >
+                  {t('rename')}
+                </button>
+              )}
               {/* Sync indicators — colored chips for ahead/behind so the user
                   sees at a glance which branches need pushing/pulling. */}
               {b.behind ? (
@@ -745,6 +1040,15 @@ function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () =>
                   ↑{b.ahead}
                 </span>
               ) : null}
+              {!b.current && (
+                <button
+                  onClick={() => mergeBranch(b.name)}
+                  className="opacity-0 group-hover:opacity-100 text-surface-500 hover:text-emerald-300 transition-all text-[10px] leading-none"
+                  title={t('Merge :name into the current branch', { name: b.name })}
+                >
+                  {t('merge')}
+                </button>
+              )}
               {!b.current && (
                 <button
                   onClick={() => rebaseOnto(b.name)}
@@ -773,15 +1077,33 @@ function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () =>
         <section>
           <p className="px-3 py-1.5 text-[10px] uppercase tracking-widest text-surface-500 font-semibold">{t('Remote')}</p>
           {remote.map(b => (
-            <button
+            <div
               key={b.name}
-              onClick={() => checkout(b.name, false)}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-surface-400 hover:bg-surface-800/50 hover:text-surface-200 transition-colors"
-              title={t('Click to check out - creates a local tracking branch if needed')}
+              className="group w-full flex items-center gap-2 px-3 py-1.5 text-xs text-surface-400 hover:bg-surface-800/50 transition-colors"
             >
               <span className="w-3" />
-              <span className="font-mono truncate">{b.name}</span>
-            </button>
+              <button
+                onClick={() => checkout(b.name, false)}
+                className="flex-1 text-left font-mono truncate hover:text-surface-200"
+                title={t('Click to check out - creates a local tracking branch if needed')}
+              >
+                {b.name}
+              </button>
+              <button
+                onClick={() => mergeBranch(b.name)}
+                className="opacity-0 group-hover:opacity-100 text-surface-500 hover:text-emerald-300 transition-all text-[10px] leading-none"
+                title={t('Merge :name into the current branch', { name: b.name })}
+              >
+                {t('merge')}
+              </button>
+              <button
+                onClick={() => deleteRemoteBranch(b.name)}
+                className="opacity-0 group-hover:opacity-100 text-surface-500 hover:text-red-400 transition-all text-xs leading-none"
+                title={t('Delete :name on the remote', { name: b.name })}
+              >
+                ✕
+              </button>
+            </div>
           ))}
         </section>
       )}
@@ -798,30 +1120,110 @@ function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () =>
         <section className="border-t border-surface-800 mt-1">
           <p className="px-3 py-1.5 text-[10px] uppercase tracking-widest text-surface-500 font-semibold">{t('Stashes')}</p>
           {stashes.map(s => (
-            <div key={s.ref} className="group flex items-center gap-2 px-3 py-1.5 text-xs text-surface-300 hover:bg-surface-800/50">
-              <span className="font-mono text-[10px] text-surface-500 shrink-0">{s.ref}</span>
-              <span className="truncate flex-1" title={s.branch ? t('on :branch: :message', { branch: s.branch, message: s.message }) : s.message}>
-                {s.message}
-                {s.branch && <span className="text-surface-600"> {t('(on :branch)', { branch: s.branch })}</span>}
-              </span>
-              <button
-                onClick={() => popStash(s.ref)}
-                className="opacity-0 group-hover:opacity-100 text-[10px] text-blue-400 hover:text-blue-300 transition-all shrink-0"
-                title={t('Restore these changes onto the current branch')}
-              >
-                {t('Pop')}
-              </button>
-              <button
-                onClick={() => dropStash(s.ref)}
-                className="opacity-0 group-hover:opacity-100 text-[10px] text-surface-500 hover:text-red-400 transition-all shrink-0"
-                title={t('Discard this stash')}
-              >
-                ✕
-              </button>
+            <div key={s.ref}>
+              <div className="group flex items-center gap-2 px-3 py-1.5 text-xs text-surface-300 hover:bg-surface-800/50">
+                <span className="font-mono text-[10px] text-surface-500 shrink-0">{s.ref}</span>
+                <span className="truncate flex-1" title={s.branch ? t('on :branch: :message', { branch: s.branch, message: s.message }) : s.message}>
+                  {s.message}
+                  {s.branch && <span className="text-surface-600"> {t('(on :branch)', { branch: s.branch })}</span>}
+                </span>
+                <button
+                  onClick={() => toggleStashDiff(s.ref)}
+                  className="opacity-0 group-hover:opacity-100 text-[10px] text-surface-500 hover:text-surface-200 transition-all shrink-0"
+                  title={t('Show what this stash changed')}
+                >
+                  {t('Diff')}
+                </button>
+                <button
+                  onClick={() => applyStash(s.ref)}
+                  className="opacity-0 group-hover:opacity-100 text-[10px] text-surface-500 hover:text-surface-200 transition-all shrink-0"
+                  title={t('Restore these changes and keep the stash')}
+                >
+                  {t('Apply')}
+                </button>
+                <button
+                  onClick={() => popStash(s.ref)}
+                  className="opacity-0 group-hover:opacity-100 text-[10px] text-blue-400 hover:text-blue-300 transition-all shrink-0"
+                  title={t('Restore these changes onto the current branch and drop the stash')}
+                >
+                  {t('Pop')}
+                </button>
+                <button
+                  onClick={() => dropStash(s.ref)}
+                  className="opacity-0 group-hover:opacity-100 text-[10px] text-surface-500 hover:text-red-400 transition-all shrink-0"
+                  title={t('Discard this stash')}
+                >
+                  ✕
+                </button>
+              </div>
+              {openStash === s.ref && (
+                <div className="max-h-72 overflow-auto border-y border-surface-800/50 bg-surface-900/40">
+                  {stashDiff ? <DiffViewer diff={stashDiff} /> : <p className="text-[11px] text-surface-500 px-3 py-2">{t('Loading…')}</p>}
+                </div>
+              )}
             </div>
           ))}
         </section>
       )}
+
+      {/* Tags */}
+      <section className="border-t border-surface-800 mt-1">
+        <div className="px-3 py-1.5 flex items-center justify-between">
+          <p className="text-[10px] uppercase tracking-widest text-surface-500 font-semibold">{t('Tags')}</p>
+          <div className="flex items-center gap-3">
+            {tags.length > 0 && (
+              <button onClick={pushTags} className="text-[10px] text-surface-500 hover:text-blue-300 transition-colors" title={t('Push all tags to the remote')}>
+                {t('Push tags')}
+              </button>
+            )}
+            {!addingTag && (
+              <button onClick={() => setAddingTag(true)} className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors">
+                {t('+ Add')}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {addingTag && (
+          <div className="px-3 pb-2 flex flex-col gap-1.5">
+            <input
+              autoFocus
+              value={tagName}
+              onChange={e => setTagName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') createTag(); if (e.key === 'Escape') setAddingTag(false); }}
+              placeholder={t('tag name (e.g. v1.2.0)')}
+              className="w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-blue-500 placeholder-surface-600"
+            />
+            <input
+              value={tagMessage}
+              onChange={e => setTagMessage(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') createTag(); if (e.key === 'Escape') setAddingTag(false); }}
+              placeholder={t('message (optional - creates an annotated tag)')}
+              className="w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500 placeholder-surface-600"
+            />
+            <div className="flex gap-2">
+              <button onClick={createTag} disabled={!tagName.trim()} className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-40 transition-colors">{t('Create tag')}</button>
+              <button onClick={() => setAddingTag(false)} className="text-xs text-surface-500 hover:text-white transition-colors">{t('Cancel')}</button>
+            </div>
+          </div>
+        )}
+
+        {tags.map(tag => (
+          <div key={tag.name} className="group flex items-center gap-2 px-3 py-1 text-xs text-surface-300 hover:bg-surface-800/50">
+            <span className="font-mono text-blue-300 shrink-0">{tag.name}</span>
+            <span className="truncate flex-1 text-surface-600" title={tag.subject}>{tag.subject}</span>
+            <button
+              onClick={() => deleteTag(tag.name)}
+              className="opacity-0 group-hover:opacity-100 text-[10px] text-surface-500 hover:text-red-400 transition-all shrink-0"
+              title={t('Delete tag :name', { name: tag.name })}
+            >✕</button>
+          </div>
+        ))}
+
+        {tags.length === 0 && !addingTag && (
+          <p className="px-3 pb-2 text-[11px] text-surface-600">{t('No tags yet.')}</p>
+        )}
+      </section>
 
       {/* Remotes */}
       <section className="border-t border-surface-800 mt-1">
@@ -1107,18 +1509,24 @@ function CiTab() {
 export function GitPanel() {
   const t = useT();
   const { reloadWorkspace } = useWorkspaceLoader();
-  const [isRepo,  setIsRepo]  = useState<boolean | null>(null);
+  const [info,    setInfo]    = useState<GitRepoInfo | null>(null);
   const [status,  setStatus]  = useState<GitStatus | null>(null);
   const [tab,     setTab]     = useState<Tab>('changes');
   const [loading, setLoading] = useState(true);
+  const [busy,    setBusy]    = useState(false);
 
   const refresh = useCallback(async () => {
     try {
-      const repo = await electron.gitIsRepo();
-      setIsRepo(repo);
-      if (repo) setStatus(await electron.gitStatus());
+      const repoInfo = await electron.gitRepoInfo();
+      setInfo(repoInfo);
+      // Only run a working-tree command once there is a repo we operate on;
+      // in 'enclosing-available'/'none' we show an offer instead (and never
+      // risk a status walk over an ancestor's whole tree).
+      setStatus(repoInfo.state === 'own' || repoInfo.state === 'scoped'
+        ? await electron.gitStatus()
+        : null);
     } catch {
-      setIsRepo(false);
+      setInfo({ state: 'none' });
     } finally {
       setLoading(false);
     }
@@ -1126,11 +1534,31 @@ export function GitPanel() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  // Opt the workspace into scoped mode (version only this subtree of the
+  // enclosing repo). Persisted in the manifest so it survives reloads.
+  async function enableScoped() {
+    setBusy(true);
+    try {
+      const ws = useStore.getState().workspace;
+      if (ws) {
+        useStore.getState().updateWorkspaceSettings({
+          ...ws.settings,
+          git: { ...ws.settings?.git, useEnclosingRepo: true },
+        });
+        const updated = useStore.getState().workspace;
+        if (updated) await electron.saveWorkspace(updated);
+      }
+      await refresh();
+    } finally { setBusy(false); }
+  }
+
   if (loading) {
     return <div className="flex-1 flex items-center justify-center text-xs text-surface-500">{t('Loading…')}</div>;
   }
 
-  if (!isRepo) {
+  const state = info?.state ?? 'none';
+
+  if (state === 'none') {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4 text-center">
         <p className="text-xs text-surface-400">{t('Not a git repository.')}</p>
@@ -1142,12 +1570,46 @@ export function GitPanel() {
     );
   }
 
+  if (state === 'enclosing-available') {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4 text-center">
+        <p className="text-xs text-surface-300">
+          {t('This workspace is inside the :repo repository (folder :scope/).', { repo: info?.repoName ?? '', scope: info?.scope ?? '' })}
+        </p>
+        <p className="text-[11px] text-surface-500">
+          {t('Version just this folder as part of that repository, or set up a separate repo here.')}
+        </p>
+        <div className="flex flex-col gap-2 w-full max-w-[240px]">
+          <button
+            onClick={enableScoped}
+            disabled={busy}
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-xs text-white transition-colors disabled:opacity-50"
+          >{t('Use :repo (scoped)', { repo: info?.repoName ?? '' })}</button>
+          <button
+            onClick={async () => { await electron.gitInit(); refresh(); }}
+            disabled={busy}
+            className="px-3 py-1.5 bg-surface-800 hover:bg-surface-700 rounded text-xs transition-colors disabled:opacity-50"
+          >{t('Initialize a separate repo here')}</button>
+        </div>
+      </div>
+    );
+  }
+
   const totalChanges = status
     ? status.staged.length + status.unstaged.length + status.untracked.length
     : 0;
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
+      {state === 'scoped' && (
+        <div
+          className="px-3 py-1 bg-surface-800/50 border-b border-surface-800 text-[10px] text-surface-400 flex items-center gap-1 flex-shrink-0"
+          title={t('Branch and sync operations affect the whole :repo repository.', { repo: info?.repoName ?? '' })}
+        >
+          <span aria-hidden="true" className="text-blue-300">⬡</span>
+          <span className="truncate">{t('scoped to :scope/ in :repo', { scope: info?.scope ?? '', repo: info?.repoName ?? '' })}</span>
+        </div>
+      )}
       <div className="flex border-b border-surface-800 flex-shrink-0">
         {(['changes', 'log', 'branches', 'ci'] as Tab[]).map(item => (
           <button
@@ -1170,8 +1632,8 @@ export function GitPanel() {
         >↺</button>
       </div>
 
-      {tab === 'changes'  && status && <ChangesTab status={status} onRefresh={refresh} reloadWorkspace={reloadWorkspace} />}
-      {tab === 'log'      && <LogTab />}
+      {tab === 'changes'  && status && <ChangesTab status={status} onRefresh={refresh} reloadWorkspace={reloadWorkspace} scoped={state === 'scoped'} />}
+      {tab === 'log'      && <LogTab onRefresh={refresh} scoped={state === 'scoped'} />}
       {tab === 'branches' && <BranchesTab onRefresh={refresh} reloadWorkspace={reloadWorkspace} />}
       {tab === 'ci'       && <CiTab />}
     </div>

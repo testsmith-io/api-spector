@@ -36,16 +36,31 @@ describe('parseCurl', () => {
     expect(parseCurl(`curl https://x.test -H 'Authorization: Basic ${enc}'`).auth).toEqual({ type: 'basic', username: 'ada', password: 'secret' });
   });
 
-  it('maps -F to a form body and joins repeated -d with &', () => {
+  it('maps -F to a multipart body and joins repeated -d with &', () => {
     expect(parseCurl('curl https://x.test -F name=ada -F role=admin').body).toEqual({
-      mode: 'form',
-      form: [
-        { key: 'name', value: 'ada', enabled: true },
-        { key: 'role', value: 'admin', enabled: true },
+      mode: 'multipart',
+      multipart: [
+        { key: 'name', value: 'ada', enabled: true, type: 'text' },
+        { key: 'role', value: 'admin', enabled: true, type: 'text' },
       ],
     });
     expect(parseCurl(`curl https://x.test -d 'a=1' -d 'b=2'`).body).toEqual({
       mode: 'raw', raw: 'a=1&b=2', rawContentType: 'application/x-www-form-urlencoded',
+    });
+  });
+
+  it('maps -F name=@path to a multipart file part with curl type/filename options', () => {
+    expect(parseCurl('curl https://x.test -F avatar=@/tmp/a.png;type=image/png').body).toEqual({
+      mode: 'multipart',
+      multipart: [
+        { key: 'avatar', enabled: true, type: 'file', filePath: '/tmp/a.png', contentType: 'image/png' },
+      ],
+    });
+    expect(parseCurl('curl https://x.test -F doc=@/tmp/r.bin;filename=report.bin').body).toEqual({
+      mode: 'multipart',
+      multipart: [
+        { key: 'doc', enabled: true, type: 'file', filePath: '/tmp/r.bin', fileName: 'report.bin' },
+      ],
     });
   });
 

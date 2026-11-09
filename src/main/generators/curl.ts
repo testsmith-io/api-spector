@@ -123,7 +123,10 @@ export function generateCurl(collection: Collection, environment: Environment | 
     const ah = authHeader(req.auth);
     if (ah) headers.unshift(ah);
 
-    const body = bodyOf(req);
+    // multipart/form-data: emit -F flags; curl sets the Content-Type (with its
+    // own boundary), so we never inject one.
+    const isMultipart = req.body.mode === 'multipart' && !['get', 'head'].includes(req.method.toLowerCase());
+    const body = isMultipart ? { contentType: undefined, text: undefined } : bodyOf(req);
     const hasCT = headers.some(h => h.key.toLowerCase() === 'content-type');
     if (body.text && body.contentType && !hasCT) {
       headers.push({ key: 'Content-Type', value: body.contentType, enabled: true });
@@ -131,7 +134,18 @@ export function generateCurl(collection: Collection, environment: Environment | 
 
     for (const h of headers) args.push(`-H ${dq(`${h.key}: ${mapOut(h.value)}`)}`);
 
-    if (body.text) args.push(`--data ${dq(mapOut(body.text))}`);
+    if (isMultipart) {
+      for (const p of (req.body.multipart ?? []).filter(f => f.enabled && f.key)) {
+        if (p.type === 'file') {
+          const typeSuffix = p.contentType ? `;type=${p.contentType}` : '';
+          args.push(`-F ${dq(`${p.key}=@${mapOut(p.filePath ?? '')}${typeSuffix}`)}`);
+        } else {
+          args.push(`-F ${dq(`${p.key}=${mapOut(p.value ?? '')}`)}`);
+        }
+      }
+    } else if (body.text) {
+      args.push(`--data ${dq(mapOut(body.text))}`);
+    }
 
     lines.push(args.join(' \\\n  '));
   });

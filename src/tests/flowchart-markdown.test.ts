@@ -96,4 +96,42 @@ describe('layoutFlowchart', () => {
       expect(Number.isFinite(n.y)).toBe(true);
     }
   });
+
+  // Count edge crossings between nodes that sit on the same pair of layers —
+  // the visible "lines crossing each other" the barycenter ordering fixes.
+  function layerCrossings(g: ReturnType<typeof flowchartFromMarkdown>): number {
+    const pos = new Map(g.nodes.map(n => [n.id, n]));
+    const es = g.edges.filter(e => pos.has(e.from) && pos.has(e.to) && e.from !== e.to);
+    let c = 0;
+    for (let i = 0; i < es.length; i++) {
+      for (let j = i + 1; j < es.length; j++) {
+        const a = es[i], b = es[j];
+        const [af, at] = [pos.get(a.from)!, pos.get(a.to)!];
+        const [bf, bt] = [pos.get(b.from)!, pos.get(b.to)!];
+        if (af.y === bf.y && at.y === bt.y && (af.x - bf.x) * (at.x - bt.x) < 0) c++;
+      }
+    }
+    return c;
+  }
+
+  it('orders siblings to avoid crossings when children are declared out of parent order', () => {
+    // Without crossing reduction, L1/L2/L3 keep declaration order and the edges
+    // B->L1, C->L2, A->L3 cross; the barycenter sweep aligns each child under
+    // its parent instead.
+    const g = flowchartFromMarkdown(
+      'flowchart TD\nRoot --> A\nRoot --> B\nRoot --> C\nB --> L1\nC --> L2\nA --> L3',
+    );
+    expect(layerCrossings(g)).toBe(0);
+    // L3 (child of A) ends up left of L1 (child of B), which is left of L2 (child of C).
+    const x = (id: string) => g.nodes.find(n => n.id === id)!.x;
+    expect(x('L3')).toBeLessThan(x('L1'));
+    expect(x('L1')).toBeLessThan(x('L2'));
+  });
+
+  it('keeps a simple branch-and-merge crossing-free', () => {
+    const g = flowchartFromMarkdown(
+      'flowchart TD\nA --> B\nA --> C\nB --> D\nC --> D',
+    );
+    expect(layerCrossings(g)).toBe(0);
+  });
 });
