@@ -371,6 +371,11 @@ export interface VaultSettings {
   address?: string
   /** Vault Enterprise namespace (env: VAULT_NAMESPACE). */
   namespace?: string
+  /** Path prefix prepended to every `vault:`/`bao:` reference path, so refs can
+   *  be short. Include the KV v2 `data/` segment here if the engine is v2, e.g.
+   *  `stack/1000120-test-automation/data/` lets a ref read `applications/api`.
+   *  (env: VAULT_PATH_PREFIX / BAO_PATH_PREFIX). */
+  pathPrefix?: string
   /** How API Spector authenticates to Vault. Defaults are inferred from which
    *  credentials are present (token → approle → jwt). */
   authMethod?: 'token' | 'approle' | 'jwt'

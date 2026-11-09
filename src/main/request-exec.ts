@@ -595,7 +595,7 @@ export async function performHttpExchange(opts: ExchangeOptions): Promise<Exchan
   // For the runner path these are already in `vars`; resolving again here (cache
   // hit) also covers the single-send path, which does not run executeRunnerRequest.
   let vars = opts.vars;
-  const inlineSecrets = await resolveInlineSecrets(req);
+  const inlineSecrets = await resolveInlineSecrets(req, vars);
   if (Object.keys(inlineSecrets).length) vars = { ...vars, ...inlineSecrets };
 
   const start = Date.now();
@@ -809,7 +809,10 @@ export interface RunnerExecResult {
 // scope keyed by their full reference (e.g. vars['vault:kv/data/app#k'] = 'v'),
 // so the normal {{...}} substitution then picks them up. Throws with a clear
 // message if a referenced secret cannot be resolved.
-export async function resolveInlineSecrets(req: ApiRequest): Promise<Record<string, string>> {
+export async function resolveInlineSecrets(
+  req: ApiRequest,
+  vars?: Record<string, string>,
+): Promise<Record<string, string>> {
   const haystack = [
     req.url ?? '',
     JSON.stringify(req.params ?? []),
@@ -820,7 +823,7 @@ export async function resolveInlineSecrets(req: ApiRequest): Promise<Record<stri
     req.postRequestScript ?? '',
   ].join('\n');
 
-  return resolveInlineSecretRefs(haystack);
+  return resolveInlineSecretRefs(haystack, vars);
 }
 
 export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<RunnerExecResult> {
@@ -952,7 +955,7 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
   // synchronous interpolate() can substitute them.
   let inlineSecrets: Record<string, string> = {};
   try {
-    inlineSecrets = await resolveInlineSecrets(req);
+    inlineSecrets = await resolveInlineSecrets(req, vars);
   } catch (err) {
     return {
       result: {

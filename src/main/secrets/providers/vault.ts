@@ -6,7 +6,16 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { Dispatcher } from 'undici';
 import { getSecretsConfig } from '../config';
-import type { SecretProvider } from '../types';
+import type { SecretProvider, SecretResolveContext } from '../types';
+
+// Substitute `{{name}}` tokens from the active variable scope. A small, local
+// replacer (not the engine's interpolate()) so the provider stays lean and free
+// of import cycles; unknown tokens are left untouched so the failure is visible.
+function applyVars(str: string, vars: Record<string, string> | undefined): string {
+  if (!vars || !str.includes('{{')) return str;
+  return str.replace(/\{\{\s*([\w.$-]+)\s*\}\}/g, (m, name: string) =>
+    (name in vars ? vars[name] : m));
+}
 
 // HashiCorp Vault / OpenBao provider. References look like `vault:<path>#<key>`
 // (or `bao:<path>#<key>` for OpenBao), where <path> is the exact API path
@@ -14,6 +23,12 @@ import type { SecretProvider } from '../types';
 // within that secret. OpenBao is API-compatible with Vault (same /v1 paths and
 // X-Vault-Token header), so the two schemes share this implementation and differ
 // only in which environment variables they read first (BAO_* vs VAULT_*).
+//
+// A configured path prefix (settings.secrets.vault.pathPrefix or
+// VAULT_PATH_PREFIX / BAO_PATH_PREFIX) is prepended to every reference path, so
+// `vault:applications/api#email` under prefix `stack/1000120-test-automation/data/`
+// reads `stack/1000120-test-automation/data/applications/api`. A reference whose
+// path starts with `/` is absolute and ignores the prefix.
 //
 // Authentication follows the ambient context (same across UI / CLI / CI, only
 // the source differs):
@@ -27,6 +42,7 @@ import type { SecretProvider } from '../types';
 interface VaultConn {
   address: string
   namespace?: string
+  pathPrefix?: string
   authMethod: 'token' | 'approle' | 'jwt'
   token?: string
   roleId?: string
@@ -81,6 +97,7 @@ function resolveConn(): VaultConn {
   return {
     address: address.replace(/\/+$/, ''),
     namespace: env('VAULT_NAMESPACE', 'BAO_NAMESPACE', 'API_SPECTOR_VAULT_NAMESPACE') ?? cfg.namespace,
+    pathPrefix: env('VAULT_PATH_PREFIX', 'BAO_PATH_PREFIX', 'API_SPECTOR_VAULT_PATH_PREFIX') ?? cfg.pathPrefix,
     authMethod,
     token,
     roleId,
@@ -178,18 +195,28 @@ async function clientToken(conn: VaultConn): Promise<string> {
   return token;
 }
 
-async function readSecret(refBody: string, scheme: string): Promise<string> {
+async function readSecret(refBody: string, scheme: string, ctx: SecretResolveContext = {}): Promise<string> {
   const hash = refBody.lastIndexOf('#');
   if (hash < 0) {
     throw new Error(`${scheme} reference must be '${scheme}:<path>#<key>' (got '${scheme}:${refBody}')`);
   }
-  const path = refBody.slice(0, hash).replace(/^\/+/, '');
+  const rawPath = refBody.slice(0, hash);
   const key = refBody.slice(hash + 1);
-  if (!path || !key) {
+  // A leading '/' marks an absolute path that bypasses the configured prefix.
+  const absolute = /^\//.test(rawPath);
+  const relPath = rawPath.replace(/^\/+/, '');
+  if (!relPath || !key) {
     throw new Error(`${scheme} reference must be '${scheme}:<path>#<key>' (got '${scheme}:${refBody}')`);
   }
 
   const conn = resolveConn();
+  // Interpolate {{var}} in both the prefix and the reference path so teams can
+  // point at a per-environment folder (e.g. prefix `stack/{{stackFolder}}/data/`).
+  const relResolved = applyVars(relPath, ctx.vars);
+  // Prepend the configured path prefix (e.g. `stack/.../data/`) unless the ref
+  // is absolute. The prefix is trimmed of surrounding slashes so one `/` joins.
+  const prefix = applyVars(conn.pathPrefix ?? '', ctx.vars).replace(/^\/+|\/+$/g, '');
+  const path = (!absolute && prefix) ? `${prefix}/${relResolved}` : relResolved;
   const cacheKey = `${conn.address}|${conn.namespace ?? ''}|${path}`;
   const now = Date.now();
 
@@ -226,12 +253,12 @@ export function _resetVaultCache(): void {
 
 export const vaultProvider: SecretProvider = {
   scheme: 'vault',
-  resolve: (refBody) => readSecret(refBody, 'vault'),
+  resolve: (refBody, ctx) => readSecret(refBody, 'vault', ctx),
 };
 
 // OpenBao is API-compatible with Vault, so `bao:<path>#<key>` references resolve
 // through the exact same client (reading BAO_* env vars first; see resolveConn).
 export const openBaoProvider: SecretProvider = {
   scheme: 'bao',
-  resolve: (refBody) => readSecret(refBody, 'bao'),
+  resolve: (refBody, ctx) => readSecret(refBody, 'bao', ctx),
 };

@@ -31,7 +31,7 @@ function mockVault(...routes: Route[]): ReturnType<typeof vi.fn> {
 
 const ENV_KEYS = [
   'VAULT_ADDR', 'VAULT_TOKEN', 'VAULT_NAMESPACE', 'VAULT_ROLE_ID', 'VAULT_SECRET_ID',
-  'VAULT_JWT', 'VAULT_JWT_ROLE', 'VAULT_AUTH_METHOD', 'VAULT_KV_VERSION',
+  'VAULT_JWT', 'VAULT_JWT_ROLE', 'VAULT_AUTH_METHOD', 'VAULT_KV_VERSION', 'VAULT_PATH_PREFIX',
 ];
 // HOME/USERPROFILE are redirected to a bogus dir so the provider's ~/.vault-token
 // fallback never picks up the developer's real Vault token during tests.
@@ -141,6 +141,98 @@ describe('vault provider', () => {
   it('throws when Vault is not configured', async () => {
     await expect(resolveExternalSecret('vault:secret/data/app#token'))
       .rejects.toThrow(/not configured/);
+  });
+});
+
+// ─── configurable path prefix ─────────────────────────────────────────────────
+
+describe('vault path prefix', () => {
+  it('prepends a configured prefix to the reference path', async () => {
+    process.env.VAULT_ADDR = 'https://vault.test';
+    process.env.VAULT_TOKEN = 't';
+    setSecretsConfig({ vault: { pathPrefix: 'stack/1000120-test-automation/data/' } });
+    const fetchMock = mockVault((url) =>
+      url.endsWith('/v1/stack/1000120-test-automation/data/applications/api')
+        ? { data: { data: { email: 'qa@acme.test' }, metadata: {} } }
+        : undefined,
+    );
+
+    await expect(resolveExternalSecret('vault:applications/api#email')).resolves.toBe('qa@acme.test');
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('reads the prefix from VAULT_PATH_PREFIX / BAO_PATH_PREFIX env too', async () => {
+    process.env.VAULT_ADDR = 'https://vault.test';
+    process.env.VAULT_TOKEN = 't';
+    process.env.VAULT_PATH_PREFIX = 'team/data';
+    mockVault((url) =>
+      url.endsWith('/v1/team/data/app') ? { data: { data: { k: 'v' }, metadata: {} } } : undefined,
+    );
+
+    await expect(resolveExternalSecret('vault:app#k')).resolves.toBe('v');
+    delete process.env.VAULT_PATH_PREFIX;
+  });
+
+  it('a path starting with / is absolute and bypasses the prefix', async () => {
+    process.env.VAULT_ADDR = 'https://vault.test';
+    process.env.VAULT_TOKEN = 't';
+    setSecretsConfig({ vault: { pathPrefix: 'stack/x/data/' } });
+    mockVault((url) =>
+      url.endsWith('/v1/secret/data/other') ? { data: { data: { k: 'abs' }, metadata: {} } } : undefined,
+    );
+
+    await expect(resolveExternalSecret('vault:/secret/data/other#k')).resolves.toBe('abs');
+  });
+
+  it('interpolates {{var}} in the prefix from the provided scope', async () => {
+    process.env.VAULT_ADDR = 'https://vault.test';
+    process.env.VAULT_TOKEN = 't';
+    setSecretsConfig({ vault: { pathPrefix: 'stack/{{stackFolder}}/data/' } });
+    mockVault((url) =>
+      url.endsWith('/v1/stack/qa-123/data/applications/api')
+        ? { data: { data: { email: 'qa@acme.test' }, metadata: {} } }
+        : undefined,
+    );
+
+    await expect(
+      resolveExternalSecret('vault:applications/api#email', { vars: { stackFolder: 'qa-123' } }),
+    ).resolves.toBe('qa@acme.test');
+  });
+
+  it('interpolates {{var}} inside the reference path too', async () => {
+    process.env.VAULT_ADDR = 'https://vault.test';
+    process.env.VAULT_TOKEN = 't';
+    mockVault((url) =>
+      url.endsWith('/v1/secret/data/prod/app') ? { data: { data: { k: 'v' }, metadata: {} } } : undefined,
+    );
+
+    await expect(
+      resolveExternalSecret('vault:secret/data/{{tier}}/app#k', { vars: { tier: 'prod' } }),
+    ).resolves.toBe('v');
+  });
+
+  it('resolves a secretRef whose prefix var is defined later in the same environment', async () => {
+    process.env.VAULT_ADDR = 'https://vault.test';
+    process.env.VAULT_TOKEN = 't';
+    setSecretsConfig({ vault: { pathPrefix: 'stack/{{stackFolder}}/data/' } });
+    mockVault((url) =>
+      url.endsWith('/v1/stack/team-7/data/applications/api')
+        ? { data: { data: { email: 'team7@acme.test' }, metadata: {} } }
+        : undefined,
+    );
+
+    const env: Environment = {
+      version: '1.0', id: 'e1', name: 'prod',
+      variables: [
+        // secretRef declared BEFORE the plain var it depends on — the two-pass
+        // resolution in buildEnvVars must still find `stackFolder`.
+        { key: 'EMAIL', value: '', enabled: true, secretRef: 'vault:applications/api#email' },
+        { key: 'stackFolder', value: 'team-7', enabled: true },
+      ],
+    };
+
+    const vars = await buildEnvVars(env);
+    expect(vars.EMAIL).toBe('team7@acme.test');
   });
 });
 

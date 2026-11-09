@@ -23,7 +23,7 @@ async function resolveVars(ctx: VarResolveContext | undefined, auth: AuthConfig)
   // Inline secret tokens used directly in an auth field, e.g.
   // `{{vault:secret/data/app#clientSecret}}` in the Client Secret. Keyed by the
   // full reference so interpolate() picks them up, mirroring the send path.
-  const inline = await resolveInlineSecretRefs(JSON.stringify(auth ?? {}));
+  const inline = await resolveInlineSecretRefs(JSON.stringify(auth ?? {}), scope);
   return { ...scope, ...inline };
 }
 
