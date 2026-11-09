@@ -46,6 +46,7 @@ import { useT } from '../../i18n';
 // carries the name to resolve and the exact text to show as the token label.
 function parseVarTokens(str: string): { name: string; display: string }[] {
   const found: { name: string; display: string }[] = [];
+  if (!str) return found;
   const seen = new Set<string>();
   const push = (name: string, display: string) => {
     if (!seen.has(display)) { seen.add(display); found.push({ name, display }); }
@@ -102,8 +103,10 @@ function PortalDropdown({
 
 type SuggestionMode = 'var' | 'static'
 
-interface Props extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
-  readonly value: string
+interface Props extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {
+  /** Current value. May be null/undefined from imported or shared data; the
+   *  component coerces it to '' internally. */
+  readonly value: string | null | undefined
   readonly onChange: (value: string) => void
   /** Classes for the outer wrapper div (layout: flex-1, w-full, etc.) */
   readonly wrapperClassName?: string
@@ -122,7 +125,13 @@ interface Props extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onCha
   readonly extraVars?: Record<string, string>
 }
 
-export function VarInput({ value, onChange, className, wrapperClassName, staticSuggestions, extraVars, ...rest }: Readonly<Props>) {
+export function VarInput({ value: valueProp, onChange, className, wrapperClassName, staticSuggestions, extraVars, ...rest }: Readonly<Props>) {
+  // A variable value can reach us as null/undefined (an empty collection/env
+  // cell, or data imported from an external tool) despite the string prop type.
+  // Coerce once so parseVarTokens, the slice/length maths and the controlled
+  // <input> never operate on null. Without this the Collection Variables tab
+  // throws "Cannot read properties of null (reading 'matchAll')".
+  const value = valueProp ?? '';
   const t         = useT();
   const varNames  = useVarNames();
   const varValues = useVarValues();
