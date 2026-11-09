@@ -7,6 +7,7 @@ import { cmLabel } from '../../lib/cmA11y';
 import { oneDark } from '@codemirror/theme-one-dark';
 import type { ApiRequest, RequestBody } from '../../../../shared/types';
 import { KVTable } from './KVTable';
+import { MultipartTable } from './MultipartTable';
 import { varCompletionExtension, varHoverTooltipExtension } from './atCompletions';
 import { jsonWithComments, xmlWithComments, commentKeymap } from './commentKeymap';
 import { useVarNames } from '../../hooks/useVarNames';
@@ -19,6 +20,13 @@ const GraphQLEditor = lazy(() => import('./GraphQLEditor').then(m => ({ default:
 const SoapEditor = lazy(() => import('./SoapEditor').then(m => ({ default: m.SoapEditor })));
 
 type BodyMode = RequestBody['mode']
+
+// Disambiguate the two form bodies in the picker: `form` is urlencoded, the new
+// `multipart` is form-data with file uploads. Other modes show their bare name.
+const MODE_LABELS: Partial<Record<BodyMode, string>> = {
+  form: 'form-url',
+  multipart: 'form-data',
+};
 
 export function BodyTab({ request, onChange }: { readonly request: ApiRequest; readonly onChange: (p: Partial<ApiRequest>) => void }) {
   const t = useT();
@@ -54,7 +62,7 @@ export function BodyTab({ request, onChange }: { readonly request: ApiRequest; r
     <div className="flex flex-col gap-2 h-full min-h-0">
       {/* Mode selector */}
       <div className="flex gap-3 text-xs flex-shrink-0">
-        {(['none', 'json', 'form', 'raw', 'graphql', 'soap'] as BodyMode[]).map(m => (
+        {(['none', 'json', 'form', 'multipart', 'raw', 'graphql', 'soap'] as BodyMode[]).map(m => (
           <label key={m} className="flex items-center gap-1 cursor-pointer">
             <input
               type="radio"
@@ -63,7 +71,7 @@ export function BodyTab({ request, onChange }: { readonly request: ApiRequest; r
               onChange={() => setMode(m)}
               className="accent-blue-500"
             />
-            <span className={mode === m ? 'text-white' : 'text-surface-400'}>{m}</span>
+            <span className={mode === m ? 'text-white' : 'text-surface-400'}>{MODE_LABELS[m] ?? m}</span>
           </label>
         ))}
       </div>
@@ -104,6 +112,18 @@ export function BodyTab({ request, onChange }: { readonly request: ApiRequest; r
           keyPlaceholder={t('field')}
           valuePlaceholder={t('value')}
         />
+      )}
+
+      {mode === 'multipart' && (
+        <div className="flex flex-col gap-1">
+          <p className="text-[10px] text-surface-500">
+            {t('Sent as multipart/form-data. File parts are read from disk when the request runs.')}
+          </p>
+          <MultipartTable
+            rows={body.multipart ?? []}
+            onChange={rows => onChange({ body: { ...body, multipart: rows } })}
+          />
+        </div>
       )}
 
       {mode === 'raw' && (

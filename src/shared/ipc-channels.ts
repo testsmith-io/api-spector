@@ -20,6 +20,9 @@ export const IPC = {
     openWorkspace:       'file:openWorkspace',
     openWorkspacePath:   'file:openWorkspacePath',
     openFromGit:         'file:openFromGit',
+    /** Add an API Spector workspace into an existing local project folder,
+     *  picking/creating a subfolder; auto-enables scoped git mode when inside a repo. */
+    addToProject:        'file:addToProject',
     /** Event (main→renderer): a `spector://open-from-git?url=…` deep link was
      *  received; the renderer runs the same open-from-Git flow as the button. */
     openFromGitDeepLink: 'file:openFromGitDeepLink',
@@ -51,6 +54,8 @@ export const IPC = {
   // ─── Native dialogs ────────────────────────────────────────────────────────
   dialog: {
     pickDir: 'dialog:pickDir',
+    /** Pick a single file on disk; returns its absolute path (e.g. a multipart upload). */
+    pickFile: 'dialog:pickFile',
   },
 
   // ─── HTTP execution ────────────────────────────────────────────────────────
@@ -113,6 +118,7 @@ export const IPC = {
     http:              'import:http',
     har:               'import:har',
     arazzo:            'import:arazzo',
+    soapui:            'import:soapui',
     wsdl:              'import:wsdl',
     spector:           'import:spector',
     openapiSchemas:    'import:openapi-schemas',
@@ -276,6 +282,7 @@ export const IPC = {
   // ─── Git ───────────────────────────────────────────────────────────────────
   git: {
     isRepo:         'git:isRepo',
+    repoInfo:       'git:repoInfo',
     init:           'git:init',
     status:         'git:status',
     diff:           'git:diff',
@@ -283,21 +290,36 @@ export const IPC = {
     stage:          'git:stage',
     unstage:        'git:unstage',
     stageAll:       'git:stageAll',
+    discard:        'git:discard',
     commit:         'git:commit',
+    amend:          'git:amend',
+    uncommit:       'git:uncommit',
+    show:           'git:show',
+    getIdentity:    'git:getIdentity',
+    setIdentity:    'git:setIdentity',
     log:            'git:log',
     branches:       'git:branches',
     checkout:       'git:checkout',
     deleteBranch:   'git:deleteBranch',
+    renameBranch:   'git:renameBranch',
+    merge:          'git:merge',
     rebase:         'git:rebase',
     rebaseContinue: 'git:rebaseContinue',
     rebaseAbort:    'git:rebaseAbort',
     stashList:      'git:stashList',
     stash:          'git:stash',
     stashPop:       'git:stashPop',
+    stashApply:     'git:stashApply',
+    stashShow:      'git:stashShow',
     stashDrop:      'git:stashDrop',
     fetch:          'git:fetch',
     pull:           'git:pull',
     push:           'git:push',
+    deleteRemoteBranch: 'git:deleteRemoteBranch',
+    tagList:        'git:tagList',
+    createTag:      'git:createTag',
+    deleteTag:      'git:deleteTag',
+    pushTags:       'git:pushTags',
     remotes:        'git:remotes',
     addRemote:      'git:addRemote',
     setRemoteUrl:   'git:setRemoteUrl',

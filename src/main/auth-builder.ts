@@ -202,7 +202,8 @@ export interface NtlmRequestOptions {
   vars: Record<string, string>
   /** Already-resolved request headers (user headers + content-type). No Authorization. */
   baseHeaders: Record<string, string>
-  body?: string
+  /** Request body: a string for text modes, a Buffer for multipart/form-data. */
+  body?: string | Buffer
   tls?: TlsSettings
   proxy?: { url?: string }
 }

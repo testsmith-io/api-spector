@@ -134,8 +134,12 @@ export function flowchartToSvg(code: string): string {
     nodes += shapeSvg(n.shape, x, y, W, H) + labelSvg(n.label, x + W / 2, y + H / 2);
   }
 
+  // Intrinsic width caps at 900; `max-width:100%` + `height:auto` then let a
+  // wide chart scale down to the page column (instead of overflowing) and keep
+  // a narrow one at a readable natural size, centred in the column either way.
   const drawnWidth = Math.min(width, 900);
-  return `<svg class="flowchart" viewBox="0 0 ${width.toFixed(0)} ${height.toFixed(0)}" width="${drawnWidth.toFixed(0)}" role="img" xmlns="http://www.w3.org/2000/svg">`
+  const style = 'display:block;height:auto;max-width:100%;margin:0.5rem auto';
+  return `<svg class="flowchart" viewBox="0 0 ${width.toFixed(0)} ${height.toFixed(0)}" width="${drawnWidth.toFixed(0)}" style="${style}" role="img" xmlns="http://www.w3.org/2000/svg">`
     + `<defs><marker id="fc-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="${EDGE}"/></marker></defs>`
     + edges + nodes + `</svg>`;
 }

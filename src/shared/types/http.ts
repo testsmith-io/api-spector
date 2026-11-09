@@ -160,10 +160,35 @@ export interface GrpcServiceInfo {
   methods: GrpcMethodInfo[]
 }
 
+/**
+ * One part of a `multipart/form-data` body. Text parts carry a `value`; file
+ * parts reference a file on disk by `filePath`, read and streamed at send time
+ * (never embedded in the `.spector` file). `form` mode above stays
+ * `application/x-www-form-urlencoded`; this is the distinct form-data body.
+ */
+export interface MultipartPart {
+  key: string
+  enabled: boolean
+  /** 'text' sends `value`; 'file' reads and uploads `filePath`. */
+  type: 'text' | 'file'
+  /** Text parts: the field value (supports {{var}} interpolation). */
+  value?: string
+  /** File parts: absolute path to the file on disk (supports {{var}}). */
+  filePath?: string
+  /** File parts: override the transmitted filename. Defaults to the basename of `filePath`. */
+  fileName?: string
+  /** Optional per-part Content-Type (e.g. image/png); auto-detected from the
+   *  file extension when omitted for file parts. */
+  contentType?: string
+  description?: string
+}
+
 export interface RequestBody {
-  mode: 'none' | 'json' | 'form' | 'raw' | 'graphql' | 'soap' | 'grpc'
+  mode: 'none' | 'json' | 'form' | 'raw' | 'graphql' | 'soap' | 'grpc' | 'multipart'
   json?: string
   form?: KeyValuePair[]
+  /** Parts for `mode: 'multipart'` (multipart/form-data, with file uploads). */
+  multipart?: MultipartPart[]
   raw?: string
   rawContentType?: string
   graphql?: GraphQLBody

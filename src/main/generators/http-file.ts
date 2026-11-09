@@ -13,6 +13,12 @@ import { SPECTOR_TO_HTTP } from '../importers/http-file';
 // variables are emitted as `@name = value` declarations so the file is
 // self-contained and round-trips back through the importer.
 
+/** Basename of a path, tolerant of both / and \ separators (no node:path dep). */
+function basenameOf(p: string): string {
+  const parts = p.split(/[/\\]/);
+  return parts[parts.length - 1] || p;
+}
+
 /** Rewrite API Spector `{{$dynamic}}` tokens back to REST Client names. */
 function mapOut(s: string): string {
   return s.replaceAll(/\{\{\s*(\$[A-Za-z]+)\s*\}\}/g, (_m, name: string) =>
@@ -115,9 +121,36 @@ export function generateHttpFile(collection: Collection, environment: Environmen
     const authHeader = authToHeader(req.auth);
     if (authHeader) headers.unshift(authHeader);
 
+    const hasCT = headers.some(h => h.key.toLowerCase() === 'content-type');
+    const isMultipart = req.body.mode === 'multipart' && !['get', 'head'].includes(req.method.toLowerCase())
+      && (req.body.multipart ?? []).some(p => p.enabled && p.key);
+
+    if (isMultipart) {
+      // REST Client .http multipart: explicit boundary, with `< path` including
+      // a file's contents. We always set the Content-Type so the boundary matches.
+      const boundary = '----WebKitFormBoundaryApiSpector';
+      const ctIdx = headers.findIndex(h => h.key.toLowerCase() === 'content-type');
+      const ctHeader = { key: 'Content-Type', value: `multipart/form-data; boundary=${boundary}`, enabled: true };
+      if (ctIdx >= 0) headers[ctIdx] = ctHeader; else headers.push(ctHeader);
+
+      for (const h of headers) lines.push(`${h.key}: ${mapOut(h.value)}`);
+      lines.push('');
+      for (const p of (req.body.multipart ?? []).filter(f => f.enabled && f.key)) {
+        lines.push(`--${boundary}`);
+        if (p.type === 'file') {
+          lines.push(`Content-Disposition: form-data; name="${p.key}"; filename="${p.fileName || basenameOf(p.filePath ?? '')}"`);
+          if (p.contentType) lines.push(`Content-Type: ${p.contentType}`);
+          lines.push('', `< ${mapOut(p.filePath ?? '')}`);
+        } else {
+          lines.push(`Content-Disposition: form-data; name="${p.key}"`, '', mapOut(p.value ?? ''));
+        }
+      }
+      lines.push(`--${boundary}--`);
+      return;
+    }
+
     const body = bodyLines(req);
     // Emit a Content-Type header for the body if the request doesn't already set one.
-    const hasCT = headers.some(h => h.key.toLowerCase() === 'content-type');
     if (body.text && body.contentType && !hasCT) {
       headers.push({ key: 'Content-Type', value: body.contentType, enabled: true });
     }

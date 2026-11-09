@@ -14,9 +14,12 @@
 
 import { fetch, Headers, ProxyAgent, Agent, Pool, type Dispatcher } from 'undici';
 import { readFile } from 'fs/promises';
+import { basename, extname } from 'path';
+import { randomBytes } from 'crypto';
 import * as nodeTls from 'tls';
 import type {
   ApiRequest,
+  MultipartPart,
   SendRequestPayload,
   SentRequest,
   TestResult,
@@ -404,9 +407,99 @@ export async function buildDispatcher(
 
 // ─── Body serialization ───────────────────────────────────────────────────────
 
+// A small, dependency-free extension→MIME map for multipart file parts. Covers
+// the common upload types; anything else falls back to application/octet-stream
+// (and the user can always set a per-part Content-Type by hand).
+const MIME_BY_EXT: Record<string, string> = {
+  '.json': 'application/json', '.xml': 'application/xml', '.txt': 'text/plain',
+  '.csv': 'text/csv', '.html': 'text/html', '.pdf': 'application/pdf',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
+  '.zip': 'application/zip', '.gz': 'application/gzip',
+  '.mp4': 'video/mp4', '.mp3': 'audio/mpeg', '.wav': 'audio/wav',
+  '.doc': 'application/msword', '.xls': 'application/vnd.ms-excel',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.bin': 'application/octet-stream',
+};
+
+function guessMultipartContentType(name: string): string {
+  return MIME_BY_EXT[extname(name).toLowerCase()] ?? 'application/octet-stream';
+}
+
+// Header field names/filenames must not carry raw quotes or CR/LF (header
+// injection / malformed boundary). Percent-encode quotes, strip line breaks.
+function sanitizeFormName(s: string): string {
+  return s.replace(/"/g, '%22').replace(/[\r\n]/g, '');
+}
+
+export interface MultipartBuildResult {
+  /** The assembled multipart/form-data payload. */
+  body: Buffer
+  /** The Content-Type header value, including the generated boundary. */
+  contentType: string
+  /** Human-readable summary for the request snapshot / history (no file bytes). */
+  preview: string
+}
+
+/**
+ * Assemble a `multipart/form-data` body from the request's parts. File parts are
+ * read from disk and streamed inline; text parts carry their interpolated value.
+ * We build the payload with an explicit boundary (rather than handing a FormData
+ * to fetch) so the exact same Buffer works across the normal, NTLM and digest
+ * send paths, and so the snapshot/preview stays a readable string.
+ */
+export async function buildMultipartBody(
+  parts: MultipartPart[],
+  vars: Record<string, string>,
+): Promise<MultipartBuildResult> {
+  const boundary = `----APISpectorFormBoundary${randomBytes(16).toString('hex')}`;
+  const chunks: Buffer[] = [];
+  const previewLines: string[] = [];
+
+  for (const p of parts) {
+    if (!p.enabled || !p.key.trim()) continue;
+    const name = sanitizeFormName(interpolate(p.key, vars));
+    chunks.push(Buffer.from(`--${boundary}\r\n`));
+
+    if (p.type === 'file') {
+      const path = interpolate(p.filePath ?? '', vars).trim();
+      let bytes: Buffer;
+      try {
+        bytes = await readFile(path);
+      } catch {
+        throw new Error(`Multipart file not found or unreadable: ${path || '(no path set)'}`);
+      }
+      const filename = sanitizeFormName(interpolate(p.fileName?.trim() || basename(path), vars));
+      const ct = (p.contentType?.trim() || guessMultipartContentType(filename));
+      chunks.push(Buffer.from(
+        `Content-Disposition: form-data; name="${name}"; filename="${filename}"\r\n`
+        + `Content-Type: ${ct}\r\n\r\n`,
+      ));
+      chunks.push(bytes);
+      chunks.push(Buffer.from('\r\n'));
+      previewLines.push(`${name}: <file ${path} (${ct}, ${bytes.length} bytes)>`);
+    } else {
+      const value = interpolate(p.value ?? '', vars);
+      chunks.push(Buffer.from(`Content-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`));
+      previewLines.push(`${name}: ${value}`);
+    }
+  }
+  chunks.push(Buffer.from(`--${boundary}--\r\n`));
+
+  return {
+    body: Buffer.concat(chunks),
+    contentType: `multipart/form-data; boundary=${boundary}`,
+    preview: previewLines.join('\n'),
+  };
+}
+
 /**
  * Serialize the request body for the current mode and apply the Content-Type /
  * SOAPAction defaults onto `headers` (only when the user did not set them).
+ *
+ * Note: `multipart` mode is handled separately (async, reads files) in
+ * `performHttpExchange` via `buildMultipartBody` and is a no-op here.
  */
 export function buildBodyAndApplyHeaders(
   req: ApiRequest,
@@ -534,14 +627,28 @@ export async function performHttpExchange(opts: ExchangeOptions): Promise<Exchan
   }
   for (const [k, v] of Object.entries(authHeaders)) headers.set(k, v);
 
-  const body = buildBodyAndApplyHeaders(req, vars, headers);
   const methodHasBody = !['GET', 'HEAD'].includes(req.method);
-  const effectiveBody = methodHasBody ? body : undefined;
+  // The actual bytes handed to the transport (string for text modes, a Buffer
+  // for multipart) vs. a readable string for the snapshot/history/preview.
+  let effectiveBody: string | Buffer | undefined;
+  let previewBody: string | undefined;
+  if (methodHasBody && req.body.mode === 'multipart' && req.body.multipart?.length) {
+    const mp = await buildMultipartBody(req.body.multipart, vars);
+    effectiveBody = mp.body;
+    previewBody = mp.preview;
+    // undici would auto-set a boundary only for a FormData body; we build the
+    // bytes ourselves, so set the Content-Type (unless the user forced one).
+    if (!headers.has('content-type')) headers.set('Content-Type', mp.contentType);
+  } else {
+    const body = buildBodyAndApplyHeaders(req, vars, headers);
+    effectiveBody = methodHasBody ? body : undefined;
+    previewBody = typeof effectiveBody === 'string' ? effectiveBody : undefined;
+  }
 
   const captureSent = (h: Headers): Record<string, string> => {
     const captured: Record<string, string> = {};
     h.forEach((value, key) => { captured[key] = value; });
-    onSent?.({ method: req.method, url: finalUrl, headers: captured, body: effectiveBody });
+    onSent?.({ method: req.method, url: finalUrl, headers: captured, body: previewBody });
     return captured;
   };
 
@@ -620,7 +727,7 @@ export async function performHttpExchange(opts: ExchangeOptions): Promise<Exchan
     responseBody,
     durationMs: Date.now() - start,
     sentHeaders,
-    sentBody: effectiveBody,
+    sentBody: previewBody,
     finalUrl,
     ...streamFields,
   };

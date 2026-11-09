@@ -171,6 +171,15 @@ function buildTestFile(folderName: string, folder: Folder, collection: Collectio
         const pairs = req.body.form.filter(p => p.enabled && p.key)
           .map(p => `${p.key}: \`${interpolateValue(p.value, sharedVars)}\``).join(', ');
         lines.push(`      .type('form')`, `      .send({ ${pairs} })`);
+      } else if (req.body.mode === 'multipart' && req.body.multipart) {
+        // supertest builds multipart/form-data from .field()/.attach() chains.
+        for (const p of req.body.multipart.filter(f => f.enabled && f.key)) {
+          if (p.type === 'file') {
+            lines.push(`      .attach('${p.key}', \`${interpolateValue(p.filePath ?? '', sharedVars)}\`)`);
+          } else {
+            lines.push(`      .field('${p.key}', \`${interpolateValue(p.value ?? '', sharedVars)}\`)`);
+          }
+        }
       }
     }
 

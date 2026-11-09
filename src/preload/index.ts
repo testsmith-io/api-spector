@@ -38,10 +38,14 @@ import type {
   HistoryEntry,
   ContractSnapshot,
   GitStatus,
+  GitRepoInfo,
+  GitFile,
   GitCommit,
   GitBranch,
   GitRemote,
   GitStash,
+  GitTag,
+  GitIdentity,
   RecorderConfig,
   RecordedEntry,
   RecordingSession,
@@ -49,6 +53,7 @@ import type {
   PerfProgress,
   PerfPlan,
   SecretsSettings,
+  SoapUiImportReport,
 } from '../shared/types';
 import type { FlowRunEvent, FlowRunSummary } from '../shared/flow-engine';
 
@@ -75,8 +80,10 @@ const api = {
     ipcRenderer.invoke(IPC.file.getRecentWorkspaces),
   openWorkspacePath: (path: string): Promise<{ workspace: Workspace; workspacePath: string } | null> =>
     ipcRenderer.invoke(IPC.file.openWorkspacePath, path),
-  openFromGit: (repoUrl: string): Promise<{ workspace: Workspace; workspacePath: string } | null> =>
+  openFromGit: (repoUrl: string): Promise<{ workspace: Workspace; workspacePath: string; enclosingRepo?: { name: string; scope: string } } | null> =>
     ipcRenderer.invoke(IPC.file.openFromGit, repoUrl),
+  addToProject: (): Promise<{ workspace: Workspace; workspacePath: string; enclosingRepo?: { name: string; scope: string } } | null> =>
+    ipcRenderer.invoke(IPC.file.addToProject),
   onOpenFromGit: (cb: (repoUrl: string) => void): void => {
     ipcRenderer.on(IPC.file.openFromGitDeepLink, (_e, repoUrl: string) => cb(repoUrl));
   },
@@ -95,7 +102,7 @@ const api = {
     ipcRenderer.invoke(IPC.file.serializeWorkspace),
   applyWorkspaceSnapshot: (snap: { manifest: Workspace; files: Record<string, string> }): Promise<{ ok: boolean; filesWritten: number; collections: number; workspace: Workspace; workspacePath: string }> =>
     ipcRenderer.invoke(IPC.file.applyWorkspaceSnapshot, snap),
-  newWorkspace: (): Promise<{ workspace: Workspace; workspacePath: string } | null> =>
+  newWorkspace: (): Promise<{ workspace: Workspace; workspacePath: string; enclosingRepo?: { name: string; scope: string } } | null> =>
     ipcRenderer.invoke(IPC.file.newWorkspace),
   closeWorkspace: (): Promise<void> =>
     ipcRenderer.invoke(IPC.file.closeWorkspace),
@@ -195,6 +202,10 @@ const api = {
    *  sources) plus one Flow per workflow, with any translation warnings. */
   importArazzo: (): Promise<{ collection: Collection; flows: Flow[]; warnings: string[] } | null> =>
     ipcRenderer.invoke(IPC.import.arazzo),
+  /** Import a SoapUI / ReadyAPI project: a collection (Groovy converted to sp.*)
+   *  plus a report with suite/case/request counts, script conversion tallies and warnings. */
+  importSoapUi: (): Promise<{ collection: Collection; report: SoapUiImportReport } | null> =>
+    ipcRenderer.invoke(IPC.import.soapui),
   importSpectorCollection: (): Promise<Collection | null> =>
     ipcRenderer.invoke(IPC.import.spector),
   /** Extract response-body schemas from an OpenAPI spec file (no full import). */
@@ -209,6 +220,10 @@ const api = {
     ipcRenderer.invoke(IPC.generate.code, opts),
   pickOutputDir: (): Promise<string | null> =>
     ipcRenderer.invoke(IPC.dialog.pickDir),
+
+  /** Open a native file picker and return the chosen file's absolute path. */
+  pickFile: (): Promise<string | null> =>
+    ipcRenderer.invoke(IPC.dialog.pickFile),
   saveGeneratedFiles: (files: GeneratedFile[], outputDir: string): Promise<void> =>
     ipcRenderer.invoke(IPC.generate.save, files, outputDir),
   saveGeneratedFilesAsZip: (files: GeneratedFile[], collectionName: string, target: GenerateTarget): Promise<boolean> =>
@@ -594,6 +609,8 @@ const api = {
   // ─── Git ──────────────────────────────────────────────────────────────────
   gitIsRepo:     (): Promise<boolean> =>
     ipcRenderer.invoke(IPC.git.isRepo),
+  gitRepoInfo:   (): Promise<GitRepoInfo> =>
+    ipcRenderer.invoke(IPC.git.repoInfo),
   gitInit:       (): Promise<void> =>
     ipcRenderer.invoke(IPC.git.init),
   gitStatus:     (): Promise<GitStatus> =>
@@ -608,8 +625,20 @@ const api = {
     ipcRenderer.invoke(IPC.git.unstage, paths),
   gitStageAll:   (): Promise<void> =>
     ipcRenderer.invoke(IPC.git.stageAll),
+  gitDiscard:    (files: GitFile[]): Promise<void> =>
+    ipcRenderer.invoke(IPC.git.discard, files),
   gitCommit:     (message: string): Promise<void> =>
     ipcRenderer.invoke(IPC.git.commit, message),
+  gitAmend:      (message: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.git.amend, message),
+  gitUncommit:   (): Promise<void> =>
+    ipcRenderer.invoke(IPC.git.uncommit),
+  gitShow:       (sha: string): Promise<string> =>
+    ipcRenderer.invoke(IPC.git.show, sha),
+  gitGetIdentity: (): Promise<GitIdentity> =>
+    ipcRenderer.invoke(IPC.git.getIdentity),
+  gitSetIdentity: (name: string, email: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.git.setIdentity, name, email),
   gitLog:        (limit?: number): Promise<GitCommit[]> =>
     ipcRenderer.invoke(IPC.git.log, limit),
   gitBranches:   (): Promise<GitBranch[]> =>
@@ -618,6 +647,10 @@ const api = {
     ipcRenderer.invoke(IPC.git.checkout, branch, create),
   gitDeleteBranch: (name: string, force = false): Promise<void> =>
     ipcRenderer.invoke(IPC.git.deleteBranch, name, force),
+  gitRenameBranch: (newName: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.git.renameBranch, newName),
+  gitMerge:          (branch: string): Promise<{ conflict: boolean }> =>
+    ipcRenderer.invoke(IPC.git.merge, branch),
   gitRebase:         (onto: string): Promise<{ conflict: boolean }> =>
     ipcRenderer.invoke(IPC.git.rebase, onto),
   gitRebaseContinue: (): Promise<{ conflict: boolean }> =>
@@ -630,14 +663,28 @@ const api = {
     ipcRenderer.invoke(IPC.git.stash, message),
   gitStashPop:   (ref?: string): Promise<void> =>
     ipcRenderer.invoke(IPC.git.stashPop, ref),
+  gitStashApply: (ref?: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.git.stashApply, ref),
+  gitStashShow:  (ref?: string): Promise<string> =>
+    ipcRenderer.invoke(IPC.git.stashShow, ref),
   gitStashDrop:  (ref?: string): Promise<void> =>
     ipcRenderer.invoke(IPC.git.stashDrop, ref),
   gitFetch:      (): Promise<void> =>
     ipcRenderer.invoke(IPC.git.fetch),
   gitPull:       (rebase = false): Promise<void> =>
     ipcRenderer.invoke(IPC.git.pull, rebase),
-  gitPush:       (setUpstream: boolean): Promise<void> =>
-    ipcRenderer.invoke(IPC.git.push, setUpstream),
+  gitPush:       (setUpstream: boolean, force = false): Promise<void> =>
+    ipcRenderer.invoke(IPC.git.push, setUpstream, force),
+  gitDeleteRemoteBranch: (remote: string, name: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.git.deleteRemoteBranch, remote, name),
+  gitTagList:    (): Promise<GitTag[]> =>
+    ipcRenderer.invoke(IPC.git.tagList),
+  gitCreateTag:  (name: string, message?: string, ref?: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.git.createTag, name, message, ref),
+  gitDeleteTag:  (name: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.git.deleteTag, name),
+  gitPushTags:   (): Promise<void> =>
+    ipcRenderer.invoke(IPC.git.pushTags),
   gitRemotes:      (): Promise<GitRemote[]> =>
     ipcRenderer.invoke(IPC.git.remotes),
   gitAddRemote:    (name: string, url: string): Promise<void> =>

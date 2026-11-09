@@ -137,6 +137,16 @@ export function parseBruFile(content: string, fileName: string): ApiRequest {
       key: k, value: v, enabled: true,
     }));
     body = { mode: 'form', form };
+  } else if (bodyMode === 'multipartForm') {
+    // Bruno multipart: a file field's value is `@file(path)`; a plain value is a
+    // text field. `@file(a, b)` lists several files — we take the first path.
+    const multipart = Object.entries(parseKv(extractBlock(content, 'body:multipart-form'))).map(([k, v]) => {
+      const fileMatch = /^@file\(\s*([^),]+)/.exec(v.trim());
+      return fileMatch
+        ? { key: k, enabled: true, type: 'file' as const, filePath: fileMatch[1].trim() }
+        : { key: k, enabled: true, type: 'text' as const, value: v };
+    });
+    body = { mode: 'multipart', multipart };
   } else if (bodyMode === 'graphql') {
     const gqlContent = extractBlock(content, 'body:graphql') ?? '';
     body = { mode: 'graphql', graphql: { query: gqlContent.trim(), variables: '{}' } };

@@ -17,6 +17,8 @@ import { importHttpFile }                                   from '../importers/h
 import { importHar }                                        from '../importers/har';
 import { importArazzoFiles }                                from '../importers/arazzo';
 import { importWsdlCollection }                             from '../importers/wsdl';
+import { importSoapUiProject }                              from '../importers/soapui';
+import { basename }                                         from 'node:path';
 
 export function registerImportHandlers(ipc: IpcMain): void {
   // WSDL -> a collection of SOAP requests (one per operation). From a URL (e.g.
@@ -116,6 +118,24 @@ export function registerImportHandlers(ipc: IpcMain): void {
     });
     if (result.canceled || !result.filePaths[0]) return null;
     return importHar(result.filePaths[0]);
+  });
+
+  // SoapUI / ReadyAPI project XML -> a collection, with its Groovy scripts
+  // converted to the sp.* sandbox. Returns the parse report (suite/case/request
+  // counts, script conversion tally, warnings) so the import summary can show
+  // what converted cleanly and what needs a look.
+  handleIpc(ipc, IPC.import.soapui, async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Import SoapUI / ReadyAPI Project',
+      filters: [{ name: 'SoapUI / ReadyAPI Project', extensions: ['xml'] }],
+      properties: ['openFile'],
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    const path = result.filePaths[0];
+    const xml = await readFile(path, 'utf8');
+    const name = basename(path).replace(/[-.]soapui-project\.xml$/i, '').replace(/\.xml$/i, '');
+    const { collection, report } = importSoapUiProject(xml, name || 'SoapUI Import');
+    return { collection, report };
   });
 
   handleIpc(ipc, IPC.import.arazzo, async () => {

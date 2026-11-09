@@ -80,6 +80,26 @@ function parseBody(body: any): RequestBody {
       })),
     };
   }
+  if (mode === 'formdata') {
+    // Postman form-data: each item is a text field or a file. A file item
+    // carries `src` (the path on the exporting machine, often absent) and
+    // `type: 'file'`; `contentType` is an optional per-part override.
+    return {
+      mode: 'multipart',
+      multipart: (body.formdata ?? []).map((p: any) => {
+        const isFile = p.type === 'file';
+        const src = Array.isArray(p.src) ? p.src[0] : p.src;
+        return {
+          key: p.key ?? '',
+          enabled: !p.disabled,
+          type: isFile ? 'file' as const : 'text' as const,
+          ...(isFile ? { filePath: src ?? '' } : { value: p.value ?? '' }),
+          ...(p.contentType ? { contentType: p.contentType } : {}),
+          ...(p.description ? { description: String(p.description) } : {}),
+        };
+      }),
+    };
+  }
   return { mode: 'none' };
 }
 

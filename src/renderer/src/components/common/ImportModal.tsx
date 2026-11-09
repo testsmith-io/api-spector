@@ -3,7 +3,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import type { Collection, ApiRequest, Folder, Environment, EnvVariable, Flow } from '../../../../shared/types';
+import type { Collection, ApiRequest, Folder, Environment, EnvVariable, Flow, SoapUiImportReport } from '../../../../shared/types';
 import { useStore } from '../../store';
 import { envRelPath } from '../../../../shared/naming-utils';
 import { parseCurl } from '../../../../shared/curl-import';
@@ -34,6 +34,7 @@ const OPTIONS: ImportOption[] = [
   { id: 'http',     label: 'HTTP file', description: '.http / .rest (REST Client)' },
   { id: 'har',      label: 'HAR',      description: 'HTTP Archive (.har) from devtools or a proxy' },
   { id: 'arazzo',   label: 'Arazzo',   description: 'Workflow spec -> Flows. Select the .arazzo file AND its OpenAPI spec file(s)' },
+  { id: 'soapui',   label: 'SoapUI / ReadyAPI', description: 'Project XML -> requests; Groovy scripts converted to sp.*' },
   { id: 'spector',  label: 'API Spector', description: 'An existing .spector / .json collection' },
   { id: 'curl',     label: 'cURL',     description: 'Paste a curl command' },
 ];
@@ -44,6 +45,16 @@ interface EndpointEntry {
   request: ApiRequest
   /** Folder names from root to (but not including) the request, for grouping. */
   folderPath: string[]
+}
+
+/** What the post-import summary screen shows: what landed, and what to look at. */
+interface ImportSummary {
+  name: string
+  /** True when the import merged into an existing collection rather than a new one. */
+  merged?: boolean
+  stats: { requests: number; folders: number; variables: number; flows: number }
+  /** Things skipped or needing manual attention (empty = a clean import). */
+  warnings: string[]
 }
 
 function listEndpoints(col: Collection): EndpointEntry[] {
@@ -74,7 +85,7 @@ export function ImportModal({ onImport, onClose }: Props) {
   const [curlText, setCurlText]   = useState('');
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState<string | null>(null);
-  const [importWarnings, setImportWarnings] = useState<string[] | null>(null);
+  const [summary, setSummary] = useState<ImportSummary | null>(null);
   const urlInputRef               = useRef<HTMLInputElement>(null);
 
   // ── OpenAPI preview state ──────────────────────────────────────────────────
@@ -132,11 +143,16 @@ export function ImportModal({ onImport, onClose }: Props) {
         const res = await electron.importArazzo();
         if (!res) return;
         onImport(res.collection, { flows: res.flows });
-        if (res.warnings.length > 0) {
-          setImportWarnings(res.warnings);
-        } else {
-          onClose();
-        }
+        setSummary(buildSummary(res.collection, { warnings: res.warnings, flows: res.flows.length }));
+        return;
+      }
+      // SoapUI / ReadyAPI returns a collection plus a parse report; surface the
+      // script-conversion tally and any skipped items on the summary screen.
+      if (opt.id === 'soapui') {
+        const res = await electron.importSoapUi();
+        if (!res) return;
+        onImport(res.collection);
+        setSummary(buildSummary(res.collection, { warnings: soapUiWarnings(res.report) }));
         return;
       }
       let col: Collection | null = null;
@@ -155,7 +171,7 @@ export function ImportModal({ onImport, onClose }: Props) {
         enterPreview(col);
       } else {
         onImport(col);
-        onClose();
+        setSummary(buildSummary(col, {}));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -283,7 +299,8 @@ export function ImportModal({ onImport, onClose }: Props) {
         // pruneFolder mutates the third object — re-collect requests:
         filtered.requests = collectRequestsByFolder(filtered.rootFolder, previewCol);
         onImport(filtered);
-        onClose();
+        setPreviewCol(null);
+        setSummary(buildSummary(filtered, {}));
       } else {
         // Merge selected endpoints into the target existing collection,
         // preserving the folder/tag structure from the spec.
@@ -300,7 +317,13 @@ export function ImportModal({ onImport, onClose }: Props) {
         }
         setActiveCollection(target);
         onImport(null);
-        onClose();
+        setPreviewCol(null);
+        setSummary({
+          name: targetCol.name,
+          merged: true,
+          stats: { requests: Object.keys(prunedRequests).length, folders: countFolders(prunedRoot), variables: 0, flows: 0 },
+          warnings: [],
+        });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -362,6 +385,61 @@ export function ImportModal({ onImport, onClose }: Props) {
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
+
+  if (summary) {
+    const s = summary.stats;
+    const chips: string[] = [
+      t(':count request|:count requests', { count: s.requests }),
+      t(':count folder|:count folders', { count: s.folders }),
+    ];
+    if (s.variables > 0) chips.push(t(':count variable|:count variables', { count: s.variables }));
+    if (s.flows > 0) chips.push(t(':count flow|:count flows', { count: s.flows }));
+    return (
+      <Modal
+        onClose={onClose}
+        overlayClassName="z-50 flex items-center justify-center bg-black/60"
+        panelClassName="bg-surface-900 border border-surface-700 rounded-xl shadow-2xl w-[460px] p-5 flex flex-col gap-4"
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-surface-100">
+            {summary.merged
+              ? t('Merged into :name', { name: summary.name })
+              : t('Imported :name', { name: summary.name })}
+          </h2>
+          <button onClick={onClose} className="text-surface-500 hover:text-surface-300 text-lg leading-none">×</button>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {chips.map(c => (
+            <span key={c} className="text-[11px] px-2 py-1 rounded bg-surface-800 border border-surface-700 text-surface-200">
+              {c}
+            </span>
+          ))}
+        </div>
+
+        {summary.warnings.length > 0 && (
+          <div className="rounded border border-amber-700/50 bg-amber-900/20 px-3 py-2">
+            <p className="text-[11px] font-medium text-amber-300 mb-1">
+              {t(':count item needs a look|:count items need a look', { count: summary.warnings.length })}
+            </p>
+            <ul className="text-[11px] text-amber-200/80 list-disc pl-4 space-y-0.5 max-h-48 overflow-y-auto">
+              {summary.warnings.map((w, i) => <li key={i}>{w}</li>)}
+            </ul>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            onClick={() => { setSummary(null); setSelected(null); setPreviewCol(null); setError(null); setUrl(''); setCurlText(''); }}
+            className={btnSecondaryCls}
+          >
+            {t('Import another')}
+          </button>
+          <button onClick={onClose} className={btnPrimaryCls}>{t('Done')}</button>
+        </div>
+      </Modal>
+    );
+  }
 
   if (previewCol) {
     return (
@@ -615,18 +693,6 @@ export function ImportModal({ onImport, onClose }: Props) {
         {/* Error */}
         {error && <p className="text-[11px] text-red-400">{error}</p>}
 
-        {/* Arazzo import warnings (import still succeeded) */}
-        {importWarnings && (
-          <div className="rounded border border-amber-700/50 bg-amber-900/20 px-3 py-2">
-            <p className="text-[11px] font-medium text-amber-300 mb-1">
-              {t('Imported with :count note|Imported with :count notes', { count: importWarnings.length })}
-            </p>
-            <ul className="text-[11px] text-amber-200/80 list-disc pl-4 space-y-0.5 max-h-40 overflow-y-auto">
-              {importWarnings.map((w, i) => <li key={i}>{w}</li>)}
-            </ul>
-          </div>
-        )}
-
         {/* Action row */}
         <div className="flex justify-end gap-2 pt-1">
           <button
@@ -661,6 +727,43 @@ export function ImportModal({ onImport, onClose }: Props) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+/** Count every folder in a tree (excluding the implicit root). */
+function countFolders(root: Folder): number {
+  let n = 0;
+  for (const f of root.folders) n += 1 + countFolders(f);
+  return n;
+}
+
+/** Turn a SoapUI import report into summary warnings: a script-conversion
+ *  tally (only when something needs a review) followed by any skipped items. */
+function soapUiWarnings(report: SoapUiImportReport): string[] {
+  const out: string[] = [];
+  const s = report.scripts;
+  const needsReview = s.partial + s.unsupported;
+  if (needsReview > 0) {
+    out.push(
+      `${needsReview} of ${s.total} converted Groovy scripts need a review `
+      + `(${s.partial} partial, ${s.unsupported} unsupported). `
+      + `Check each request's Scripts tab before running.`,
+    );
+  }
+  return [...out, ...report.warnings];
+}
+
+/** Build the post-import summary from the resulting collection. */
+function buildSummary(col: Collection, opts: { warnings?: string[]; flows?: number }): ImportSummary {
+  return {
+    name: col.name,
+    stats: {
+      requests: Object.keys(col.requests).length,
+      folders: countFolders(col.rootFolder),
+      variables: Object.keys(col.collectionVariables ?? {}).length,
+      flows: opts.flows ?? 0,
+    },
+    warnings: opts.warnings ?? [],
+  };
+}
 
 /**
  * Find the longest common URL prefix across `urls`, trimmed back to the last

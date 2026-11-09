@@ -13,7 +13,9 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Collection, ApiRequest, Folder, KeyValuePair, RequestBody } from '../../shared/types';
 
 interface HarNameValue { name: string; value?: string }
-interface HarPostData { mimeType?: string; text?: string; params?: HarNameValue[] }
+// HAR postData params carry `fileName`/`contentType` for multipart file parts.
+interface HarPostParam extends HarNameValue { fileName?: string; contentType?: string }
+interface HarPostData { mimeType?: string; text?: string; params?: HarPostParam[] }
 interface HarEntry {
   _resourceType?: string
   request?: {
@@ -47,6 +49,19 @@ function bodyFrom(postData: HarPostData | undefined): RequestBody {
   const mime = (postData.mimeType ?? '').toLowerCase();
   if (postData.params && postData.params.length && mime.includes('x-www-form-urlencoded')) {
     return { mode: 'form', form: postData.params.map(p => ({ key: p.name, value: p.value ?? '', enabled: true })) };
+  }
+  if (postData.params && postData.params.length && mime.includes('multipart/form-data')) {
+    // A recorded multipart part with a `fileName` was a file upload. HAR does
+    // not capture the file bytes, only the name, so we carry it as the filePath
+    // hint; the user re-points it to a local file before re-sending.
+    return {
+      mode: 'multipart',
+      multipart: postData.params.map(p => (
+        p.fileName
+          ? { key: p.name, enabled: true, type: 'file' as const, filePath: p.fileName, ...(p.contentType ? { contentType: p.contentType } : {}) }
+          : { key: p.name, enabled: true, type: 'text' as const, value: p.value ?? '' }
+      )),
+    };
   }
   const text = postData.text ?? '';
   if (!text.trim()) return { mode: 'none' };

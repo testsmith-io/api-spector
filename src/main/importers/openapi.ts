@@ -145,6 +145,25 @@ function buildBody(rawOperation: any, params: any[], spec: any): RequestBody {
     return { mode: 'json', json: JSON.stringify(schemaToExample(content[jsonKey].schema ?? {}), null, 2) };
   }
 
+  // OpenAPI 3: multipart/form-data → a multipart body. Each schema property
+  // becomes a part; a `string`/`format: binary` (or an array of them) is a file
+  // part, everything else a text field seeded with an example value.
+  const multipartKey = Object.keys(content).find(k => k.toLowerCase().includes('multipart/form-data'));
+  if (multipartKey) {
+    const schema = resolve(spec, content[multipartKey].schema ?? {}, new Set());
+    const props = (schema?.properties ?? {}) as Record<string, any>;
+    const required = new Set<string>(Array.isArray(schema?.required) ? schema.required : []);
+    const parts = Object.entries(props).map(([name, rawProp]) => {
+      const prop = resolve(spec, rawProp, new Set());
+      const isBinary = prop?.format === 'binary' || prop?.format === 'base64'
+        || (prop?.type === 'array' && (resolve(spec, prop.items ?? {}, new Set())?.format === 'binary'));
+      return isBinary
+        ? { key: name, enabled: required.has(name), type: 'file' as const, filePath: '', ...(prop?.description ? { description: String(prop.description) } : {}) }
+        : { key: name, enabled: required.has(name), type: 'text' as const, value: String(schemaToExample(prop ?? {}) ?? ''), ...(prop?.description ? { description: String(prop.description) } : {}) };
+    });
+    if (parts.length) return { mode: 'multipart', multipart: parts };
+  }
+
   // Swagger 2.0: a single `in: body` parameter carries the schema.
   const bodyParam = params.find(p => p?.in === 'body');
   if (bodyParam) {
@@ -152,9 +171,20 @@ function buildBody(rawOperation: any, params: any[], spec: any): RequestBody {
     return { mode: 'json', json: JSON.stringify(schemaToExample(schema), null, 2) };
   }
 
-  // Swagger 2.0 / OpenAPI formData → a form body (one row per field).
+  // Swagger 2.0 formData. With a `type: file` param it's a multipart upload;
+  // otherwise it's a urlencoded form (one row per field).
   const formParams = params.filter(p => p?.in === 'formData');
   if (formParams.length) {
+    if (formParams.some(p => p?.type === 'file')) {
+      return {
+        mode: 'multipart',
+        multipart: formParams.map(p => (
+          p?.type === 'file'
+            ? { key: String(p.name ?? ''), enabled: p.required ?? false, type: 'file' as const, filePath: '', description: p.description ?? '' }
+            : { key: String(p.name ?? ''), enabled: p.required ?? false, type: 'text' as const, value: String(schemaToExample(p.schema ?? p) ?? ''), description: p.description ?? '' }
+        )),
+      };
+    }
     return {
       mode: 'form',
       form: formParams.map(p => ({
