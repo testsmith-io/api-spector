@@ -122,6 +122,7 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
   const sec = existing.secrets ?? {};
   const [vAddress,   setVAddress]   = useState(sec.vault?.address ?? '');
   const [vNamespace, setVNamespace] = useState(sec.vault?.namespace ?? '');
+  const [vPathPrefix, setVPathPrefix] = useState(sec.vault?.pathPrefix ?? '');
   const [vAuthMethod, setVAuthMethod] = useState<'token' | 'approle' | 'jwt'>(sec.vault?.authMethod ?? 'token');
   const [vRoleId,    setVRoleId]    = useState(sec.vault?.roleId ?? '');
   const [vJwtRole,   setVJwtRole]   = useState(sec.vault?.jwtRole ?? '');
@@ -228,6 +229,7 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
     const vault: NonNullable<typeof secrets.vault> = {};
     if (vAddress.trim())    vault.address = vAddress.trim();
     if (vNamespace.trim())  vault.namespace = vNamespace.trim();
+    if (vPathPrefix.trim()) vault.pathPrefix = vPathPrefix.trim();
     if (vAuthMethod !== 'token') vault.authMethod = vAuthMethod;
     if (vRoleId.trim())     vault.roleId = vRoleId.trim();
     if (vJwtRole.trim())    vault.jwtRole = vJwtRole.trim();
@@ -730,6 +732,15 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
                   <label className={labelCls}>{t('Address (VAULT_ADDR / BAO_ADDR)')}</label>
                   <input value={vAddress} onChange={e => setVAddress(e.target.value)} placeholder="https://vault.acme.internal:8200"
                     className={`${inputCls} placeholder-surface-600`} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className={labelCls}>{t('Path prefix')}</label>
+                  <input value={vPathPrefix} onChange={e => setVPathPrefix(e.target.value)} placeholder="stack/1000120-test-automation/data/"
+                    aria-label={t('Path prefix')}
+                    className={`${inputCls} placeholder-surface-600 font-mono`} />
+                  <span className="text-[10px] text-surface-600 normal-case">
+                    {t('Prepended to every vault: / bao: reference (include the KV v2 "data/" segment). A reference starting with / ignores it.')}
+                  </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">

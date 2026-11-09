@@ -12,6 +12,10 @@
 export interface SecretResolveContext {
   /** Reserved for future per-request scoping (profile selection, etc.). */
   readonly profile?: string
+  /** The active variable scope (environment + collection + …), so a provider
+   *  can interpolate `{{var}}` tokens inside a reference path or a configured
+   *  path prefix — e.g. the Vault prefix `stack/{{stackFolder}}/data/`. */
+  readonly vars?: Record<string, string>
 }
 
 export interface SecretProvider {

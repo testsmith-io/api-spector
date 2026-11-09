@@ -165,18 +165,14 @@ export async function buildEnvVars(environment: Environment | null): Promise<Rec
   const vars: Record<string, string> = {};
   if (!environment) return vars;
   const masterKey = process.env['API_SPECTOR_MASTER_KEY'];
+  // External secrets resolve in a second pass, after all plain/env/encrypted
+  // vars, so a secret ref (or a provider's path prefix) can interpolate a
+  // {{var}} that is defined anywhere in this environment, not only above it.
+  const deferredSecretRefs: { key: string; ref: string }[] = [];
   for (const v of environment.variables) {
     if (!v.enabled) continue;
     if (v.secretRef && hasSecretScheme(v.secretRef)) {
-      // External secret manager (HashiCorp Vault, ...) — resolved at send-time,
-      // never stored. A resolution failure leaves the var unset (so only the
-      // requests that use it fail) with a warning, rather than aborting the run.
-      try {
-        const resolved = await resolveExternalSecret(v.secretRef);
-        if (resolved !== null) vars[v.key] = resolved;
-      } catch (err) {
-        console.warn(`[secrets] could not resolve ${v.key} (${v.secretRef}): ${(err as Error).message}`);
-      }
+      deferredSecretRefs.push({ key: v.key, ref: v.secretRef });
     } else if (v.envRef) {
       // OS environment variable — read from process.env at send-time
       const envValue = process.env[v.envRef];
@@ -203,6 +199,17 @@ export async function buildEnvVars(environment: Environment | null): Promise<Rec
       vars[v.key] = v.value;
     }
   }
+  // Second pass: external secrets, with the plain vars available as the scope a
+  // provider interpolates against. A resolution failure leaves the var unset (so
+  // only the requests that use it fail) with a warning, rather than aborting.
+  for (const { key, ref } of deferredSecretRefs) {
+    try {
+      const resolved = await resolveExternalSecret(ref, { vars });
+      if (resolved !== null) vars[key] = resolved;
+    } catch (err) {
+      console.warn(`[secrets] could not resolve ${key} (${ref}): ${(err as Error).message}`);
+    }
+  }
   return vars;
 }
 
@@ -215,7 +222,10 @@ export async function buildEnvVars(environment: Environment | null): Promise<Rec
  * these async lookups must run up-front. Throws if a referenced secret cannot
  * be resolved.
  */
-export async function resolveInlineSecretRefs(text: string): Promise<Record<string, string>> {
+export async function resolveInlineSecretRefs(
+  text: string,
+  vars?: Record<string, string>,
+): Promise<Record<string, string>> {
   const refs = new Set<string>();
   for (const m of text.matchAll(/\{\{\s*([^}]+?)\s*\}\}/g)) {
     const inner = m[1].trim();
@@ -225,7 +235,9 @@ export async function resolveInlineSecretRefs(text: string): Promise<Record<stri
 
   const out: Record<string, string> = {};
   await Promise.all([...refs].map(async (ref) => {
-    const value = await resolveExternalSecret(ref);
+    // Pass the variable scope so a provider can interpolate {{var}} inside a
+    // reference path or its configured path prefix.
+    const value = await resolveExternalSecret(ref, { vars });
     if (value !== null) out[ref] = value;
   }));
   return out;
