@@ -83,17 +83,15 @@ describe('runMqttTest', () => {
   });
 
   it('does not publish to a wildcard topic, and collects for the full window', async () => {
-    // A wildcard in the Publish topic is illegal to publish and would make the
-    // broker drop the connection mid-test. The test must skip the publish and
-    // still run the collect window to completion (here: an outside publisher
-    // feeds the subscription).
+    // A wildcard Publish topic is illegal and would drop the connection, so the test skips
+    // the publish but still runs the collect window to the end (an outside publisher feeds the sub).
     const feeder = (await import('mqtt')).default.connect(url, { clientId: 'feeder' });
     await new Promise<void>(r => feeder.on('connect', () => r()));
     const t0 = Date.now();
     const res = await runMqttTest({
       url,
       subscribeTopic: 'sensors/#',
-      publishTopic: 'sensors/#',          // wildcard — must not be published
+      publishTopic: 'sensors/#',          // wildcard - must not be published
       publishPayload: 'ignored',
       qos: 0,
       collectMs: 500,

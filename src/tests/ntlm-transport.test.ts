@@ -55,7 +55,7 @@ function authType(headerValue: string): 'type1' | 'type3' | null {
 describe('performNtlmRequest — end-to-end against a real NTLM server', () => {
   let server: Server;
   let port: number;
-  // Challenge is bound to the socket — this is what makes the test also verify
+  // Challenge is bound to the socket - this is what makes the test also verify
   // that message 3 arrives on the SAME connection as message 1.
   const challengeBySocket = new WeakMap<Socket, Buffer>();
   const targetInfo = Buffer.from('02000800430041000000', 'hex'); // tiny AV_PAIR block
@@ -92,7 +92,7 @@ describe('performNtlmRequest — end-to-end against a real NTLM server', () => {
           }
           return;
         }
-        // No NTLM header at all — demand it.
+        // No NTLM header at all - demand it.
         res.writeHead(401, { 'WWW-Authenticate': 'NTLM', 'Content-Type': 'text/plain' });
         res.end('need ntlm');
       };

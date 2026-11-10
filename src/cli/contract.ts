@@ -3,37 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * API Spector contract CLI
- *
- * Usage:
- *   api-spector contract list --workspace <path>
- *   api-spector contract pin  --workspace <path> --spec-url <url> | --spec-path <file> [--name <label>]
- *   api-spector contract run  --workspace <path> --mode <mode> [options]
- *
- *   Modes: consumer | provider | provider-live | bidirectional
- *
- * Run options:
- *   --snapshot <id|name>      Run against a pinned snapshot (looks up by id
- *                             prefix or exact name). Takes priority over
- *                             --spec-url / --spec-path.
- *   --spec-url <url>          Fetch spec from URL for this run (not pinned).
- *   --spec-path <path>        Read spec from local file for this run.
- *   --collection <name>       Limit to a specific collection (default: all).
- *   --environment <name>      Environment to resolve {{vars}} against.
- *   --request-base-url <url>  Strip this host from request URLs before matching.
- *   --output <path>           Write ContractReport JSON to a file.
- *   --allow-pending           Never-verified failures report as pending.
- *
- * publish-verification options:
- *   --consumer / --provider   Pacticipant names (required).
- *   --success <true|false>    The outcome (required). In CI, derive it from the
- *                             exit code of `contract run`.
- *   --report <path>           Attach the ContractReport written by
- *                             `contract run --output <path>`, so the cloud shows
- *                             the per-interaction violations, not just pass/fail.
- *
- * Also: pin, can-i-deploy [--to <env>], record-deployment, environments,
- * webhooks [--test], report [--html <path>], pact-import, pact-export.
+ * API Spector contract CLI. Modes: consumer | provider | provider-live | bidirectional.
+ * Run with --help (or no subcommand) for the full command and option list.
  */
 
 import { readFile, writeFile, writeFile as fsWriteFile } from 'node:fs/promises';
@@ -61,7 +32,7 @@ import { fetch as undiciFetch } from 'undici';
 import { load as loadYamlSpec } from 'js-yaml';
 import { selectEnvironment, resolveEnvironmentChain } from '../shared/environments';
 
-// ─── Commands ────────────────────────────────────────────────────────────────
+// Commands
 
 async function cmdList ( args: Record<string, string | boolean> ): Promise<void> {
   const wsArg = args['workspace'];
@@ -94,8 +65,7 @@ async function cmdList ( args: Record<string, string | boolean> ): Promise<void>
   console.log( '    api-spector contract run --workspace <path> --mode provider --snapshot <id>' );
 }
 
-/** Pin an OpenAPI spec as a workspace snapshot (same as the GUI's Pin button)
- *  and register it in the workspace file so `list`/`run --snapshot` see it. */
+/** Pin an OpenAPI spec as a workspace snapshot and register it in the workspace file. */
 async function cmdPin ( args: Record<string, string | boolean> ): Promise<void> {
   const wsArg = args['workspace'];
   if ( typeof wsArg !== 'string' ) {
@@ -127,8 +97,7 @@ async function cmdPin ( args: Record<string, string | boolean> ): Promise<void> 
   console.log( `    api-spector contract run --workspace ${wsArg} --mode provider --snapshot ${snapshot.id.slice( 0, 8 )}` );
 }
 
-/** Find a snapshot by exact id, id-prefix (first 8 chars are shown by `list`),
- *  or exact name. Returns the rel-path + loaded snapshot for use with run. */
+/** Find a snapshot by exact id, id-prefix, or exact name. */
 async function resolveSnapshot (
   ws: Workspace,
   dir: string,
@@ -167,8 +136,7 @@ async function cmdRun ( args: Record<string, string | boolean> ): Promise<void> 
   const collections = await loadCollections( workspace, dir, { filterName: collectionName } );
   const envs = await loadEnvironments( workspace, dir );
   const envName = typeof args['environment'] === 'string' ? args['environment'] : undefined;
-  // --environment flag, else the workspace's default environment, else the
-  // first environment (historical behavior). Inheritance chains are merged.
+  // --environment flag, else workspace default, else first env. Chains merged.
   const activeEnv = selectEnvironment( workspace, envs, envName )
     ?? ( envName ? undefined : envs[0] ? resolveEnvironmentChain( envs[0], envs ) : undefined );
   const envVars: Record<string, string> = {};
@@ -188,9 +156,8 @@ async function cmdRun ( args: Record<string, string | boolean> ): Promise<void> 
   const contractRequests = [ ...collectionContracts, ...designContracts ];
   if ( designContracts.length ) {
     console.log( `  + ${designContracts.length} design-first interaction(s) from the Contract Designer / pacts/` );
-    // Imported pacts use {{baseUrl}} (see pactToCollection). Run directly - without
-    // a collection to define it - by defaulting baseUrl to empty, so the path
-    // resolves and provider-live / bidirectional rebase onto the real provider.
+    // Imported pacts use {{baseUrl}}; default it to empty so host-less paths
+    // resolve and provider-live / bidirectional rebase onto the real provider.
     if ( envVars['baseUrl'] === undefined && collectionVars['baseUrl'] === undefined ) {
       collectionVars['baseUrl'] = '';
     }
@@ -203,8 +170,7 @@ async function cmdRun ( args: Record<string, string | boolean> ): Promise<void> 
 
   if ( typeof args['snapshot'] === 'string' ) {
     const { snapshot } = await resolveSnapshot( workspace, dir, args['snapshot'] );
-    // Materialize the snapshot spec to a tmp file so the verifier can read it
-    // like any other local spec file (matches how the IPC handler does it).
+    // Materialize the snapshot spec to a tmp file so the verifier reads it like any local spec.
     const tmp = join( tmpdir(), `api-spector-${randomUUID()}.${snapshot.format === 'yaml' ? 'yaml' : 'json'}` );
     await fsWriteFile( tmp, snapshot.spec, 'utf8' );
     specPath = tmp;
@@ -249,10 +215,9 @@ async function cmdRun ( args: Record<string, string | boolean> ): Promise<void> 
       break;
   }
 
-  // Pending contracts: failures of interactions that never passed before are
-  // reported but do not block (Pact's pending pacts). Opt-in per run; the
-  // first-pass ledger lives in contracts/pending.json and only updates when
-  // the flag is used, so teams that don't use it see no new files.
+  // Pending contracts: failures of never-passed interactions are reported but
+  // don't block. Opt-in; the ledger in contracts/pending.json updates only when
+  // the flag is used.
   if ( args['allow-pending'] ) {
     const store = await loadPendingStore( dir );
     const verified = mode === 'provider' ? allRequests : contractRequests;
@@ -323,7 +288,7 @@ async function cmdRun ( args: Record<string, string | boolean> ): Promise<void> 
   process.exit( report.failed === 0 ? 0 : 1 );
 }
 
-// ─── can-i-deploy ─────────────────────────────────────────────────────────────
+// can-i-deploy
 
 async function cmdCanIDeploy ( args: Record<string, string | boolean> ): Promise<void> {
   const wsArg = args['workspace'];
@@ -355,7 +320,7 @@ async function cmdCanIDeploy ( args: Record<string, string | boolean> ): Promise
   process.exit( verdict.deployable ? 0 : 1 );
 }
 
-// ─── Deployment tracking ──────────────────────────────────────────────────────
+// Deployment tracking
 
 async function cmdRecordDeployment ( args: Record<string, string | boolean> ): Promise<void> {
   const wsArg = args['workspace'];
@@ -369,9 +334,8 @@ async function cmdRecordDeployment ( args: Record<string, string | boolean> ): P
 
   const { dir } = await loadWorkspace( wsArg );
 
-  // Recording documents a fact (the deploy happened), so it never blocks.
-  // But warn loudly when the recorded version has no passing verification,
-  // because that means the can-i-deploy gate was skipped.
+  // Recording a deploy never blocks, but warn when the version has no passing
+  // verification (the can-i-deploy gate was skipped).
   const verdict = await canIDeploy( dir, pacticipant, appVersion );
   const { file, previous } = await recordDeployment( dir, env, pacticipant, appVersion, new Date().toISOString() );
 
@@ -408,7 +372,7 @@ async function cmdEnvironments ( args: Record<string, string | boolean> ): Promi
   console.log( '' );
 }
 
-// ─── Fuzzing ──────────────────────────────────────────────────────────────────
+// Fuzzing
 
 async function cmdFuzz ( args: Record<string, string | boolean> ): Promise<void> {
   const wsArg = args['workspace'];
@@ -428,8 +392,7 @@ async function cmdFuzz ( args: Record<string, string | boolean> ): Promise<void>
 
   const allRequests: ApiRequest[] = collections.flatMap( c => Object.values( c.requests ) );
 
-  // Spec source: --snapshot, --spec-url, or --spec-path. Optional: without one,
-  // request bodies are the baseline.
+  // Spec source: --snapshot / --spec-url / --spec-path. Without one, request bodies are the baseline.
   let specUrl = typeof args['spec-url'] === 'string' ? args['spec-url'] : undefined;
   let specPath = typeof args['spec-path'] === 'string' ? args['spec-path'] : undefined;
   if ( typeof args['snapshot'] === 'string' ) {
@@ -513,7 +476,7 @@ async function cmdFuzz ( args: Record<string, string | boolean> ): Promise<void>
   process.exit( report.totalFindings === 0 ? 0 : 1 );
 }
 
-// ─── Webhooks ─────────────────────────────────────────────────────────────────
+// Webhooks
 
 async function cmdWebhooks ( args: Record<string, string | boolean> ): Promise<void> {
   const wsArg = args['workspace'];
@@ -561,7 +524,7 @@ async function cmdWebhooks ( args: Record<string, string | boolean> ): Promise<v
   }
 }
 
-// ─── Dashboard report ─────────────────────────────────────────────────────────
+// Dashboard report
 
 async function cmdReport ( args: Record<string, string | boolean> ): Promise<void> {
   const wsArg = args['workspace'];
@@ -576,7 +539,7 @@ async function cmdReport ( args: Record<string, string | boolean> ): Promise<voi
   console.log( `  Dashboard with ${records.length} recorded result(s) written to ${out}` );
 }
 
-// ─── Pact interop ─────────────────────────────────────────────────────────────
+// Pact interop
 
 async function cmdPactImport ( args: Record<string, string | boolean> ): Promise<void> {
   const file = args['file'];
@@ -617,12 +580,9 @@ async function cmdPactExport ( args: Record<string, string | boolean> ): Promise
   console.log( `  Exported ${requests.length} interaction(s) to ${out} (${consumer} → ${provider})` );
 }
 
-// ─── Cloud broker commands (git-native, CI-native) ──────────────────────────
-//
-// These target the API Spector Cloud broker (auth: API_SPECTOR_TOKEN), keyed to
-// the git SHA automatically. The existing can-i-deploy / record-deployment
-// commands stay local (--workspace); the broker path is taken with --broker or
-// when API_SPECTOR_TOKEN is set and no --workspace is given.
+// Cloud broker commands (git-native, CI-native). Target the Cloud broker (auth
+// API_SPECTOR_TOKEN, version = git SHA), used with --broker or when the token is
+// set and no --workspace is given.
 
 const str = ( v: string | boolean | undefined ): string | undefined => typeof v === 'string' ? v : undefined;
 const die = ( msg: string ): never => { console.error( `  [error] ${msg}` ); process.exit( 2 ); };
@@ -632,9 +592,8 @@ function wantsCloud ( args: Record<string, string | boolean> ): boolean {
   return !!args['broker'] || ( !!process.env['API_SPECTOR_TOKEN'] && !args['workspace'] );
 }
 
-/** Derive a contract expectation from a request's saved example response — the
- *  "pact from traffic you already ran" path, no Contract tab needed. Status +
- *  a type-based body schema (integer/string/… per top-level field). */
+/** Derive a contract expectation from a request's saved example response:
+ *  status + a type-based body schema per top-level field. */
 function deriveContract ( req: ApiRequest ): ContractExpectation | undefined {
   const ex = ( req.examples ?? [] ).find( e => e.response && typeof e.response.status === 'number' );
   if ( !ex?.response ) return undefined;
@@ -653,7 +612,7 @@ function deriveContract ( req: ApiRequest ): ContractExpectation | undefined {
         properties: Object.fromEntries( Object.entries( body ).map( ( [k, v] ) => [k, { type: jsType( v ) }] ) ),
       } );
     }
-  } catch { /* non-JSON body → status-only contract */ }
+  } catch { /* non-JSON body -> status-only contract */ }
   return c;
 }
 
@@ -672,8 +631,7 @@ async function cmdPublish ( args: Record<string, string | boolean> ): Promise<vo
 
   let requests = all.filter( r => hasContract( r.contract ) );
 
-  // --derive: for requests without an explicit contract, synthesise one from a
-  // saved example response (pact from traffic).
+  // --derive: synthesise a contract from a saved example response for requests without one.
   if ( args['derive'] ) {
     const derived = all
       .filter( r => !hasContract( r.contract ) )
@@ -689,9 +647,9 @@ async function cmdPublish ( args: Record<string, string | boolean> ): Promise<vo
   console.log( `  Published ${requests.length} interaction(s): ${consumer}@${version.slice( 0, 7 )} → ${provider}` );
 }
 
-// Local provider-spec publish = pin the spec into the workspace (git). `--spec`
-// is accepted as an alias for `--spec-path`, and `--provider` names the snapshot,
-// so the same flags work whether you target the broker or the workspace.
+// Local provider-spec publish = pin the spec into the workspace. `--spec` aliases
+// `--spec-path` and `--provider` names the snapshot, so the same flags work for
+// broker or workspace.
 async function cmdPublishSpecLocal ( args: Record<string, string | boolean> ): Promise<void> {
   const norm = { ...args };
   if ( typeof norm['spec'] === 'string' && typeof norm['spec-path'] !== 'string' ) norm['spec-path'] = norm['spec'];
@@ -720,8 +678,8 @@ async function cmdPublishSpec ( args: Record<string, string | boolean> ): Promis
   try { spec = JSON.parse( specText ); } catch { spec = loadYamlSpec( specText ); }
   if ( !spec || typeof spec !== 'object' ) die( 'Could not parse the OpenAPI spec (expected JSON or YAML).' );
 
-  // Optional provider self-verification: the outcome of running the provider's own
-  // tests (JUnit/Postman/Schemathesis) against this spec, published as evidence.
+  // Optional provider self-verification: the outcome of the provider's own tests
+  // against this spec, published as evidence.
   let results: Record<string, unknown> | undefined;
   const resultsPath = str( args['results'] );
   if ( resultsPath ) results = parseSelfVerification( await readFile( resultsPath, 'utf8' ), resultsPath );
@@ -769,11 +727,10 @@ async function cmdCloudRecordDeployment ( args: Record<string, string | boolean>
   console.log( `  Recorded ${pacticipant}@${version.slice( 0, 7 )} deployed to ${environment}` );
 }
 
-// ─── Entry ───────────────────────────────────────────────────────────────────
+// Entry
 
-// The Compatibility Check: is consumer@version compatible with provider@version?
-// Read-only, pairwise, no deployment considered (that is deploy-check). Exit 1 on
-// incompatible, with per-field reasons — usable as a CI gate on its own.
+// Compatibility check: is consumer@version compatible with provider@version?
+// Read-only, pairwise, no deployment considered. Exit 1 on incompatible.
 async function cmdCheck ( args: Record<string, string | boolean> ): Promise<void> {
   const consumer = str( args['consumer'] ) ?? die( '--consumer <name> is required' );
   const consumerVersion = str( args['consumer-version'] ) ?? die( '--consumer-version <ver> is required' );
@@ -794,9 +751,8 @@ async function cmdCheck ( args: Record<string, string | boolean> ): Promise<void
   process.exit( 1 );
 }
 
-// Publish a provider verification result to the broker (the outcome of verifying
-// the provider against a consumer's pact). Resolves the contract id via the
-// broker, then records the pass/fail against the provider version.
+// Publish a provider verification result to the broker. Resolves the contract id,
+// then records pass/fail against the provider version.
 async function cmdPublishVerification ( args: Record<string, string | boolean> ): Promise<void> {
   const consumer = str( args['consumer'] ) ?? die( '--consumer <name> is required' );
   const provider = str( args['provider'] ) ?? die( '--provider <name> is required' );
@@ -807,8 +763,7 @@ async function cmdPublishVerification ( args: Record<string, string | boolean> )
   const buildUrl = str( args['build-url'] );
   const consumerVersion = str( args['consumer-version'] );
 
-  // Optional: attach the full ContractReport (written by `contract run
-  // --output report.json`) so the cloud shows WHY it failed, not just pass/fail.
+  // Optional: attach the full ContractReport so the cloud shows why it failed, not just pass/fail.
   let results: unknown;
   const reportPath = str( args['report'] );
   if ( reportPath ) {
@@ -835,9 +790,8 @@ async function main (): Promise<void> {
   if ( sub === 'pin' ) return cmdPin( args );
   if ( sub === 'run' ) return cmdRun( args );
   if ( sub === 'publish' ) return cmdPublish( args );
-  // `publish-spec` mirrors deploy-check: --broker publishes to the cloud broker,
-  // otherwise it pins the spec into the workspace (local / git) — the provider
-  // side of bi-directional testing, with or without the cloud.
+  // `publish-spec` mirrors deploy-check: --broker publishes to the cloud, else pins
+  // the spec into the workspace - the provider side of bi-directional testing.
   if ( sub === 'publish-spec' ) return wantsCloud( args ) ? cmdPublishSpec( args ) : cmdPublishSpecLocal( args );
   if ( sub === 'preview' ) return cmdPreview( args );
   // `deploy-check` is the primary name; `can-i-deploy` is a Pact-compatible alias.

@@ -197,7 +197,7 @@ export function AssertMenu({ state, onClose, onConfirm }: Props) {
         </div>
       )}
 
-      {/* ── Extract section ── */}
+      {/* Extract section */}
       <div className="mt-1 border-t border-surface-800 pt-1">
         <div className="text-[10px] text-surface-500 uppercase tracking-wider px-2 py-1">{t('Extract')}</div>
         {extractScopes.map(scope => (

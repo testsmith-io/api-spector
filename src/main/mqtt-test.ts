@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 // Run an MQTT request as a test: connect, subscribe, optionally publish, collect
-// the messages that arrive for a window, then run an sp.* assertion script over
-// them (the messages are exposed as sp.messages). Used by the MQTT panel's "Run
-// test" button and by the collection runner so an MQTT request can be a pass/
-// fail step. One-shot: it opens its own connection and closes it when done.
+// arriving messages for a window, then run an sp.* assertion script over them
+// (exposed as sp.messages). One-shot: opens its own connection and closes it when done.
 
 import mqtt from 'mqtt';
 import { runScript } from './script-runner';
@@ -68,7 +66,7 @@ export async function runMqttTest(cfg: MqttTestConfig): Promise<MqttTestResult> 
       if (timer) clearTimeout(timer);
       try { client?.end(true); } catch { /* ignore */ }
 
-      // A connection error with nothing collected is the result — don't run the
+      // A connection error with nothing collected is the result; don't run the
       // script against an empty set as if it were a legitimate "no messages".
       if (connectError && messages.length === 0) {
         resolve({ testResults: [], consoleOutput: [], error: connectError, messages, clientId });
@@ -104,11 +102,9 @@ export async function runMqttTest(cfg: MqttTestConfig): Promise<MqttTestResult> 
       const publish = () => {
         const topic = cfg.publishTopic?.trim();
         if (!topic) return;
-        // A PUBLISH topic must be concrete: MQTT forbids wildcards (+ or #) in a
-        // published topic, and a broker answers such a packet by dropping the
-        // connection with a protocol error. Subscribing to a wildcard is fine,
-        // so when the Publish topic is a filter we simply skip publishing and
-        // just collect from the subscription (the usual "listen only" test).
+        // A PUBLISH topic must be concrete: MQTT forbids wildcards (+ or #) and a broker
+        // drops the connection with a protocol error on one. Subscribing to a wildcard is
+        // fine, so skip publishing when the topic is a filter (listen-only test).
         if (/[+#]/.test(topic)) return;
         client.publish(topic, cfg.publishPayload ?? '', { qos: (cfg.qos ?? 0) as 0 | 1 | 2, retain: Boolean(cfg.retain) });
       };
@@ -125,11 +121,9 @@ export async function runMqttTest(cfg: MqttTestConfig): Promise<MqttTestResult> 
       messages.push({ topic, payload: payload.toString('utf8'), qos: packet?.qos, retain: Boolean(packet?.retain), timestamp: Date.now() });
     });
 
-    // mqtt.js can emit an error with an empty message for a refused connection,
-    // so fall back to a clear one. A close while we are still collecting is a
-    // real problem: either we never connected, or the broker dropped the
-    // connection mid-test (a protocol error such as publishing to a wildcard
-    // topic, or another connection using the same client id).
+    // mqtt.js can emit an error with an empty message for a refused connection, so
+    // fall back to a clear one. A close while still collecting is a real problem: we
+    // never connected, or the broker dropped us mid-test.
     client.on('error', (err: Error) => {
       const code = (err as { code?: string })?.code;
       lastError = [err?.message, code].filter(Boolean).join(' ');

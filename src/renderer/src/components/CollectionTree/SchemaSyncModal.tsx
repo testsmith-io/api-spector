@@ -32,23 +32,16 @@ export type SchemaSyncScope =
   | { type: 'folder'; folderId: string }
   | { type: 'request'; requestId: string }
 
-/**
- * Normalise a URL so we can compare it against an OpenAPI path template.
- * Strips any leading `{{baseUrl}}` or `https://host:port` prefix, and
- * replaces `{{name}}` variable tokens back to `{name}` so they match the
- * OpenAPI `{name}` format.
- */
+/** Normalise a URL for comparison against an OpenAPI path template: strip any
+ *  `{{baseUrl}}` / `https://host:port` prefix and rewrite `{{name}}` to `{name}`. */
 function normalisePath(url: string): string {
   let path = url
-    // Strip variable-based prefix: {{baseUrl}}/foo → /foo
+    // Strip variable-based prefix: {{baseUrl}}/foo -> /foo
     .replace(/^\{\{[^}]+\}\}/, '')
-    // Strip absolute URL prefix: https://host:port/foo → /foo
+    // Strip absolute URL prefix: https://host:port/foo -> /foo
     .replace(/^https?:\/\/[^/]+/, '');
-  // Ensure leading slash
   if (!path.startsWith('/')) path = '/' + path;
-  // Drop query string
   path = path.split('?')[0];
-  // Rewrite {{x}} back to {x}
   path = path.replaceAll(/\{\{([^}]+)\}\}/g, '{$1}');
   return path;
 }

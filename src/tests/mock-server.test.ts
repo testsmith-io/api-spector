@@ -5,7 +5,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { startMock, stopMock, isRunning, updateMockRoutes } from '../main/mock-server';
 import type { MockServer, MockRoute } from '../shared/types';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// Helpers
 
 // Ports are allocated sequentially to keep tests independent.
 let portCounter = 19100;
@@ -49,7 +49,7 @@ afterEach(async () => {
   cleanup.length = 0;
 });
 
-// ─── Lifecycle ────────────────────────────────────────────────────────────────
+// Lifecycle
 
 describe('mock server lifecycle', () => {
   it('isRunning returns false before start', () => {
@@ -73,13 +73,13 @@ describe('mock server lifecycle', () => {
     const mock = makeMock(nextPort());
     cleanup.push(mock.id);
     await startMock(mock);
-    // Second start on same ID — should not throw
+    // Second start on same ID - should not throw
     await startMock(mock);
     expect(isRunning(mock.id)).toBe(true);
   });
 });
 
-// ─── Route matching ───────────────────────────────────────────────────────────
+// Route matching
 
 describe('mock server: route matching', () => {
   it('returns 404 JSON for an unmatched route', async () => {
@@ -158,7 +158,7 @@ describe('mock server: route matching', () => {
   });
 });
 
-// ─── Live route updates ───────────────────────────────────────────────────────
+// Live route updates
 
 describe('mock server: live route updates', () => {
   it('reflects updated routes without restarting the server', async () => {
@@ -175,7 +175,7 @@ describe('mock server: live route updates', () => {
   });
 });
 
-// ─── Body interpolation ───────────────────────────────────────────────────────
+// Body interpolation
 
 describe('mock server: body interpolation', () => {
   it('interpolates {{request.params.id}} from URL path parameter', async () => {
@@ -241,7 +241,7 @@ describe('mock server: body interpolation', () => {
   });
 });
 
-// ─── XML request bodies ─────────────────────────────────────────────────────
+// XML request bodies
 
 describe('mock server: XML request bodies', () => {
   it('reuses a leaf value from an XML body (text/xml)', async () => {
@@ -301,7 +301,7 @@ describe('mock server: XML request bodies', () => {
   });
 });
 
-// ─── Pre-response scripts ─────────────────────────────────────────────────────
+// Pre-response scripts
 
 describe('mock server: pre-response scripts', () => {
   it('script can override the response status code', async () => {

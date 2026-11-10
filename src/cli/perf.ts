@@ -3,16 +3,15 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * API Spector CLI — performance (load) testing
+ * API Spector CLI - performance (load) testing
  *
  * Usage:
  *   api-spector perf list --workspace <path>
  *   api-spector perf run <plan> --workspace <path> [overrides]
  *
- * Runs a saved performance plan headless. The plan's target (request, a
- * collection/folder sequence, or a flow), load pattern, think time and
- * thresholds come from the workspace; the flags below override the load
- * profile for this run (handy for a lighter smoke in CI, a heavier nightly).
+ * Runs a saved performance plan headless. The plan (target, load pattern, think
+ * time, thresholds) comes from the workspace; the flags below override the load
+ * profile for this run.
  *
  * Options:
  *   --workspace   <path>    Workspace (.spector file or its folder) (required)

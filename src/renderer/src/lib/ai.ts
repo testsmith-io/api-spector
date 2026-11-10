@@ -8,7 +8,7 @@ import type { ApiRequest, Collection, Folder, GenerateDocsInput } from '../../..
 
 const { electron } = window;
 
-// AI config (model choice) lives in localStorage — per-machine, so it never
+// AI config (model choice) lives in localStorage - per-machine, so it never
 // lands in the workspace/collection files or version control. The API key
 // itself lives only in the OS keychain (see AI_OPENAI_TOKEN_REF).
 const CFG_KEY = STORAGE_KEYS.ai;
@@ -46,7 +46,7 @@ export async function generateDocs(input: Omit<GenerateDocsInput, 'model'>): Pro
   return electron.generateAiDocs({ ...input, model: getAiConfig().model });
 }
 
-// ── Context builders (readable summaries fed to the model) ───────────────────
+// Context builders (readable summaries fed to the model)
 
 function kvLines(label: string, rows: { key: string; value: string; enabled?: boolean }[] | undefined): string[] {
   const on = (rows ?? []).filter(r => r.enabled !== false && r.key);

@@ -3,25 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * API Spector coverage CLI
- *
- * Measures how much of an OpenAPI contract the workspace actually tests.
- *
- * Usage:
- *   api-spector coverage --workspace <path> --spec <file|url> [options]
- *
- * Options:
- *   --workspace <path>     Workspace file or directory (required).
- *   --spec <file|url>      OpenAPI 3.x document (JSON or YAML) to measure against.
- *                          Defaults to settings.coverageSpec if set.
- *   --collection <name>    Only count requests from this collection.
- *   --json                 Print the report as JSON.
- *   --output <path>        Write the report to a file (.json or .html by extension).
- *   --fail-under <pct>     Exit 1 if operation coverage is below this percentage
- *                          (for CI gating).
- *   --runs <report.json>   An `api-spector run --output` report; credits response
- *                          codes and response-schema properties actually seen.
- *   --help                 Show this help.
+ * API Spector coverage CLI: measures how much of an OpenAPI contract the workspace tests.
+ * Usage: api-spector coverage --workspace <path> --spec <file|url> [options]. See --help for options.
  */
 
 import { readFile, writeFile } from 'node:fs/promises';
@@ -31,8 +14,8 @@ import type { Workspace, Collection, ApiRequest } from '../shared/types';
 import { computeCoverage, flattenValuePaths, type CoverageReport, type CoverageRequestInput, type CoverageObservation } from '../shared/coverage';
 import { parseArgs, loadWorkspace, loadCollections, C, color } from './cli-common';
 
-// Turn an `api-spector run --output report.json` file into coverage
-// observations: what status each call returned and which response fields it saw.
+// An `api-spector run --output` report -> coverage observations (status + seen
+// response fields per call).
 async function loadObservations(path: string): Promise<CoverageObservation[]> {
   const report = JSON.parse(await readFile(path, 'utf8')) as { results?: Array<{ method?: string; url?: string; status?: number; httpStatus?: number; response?: { body?: string } }> };
   const out: CoverageObservation[] = [];
@@ -56,8 +39,7 @@ async function loadSpec(source: string): Promise<unknown> {
   return isYaml ? yamlLoad(raw) : JSON.parse(raw);
 }
 
-// Every non-example request across the loaded collections, reduced to what the
-// coverage engine needs. Expected status comes from a request's contract.
+// Every non-example request, reduced to what the coverage engine needs.
 function collectRequests(collections: Collection[]): CoverageRequestInput[] {
   const out: CoverageRequestInput[] = [];
   for (const col of collections) {
@@ -183,7 +165,7 @@ async function main(): Promise<void> {
     printReport(report);
   }
 
-  // CI gate: fail the build when coverage is below the threshold.
+  // CI gate: fail below the threshold.
   if (args['fail-under'] !== undefined) {
     const threshold = Number(args['fail-under']);
     if (!Number.isNaN(threshold) && report.totals.operationPct < threshold) {

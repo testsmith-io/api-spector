@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildCliArgs, generateGitHub, generateAzure, generateGitLab } from '../shared/ci-generators';
 
-// ─── buildCliArgs ─────────────────────────────────────────────────────────────
+// buildCliArgs
 
 describe('buildCliArgs', () => {
   it('produces a minimal command with only workspace path', () => {
@@ -42,7 +42,7 @@ describe('buildCliArgs', () => {
   });
 });
 
-// ─── generateGitHub ───────────────────────────────────────────────────────────
+// generateGitHub
 
 describe('generateGitHub', () => {
   it('contains API_SPECTOR_MASTER_KEY secret reference', () => {
@@ -78,7 +78,7 @@ describe('generateGitHub', () => {
   });
 });
 
-// ─── generateAzure ────────────────────────────────────────────────────────────
+// generateAzure
 
 describe('generateAzure', () => {
   it('contains API_SPECTOR_MASTER_KEY variable', () => {
@@ -109,7 +109,7 @@ describe('generateAzure', () => {
   });
 });
 
-// ─── generateGitLab ───────────────────────────────────────────────────────────
+// generateGitLab
 
 describe('generateGitLab', () => {
   it('contains API_SPECTOR_MASTER_KEY variable', () => {

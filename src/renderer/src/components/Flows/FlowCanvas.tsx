@@ -1,11 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// The flow editor: a React Flow canvas with an Add-block menu, a config
-// inspector, a run bar and an output panel. The live RF node/edge state is the
-// source of truth while mounted (block config lives in node.data); every change
-// mirrors back into the store, which autosaves. Running ships the graph to the
-// main-process engine and paints streamed per-block status onto the nodes.
+// The flow editor: a React Flow canvas with inspector, run bar and output panel.
+// Live RF node/edge state is the source of truth and mirrors into the autosaving store;
+// running ships the graph to the main-process engine and paints per-block status.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -28,7 +26,7 @@ import { useT } from '../../i18n';
 
 const NODE_TYPES = flowNodeTypes;
 
-// ─── RF ⇄ Flow conversion ──────────────────────────────────────────────────
+// RF ⇄ Flow conversion
 
 function toRfNodes(flow: Flow): Node[] {
   return flow.nodes.map(n => ({
@@ -39,8 +37,7 @@ function toRfNodes(flow: Flow): Node[] {
 function toRfEdges(flow: Flow): Edge[] {
   return flow.edges.map(e => ({
     id: e.id, source: e.source, target: e.target,
-    // Default to the single 'out'/'in' handles so edges authored without
-    // explicit ports (imported / generated flows) still attach and render.
+    // Default to the 'out'/'in' handles so edges without explicit ports (imported/generated) still attach.
     sourceHandle: e.sourcePort ?? 'out', targetHandle: e.targetPort ?? 'in',
   }));
 }
@@ -57,16 +54,15 @@ function toFlowEdges(edges: Edge[]) {
   }));
 }
 
-// ─── Add-block menu ──────────────────────────────────────────────────────
+// Add-block menu
 
 const CATEGORY_LABEL: Record<FlowBlockCategory, string> = {
   action: 'Action', logic: 'Logic', looping: 'Looping', visualize: 'Visualize',
 };
 
-// Auto-layout: layer blocks left-to-right by longest path from the start, then
-// place them using each node's MEASURED size so nothing overlaps — columns
-// advance by the previous column's widest node, and nodes stack by real height.
-// Hand-rolled (no graph-layout dependency), good enough for flow-sized graphs.
+// Auto-layout: layer blocks left-to-right by longest path from start, then place
+// by each node's measured size so nothing overlaps (columns advance by the
+// widest node, rows stack by real height). Hand-rolled, no layout dependency.
 function layeredLayout(
   nodes: Node[],
   edges: Edge[],
@@ -110,10 +106,10 @@ function layeredLayout(
     for (const n of group) {
       const d = dims.get(n.id) ?? FALLBACK;
       pos.set(n.id, { x, y });
-      y += d.h + YGAP;             // stack by real height → no vertical overlap
+      y += d.h + YGAP;             // stack by real height -> no vertical overlap
       if (d.w > colW) colW = d.w;
     }
-    x += colW + XGAP;             // next column clears the widest node → no horizontal overlap
+    x += colW + XGAP;             // next column clears the widest node -> no horizontal overlap
   }
   return pos;
 }
@@ -172,9 +168,8 @@ function AddBlockMenu({ onAdd }: { readonly onAdd: (type: FlowBlockType) => void
           <div className="fixed inset-0 z-40" role="button" tabIndex={-1} aria-label={t('Close menu')}
             onClick={() => setOpen(false)} onKeyDown={e => { if (e.key === 'Escape') setOpen(false); }} />
           <div className="absolute left-0 top-full mt-1 z-50 w-56 bg-surface-900 border border-surface-700 rounded-lg shadow-2xl max-h-[70vh] overflow-y-auto">
-            {/* includeEnd: End is a 'terminal' block (excluded from the normal
-                palette), but it must be re-addable here too — otherwise deleting
-                the End node leaves no way to add one back from the toolbar. */}
+            {/* includeEnd: End is a terminal block (not in the palette), but
+                must be re-addable here so deleting it isn't a dead end. */}
             <BlockPickerList onPick={type => { onAdd(type); setOpen(false); }} includeEnd />
           </div>
         </>
@@ -183,7 +178,7 @@ function AddBlockMenu({ onAdd }: { readonly onAdd: (type: FlowBlockType) => void
   );
 }
 
-// ─── Output panel ──────────────────────────────────────────────────────────
+// Output panel
 
 const headerText = (h: Record<string, string>) =>
   Object.entries(h).map(([k, v]) => `${k}: ${v}`).join('\n');
@@ -228,8 +223,7 @@ function BottomPanel({ runner, flowName, problems, onFocusBlock, tab, setTab }: 
   const { outputs, variables, data, log, summary } = runner;
   // Expanded request/response detail in the Run log, keyed by log index.
   const [openLog, setOpenLog] = useState<Set<number>>(new Set());
-  // When a run finishes, auto-expand failed/errored request steps so their
-  // actual request + response are visible without a click.
+  // When a run finishes, auto-expand failed/errored request steps.
   useEffect(() => {
     if (!summary) return;
     const fails = new Set<number>();
@@ -248,8 +242,7 @@ function BottomPanel({ runner, flowName, problems, onFocusBlock, tab, setTab }: 
   const errorCount = problems.filter(p => p.severity === 'error').length;
 
   if (!hasLog && outputs.length === 0 && !hasVars && !hasProblems) return null;
-  // Resolve the active tab: honor the requested one when it has content, else
-  // fall back to the first tab that does.
+  // Active tab: the requested one if it has content, else the first that does.
   const avail = (id: BottomTab) =>
     id === 'log' ? hasLog : id === 'output' ? outputs.length > 0 : id === 'variables' ? hasVars : hasProblems;
   const active: BottomTab = avail(tab) ? tab
@@ -388,7 +381,7 @@ function BottomPanel({ runner, flowName, problems, onFocusBlock, tab, setTab }: 
   );
 }
 
-// ─── Editor ──────────────────────────────────────────────────────────────
+// Editor
 
 function FlowEditor({ flow }: { readonly flow: Flow }) {
   const t = useT();
@@ -431,9 +424,8 @@ function FlowEditor({ flow }: { readonly flow: Flow }) {
     setSelectedIds(sel.map(n => n.id));
   }, []);
 
-  // Extract the selected blocks into a new sub-flow, replacing them with a
-  // single `subflow` block wired to the external edges. The selected subgraph
-  // becomes start → (entries) → … → (exits) → end inside the new flow.
+  // Extract the selected blocks into a new sub-flow, replacing them with one
+  // `subflow` block wired to the external edges (start -> entries -> exits -> end).
   const extractSubflow = useCallback(() => {
     const sel = new Set(selectedIds.filter(id => {
       const n = nodes.find(x => x.id === id);
@@ -519,9 +511,8 @@ function FlowEditor({ flow }: { readonly flow: Flow }) {
     [setEdges],
   );
 
-  // Connect-to-empty-canvas: when a connection is dropped on the pane (no target
-  // handle), pop a block picker at the cursor and create the chosen block
-  // already wired from the originating port.
+  // Connect-to-empty-canvas: dropping a connection on the pane pops a block
+  // picker at the cursor and creates the chosen block wired from the source port.
   const connectingRef = useRef<{ nodeId: string | null; handleId: string | null } | null>(null);
   const [connectMenu, setConnectMenu] = useState<
     { x: number; y: number; position: { x: number; y: number }; sourceId: string; sourceHandle: string | null } | null
@@ -537,7 +528,7 @@ function FlowEditor({ flow }: { readonly flow: Flow }) {
     connectingRef.current = null;
     if (!from?.nodeId) return;
     const target = event.target as Element | null;
-    if (!target?.classList?.contains('react-flow__pane')) return; // dropped on a handle/node → normal connect
+    if (!target?.classList?.contains('react-flow__pane')) return; // dropped on a handle/node -> normal connect
     const point = 'changedTouches' in event ? event.changedTouches[0] : event;
     setConnectMenu({
       x: point.clientX, y: point.clientY,
@@ -621,9 +612,8 @@ function FlowEditor({ flow }: { readonly flow: Flow }) {
     return m;
   }, [runner.outputs]);
 
-  // Static pre-run validation of the live graph — recomputed on every edit so
-  // problems (no request selected, dangling edge, recursive sub-flow, …) show
-  // immediately, before the user hits Run.
+  // Static validation of the live graph, recomputed on every edit so problems
+  // show immediately, before Run.
   const problems = useMemo<FlowProblem[]>(() => {
     const current: Flow = { ...flow, nodes: toFlowNodes(nodes), edges: toFlowEdges(edges) };
     const others = Object.values(storeFlows).map(f => f.data).filter(f => f.id !== flow.id);
@@ -654,8 +644,7 @@ function FlowEditor({ flow }: { readonly flow: Flow }) {
     [nodes, runner.nodeStatus, displayOutputs, problemById],
   );
 
-  // After a run, highlight the edges that were actually traversed (colored by
-  // success/fail) and dim the branches that weren't taken.
+  // After a run, highlight the traversed edges (colored by success/fail) and dim the untaken branches.
   const displayEdges = useMemo(() => {
     const taken = new Set(runner.traversedEdges);
     const hadRun = taken.size > 0;
@@ -691,7 +680,7 @@ function FlowEditor({ flow }: { readonly flow: Flow }) {
   const stepCount = nodes.filter(n => n.type !== 'start' && n.type !== 'end').length;
   const { summary } = runner;
 
-  // ── Cloud ──
+  // Cloud
   const [cloudMsg, setCloudMsg] = useState<string | null>(null);
   const [cloudBusy, setCloudBusy] = useState(false);
   const showCloud = cloudEnabled();
@@ -781,7 +770,7 @@ function FlowEditor({ flow }: { readonly flow: Flow }) {
                 className="px-2 py-1.5 text-xs text-surface-400 hover:text-surface-200 bg-surface-800 hover:bg-surface-700 rounded transition-colors">↗</button>
             </div>
           ) : (
-            // Activation nudge: run flows on a schedule in the cloud. Opens Settings → Cloud.
+            // Activation nudge: run flows on a schedule in the cloud. Opens Settings -> Cloud.
             <button onClick={() => openWorkspaceSettings('cloud')} title={t('Connect to API Spector Cloud to run flows on a schedule')}
               className="px-2.5 py-1.5 mr-1 text-xs text-sky-300 bg-sky-900/30 hover:bg-sky-900/50 border border-sky-800/50 rounded font-medium transition-colors">☁ {t('Run in the cloud')}</button>
           )}
@@ -897,7 +886,7 @@ function FlowEditor({ flow }: { readonly flow: Flow }) {
   );
 }
 
-// ─── Public component ───────────────────────────────────────────────────────
+// Public component
 
 export function FlowCanvas() {
   const t = useT();

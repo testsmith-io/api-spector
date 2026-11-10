@@ -1,28 +1,20 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-/**
- * Shared scaffolding for the CLI entry points (runner, contract, mock,
- * record, wsdl, agents): ANSI colour helpers, `--flag value` argument
- * parsing, and workspace/collection/environment/mock file loading.
- *
- * Behavioral notes (kept configurable so each CLI's output is unchanged):
- *  - `color()` only emits ANSI codes on a TTY; `colorAlways()` always does
- *    (the `agents` CLI colours unconditionally).
- *  - `loadCollections`/`loadMocks` take an optional `onError` callback so
- *    callers decide whether an unreadable file warns or is skipped silently.
- */
+/** Shared scaffolding for the CLI entry points: ANSI colour helpers, `--flag
+ *  value` arg parsing, and workspace/collection/environment/mock loading.
+ *  `color()` emits ANSI only on a TTY; `colorAlways()` always does. */
 
 import { readFile, stat, readdir } from 'node:fs/promises';
 import { join, dirname, resolve } from 'node:path';
 import type { Workspace, Collection, Environment, MockServer, Flow } from '../shared/types';
 import { inlineDataSets } from '../main/data-files';
 
-// Design-first contract loading lives in main/contract so the app's IPC can share
-// it; re-exported here so the CLI's existing import site keeps working.
+// Design-first contract loading lives in main/contract; re-exported here so the
+// CLI's import site keeps working.
 export { loadDesignContractRequests } from '../main/contract/design-contracts';
 
-// ─── ANSI colour helpers ──────────────────────────────────────────────────────
+// ANSI colour helpers
 
 export const C = {
   reset:  '\x1b[0m',
@@ -46,18 +38,15 @@ export function colorAlways(str: string, ...codes: string[]): string {
   return codes.join('') + str + C.reset;
 }
 
-// ─── Arg parsing ──────────────────────────────────────────────────────────────
+// Arg parsing
 
 type ArgValue = string | boolean | string[];
 
 export function parseArgs(argv: string[]): Record<string, string | boolean>;
 export function parseArgs(argv: string[], repeatableKeys: string[]): Record<string, ArgValue>;
 
-/**
- * Parse `--key value` / `--flag` style arguments. Keys listed in
- * `repeatableKeys` accumulate into a string[] when given more than once;
- * all other keys keep the last value.
- */
+/** Parse `--key value` / `--flag` arguments. Keys in `repeatableKeys` accumulate
+ *  into a string[]; all others keep the last value. */
 export function parseArgs(argv: string[], repeatableKeys: string[] = []): Record<string, ArgValue> {
   const args: Record<string, ArgValue> = {};
   for (let i = 0; i < argv.length; i++) {
@@ -80,7 +69,7 @@ export function parseArgs(argv: string[], repeatableKeys: string[] = []): Record
   return args;
 }
 
-// ─── Workspace / file loading ─────────────────────────────────────────────────
+// Workspace / file loading
 
 export async function resolveWorkspacePath(wsPath: string): Promise<string> {
   const s = await stat(wsPath);

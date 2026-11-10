@@ -52,7 +52,7 @@ afterEach(() => {
   globalThis.fetch = savedFetch;
 });
 
-// ─── SigV4 (AWS published "get-vanilla" signing vector) ───────────────────────
+// SigV4 (AWS published "get-vanilla" signing vector)
 
 describe('signSigV4', () => {
   it('matches the AWS SigV4 test-suite vector', () => {
@@ -69,7 +69,7 @@ describe('signSigV4', () => {
   });
 });
 
-// ─── AWS Secrets Manager ──────────────────────────────────────────────────────
+// AWS Secrets Manager
 
 describe('aws provider', () => {
   beforeEach(() => {
@@ -95,7 +95,7 @@ describe('aws provider', () => {
   });
 });
 
-// ─── Azure Key Vault ──────────────────────────────────────────────────────────
+// Azure Key Vault
 
 describe('azure provider', () => {
   beforeEach(() => {
@@ -123,7 +123,7 @@ describe('azure provider', () => {
   });
 });
 
-// ─── 1Password (Connect) ──────────────────────────────────────────────────────
+// 1Password (Connect)
 
 describe('1password provider', () => {
   beforeEach(() => {
@@ -155,7 +155,7 @@ describe('1password provider', () => {
   });
 });
 
-// ─── The built-in AES-256-GCM encryption still works (must stay) ──────────────
+// The built-in AES-256-GCM encryption still works (must stay)
 
 function encryptForTest(plaintext: string, password: string) {
   const salt = randomBytes(16);

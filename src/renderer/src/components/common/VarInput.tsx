@@ -7,20 +7,18 @@ import { useVarNames } from '../../hooks/useVarNames';
 import { useVarValues } from '../../hooks/useVarValues';
 import { FAKER_NAMESPACES, FAKER_SUB } from '../RequestBuilder/atCompletions';
 
-// Staged {{…}} completion, matching the request-body / URL editors: a variable
-// name, a $dynamic var, or an expression drilled faker → namespace → method
-// (and dayjs starters). Each item carries the exact text to splice in place of
-// the token being typed; `close` items finish with `}}`, the rest keep the
-// dropdown open so completion continues (e.g. faker. → person. → firstName()).
+// Staged {{…}} completion, matching the request-body / URL editors: variable
+// name, $dynamic var, or a faker -> namespace -> method drill (plus dayjs
+// starters). `close` items finish with `}}`; the rest keep the dropdown open.
 type CompletionType = 'variable' | 'function' | 'property'
 
 interface Suggestion {
   label: string
   insert: string
-  type: CompletionType   // drives the CodeMirror-style completion icon
-  close?: boolean        // append }} — a terminal completion
+  type: CompletionType   // drives the completion icon
+  close?: boolean        // append }} - a terminal completion
   detail?: string
-  boost?: number         // higher sorts first (matches the body editor)
+  boost?: number         // higher sorts first
 }
 
 const DAYJS_OPTIONS: { label: string; insert: string }[] = [
@@ -31,8 +29,7 @@ const DAYJS_OPTIONS: { label: string; insert: string }[] = [
   { label: "dayjs().add(1,'day').format(…)",       insert: "dayjs().add(1,'day').format('YYYY-MM-DD')" },
 ];
 
-// Mirrors CodeMirror's completion icons (@codemirror/autocomplete) so the
-// dropdown reads the same as the request-body editor.
+// Mirrors CodeMirror's completion icons so the dropdown matches the body editor.
 const ICON: Record<CompletionType, { glyph: string; cls: string }> = {
   variable: { glyph: '𝑥', cls: 'text-emerald-400' },
   function: { glyph: 'ƒ', cls: 'text-violet-400' },
@@ -40,10 +37,9 @@ const ICON: Record<CompletionType, { glyph: string; cls: string }> = {
 };
 import { useT } from '../../i18n';
 
-// ─── Parse {{varname}} tokens ─────────────────────────────────────────────────
+// Parse {{varname}} tokens
 
-// Tokens worth previewing: `{{name}}` variables and `[name]` path params. Each
-// carries the name to resolve and the exact text to show as the token label.
+// Previewable tokens: `{{name}}` variables and `[name]` path params.
 function parseVarTokens(str: string): { name: string; display: string }[] {
   const found: { name: string; display: string }[] = [];
   if (!str) return found;
@@ -56,7 +52,7 @@ function parseVarTokens(str: string): { name: string; display: string }[] {
   return found;
 }
 
-// ─── Dropdown rendered in a portal (escapes overflow:hidden parents) ──────────
+// Dropdown rendered in a portal (escapes overflow:hidden parents)
 
 interface DropdownPos { top: number; left: number; minWidth: number }
 
@@ -99,46 +95,37 @@ function PortalDropdown({
   );
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// Component
 
 type SuggestionMode = 'var' | 'static'
 
 interface Props extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {
-  /** Current value. May be null/undefined from imported or shared data; the
-   *  component coerces it to '' internally. */
+  /** May be null/undefined from imported or shared data; coerced to '' here. */
   readonly value: string | null | undefined
   readonly onChange: (value: string) => void
   /** Classes for the outer wrapper div (layout: flex-1, w-full, etc.) */
   readonly wrapperClassName?: string
-  /**
-   * Optional static suggestions (e.g. HTTP header names or common values).
-   * Shown when the field is focused and the user has not opened a {{var}} query.
-   * The user can always ignore the list and type a custom value.
-   */
+  /** Static suggestions (header names, common values) shown on focus when no
+   *  {{var}} query is open. */
   readonly staticSuggestions?: string[]
-  /**
-   * Extra `name → value` pairs resolvable as `{{name}}` in this field only, on
-   * top of the environment/collection/global vars. Used by the URL bar to
-   * resolve path/query params from the request's own Params tab, so hovering a
-   * `{{param}}` shows its assigned value and autocomplete lists it.
-   */
+  /** Extra `name -> value` pairs resolvable as `{{name}}` in this field only,
+   *  on top of env/collection/global vars. The URL bar passes the request's own
+   *  path/query params so hovering `{{param}}` shows its value. */
   readonly extraVars?: Record<string, string>
 }
 
 export function VarInput({ value: valueProp, onChange, className, wrapperClassName, staticSuggestions, extraVars, ...rest }: Readonly<Props>) {
-  // A variable value can reach us as null/undefined (an empty collection/env
-  // cell, or data imported from an external tool) despite the string prop type.
-  // Coerce once so parseVarTokens, the slice/length maths and the controlled
-  // <input> never operate on null. Without this the Collection Variables tab
-  // throws "Cannot read properties of null (reading 'matchAll')".
+  // Value can reach us as null/undefined despite the string prop type. Coerce
+  // once so parseVarTokens, the slice maths and the <input> never touch null
+  // (else the Collection Variables tab throws on matchAll).
   const value = valueProp ?? '';
   const t         = useT();
   const varNames  = useVarNames();
   const varValues = useVarValues();
   const inputRef  = useRef<HTMLInputElement>(null);
 
-  // Field-local vars (e.g. the URL bar's path/query params) take precedence over
-  // environment vars for both autocomplete and the hover preview.
+  // Field-local vars take precedence over environment vars, for both
+  // autocomplete and the hover preview.
   const extraKeys   = extraVars ? Object.keys(extraVars) : [];
   const mergedNames = extraKeys.length ? Array.from(new Set([...extraKeys, ...varNames])) : varNames;
   const mergedValues = extraKeys.length ? { ...varValues, ...extraVars } : varValues;
@@ -151,7 +138,7 @@ export function VarInput({ value: valueProp, onChange, className, wrapperClassNa
   // Length of the token currently being replaced (the completion's `from`).
   const partialLen = useRef(0);
 
-  // Recalculate portal position whenever suggestions appear or window resizes
+  // Recalculate portal position when suggestions appear.
   useEffect(() => {
     if (suggestions.length === 0) { setDropPos(null); return; }
     const el = inputRef.current;
@@ -160,21 +147,20 @@ export function VarInput({ value: valueProp, onChange, className, wrapperClassNa
     setDropPos({ top: r.bottom + 2, left: r.left, minWidth: r.width });
   }, [suggestions.length]);
 
-  // ── Autocomplete ───────────────────────────────────────────────────────────
+  // Autocomplete
 
   function show(items: Suggestion[], from: number) {
     partialLen.current = from;
     setSuggestions(items);
     setSuggestionMode('var');
-    // Highlight the top match so Enter accepts it (matches the body editor).
+    // Highlight the top match so Enter accepts it.
     setActiveIndex(items.length ? 0 : -1);
   }
 
   function detectQuery(val: string, cursor: number) {
     const before = val.slice(0, cursor);
 
-    // Prefix matches sort before mid-string ones, then higher boost — the same
-    // ordering CodeMirror applies in the body editor.
+    // Prefix matches before mid-string, then higher boost.
     const sortByMatch = (items: Suggestion[], q: string) =>
       items.map((it, i) => ({ it, i }))
         .sort((a, b) => {
@@ -184,7 +170,7 @@ export function VarInput({ value: valueProp, onChange, className, wrapperClassNa
         })
         .map(x => x.it);
 
-    // {{faker.<namespace>.<method> — drill into a namespace's generators.
+    // {{faker.<namespace>.<method> - a namespace's generators.
     let m = /\{\{faker\.(\w+)\.(\w*)$/.exec(before);
     if (m) {
       const q = m[2].toLowerCase();
@@ -192,7 +178,7 @@ export function VarInput({ value: valueProp, onChange, className, wrapperClassNa
       show(sortByMatch(subs.map(c => ({ label: c.label, type: 'function', detail: (c.detail as string) ?? '()', insert: `${c.label}()`, close: true })), q), m[2].length);
       return;
     }
-    // {{faker.<namespace> — list namespaces (person, internet, …).
+    // {{faker.<namespace> - list namespaces (person, internet, …).
     m = /\{\{faker\.(\w*)$/.exec(before);
     if (m) {
       const q = m[1].toLowerCase();
@@ -201,7 +187,7 @@ export function VarInput({ value: valueProp, onChange, className, wrapperClassNa
       show(sortByMatch(items, q), m[1].length);
       return;
     }
-    // {{dayjs… — date/time expression options.
+    // {{dayjs… - date/time expression options.
     m = /\{\{(dayjs\b[^}]*)$/.exec(before);
     if (m) {
       const q = m[1].toLowerCase();
@@ -263,8 +249,8 @@ export function VarInput({ value: valueProp, onChange, className, wrapperClassNa
       e.preventDefault();
       setActiveIndex(i => Math.max(i - 1, -1));
     } else if (e.key === 'Enter') {
-      // Accept the highlighted item, or the top match in {{var}} mode. Static
-      // suggestions with nothing highlighted fall through so a typed value stays.
+      // Accept the highlighted item, or the top match in {{var}} mode. A static
+      // suggestion with nothing highlighted falls through so a typed value stays.
       const idx = activeIndex >= 0 ? activeIndex : (suggestionMode === 'var' ? 0 : -1);
       if (idx >= 0 && idx < suggestions.length) { e.preventDefault(); apply(suggestions[idx]); }
     } else if (e.key === 'Escape') {
@@ -284,8 +270,7 @@ export function VarInput({ value: valueProp, onChange, className, wrapperClassNa
     const before = value.slice(0, cursor);
     const after  = value.slice(cursor);
     const start  = cursor - partialLen.current;                 // replace the token being typed
-    // Reuse the closing braces already after the cursor (editing an existing
-    // {{var}}, or the user typed them) instead of appending another pair.
+    // Reuse closing braces already after the cursor instead of appending a pair.
     const closeAlready = item.close && after.startsWith('}}');
     const insert    = item.insert + (item.close && !closeAlready ? '}}' : '');
     const newVal    = before.slice(0, start) + insert + after;
@@ -296,7 +281,7 @@ export function VarInput({ value: valueProp, onChange, className, wrapperClassNa
       setSuggestions([]);
       requestAnimationFrame(() => el?.setSelectionRange(newCursor, newCursor));
     } else {
-      // Non-terminal (faker. / namespace. / dayjs().) — keep completing.
+      // Non-terminal (faker. / namespace. / dayjs().): keep completing.
       requestAnimationFrame(() => {
         el?.focus();
         el?.setSelectionRange(newCursor, newCursor);
@@ -311,7 +296,7 @@ export function VarInput({ value: valueProp, onChange, className, wrapperClassNa
     rest.onBlur?.(e);
   }
 
-  // ── Hover preview ──────────────────────────────────────────────────────────
+  // Hover preview
 
   const tokens       = parseVarTokens(value);
   const hasVars      = tokens.length > 0;
@@ -321,7 +306,7 @@ export function VarInput({ value: valueProp, onChange, className, wrapperClassNa
     resolved: mergedValues[name] ?? null,
   }));
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // Render
 
   const { onFocus: _f, onBlur: _b, ...inputRest } = rest;
 
@@ -342,7 +327,7 @@ export function VarInput({ value: valueProp, onChange, className, wrapperClassNa
         {...inputRest}
       />
 
-      {/* Autocomplete dropdown — rendered in a portal to escape overflow:hidden parents */}
+      {/* Autocomplete dropdown - portaled to escape overflow:hidden parents */}
       {suggestions.length > 0 && dropPos && (
         <PortalDropdown
           pos={dropPos}
@@ -361,9 +346,8 @@ export function VarInput({ value: valueProp, onChange, className, wrapperClassNa
               <span className="font-mono text-blue-400 shrink-0">{display}</span>
               <span className="text-surface-500 shrink-0">→</span>
               {resolved !== null
-                // Long values (tokens, URLs, JWTs) wrap and break instead of
-                // truncating, so the whole value stays readable; min-w-0 lets it
-                // wrap inside the flex row rather than overflow.
+                // Long values wrap/break instead of truncating; min-w-0 lets
+                // them wrap inside the flex row rather than overflow.
                 ? <span className="font-mono text-emerald-400 flex-1 min-w-0 break-all whitespace-pre-wrap">{resolved}</span>
                 : <span className="text-orange-400 italic">{t('undefined')}</span>
               }

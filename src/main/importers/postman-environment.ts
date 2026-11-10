@@ -1,14 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Import a Postman environment export (the "Export" of an Environment, not a
-// Collection). The file looks like:
-//   { "name": "...", "values": [ { "key", "value", "type", "enabled" } ],
-//     "_postman_variable_scope": "environment" }
-// We map each entry to an EnvVariable. Postman stores secret values inline in
-// the export, so we import them as plain values (our encrypted-secret flow needs
-// the workspace master key, which isn't available at import time); the user can
-// re-mark a variable as secret afterwards.
+// Import a Postman environment export (not a Collection) into EnvVariables. Postman
+// stores secrets inline, so they import as plain values; the user can re-mark them secret.
 
 import { readFile } from 'node:fs/promises';
 import { v4 as uuidv4 } from 'uuid';
@@ -36,8 +30,8 @@ export async function importPostmanEnvironment(filePath: string): Promise<Enviro
     throw new Error('Not valid JSON — pick a Postman environment export file.');
   }
 
-  // Guard against someone picking a Postman *collection* (or anything else):
-  // environment exports carry a `values` array, and usually the scope marker.
+  // Guard against a Postman collection: environment exports carry a `values`
+  // array, and usually the scope marker.
   if (!Array.isArray(data.values) || data._postman_variable_scope === 'collection') {
     throw new Error('Not a Postman environment file (no "values" array found).');
   }

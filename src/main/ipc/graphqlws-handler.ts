@@ -1,11 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// GraphQL subscriptions over WebSocket, using the graphql-ws protocol
-// ("graphql-transport-ws" subprotocol). Managed in the main process and keyed
-// by requestId, like the WebSocket and Socket.IO handlers. We speak the protocol
-// directly over the ws library (already a dependency): connection_init ->
-// connection_ack -> subscribe -> next* -> complete, answering server pings.
+// GraphQL subscriptions over the graphql-ws protocol ("graphql-transport-ws"),
+// keyed by requestId. Spoken directly over ws: connection_init -> connection_ack
+// -> subscribe -> next* -> complete, answering server pings.
 
 import { type IpcMain, type IpcMainInvokeEvent } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
@@ -49,9 +47,8 @@ export function registerGraphqlWsHandlers(ipc: IpcMain): void {
     const existing = connections.get(requestId);
     if (existing) { existing.close(); connections.delete(requestId); }
 
-    // The renderer may be gone (tab/window closed or reloaded) while the socket
-    // is still open and firing close/error callbacks, so guard every send —
-    // calling WebContents.send on a destroyed sender throws.
+    // The renderer may be gone while the socket still fires callbacks, so guard
+    // every send; WebContents.send on a destroyed sender throws.
     const alive = () => !event.sender.isDestroyed();
     const send = (message: GraphQlWsMessage) => { if (alive()) event.sender.send(IPC.graphqlws.message, { requestId, message }); };
     const status = (s: string, error?: string) => { if (alive()) event.sender.send(IPC.graphqlws.status, { requestId, status: s, error }); };
@@ -77,8 +74,8 @@ export function registerGraphqlWsHandlers(ipc: IpcMain): void {
     }
     connections.set(requestId, ws);
 
-    // If the renderer goes away (tab/window closed or reloaded), close the
-    // socket so the subscription doesn't stream into a destroyed sender.
+    // If the renderer goes away, close the socket so the subscription doesn't
+    // stream into a destroyed sender.
     event.sender.once('destroyed', () => { try { ws.close(); } catch { /* ignore */ } connections.delete(requestId); });
 
     ws.on('open', () => {
@@ -122,7 +119,7 @@ export function registerGraphqlWsHandlers(ipc: IpcMain): void {
     });
   });
 
-  // graphqlws:test — run a one-shot subscription test (its own connection) and assert.
+  // graphqlws:test - run a one-shot subscription test (its own connection) and assert.
   handleIpc(ipc, IPC.graphqlws.test, async (_event: IpcMainInvokeEvent, cfg: GraphqlWsTestConfig): Promise<RealtimeTestResult> => {
     const t0 = Date.now();
     const res = await runGraphqlWsTest(cfg);

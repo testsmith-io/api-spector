@@ -21,7 +21,7 @@ export function ShareModal({
   readonly title: string
   readonly type: 'collection' | 'request' | 'folder'
   readonly sourceId: string
-  /** Mint (or refresh) the link — wraps shareCollectionToCloud/shareRequestToCloud. */
+  /** Mint (or refresh) the link - wraps shareCollectionToCloud/shareRequestToCloud. */
   readonly onCreate: () => Promise<ShareResult>
   readonly onClose: () => void
 }) {

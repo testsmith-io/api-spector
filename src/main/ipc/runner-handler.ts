@@ -10,7 +10,7 @@ import { getGlobals } from '../globals-store';
 import { buildDispatcher, executeRunnerRequest, HookSkipTracker, type RunnerExecResult } from '../request-exec';
 import { runPlanConcurrent } from '../../shared/run-concurrent';
 
-// ─── IPC handler ─────────────────────────────────────────────────────────────
+// IPC handler
 
 const sleep = ( ms: number ) => new Promise( resolve => setTimeout( resolve, ms ) );
 
@@ -40,7 +40,7 @@ export function registerRunnerHandler ( ipc: IpcMain ): void {
 
     const skipTracker = new HookSkipTracker();
 
-    // ── Shared helpers ───────────────────────────────────────────────────────
+    // Shared helpers
     const meta = ( item: RunnerItem, index: number ) => ( {
       index, iterationLabel: item.iterationLabel,
       isHook: item.isHook, hookType: item.hookType, scopeId: item.scopeId,
@@ -97,7 +97,7 @@ export function registerRunnerHandler ( ipc: IpcMain ): void {
     };
 
     if ( concurrency <= 1 ) {
-      // ── Sequential (default) ─────────────────────────────────────────────
+      // Sequential (default)
       for ( let i = 0; i < items.length; i++ ) {
         const item = items[i];
         const skipReason = skipTracker.shouldSkip( item );
@@ -116,10 +116,8 @@ export function registerRunnerHandler ( ipc: IpcMain ): void {
         if ( requestDelay > 0 && i < items.length - 1 ) await sleep( requestDelay );
       }
     } else {
-      // ── Parallel ─────────────────────────────────────────────────────────
-      // Hooks are barriers (beforeAll finishes before the batch, afterAll runs
-      // after); regular requests run up to `concurrency` at a time, each from
-      // the current snapshot, with writes merged back as they complete.
+      // Parallel: hooks are barriers (beforeAll before the batch, afterAll after);
+      // regular requests run up to `concurrency` at a time, writes merged as they finish.
       const runItem = async ( item: RunnerItem, index: number ): Promise<void> => {
         const skipReason = skipTracker.shouldSkip( item );
         if ( skipReason ) { const sk = skippedResult( item, skipReason ); tally( sk.status ); emitResult( item, index, sk ); return; }

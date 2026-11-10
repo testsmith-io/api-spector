@@ -33,7 +33,7 @@ import { makeTab, protocolFor, syncPanelsToActiveTab } from './tabs-slice';
 import { generateSecurityTests } from '../../../../shared/security-tests';
 import type { FullState } from '../index';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// Helpers
 
 function makeRequest(override: Partial<ApiRequest> = {}): ApiRequest {
   return {
@@ -49,13 +49,8 @@ function makeRequest(override: Partial<ApiRequest> = {}): ApiRequest {
   };
 }
 
-/**
- * A folder name unique among its siblings. If `desired` is free it is returned
- * as-is; otherwise " 2", " 3", … is appended until free. `exclude` is the id of
- * a folder to ignore (the one being renamed/moved), so it doesn't clash with
- * itself. Used so create / duplicate / move never produce two folders with the
- * same name at the same level.
- */
+/** Folder name unique among its siblings, appending " 2", " 3", … if taken.
+ *  `exclude` skips one folder (the one being renamed/moved) from the clash check. */
 function uniqueFolderName(parent: Folder, desired: string, exclude?: string): string {
   const taken = new Set(parent.folders.filter(f => f.id !== exclude).map(f => f.name));
   if (!taken.has(desired)) return desired;
@@ -76,7 +71,7 @@ function makeCollection(name: string): Collection {
   };
 }
 
-// ─── Slice ───────────────────────────────────────────────────────────────────
+// Slice
 
 export interface CollectionsSliceState {
   collections: Record<string, { relPath: string; data: Collection; dirty: boolean }>
@@ -88,8 +83,7 @@ export interface CollectionsSliceActions {
 
   // Collection CRUD
   addCollection: (name: string) => void
-  /** Insert a fully-built collection (e.g. generated tests) and register it in
-   *  the workspace so it persists. Returns the collection id. */
+  /** Insert a fully-built collection and register it in the workspace. Returns its id. */
   addCollectionObject: (data: Collection) => string
   renameCollection: (id: string, name: string) => void
   deleteCollection: (id: string) => void
@@ -102,10 +96,8 @@ export interface CollectionsSliceActions {
 
   duplicateCollection: (id: string) => void
 
-  // Merge a folder tree (with its requests) into an existing collection,
-  // preserving the source folder structure. Used by importers when the user
-  // picks "merge into existing". Each folder and request is re-IDed to avoid
-  // collisions.
+  // Merge a folder tree into an existing collection, re-IDing every folder and
+  // request to avoid collisions. Used by importers' "merge into existing".
   mergeIntoCollection: (
     collectionId: string,
     sourceFolder: Folder,
@@ -124,17 +116,15 @@ export interface CollectionsSliceActions {
   renameRequest: (id: string, name: string) => void
   deleteRequest: (collectionId: string, id: string) => void
   duplicateRequest: (collectionId: string, id: string) => void
-  /** Generate OWASP security tests for a request into its folder. Returns the
-   *  number of tests added. Opt-in — only runs when the user invokes it. */
+  /** Generate OWASP security tests for a request into its folder; returns the count added. */
   addSecurityTests: (collectionId: string, requestId: string) => number
   moveRequest: (srcCollectionId: string, requestId: string, destCollectionId: string, destFolderId: string, destIndex?: number) => void
+  /** Copy a request into another folder/collection; the copy gets a fresh id, keeps the name. */
+  copyRequest: (srcCollectionId: string, requestId: string, destCollectionId: string, destFolderId: string, destIndex?: number) => void
   moveFolder: (collectionId: string, folderId: string, destParentFolderId: string, destIndex?: number) => void
-  /** Move a request or sub-folder to a unified position among a folder's
-   *  children (interleaving requests and folders). Same-collection only. */
+  /** Move a request or sub-folder to a position among a folder's interleaved children. Same-collection only. */
   reorderChild: (collectionId: string, ref: ChildRef, destParentFolderId: string, destIndex: number) => void
-  /** Sort a folder's direct children (requests + sub-folders, interleaved)
-   *  alphabetically by name. Pass the collection's rootFolder id to sort the
-   *  collection's top level. */
+  /** Sort a folder's interleaved children alphabetically; pass rootFolder id for the top level. */
   sortChildren: (collectionId: string, folderId: string) => void
 
   // Request examples (Postman/Bruno-style saved request/response snapshots)
@@ -161,8 +151,7 @@ export interface CollectionsSliceActions {
 
   // Inherited auth/headers selector
   getInheritedAuthAndHeaders: (requestId: string) => { auth: AuthConfig | null; headers: KeyValuePair[] }
-  /** Merge the folder-chain variables for a request (root → immediate folder,
-   *  inner folders override). Excludes collection/environment/local scopes. */
+  /** Merge the folder-chain variables for a request (inner folders override). */
   getInheritedVariables: (requestId: string) => Record<string, string>
 
   // Collection dataset
@@ -186,16 +175,13 @@ export const createCollectionsSlice: StateCreator<
   collections: {},
 
   loadCollection: (relPath, data) => set(s => {
-    // Ensure every request has required array/object fields — AI-generated
-    // or hand-edited collections may omit them.
+    // Backfill required fields a hand-edited collection may omit.
     for (const req of Object.values(data.requests)) {
       if (!req.headers) req.headers = [];
       if (!req.params) req.params = [];
       if (!req.body) req.body = { mode: 'none' };
       if (!req.auth) req.auth = { type: 'none' };
-      // Migration: requests pre-dating the `soap` protocol value were
-      // identified solely by body.mode. Lift them so the new request shell
-      // (locked POST, WSDL-derived URL) kicks in automatically.
+      // Migration: pre-`soap`-protocol requests were identified by body.mode alone.
       if (!req.protocol && req.body.mode === 'soap') req.protocol = 'soap';
     }
     // Ensure every folder has required arrays
@@ -212,7 +198,7 @@ export const createCollectionsSlice: StateCreator<
     if (s.collections[id]) s.collections[id].dirty = false;
   }),
 
-  // ── Collection CRUD ─────────────────────────────────────────────────────────
+  // Collection CRUD
   addCollection: (name) => set(s => {
     const existingNames = Object.values(s.collections).map(c => c.data.name);
     const safeName = uniqueName(name, existingNames);
@@ -315,17 +301,13 @@ export const createCollectionsSlice: StateCreator<
       return newId;
     });
 
-    // Append each top-level subfolder of the cloned root into the target
-    // collection's root. This preserves the section/tag grouping. If the
-    // source root itself had direct requests (no subfolder), wrap them in
-    // a folder named after the source root.
+    // Append each top-level subfolder into the target's root, preserving the
+    // grouping. Direct requests on the source root are wrapped in a folder.
     if (cloned.folders.length > 0) {
-      // Has subfolders — merge them individually so we don't create an
-      // unnecessary wrapper.
       for (const sub of cloned.folders) {
         col.rootFolder.folders.push(sub);
       }
-      // Also add any root-level requests (rare, but possible)
+      // Any root-level requests (rare)
       if (cloned.requestIds.length > 0) {
         const wrapper: Folder = {
           id: uuidv4(),
@@ -337,7 +319,7 @@ export const createCollectionsSlice: StateCreator<
         col.rootFolder.folders.push(wrapper);
       }
     } else {
-      // No subfolders — the whole thing is one flat folder
+      // No subfolders: one flat folder
       col.rootFolder.folders.push(cloned);
     }
 
@@ -347,9 +329,7 @@ export const createCollectionsSlice: StateCreator<
 
   deleteCollection: (id) => {
     const relPath = get().collections[id]?.relPath;
-    // Fire-and-forget the disk unlink — handler is idempotent so a missing
-    // file isn't an error. Store mutation continues regardless so the UI
-    // stays in sync even if the unlink fails.
+    // Fire-and-forget disk unlink (idempotent); the store mutation runs regardless.
     if (relPath) {
       window.electron.deleteWorkspaceFile(relPath).catch((err: unknown) => {
         console.warn('deleteCollection: could not remove file', relPath, err);
@@ -403,7 +383,7 @@ export const createCollectionsSlice: StateCreator<
     s.collections[id].dirty = true;
   }),
 
-  // ── Folder CRUD ─────────────────────────────────────────────────────────────
+  // Folder CRUD
   addFolder: (collectionId, parentFolderId, name) => set(s => {
     const col = s.collections[collectionId]?.data;
     if (!col) return;
@@ -418,8 +398,7 @@ export const createCollectionsSlice: StateCreator<
     if (!col) return;
     const folder = findFolder(col.rootFolder, folderId);
     if (!folder) return;
-    // Reject a rename that would collide with a sibling folder (the inline
-    // editor blocks this too; this guards any other caller).
+    // Reject a rename that would collide with a sibling folder.
     const parent = findFolderParent(col.rootFolder, folderId) ?? col.rootFolder;
     if (parent.folders.some(f => f.id !== folderId && f.name === name)) return;
     folder.name = name;
@@ -470,7 +449,7 @@ export const createCollectionsSlice: StateCreator<
     syncPanelsToActiveTab(s);
   }),
 
-  // ── Request CRUD ────────────────────────────────────────────────────────────
+  // Request CRUD
   addRequest: (collectionId, folderId) => {
     const req = makeRequest();
     set(s => {
@@ -496,7 +475,7 @@ export const createCollectionsSlice: StateCreator<
     entry.dirty = true;
   }),
 
-  // ── Request examples ────────────────────────────────────────────────────────
+  // Request examples
   addExample: (requestId, snapshot) => {
     const id = uuidv4();
     set(s => {
@@ -519,8 +498,7 @@ export const createCollectionsSlice: StateCreator<
   },
 
   addExampleFromRequest: (requestId) => {
-    // Snapshot from committed (non-draft) state so structuredClone can't hit an
-    // Immer proxy; the example's payload starts as a copy of the request.
+    // Snapshot from committed (non-draft) state so structuredClone can't hit an Immer proxy.
     const entry = Object.values(get().collections).find(c => c.data.requests[requestId]);
     if (!entry) return null;
     const req = entry.data.requests[requestId];
@@ -587,9 +565,7 @@ export const createCollectionsSlice: StateCreator<
   }),
 
   duplicateExample: (requestId, exampleId) => {
-    // Snapshot the source from committed state (get), not a draft: structuredClone
-    // throws on an Immer draft proxy -- the same trap addExampleFromRequest guards
-    // against. Cloning the draft here is what made "Duplicate" silently do nothing.
+    // Snapshot from committed state (get): structuredClone throws on an Immer draft proxy.
     const srcEntry = Object.values(get().collections).find(c => c.data.requests[requestId]);
     const list = srcEntry?.data.requests[requestId].examples;
     const src = list?.find(e => e.id === exampleId);
@@ -630,8 +606,7 @@ export const createCollectionsSlice: StateCreator<
   }),
 
   openExample: (requestId, collectionId, exampleId) => set(s => {
-    // Showing an example supersedes the collection / folder data panels — the
-    // active tab (a request/example tab) drives this via syncPanelsToActiveTab.
+    // The active tab drives the panels via syncPanelsToActiveTab.
     const existing = s.tabs.find(t => t.requestId === requestId && t.exampleId === exampleId);
     if (existing) { s.activeTabId = existing.id; s.activeCollectionId = collectionId; syncPanelsToActiveTab(s); return; }
     const ex = Object.values(s.collections).find(c => c.data.requests[requestId])
@@ -682,8 +657,7 @@ export const createCollectionsSlice: StateCreator<
       folder.requestIds.splice(idx + 1, 0, copy.id);
     }
     s.collections[collectionId].dirty = true;
-    // Open copy in a new tab — preserves protocol so SOAP duplicates land
-    // on the SOAP panel directly.
+    // Open copy in a new tab, preserving protocol so SOAP duplicates land on the SOAP panel.
     const tab = makeTab(copy.id, collectionId, { protocol: copy.protocol, defaultTab: s.workspace?.settings?.defaultRequestTab });
     s.tabs.push(tab);
     s.activeTabId = tab.id;
@@ -716,19 +690,16 @@ export const createCollectionsSlice: StateCreator<
     const req = srcCol.requests[requestId];
     if (!req) return;
 
-    // Remember source folder + index before removal (to adjust destIndex for same-folder moves)
+    // Source folder + index before removal, to adjust destIndex on same-folder moves.
     const srcFolder = findFolderContaining(srcCol.rootFolder, requestId);
     const srcIdx    = srcFolder ? srcFolder.requestIds.indexOf(requestId) : -1;
 
-    // Remove from source folder
     removeFromFolder(srcCol.rootFolder, requestId);
     s.collections[srcCollectionId].dirty = true;
 
     if (srcCollectionId !== destCollectionId) {
-      // Move request data to destination collection
       delete srcCol.requests[requestId];
       destCol.requests[requestId] = req;
-      // Update any open tab's collectionId
       const tab = s.tabs.find(t => t.requestId === requestId);
       if (tab) tab.collectionId = destCollectionId;
     }
@@ -736,7 +707,7 @@ export const createCollectionsSlice: StateCreator<
     const destFolder = findFolder(destCol.rootFolder, destFolderId);
     if (destFolder) {
       if (destIndex !== undefined) {
-        // Adjust index when moving within the same folder: removal shifted everything down by 1
+        // Same-folder move: removal shifted everything down by 1.
         let adjusted = destIndex;
         if (srcCollectionId === destCollectionId && srcFolder?.id === destFolder.id && srcIdx < destIndex) {
           adjusted--;
@@ -745,6 +716,29 @@ export const createCollectionsSlice: StateCreator<
         destFolder.requestIds.splice(adjusted, 0, requestId);
       } else {
         destFolder.requestIds.push(requestId);
+      }
+    }
+    s.collections[destCollectionId].dirty = true;
+  }),
+
+  copyRequest: (srcCollectionId, requestId, destCollectionId, destFolderId, destIndex?) => set(s => {
+    const srcCol  = s.collections[srcCollectionId]?.data;
+    const destCol = s.collections[destCollectionId]?.data;
+    if (!srcCol || !destCol) return;
+    const orig = srcCol.requests[requestId];
+    if (!orig) return;
+
+    // Deep clone with a fresh id; keep the name (copy lands in a different folder/collection).
+    const copy: ApiRequest = { ...JSON.parse(JSON.stringify(orig)), id: uuidv4() };
+    destCol.requests[copy.id] = copy;
+
+    const destFolder = findFolder(destCol.rootFolder, destFolderId);
+    if (destFolder) {
+      if (destIndex !== undefined) {
+        const at = Math.max(0, Math.min(destIndex, destFolder.requestIds.length));
+        destFolder.requestIds.splice(at, 0, copy.id);
+      } else {
+        destFolder.requestIds.push(copy.id);
       }
     }
     s.collections[destCollectionId].dirty = true;
@@ -765,8 +759,7 @@ export const createCollectionsSlice: StateCreator<
     // Remove from source
     srcParent.folders.splice(srcIdx, 1);
 
-    // Insert into destination. When moving to a different parent, make sure the
-    // name stays unique among the destination's folders.
+    // Insert into destination, keeping the name unique under a different parent.
     const destParent = findFolder(col.rootFolder, destParentFolderId);
     if (!destParent) return;
     if (destParent.id !== srcParent.id) folder.name = uniqueFolderName(destParent, folder.name, folder.id);
@@ -822,7 +815,7 @@ export const createCollectionsSlice: StateCreator<
     s.collections[collectionId].dirty = true;
   }),
 
-  // ── Tags ────────────────────────────────────────────────────────────────────
+  // Tags
   updateFolderTags: (collectionId, folderId, tags) => set(s => {
     const col = s.collections[collectionId]?.data;
     if (!col) return;
@@ -838,7 +831,7 @@ export const createCollectionsSlice: StateCreator<
     entry.dirty = true;
   }),
 
-  // ── Folder settings ─────────────────────────────────────────────────────────
+  // Folder settings
   updateFolder: (collectionId, folderId, patch) => set(s => {
     const col = s.collections[collectionId]?.data;
     if (!col) return;
@@ -849,7 +842,7 @@ export const createCollectionsSlice: StateCreator<
     }
   }),
 
-  // ── Inherited auth/headers ──────────────────────────────────────────────────
+  // Inherited auth/headers
   getInheritedAuthAndHeaders: (requestId) => {
     const state = get();
     const colEntry = Object.values(state.collections).find(c => c.data.requests[requestId]);
@@ -861,7 +854,7 @@ export const createCollectionsSlice: StateCreator<
     let inheritedHeaders: KeyValuePair[] =
       colEntry.data.headers?.filter(h => h.enabled && h.key) ?? [];
 
-    // Walk folder path (root → immediate folder); each level overrides the previous
+    // Walk folder path (root -> immediate folder); each level overrides the previous
     const path = findFolderPath(colEntry.data.rootFolder, requestId);
     for (const folder of path) {
       if (folder.auth && folder.auth.type !== 'none') inheritedAuth = folder.auth;
@@ -875,7 +868,7 @@ export const createCollectionsSlice: StateCreator<
     const colEntry = Object.values(state.collections).find(c => c.data.requests[requestId]);
     if (!colEntry) return {};
     const merged: Record<string, string> = {};
-    // Root → immediate folder; each inner folder overrides the outer ones.
+    // Root -> immediate folder; each inner folder overrides the outer ones.
     for (const folder of findFolderPath(colEntry.data.rootFolder, requestId)) {
       if (folder.variables) Object.assign(merged, folder.variables);
     }

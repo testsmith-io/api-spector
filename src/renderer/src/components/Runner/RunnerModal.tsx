@@ -18,7 +18,7 @@ import { useT } from '../../i18n';
 
 const { electron } = window;
 
-// ─── Hook badge ──────────────────────────────────────────────────────────────
+// Hook badge
 
 const HOOK_BADGE: Record<string, { label: string; cls: string }> = {
   beforeAll: { label: 'BEFORE ALL', cls: 'bg-violet-700 text-white' },
@@ -27,7 +27,7 @@ const HOOK_BADGE: Record<string, { label: string; cls: string }> = {
   afterAll:  { label: 'AFTER ALL',  cls: 'bg-cyan-800   text-white' },
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// Helpers
 
 function collectRequests(
   collectionId: string,
@@ -50,7 +50,7 @@ function allTagsIn(collectionId: string, folderId: string | null): string[] {
   return collectAllTags(rootFolder, col.requests);
 }
 
-// ─── Status indicator ─────────────────────────────────────────────────────────
+// Status indicator
 
 function StatusDot({ status }: { readonly status: RunRequestResult['status'] }) {
   const colors: Record<string, string> = {
@@ -64,9 +64,9 @@ function StatusDot({ status }: { readonly status: RunRequestResult['status'] }) 
   return <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${colors[status] ?? 'bg-surface-700'}`} />;
 }
 
-// ─── Per-request detail (same data the exported report carries) ───────────────
+// Per-request detail (same data the exported report carries)
 
-/** True when a result has anything worth expanding to show. */
+/** Whether a result has anything worth expanding. */
 function hasDetail(r: RunRequestResult): boolean {
   return !!(
     r.testResults?.length || r.consoleOutput?.length ||
@@ -156,7 +156,7 @@ function ResultDetail({ r }: { readonly r: RunRequestResult }) {
   );
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// Component
 
 export function RunnerModal() {
   const t = useT();
@@ -200,7 +200,7 @@ export function RunnerModal() {
     ? (findFolder(colEntry.data.rootFolder, folderId)?.name ?? t('Folder'))
     : null;
 
-  // When running a folder, its own dataset wins; otherwise use the collection's.
+  // Running a folder: its own dataset wins, else the collection's.
   const dataSet =
     ((folderId && colEntry ? findFolder(colEntry.data.rootFolder, folderId)?.dataSet : null)
       ?? colEntry?.data.dataSet) ?? { columns: [], rows: [] };
@@ -214,8 +214,8 @@ export function RunnerModal() {
   const initEnvIdRef = useRef(activeEnvId);
   initEnvIdRef.current = activeEnvId;
 
-  // Reset when modal opens — reads refs so we snapshot values at open time
-  // without re-running when filterTags or activeEnvId change mid-session
+  // Reset on open, reading refs so values are snapshotted at open time without
+  // re-running when filterTags or activeEnvId change mid-session.
   useEffect(() => {
     setFilterTags(initFilterTagsRef.current);
     setSelectedEnvId(initEnvIdRef.current ?? '');
@@ -227,7 +227,7 @@ export function RunnerModal() {
   const toggleTag = (tag: string) =>
     setFilterTags(prev => prev.includes(tag) ? prev.filter(tg => tg !== tag) : [...prev, tag]);
 
-  // ── Run ───────────────────────────────────────────────────────────────────
+  // Run
 
   const run = useCallback(async () => {
     const ds =
@@ -236,18 +236,14 @@ export function RunnerModal() {
     const baseItems = collectionId ? collectRequests(collectionId, folderId, filterTags) : [];
     if (baseItems.length === 0) return;
 
-    // Data-table expansion:
-    //  - Collection run: each folder's own data table iterates its requests, then
-    //  - the whole-scope table repeats the plan once per row. No rows → single pass.
-    //  A data table can also carry `expectStatus`/`owasp` columns to act as an
-    //  access-control matrix (run as different personas, assert allow/deny).
+    // Data-table expansion: each folder's table iterates its requests; the whole-scope
+    // table repeats the plan per row. expectStatus/owasp columns act as an access-control matrix.
     let items: RunnerItem[] = baseItems;
     if (!folderId && colEntry) items = expandFolderDataSets(items, colEntry.data);
     items = expandRunPlanWithData(items, ds);
 
-    // Merge inherited auth/headers from collection/folder into each request
-    // so the runner sees the effective auth, not just request-level overrides.
-    // Deep-clone via JSON round-trip — store objects are frozen by Immer.
+    // Merge inherited collection/folder auth/headers into each request so the
+    // runner sees the effective auth. Deep-clone: store objects are Immer-frozen.
     const col = colEntry?.data;
     if (col) {
       items = items.map(item => {
@@ -266,14 +262,14 @@ export function RunnerModal() {
 
     const env = resolveEnvironmentById(environments, selectedEnvId || null);
 
-    // Ask variables ({{@Message}}) used anywhere in the run — prompt once up
-    // front, then inject the answers into every item so the run stays unattended.
+    // Ask variables ({{@Message}}) anywhere in the run: prompt once up front,
+    // then inject answers into every item so the run stays unattended.
     const askByKey = new Map<string, AskVar>();
     for (const it of items) for (const a of askVarsInRequest(it.request)) if (!askByKey.has(a.key)) askByKey.set(a.key, a);
     const unionAsks = [...askByKey.values()];
     if (unionAsks.length) {
       const answers = await promptAskVars(unionAsks);
-      if (!answers) return;  // cancelled — do not run
+      if (!answers) return;  // cancelled
       const askValues = resolveAskValues(unionAsks, answers);
       items = items.map(it => ({ ...it, collectionVars: { ...it.collectionVars, ...askValues } }));
     }
@@ -296,8 +292,8 @@ export function RunnerModal() {
     progressIdxRef.current = 0;
 
     electron.onRunProgress((result: RunRequestResult) => {
-      // A parallel run reports results out of order, so prefer the item index
-      // the runner stamps on each event; fall back to the running counter.
+      // A parallel run reports out of order, so prefer the runner's stamped
+      // index; fall back to the running counter.
       const idx = result.index ?? progressIdxRef.current;
       patchRunnerResult(idx, result);
       if (result.index === undefined && result.status !== 'running') progressIdxRef.current++;
@@ -339,7 +335,7 @@ export function RunnerModal() {
         </>
       }
     >
-        {/* Config — scrollable to handle tags + data + CI/CD */}
+        {/* Config - scrollable for tags + data + CI/CD */}
         <div className="px-4 py-3 border-b border-surface-800 flex flex-col gap-3 flex-shrink-0 overflow-y-auto max-h-[45vh]">
 
           {/* Env + Delay + Run */}

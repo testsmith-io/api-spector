@@ -1,15 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// In-app auto-update for the packaged desktop app (electron-updater). The
-// installer is downloaded *inside the app* from the GitHub release and applied
-// on restart — so it never goes through the browser (no Edge SmartScreen
-// download prompt) and, since the NSIS build is per-user, needs no admin. This
-// is what makes updates work on locked-down/controlled machines.
-//
-// When the app is run from the npm package (not packaged), electron-updater
-// can't self-update, so `updateMode()` reports 'npm' and the renderer falls
-// back to the "npm update -g" hint (see update-check.ts / UpdateToast).
+// In-app auto-update for the packaged desktop app (electron-updater): downloads
+// in-app, applies on restart. From npm it can't self-update, so `updateMode()`
+// reports 'npm' and the renderer shows the "npm update -g" hint.
 
 import { app, BrowserWindow } from 'electron';
 import { autoUpdater } from 'electron-updater';
@@ -45,8 +39,8 @@ export function initAutoUpdater(): void {
     send(IPC.app.onUpdateError, { message: err instanceof Error ? err.message : String(err) });
   });
 
-  // Best-effort: offline, no release, or blocked network just no-ops (the
-  // renderer shows nothing). Never let an update check crash startup.
+  // Offline, no release, or blocked network just no-ops. Never let an update
+  // check crash startup.
   autoUpdater.checkForUpdates().catch(() => { /* ignore */ });
 }
 

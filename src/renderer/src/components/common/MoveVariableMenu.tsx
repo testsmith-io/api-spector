@@ -1,11 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 //
-// A small "move ▸" control shown next to a variable in any scope editor. Opens
-// a popover to pick the destination scope; when that scope has several instances
-// (which collection / folder / environment / request) it shows an instance
-// picker. Moves via moveVariable, which blocks on a name clash and surfaces the
-// reason inline.
+// A "move" control next to a variable: pick a destination scope (with an instance
+// picker when the scope has several). Moves via moveVariable, which blocks name clashes.
 
 import React, { useState } from 'react';
 import { useT } from '../../i18n';

@@ -4,14 +4,8 @@
 export type DiffLineType = 'equal' | 'removed' | 'added'
 export interface DiffLine { type: DiffLineType; text: string }
 
-/**
- * Compute a line-by-line diff using the LCS algorithm. O(n*m) — fine for
- * response bodies up to a few thousand lines.
- *
- *   - 'equal'   line appears in both `a` and `b`
- *   - 'removed' line is in `a` but not `b` (would render with a "-" gutter)
- *   - 'added'   line is in `b` but not `a` (would render with a "+" gutter)
- */
+/** Line-by-line LCS diff. O(n*m), fine for bodies up to a few thousand lines.
+ *  'equal' = in both; 'removed' = in `a` only; 'added' = in `b` only. */
 export function computeLineDiff(a: string, b: string): DiffLine[] {
   const aLines = a.split('\n');
   const bLines = b.split('\n');

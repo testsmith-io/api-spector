@@ -5,12 +5,8 @@ import type { ApiRequest, AuthConfig, Collection, Environment, Folder, KeyValueP
 import { authIsConfigured } from '../../shared/request-collection';
 import { parsePostScript } from './script-parser';
 
-// ─── Shared helpers for the code generators ──────────────────────────────────
-//
-// Every function in this file was copy-pasted verbatim across two or more
-// generators before being extracted here. Generated output must stay
-// byte-identical, so behaviour-affecting changes to these helpers require
-// updating the generator snapshot tests.
+// Shared helpers for the code generators. Generated output must stay byte-identical,
+// so behaviour changes here require updating the generator snapshot tests.
 
 /** Lowercase, hyphenated file-stem (e.g. for spec/test filenames). */
 export function slug(name: string): string {
@@ -22,11 +18,8 @@ export function toEnvVar(key: string): string {
   return key.replaceAll(/\W+/g, '_').toUpperCase();
 }
 
-/**
- * Replace `{{var}}` tokens with JS template expressions: `${VAR}` if the
- * variable was extracted by a hook (present in `sharedVars`), otherwise
- * `${process.env.VAR ?? ''}`.
- */
+/** Replace `{{var}}` tokens with JS template expressions: `${VAR}` when in
+ *  `sharedVars`, otherwise `${process.env.VAR ?? ''}`. */
 export function interpolateEnvVars(value: string, sharedVars: Set<string> = new Set()): string {
   return value.replaceAll(/\{\{([^}]+)\}\}/g, (_, key) => {
     const envKey = toEnvVar(key.trim());
@@ -83,11 +76,8 @@ export function javaClass(name: string): string {
     .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
 }
 
-/**
- * The request's own auth wins; a request with `type: 'none'` falls back to
- * the auth inherited from its folder/collection (or its own 'none' config
- * when nothing is inherited).
- */
+/** Request's own auth wins; `type: 'none'` falls back to inherited
+ *  folder/collection auth. */
 export function resolveEffectiveAuth(
   req: ApiRequest,
   inherited: { auth: AuthConfig | null },
@@ -95,7 +85,7 @@ export function resolveEffectiveAuth(
   return authIsConfigured(req.auth) ? req.auth : (inherited.auth ?? req.auth);
 }
 
-/** Inherited (collection/folder) headers first, then the request's own — enabled + non-empty only. */
+/** Inherited (collection/folder) headers first, then the request's own - enabled + non-empty only. */
 export function mergeHeaders(
   req: ApiRequest,
   inherited: { headers: KeyValuePair[] },
@@ -135,19 +125,14 @@ export function renderTree(paths: string[]): string {
   return ['.', ...render(root)].join('\n');
 }
 
-// ─── Per-framework method support ─────────────────────────────────────────────
-//
-// Verbs beyond the classic set (notably QUERY, RFC 10008) are not first-class
-// in every client library. Each generator either falls back to that library's
-// generic-request form or skips the request with a visible note.
+// Per-framework method support. Verbs beyond the classic set (notably QUERY) aren't
+// first-class in every library; generators fall back to a generic form or skip with a note.
 
-/** Verb helpers that exist on Playwright's APIRequestContext. Anything else
- *  (QUERY, OPTIONS, …) must go through `request.fetch()` with an explicit
- *  `method` option. */
+/** Verb helpers on Playwright's APIRequestContext. Anything else goes through
+ *  `request.fetch()` with an explicit `method`. */
 export const PLAYWRIGHT_VERBS = ['get', 'post', 'put', 'patch', 'delete', 'head'];
 
-/** Verb helpers supertest exposes. QUERY has no supertest equivalent — callers
- *  should skip those requests with a note. */
+/** Verb helpers supertest exposes. QUERY has none; callers skip those with a note. */
 export const SUPERTEST_VERBS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'];
 
 /** REST Assured call suffix: verb helper when one exists, generic
@@ -157,21 +142,14 @@ export function restAssuredCall(method: string, pathArg: string): string {
   return verbs.includes(method) ? `.${method}(${pathArg})` : `.request("${method.toUpperCase()}", ${pathArg})`;
 }
 
-/** Keywords provided by robotframework-requests. QUERY is not among them —
- *  callers should emit a WARN + skip for those requests. */
+/** Keywords from robotframework-requests. QUERY is absent; callers WARN + skip. */
 export const ROBOT_REQUESTS_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
-// ─── JSONPath extraction rendering ────────────────────────────────────────────
-//
-// `sp.jsonPath(json, '<query>')` uses jsonpath-plus (Jayway) syntax. The JS
-// targets use the same library, Karate's `karate.jsonPath` and REST Assured via
-// Jayway share the syntax, so the query string passes through verbatim.
+// JSONPath extraction rendering. `sp.jsonPath` uses jsonpath-plus (Jayway) syntax, shared by
+// JS targets, Karate and REST Assured, so the query string passes through verbatim.
 
-/**
- * A JS expression resolving a JSONPath query against `jsonVar`, applying the
- * optional element index and `?? fallback`. Uses `jsonpath-plus`' `JSONPath`,
- * which the generated project must import and depend on.
- */
+/** JS expression resolving a JSONPath query against `jsonVar`, with optional
+ *  index and `?? fallback`. Needs `jsonpath-plus`' `JSONPath` imported. */
 export function jsJsonPathExpr(
   q: { query: string; index: number | null; fallback: string | null },
   jsonVar: string
@@ -182,10 +160,8 @@ export function jsJsonPathExpr(
   return picked;
 }
 
-/**
- * A Karate expression resolving a JSONPath query via `karate.jsonPath`, applying
- * the optional index and `||` fallback (Karate's JS engine).
- */
+/** Karate expression resolving a JSONPath query via `karate.jsonPath`, with
+ *  optional index and `||` fallback. */
 export function karateJsonPathExpr(
   q: { query: string; index: number | null; fallback: string | null }
 ): string {

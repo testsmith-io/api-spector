@@ -3,25 +3,11 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * API Spector test-generation CLI
+ * API Spector test-generation CLI: generate happy-path, negative and boundary
+ * tests from an OpenAPI spec into a collection file for a workspace or import.
  *
- * Generate tests from an OpenAPI spec: a happy-path call per operation (with a
- * response-schema assertion), plus negative and boundary tests. Writes a
- * collection file you can drop into a workspace or import in the app.
- *
- * Usage:
- *   api-spector generate-tests --spec <file|url> --output <collection.json> [options]
- *
- * Options:
- *   --spec <file|url>       OpenAPI 3.x document (required).
- *   --output <path>         Collection JSON to write (required).
- *   --name <label>          Collection name (default: from the spec title).
- *   --workspace <path>      With --untested-only, measure coverage against this
- *                           workspace and generate only for untested operations.
- *   --untested-only         Only generate tests for operations with no test yet.
- *   --no-negative           Skip negative (missing field / wrong type) tests.
- *   --no-boundary           Skip boundary (min/max/length) tests.
- *   --help                  Show this help.
+ * Usage: api-spector generate-tests --spec <file|url> --output <collection.json>
+ *   [--name <label>] [--untested-only --workspace <path>] [--no-negative] [--no-boundary]
  */
 
 import { readFile, writeFile } from 'node:fs/promises';

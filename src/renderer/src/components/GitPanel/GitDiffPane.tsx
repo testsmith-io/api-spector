@@ -49,7 +49,7 @@ export function GitDiffPane() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
-      {/* Header — file path + status + close */}
+      {/* Header - file path + status + close */}
       <div className="px-4 py-2 border-b border-surface-800 flex items-center gap-3 flex-shrink-0">
         <span
           className={`text-[10px] uppercase tracking-wider font-semibold ${

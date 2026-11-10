@@ -17,10 +17,8 @@ export type SchemaValidation =
   | { status: 'invalid'; errors: SchemaError[] }
   | { status: 'error'; message: string }
 
-/** Validate a response body string against a JSON Schema string. Returns a
- *  discriminated result so callers can render pass / fail / not-applicable
- *  without throwing. `schema`/`body` that are empty yield an 'error' status
- *  with an explanatory message. */
+/** Validate a response body against a JSON Schema string. Returns a
+ *  discriminated result (valid / invalid / error) instead of throwing. */
 export function validateBodyAgainstSchema(schema: string, body: string | null | undefined): SchemaValidation {
   if (!schema.trim()) return { status: 'error', message: 'No schema defined.' };
   if (body == null) return { status: 'error', message: 'No response body to validate.' };

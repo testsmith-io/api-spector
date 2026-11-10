@@ -33,13 +33,13 @@ function makeDuplicateCollection (): Collection {
   };
 }
 
-// ─── Shared helpers ───────────────────────────────────────────────────────────
+// Shared helpers
 
 function fileByPath ( files: { path: string; content: string }[], pathFragment: string ) {
   return files.find( f => f.path.includes( pathFragment ) );
 }
 
-// ─── Robot Framework ─────────────────────────────────────────────────────────
+// Robot Framework
 
 describe( 'generateCurl', () => {
   const [file] = generateCurl( collection, environment );
@@ -165,7 +165,7 @@ describe( 'generateRobotFramework', () => {
   } );
 } );
 
-// ─── Playwright ───────────────────────────────────────────────────────────────
+// Playwright
 
 describe( 'generatePlaywright', () => {
   const files = generatePlaywright( collection, environment );
@@ -195,7 +195,7 @@ describe( 'generatePlaywright', () => {
   } );
 } );
 
-// ─── Supertest TS ─────────────────────────────────────────────────────────────
+// Supertest TS
 
 describe( 'generateSupertestTs', () => {
   const files = generateSupertestTs( collection, environment );
@@ -237,7 +237,7 @@ describe( 'generateSupertestTs', () => {
   } );
 } );
 
-// ─── REST Assured ─────────────────────────────────────────────────────────────
+// REST Assured
 
 describe( 'generateRestAssured', () => {
   const files = generateRestAssured( collection, environment );
@@ -275,7 +275,7 @@ describe( 'generateRestAssured', () => {
   } );
 } );
 
-// ─── Karate ───────────────────────────────────────────────────────────────────
+// Karate
 
 describe( 'generateKarate', () => {
   const files = generateKarate( collection, environment );
@@ -370,14 +370,14 @@ describe( 'generateKarate', () => {
   } );
 
   it( '`{{BASE_URL}}/path` keeps the config-driven baseUrl + path split', () => {
-    // makeCollection uses {{BASE_URL}}/users — the default fixture covers this.
+    // makeCollection uses {{BASE_URL}}/users - the default fixture covers this.
     const feature = files.find( x => x.path.endsWith( '.feature' ) )!;
     expect( feature.content ).toMatch( /Given url baseUrl/ );
     expect( feature.content ).toMatch( /And path 'users'/ );
   } );
 } );
 
-// ─── QUERY method (RFC 10008) ────────────────────────────────────────────────
+// QUERY method (RFC 10008)
 
 /** A collection with a single QUERY request carrying a JSON body. */
 function makeQueryCollection (): Collection {

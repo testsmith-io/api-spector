@@ -10,9 +10,9 @@ import {
   jsJsonPathExpr, folderUsesJsonPath, collectionUsesJsonPath,
 } from './generator-utils';
 
-// ─── Supertest + Jest TypeScript generator ────────────────────────────────────
+// Supertest + Jest TypeScript generator
 
-// ─── jest.config.ts ────────────────────────────────────────────────────────────
+// jest.config.ts
 
 function buildJestConfig(): string {
   return `\
@@ -29,7 +29,7 @@ export default config
 `;
 }
 
-// ─── helpers/api-client.ts ────────────────────────────────────────────────────
+// helpers/api-client.ts
 
 function buildClient(environment: Environment | null): string {
   const baseUrl = getEnvBaseUrl(environment, 'http://localhost:3000');
@@ -51,7 +51,7 @@ export const api = supertest(BASE_URL);
 `;
 }
 
-// ─── Test file per folder ─────────────────────────────────────────────────────
+// Test file per folder
 
 function buildTestFile(folderName: string, folder: Folder, collection: Collection): string {
   const requests = collection.requests;
@@ -73,7 +73,7 @@ function buildTestFile(folderName: string, folder: Folder, collection: Collectio
     nameMap.set(id, name);
   }
 
-  // Hook blocks (collected from this folder + all ancestors) with variable extraction
+  // Hook blocks from this folder + ancestors, with variable extraction
   const hooks = getAllApplicableHooks(folder.id, collection);
   const beforeAllH = hooks.beforeAll;
   const afterAllH  = hooks.afterAll;
@@ -230,7 +230,7 @@ ${tests.join('\n\n')}
 `;
 }
 
-// ─── Project scaffolding files ────────────────────────────────────────────────
+// Project scaffolding files
 
 function buildPackageJson(collectionName: string, usesJsonPath: boolean): string {
   const name = collectionName.replaceAll(/\W+/g, '-').toLowerCase();
@@ -288,7 +288,7 @@ npm test
 `;
 }
 
-// ─── Main entry ───────────────────────────────────────────────────────────────
+// Main entry
 
 export function generateSupertestTs(
   collection: Collection,

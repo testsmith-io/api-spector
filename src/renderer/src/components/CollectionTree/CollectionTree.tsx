@@ -27,7 +27,7 @@ import {
 } from '../common/icons';
 import { useT } from '../../i18n';
 
-// ─── Drag-and-drop context ────────────────────────────────────────────────────
+// Drag-and-drop context
 
 export type DragState =
   | { type: 'request'; requestId: string; collectionId: string }
@@ -36,29 +36,35 @@ export type DragState =
 export const DragCtx = createContext<{
   dragging: DragState | null
   setDragging: ( d: DragState | null ) => void
-  onDropRequest: ( destCollectionId: string, destFolderId: string, destIndex?: number ) => void
+  /** `copy` true duplicates the dragged request(s) instead of moving, set when
+   *  the drop happens with the copy modifier (Ctrl / Cmd). Folders always move. */
+  onDropRequest: ( destCollectionId: string, destFolderId: string, destIndex?: number, copy?: boolean ) => void
   onDropFolder: ( destCollectionId: string, destParentFolderId: string, destIndex?: number ) => void
   /** Drop the dragged item at a unified position among a folder's children. */
-  onReorderChild: ( destCollectionId: string, destParentFolderId: string, destIndex: number ) => void
+  onReorderChild: ( destCollectionId: string, destParentFolderId: string, destIndex: number, copy?: boolean ) => void
 }>( { dragging: null, setDragging: () => { }, onDropRequest: () => { }, onDropFolder: () => { }, onReorderChild: () => { } } );
 
-// Left padding (px) for a tree row at a given folder depth. Depth is the real
-// collection/folder nesting only — requests and examples do NOT add a level, so
-// first-level requests sit close to the edge and get the width back for names.
-// Capped so deeply nested folders can't push content off-screen.
+// A drop copies instead of moves when Ctrl/Cmd is held (Explorer/Finder
+// convention); the cursor shows a "+" via dropEffect.
+export function isCopyDrag ( e: React.DragEvent ): boolean {
+  return e.ctrlKey || e.metaKey;
+}
+
+// Left padding (px) for a tree row at a given folder depth. Only folders add a
+// level (requests and examples don't). Capped so deep nesting can't push content
+// off-screen.
 const INDENT_STEP = 12;
-// Enough left gutter at the first level to host the hover-only selection
-// checkbox (overlaid in the indentation, so it reserves no column) while still
-// bringing the method far closer to the edge than before.
+// First-level gutter hosts the hover-only selection checkbox, overlaid in the
+// indentation so it reserves no column.
 const INDENT_BASE = 16;
 const INDENT_MAX_DEPTH = 12;
 function indentPx ( depth: number ): number {
   return Math.min( depth, INDENT_MAX_DEPTH ) * INDENT_STEP + INDENT_BASE;
 }
 
-// ─── Drop line (unified child ordering) ─────────────────────────────────────────
-// A thin target between rows (and at the very top, under the collection name)
-// that drops the dragged item at a specific position among a folder's children.
+// Drop line (unified child ordering)
+// A thin target between rows that drops the dragged item at a specific position
+// among a folder's children.
 
 function DropLine ( { collectionId, parentFolderId, index, indent }: {
   readonly collectionId: string
@@ -73,19 +79,18 @@ function DropLine ( { collectionId, parentFolderId, index, indent }: {
     <div
       style={{ paddingLeft: indent }}
       className="relative h-2 -my-1 z-20"
-      onDragOver={e => { e.preventDefault(); e.stopPropagation(); setOver( true ); }}
+      onDragOver={e => { e.preventDefault(); e.stopPropagation(); if ( dragCtx.dragging?.type === 'request' ) e.dataTransfer.dropEffect = isCopyDrag( e ) ? 'copy' : 'move'; setOver( true ); }}
       onDragLeave={() => setOver( false )}
-      onDrop={e => { e.preventDefault(); e.stopPropagation(); setOver( false ); dragCtx.onReorderChild( collectionId, parentFolderId, index ); }}
+      onDrop={e => { e.preventDefault(); e.stopPropagation(); setOver( false ); dragCtx.onReorderChild( collectionId, parentFolderId, index, isCopyDrag( e ) ); }}
     >
       {over && <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 h-0.5 bg-blue-500 rounded pointer-events-none" />}
     </div>
   );
 }
 
-// ─── Multi-select context ─────────────────────────────────────────────────────
-// Selection lives at the tree root and is read by RequestRow through context so
-// it doesn't have to be threaded through every folder level. Keys pair the
-// collection id with the request id (NUL-separated so ids can't collide).
+// Multi-select context
+// Selection lives at the tree root and is read by RequestRow through context.
+// Keys pair the collection id with the request id so ids can't collide.
 
 export const SelectionCtx = createContext<{
   active: boolean
@@ -95,7 +100,7 @@ export const SelectionCtx = createContext<{
   clear: () => void
 }>( { active: false, count: 0, isSelected: () => false, toggle: () => { }, clear: () => { } } );
 
-// ─── Tag chips ────────────────────────────────────────────────────────────────
+// Tag chips
 
 export function TagChips ( {
   tags, onRemove, onAdd, forceAdding = false, onDoneAdding,
@@ -159,9 +164,9 @@ export function TagChips ( {
   );
 }
 
-// ─── Root tree ────────────────────────────────────────────────────────────────
+// Root tree
 
-// ─── Search ──────────────────────────────────────────────────────────────────
+// Search
 
 function methodColor ( method: string ): string {
   switch ( method ) {
@@ -176,9 +181,8 @@ function methodColor ( method: string ): string {
 
 type SearchMatch = { collectionId: string; collectionName: string; req: ApiRequest; path: string[] };
 
-/** Walk a collection's folder tree and collect every request whose name, URL,
- *  method, or tags contain the (already lower-cased) query, remembering the
- *  folder path so the flat result can show where each request lives. */
+/** Every request whose name, URL, method, or tags contain the (lower-cased)
+ *  query, with its folder path for display. */
 function collectMatches ( col: Collection, q: string ): SearchMatch[] {
   const out: SearchMatch[] = [];
   const walk = ( folder: Folder, path: string[] ) => {
@@ -226,6 +230,7 @@ export function CollectionTree () {
   const openRunner = useStore( s => s.openRunner );
 
   const moveRequest = useStore( s => s.moveRequest );
+  const copyRequest = useStore( s => s.copyRequest );
   const moveFolder = useStore( s => s.moveFolder );
   const reorderChild = useStore( s => s.reorderChild );
 
@@ -235,11 +240,11 @@ export function CollectionTree () {
   const matches = q ? colList.flatMap( ( { data } ) => collectMatches( data, q ) ) : [];
   const [pendingConfirm, setPendingConfirm] = useState<{ message: string; onConfirm: () => void } | null>( null );
 
-  // ── Multi-select ──────────────────────────────────────────────────────────
+  // Multi-select
   const [selected, setSelected] = useState<Set<string>>( () => new Set() );
   const selKey = ( c: string, r: string ) => `${c} ${r}`;
-  // Memoized so it only changes when the selection changes — otherwise every
-  // RequestRow (a SelectionCtx consumer) would re-render on every tree render.
+  // Memoized so it changes only with the selection; otherwise every RequestRow
+  // consumer re-renders on every tree render.
   const selectionCtx = useMemo( () => ( {
     active:     selected.size > 0,
     count:      selected.size,
@@ -257,17 +262,17 @@ export function CollectionTree () {
   }
   const [newRequestId, setNewRequestId] = useState<string | null>( null );
   const [dragging, setDragging] = useState<DragState | null>( null );
-  // Collapse / expand every collection at once. `value` is the intended state
-  // (true = expanded); `seq` increments on each click so collection rows react
-  // even when toggled back to a value they already appear to hold.
+  // Collapse / expand all collections. `value` is the intended state (true =
+  // expanded); `seq` increments per click so rows react even when toggled back
+  // to a value they already hold.
   const [colExpand, setColExpand] = useState<{ value: boolean; seq: number }>( { value: true, seq: 0 } );
 
   function confirmThen ( message: string, action: () => void ) {
     setPendingConfirm( { message, onConfirm: () => { action(); setPendingConfirm( null ); } } );
   }
 
-  // Selected requests in tree order (top-to-bottom), so a multi-drag moves them
-  // as a block in the order they appear rather than the order they were picked.
+  // Selected requests in tree order, so a multi-drag moves them as a block in
+  // display order, not pick order.
   function orderedSelectedRequests (): { collectionId: string; requestId: string }[] {
     const out: { collectionId: string; requestId: string }[] = [];
     const walk = ( collectionId: string, folder: Folder ): void => {
@@ -293,12 +298,13 @@ export function CollectionTree () {
     return [{ collectionId: dragging.collectionId, requestId: dragging.requestId }];
   }
 
-  function onDropRequest ( destCollectionId: string, destFolderId: string, destIndex?: number ) {
+  function onDropRequest ( destCollectionId: string, destFolderId: string, destIndex?: number, copy = false ) {
     const reqs = draggedRequests();
     if ( reqs.length === 0 ) return;
     // Callers always append (no index) here; keep the block's relative order.
+    const op = copy ? copyRequest : moveRequest;
     reqs.forEach( ( r, i ) =>
-      moveRequest( r.collectionId, r.requestId, destCollectionId, destFolderId,
+      op( r.collectionId, r.requestId, destCollectionId, destFolderId,
         destIndex === undefined ? undefined : destIndex + i ) );
     if ( reqs.length > 1 ) selectionCtx.clear();
     setDragging( null );
@@ -313,19 +319,22 @@ export function CollectionTree () {
 
   // Drop the dragged item at a unified position among destParent's children.
   // Same-collection only; cross-collection drags fall back to appending/nesting.
-  function onReorderChild ( destCollectionId: string, destParentFolderId: string, destIndex: number ) {
+  function onReorderChild ( destCollectionId: string, destParentFolderId: string, destIndex: number, copy = false ) {
     if ( !dragging ) return;
     if ( dragging.type === 'folder' ) {
+      // Folders are always moved (copy modifier applies to requests only).
       if ( dragging.collectionId === destCollectionId ) {
         reorderChild( destCollectionId, { type: 'folder', id: dragging.folderId }, destParentFolderId, destIndex );
       }
       setDragging( null );
       return;
     }
-    // Request(s): a multi-selection moves as a contiguous block at destIndex.
+    // Request(s): a multi-selection moves (or copies) as a contiguous block at destIndex.
     const reqs = draggedRequests();
     reqs.forEach( ( r, i ) => {
-      if ( r.collectionId === destCollectionId ) {
+      if ( copy ) {
+        copyRequest( r.collectionId, r.requestId, destCollectionId, destParentFolderId, destIndex + i );
+      } else if ( r.collectionId === destCollectionId ) {
         reorderChild( destCollectionId, { type: 'request', id: r.requestId }, destParentFolderId, destIndex + i );
       } else {
         moveRequest( r.collectionId, r.requestId, destCollectionId, destParentFolderId );
@@ -490,11 +499,10 @@ export function CollectionTree () {
   );
 }
 
-// ─── Collection row ───────────────────────────────────────────────────────────
+// Collection row
 
-// `ids` null/undefined means "every folder reacts" (collection-level expand /
-// collapse). A folder-scoped expand sets `ids` to that folder's subtree so only
-// those rows react.
+// `ids` null/undefined = every folder reacts (collection-level expand/collapse);
+// a folder-scoped expand sets `ids` to that folder's subtree.
 type ExpandCtrl = { value: boolean; seq: number; ids?: Set<string> | null };
 
 /** All folder ids in a subtree, including the folder itself. */
@@ -546,24 +554,23 @@ function CollectionNode ( {
   readonly onRunFolder: ( folderId: string ) => void
 } ) {
   const t = useT();
-  // Restore the collapsed/expanded state from the previous session (default
-  // expanded). Keyed per collection id so it survives relaunch.
+  // Restore collapsed/expanded state from the previous session (default
+  // expanded), keyed per collection id.
   const [expanded, setExpanded] = useState( () => !isCollectionCollapsed( col.id ) );
-  // React to the tree-wide collapse / expand-all button. Keyed on `seq` so a
-  // repeated click re-applies even if this collection was toggled individually
-  // in between; skips the initial mount (seq 0) to preserve the restored state.
+  // React to the tree-wide collapse/expand-all button. Keyed on `seq` so a
+  // repeated click re-applies; skips the initial mount (seq 0) to keep the
+  // restored state.
   useEffect( () => {
     if ( collapseSignal.seq > 0 ) setExpanded( collapseSignal.value );
   }, [collapseSignal.seq, collapseSignal.value] );
-  // Persist every change (individual toggle or tree-wide button) so it's
-  // remembered next launch.
+  // Persist every change so it's remembered next launch.
   useEffect( () => { setCollectionCollapsed( col.id, !expanded ); }, [col.id, expanded] );
   const [renaming, setRenaming] = useState( false );
   const [showSettings, setShowSettings] = useState( false );
   const [showSchemaSync, setShowSchemaSync] = useState( false );
   const [showPushContract, setShowPushContract] = useState( false );
   // The collection panel is showing THIS collection (clicked, not just owning
-  // the active request) — highlight the row like a request/folder.
+  // the active request); highlight the row like a request/folder.
   const panelActive = useStore( s => s.collectionPanelOpen && s.activeCollectionId === col.id );
   const sortChildren = useStore( s => s.sortChildren );
   const [expandCtrl, setExpandCtrl] = useState<ExpandCtrl>( { value: true, seq: 0 } );
@@ -573,8 +580,8 @@ function CollectionNode ( {
   const [showCloudRequired, setShowCloudRequired] = useState( false );
   const [showShare, setShowShare] = useState( false );
 
-  // Open the share dialog (create / view / restrict / revoke the public link).
-  // Sharing needs the cloud; without it we invite the user to connect instead.
+  // Open the share dialog. Sharing needs the cloud; without it, invite the user
+  // to connect instead.
   function openShare () {
     if ( !cloudEnabled() ) { setShowCloudRequired( true ); return; }
     setShowShare( true );
@@ -595,12 +602,12 @@ function CollectionNode ( {
         onClick={onSelectCollection}
         onDoubleClick={e => { e.stopPropagation(); setRenaming( true ); }}
         onKeyDown={onActivateKey( onSelectCollection )}
-        onDragOver={dragCtx.dragging ? e => { e.preventDefault(); setDropOver( true ); } : undefined}
+        onDragOver={dragCtx.dragging ? e => { e.preventDefault(); if ( dragCtx.dragging?.type === 'request' ) e.dataTransfer.dropEffect = isCopyDrag( e ) ? 'copy' : 'move'; setDropOver( true ); } : undefined}
         onDragLeave={() => setDropOver( false )}
         onDrop={e => {
           e.preventDefault(); setDropOver( false );
           if ( dragCtx.dragging?.type === 'folder' ) dragCtx.onDropFolder( col.id, col.rootFolder.id );
-          else dragCtx.onDropRequest( col.id, col.rootFolder.id );
+          else dragCtx.onDropRequest( col.id, col.rootFolder.id, undefined, isCopyDrag( e ) );
         }}
       >
         <button
@@ -634,7 +641,7 @@ function CollectionNode ( {
             { type: 'item', label: t( 'Run collection' ), icon: <PlayIcon />, onClick: onRunCollection },
             { type: 'separator' },
             { type: 'item', label: t( 'Add request' ), icon: <PlusIcon />, onClick: () => onAddRequest( col.rootFolder.id ) },
-            { type: 'item', label: t( 'Add folder' ), icon: <FolderIcon />, onClick: () => onAddFolder( col.rootFolder.id, 'New Folder' ) },
+            { type: 'item', label: t( 'Add folder' ), icon: <FolderIcon />, onClick: () => { setExpanded( true ); onAddFolder( col.rootFolder.id, 'New Folder' ); } },
             { type: 'item', label: t( 'Sort A to Z' ), icon: <SortAzIcon />, onClick: () => sortChildren( col.id, col.rootFolder.id ) },
             { type: 'separator' },
             { type: 'item', label: t( 'Expand all' ), icon: <ExpandAllIcon />, onClick: expandAll },
@@ -715,7 +722,7 @@ function CollectionNode ( {
   );
 }
 
-// ─── Folder row ───────────────────────────────────────────────────────────────
+// Folder row
 
 function FolderRow ( {
   folder, collectionId, depth,
@@ -739,15 +746,14 @@ function FolderRow ( {
   readonly onToggleDisabled: () => void
   readonly onUpdateTags: ( tags: string[] ) => void
   readonly onRun: () => void
-  /** Names of the folders at this level (siblings, incl. this one) — used to
-   *  block a rename that would collide with a sibling. */
+  /** Folder names at this level (siblings, incl. this one); blocks a colliding
+   *  rename. */
   readonly siblingNames?: string[]
   readonly children: React.ReactNode
 } ) {
   const t = useT();
   // Folders start collapsed so expanding a collection doesn't blow the whole
-  // tree open. The user can still use "Expand all" from the collection
-  // context menu, which propagates through expandCtrl.
+  // tree open. "Expand all" propagates through expandCtrl.
   const [expanded, setExpanded] = useState( false );
   useEffect( () => {
     // React to collection-level expand/collapse (ids null) or a folder-scoped
@@ -792,6 +798,7 @@ function FolderRow ( {
     // Don't allow dropping a folder onto itself.
     if ( dragCtx.dragging.type === 'folder' && dragCtx.dragging.folderId === folder.id ) return;
     e.preventDefault();
+    if ( dragCtx.dragging.type === 'request' ) e.dataTransfer.dropEffect = isCopyDrag( e ) ? 'copy' : 'move';
     setDropInside( true );
   }
 
@@ -801,7 +808,7 @@ function FolderRow ( {
     setDropInside( false );
     if ( !dragCtx.dragging ) return;
     if ( dragCtx.dragging.type === 'folder' ) dragCtx.onDropFolder( collectionId, folder.id );
-    else dragCtx.onDropRequest( collectionId, folder.id );
+    else dragCtx.onDropRequest( collectionId, folder.id, undefined, isCopyDrag( e ) );
   }
 
   return (
@@ -867,7 +874,7 @@ function FolderRow ( {
             { type: 'item', label: t( 'Run folder' ), icon: <PlayIcon />, onClick: onRun },
             { type: 'separator' },
             { type: 'item', label: t( 'Add request' ), icon: <PlusIcon />, onClick: onAddRequest },
-            { type: 'item', label: t( 'Add sub-folder' ), icon: <FolderIcon />, onClick: onAddFolder },
+            { type: 'item', label: t( 'Add sub-folder' ), icon: <FolderIcon />, onClick: () => { setExpanded( true ); onAddFolder(); } },
             { type: 'item', label: t( 'Sort A to Z' ), icon: <SortAzIcon />, onClick: () => sortChildren( collectionId, folder.id ) },
             { type: 'separator' },
             { type: 'item', label: t( 'Expand all' ), icon: <ExpandAllIcon />, onClick: () => { setExpanded( true ); onRequestExpand( collectFolderIds( folder ), true ); } },
@@ -934,7 +941,7 @@ function FolderRow ( {
   );
 }
 
-// ─── Folder contents (recursive) ─────────────────────────────────────────────
+// Folder contents (recursive)
 
 function FolderContents ( {
   folder, collectionId, requests, activeRequestId, depth,
@@ -983,9 +990,9 @@ function FolderContents ( {
 
   const dropIndent = indentPx( depth );
 
-  // Requests and sub-folders are rendered in one unified, drag-orderable list
+  // Requests and sub-folders render in one unified, drag-orderable list
   // (folder.childOrder). A drop line sits before every child and after the last,
-  // so an item can be placed at any position — including above the first folder.
+  // so an item can land at any position.
   const renderChild = ( child: ChildRef ) => {
     if ( child.type === 'folder' ) {
       const sub = folder.folders.find( f => f.id === child.id );

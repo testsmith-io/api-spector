@@ -40,7 +40,7 @@ import { useT } from './i18n';
 
 const { electron } = window;
 
-// ─── Activity bar icons ───────────────────────────────────────────────────────
+// Activity bar icons
 
 function IconCollections () {
   return (
@@ -140,9 +140,8 @@ function ActivityBarBtn ( {
       >
         {children}
       </button>
-      {/* Badge lives OUTSIDE the button (positioned over it) so the button has no
-          visible text content that would conflict with its aria-label
-          (axe: label-content-name-mismatch); the count is in the aria-label. */}
+      {/* Badge lives outside the button so it isn't visible text conflicting with
+          the aria-label (axe: label-content-name-mismatch). */}
       {badge !== undefined && badge > 0 && (
         <span aria-hidden="true" className="pointer-events-none absolute top-1 right-1 text-[9px] bg-surface-600 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center font-medium leading-none">
           {badge > 9 ? '9+' : badge}
@@ -157,9 +156,9 @@ function ActivityBarBtn ( {
   );
 }
 
-// ─── App ──────────────────────────────────────────────────────────────────────
+// App
 
-// ─── Method badge colors for tab bar ─────────────────────────────────────────
+// Method badge colors for tab bar
 
 const TAB_METHOD_COLORS: Record<string, string> = {
   GET: 'text-emerald-400',
@@ -172,9 +171,8 @@ const TAB_METHOD_COLORS: Record<string, string> = {
   QUERY: 'text-fuchsia-400',
 };
 
-// Memoized tab row — prevents every tab from re-rendering when only one tab's
-// state (active/response/sending) changes. Props are intentionally scalar so
-// React.memo's shallow comparison catches no-op renders.
+// Memoized tab row so one tab's state change doesn't re-render every tab. Props
+// are scalar so React.memo's shallow compare catches no-op renders.
 interface TabRowProps {
   readonly tabId: string
   readonly kind?: 'request' | 'folder' | 'collection'
@@ -191,8 +189,8 @@ const TabRow = React.memo( function TabRow ( {
 }: TabRowProps ) {
   const t = useT();
   return (
-    // Plain container (no interactive role) so the activate + close buttons below
-    // are siblings, not nested interactives — screen readers announce both.
+    // Plain container so the activate + close buttons are siblings, not nested
+    // interactives (screen readers announce both).
     <div
       onContextMenu={e => {
         e.preventDefault();
@@ -237,8 +235,7 @@ export default function App () {
   useAutoSave();
   const { applyWorkspace } = useWorkspaceLoader();
   const workspace = useStore( s => s.workspace );
-  // Performance testing is opt-in (Workspace Settings) so it stays out of the
-  // way of plain functional testing.
+  // Performance testing is opt-in (Workspace Settings).
   const perfEnabled = Boolean( workspace?.settings?.performanceTesting );
   const collections = useStore( s => s.collections );
   const tabs = useStore( s => s.tabs );
@@ -321,8 +318,8 @@ export default function App () {
     };
   }, [] );
 
-  // "Open in API Spector" deep link (spector://open-from-git?url=…) from the web
-  // courses: run the same open-from-Git flow as the welcome-screen button.
+  // "Open in API Spector" deep link (spector://open-from-git?url=…): run the same
+  // open-from-Git flow as the welcome-screen button.
   useEffect( () => {
     electron.onOpenFromGit( async ( repoUrl: string ) => {
       try {
@@ -335,9 +332,8 @@ export default function App () {
     return () => electron.offOpenFromGit();
   }, [applyWorkspace] );
 
-  // "Open in API Spector" deep link (spector://import?token=…) from a shared
-  // collection/request link: fetch the definition and import it as a new
-  // collection, then switch the sidebar to show it.
+  // "Open in API Spector" deep link (spector://import?token=…): fetch the shared
+  // collection/request and import it as a new collection, then show the sidebar.
   useEffect( () => {
     electron.onImportShare( async ( token: string ) => {
       try {
@@ -362,8 +358,8 @@ export default function App () {
         const store = useStore.getState();
         const id = store.addCollectionObject( collection );
 
-        // Persist to disk + workspace when a workspace is open (best-effort;
-        // the collection is already in memory regardless).
+        // Persist to disk + workspace when one is open; the collection is already
+        // in memory regardless.
         try {
           const entry = useStore.getState().collections[id];
           if ( entry && useStore.getState().workspace ) {
@@ -440,8 +436,8 @@ export default function App () {
         e.preventDefault();
         setCommandPaletteOpen( true );
       }
-      // Cmd/Ctrl+Enter (re)sends the active request. The active RequestBuilder
-      // handles the actual send and ignores it for WebSocket/gRPC tabs.
+      // Cmd/Ctrl+Enter (re)sends the active request. The RequestBuilder handles
+      // the send and ignores it for WebSocket/gRPC tabs.
       if ( e.key === 'Enter' && ( e.metaKey || e.ctrlKey ) ) {
         e.preventDefault();
         requestSend();
@@ -450,7 +446,7 @@ export default function App () {
 
       const mod = e.metaKey || e.ctrlKey;
 
-      // ── Switch between OPEN request tabs ──
+      // Switch between OPEN request tabs
       // Ctrl+Tab / Ctrl+Shift+Tab cycle; Cmd/Ctrl+1..9 jump (9 = last).
       if ( tabs.length > 0 ) {
         if ( e.key === 'Tab' && e.ctrlKey ) {
@@ -469,7 +465,7 @@ export default function App () {
         }
       }
 
-      // ── Navigate within the request/response area (only when a request is open) ──
+      // Navigate within the request/response area (only when a request is open)
       // Cmd/Ctrl+Alt+Left/Right moves focus between the two panes;
       // Cmd/Ctrl+Alt+Up/Down moves through the focused pane's sub-tabs.
       if ( activeTabId && mod && e.altKey ) {
@@ -505,9 +501,8 @@ export default function App () {
     return () => mq.removeEventListener( 'change', handler );
   }, [theme] );
 
-  // Build a single requestId → ApiRequest lookup from all collections. Previously
-  // both `activeRequest` and each tab rendered a linear `Object.values(collections).find(...)`,
-  // making the tab bar O(tabs × collections). Now it's O(1) per lookup.
+  // Single requestId -> ApiRequest lookup from all collections, so tab/request
+  // lookups are O(1) instead of O(tabs × collections).
   const requestsById = useMemo( () => {
     const map = new Map<string, ApiRequest>();
     for ( const col of Object.values( collections ) ) {
@@ -520,11 +515,9 @@ export default function App () {
 
   const activeTab = useMemo( () => tabs.find( t => t.id === activeTabId ) ?? null, [tabs, activeTabId] );
   const activeBaseRequest = activeTab?.requestId ? requestsById.get( activeTab.requestId ) ?? null : null;
-  // When the tab is on an example, the example REPLACES the request when run:
-  // its params, headers and body are sent verbatim. A field the example does
-  // not list is sent empty (NOT inherited from the base request) — so an example
-  // with no body sends no body even if the base request has one. Method/URL/auth
-  // fall back to the base so the request is still runnable.
+  // When the tab is on an example, the example replaces the request: params,
+  // headers and body are sent verbatim, and a field it doesn't list is sent
+  // empty (not inherited). Method/URL/auth fall back to the base so it still runs.
   const activeRequest = useMemo( () => {
     if ( !activeBaseRequest ) return null;
     if ( !activeTab?.exampleId ) return activeBaseRequest;
@@ -537,23 +530,21 @@ export default function App () {
       params:  o.params  ?? [],
       headers: o.headers ?? [],
       body:    o.body    ?? { mode: 'none' },
-      // Variables are the exception to "replace": an example's own variables
-      // override the request's, but inherit the ones it doesn't define, so an
-      // example can hold its own values without losing the request's others.
+      // Variables are the exception to "replace": an example's own override the
+      // request's but inherit the ones it doesn't define.
       variables: { ...activeBaseRequest.variables, ...(o.variables ?? {}) },
     };
   }, [activeBaseRequest, activeTab?.exampleId] );
 
-  // Stable callback so <TabRow> memoization holds — a fresh inline arrow
-  // per render would invalidate every row's shallow-equal check.
+  // Stable callback so <TabRow> memoization holds; a fresh inline arrow would
+  // invalidate every row's shallow-equal check.
   const openTabContextMenu = useCallback( ( tabId: string, x: number, y: number ) => {
     setTabContextMenu( { x, y, tabId } );
   }, [] );
 
-  // The response panel mirrors whether the *active tab* has a response yet.
-  // Open as soon as one arrives (or when switching to a tab that has one),
-  // collapse again when switching to a tab that hasn't been sent. The user
-  // can still toggle manually after the initial state is set.
+  // Response panel mirrors whether the active tab has a response: open when one
+  // arrives or on switching to a tab with one, collapse otherwise. User can
+  // still toggle manually afterward.
   useEffect( () => {
     setResponseOpen( Boolean( activeTab?.lastResponse ) );
   }, [activeTabId, activeTab?.lastResponse] );
@@ -577,7 +568,7 @@ export default function App () {
       <ProductTour />
       {contractDesignerOpen && <ContractDesignerModal seed={contractDesignerSeed ?? undefined} onClose={closeContractDesigner} />}
       {docsModalOpen && <DocsGeneratorModal onClose={() => setDocsModalOpen( false )} />}
-      {/* macOS drag region with centered title — hidden on Windows (native title bar used instead) */}
+      {/* macOS drag region with centered title; hidden on Windows (native title bar). */}
       {window.electron.platform !== 'win32' && (
         <div className="drag-region flex-shrink-0 bg-surface-950 flex items-center justify-center">
           <span className="no-drag text-[11px] font-medium tracking-widest select-none" style={{ color: 'var(--text-muted)' }}>
@@ -907,9 +898,9 @@ export default function App () {
                 >
                   <RequestBuilder request={activeRequest} />
                 </div>
-                {/* Resize + collapse handle. The separator and the collapse button
-                    are SIBLINGS (not nested) so the focusable separator doesn't
-                    contain a focusable button (axe: nested-interactive). */}
+                {/* Resize + collapse handle. Separator and collapse button are
+                    siblings, not nested, so the separator doesn't contain a
+                    focusable button (axe: nested-interactive). */}
                 <div className="flex-shrink-0 w-1 relative group">
                   <div
                     role="separator"

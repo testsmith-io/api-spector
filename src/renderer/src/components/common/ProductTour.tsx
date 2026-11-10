@@ -1,12 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// First-run product tour. Shows exactly once — the first time a workspace is
-// open — a 3-step spotlight walking through creating a collection, an
-// environment, and a request. Dependency-free: it finds each target by a
-// [data-tour] attribute, dims the rest of the screen with a box-shadow "hole",
-// and anchors a tooltip beside it. Marking it seen on start guarantees it never
-// reappears (per the "only first time" requirement).
+// First-run product tour, shown once (first workspace open). Dependency-free:
+// finds each target by [data-tour], dims the rest with a box-shadow "hole", and
+// anchors a tooltip beside it. Marked seen on start so it never reappears.
 
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { useStore } from '../../store';
@@ -75,8 +72,7 @@ export function ProductTour() {
     try { seen = localStorage.getItem(SEEN_KEY) === '1'; } catch { seen = false; }
     if (seen) return;
     try { localStorage.setItem(SEEN_KEY, '1'); } catch { /* storage disabled */ }
-    // The sidebar defaults to open on the Collections tab, so the collection and
-    // request anchors are already on screen; make sure of the tab all the same.
+    // Sidebar defaults to the Collections tab; set it anyway so the anchors show.
     setSidebarTab('collections');
     setActive(true);
   }, [workspace, active, setSidebarTab]);

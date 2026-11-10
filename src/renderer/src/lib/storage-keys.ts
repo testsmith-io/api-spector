@@ -3,7 +3,7 @@
 
 // Central registry of localStorage keys used by the renderer, so the literal
 // strings live in one place (typo-safe, greppable). These are per-machine UI
-// preferences only — nothing here travels with the workspace.
+// preferences only - nothing here travels with the workspace.
 export const STORAGE_KEYS = {
   theme:              'theme',
   zoom:               'zoom',

@@ -4,13 +4,11 @@
 import React from 'react';
 import { FlowchartPreview } from '../components/common/FlowchartPreview';
 
-// A compact, dependency-free Markdown renderer for documentation preview.
-// It escapes all text (React does this for us by rendering strings as children)
-// and never injects raw HTML, so untrusted doc content cannot inject markup.
-// Supports: headings, bold/italic/inline-code, links, fenced + inline code,
-// unordered/ordered lists, blockquotes, horizontal rules, and paragraphs.
+// Compact, dependency-free Markdown renderer for doc preview. Escapes all text
+// and never injects raw HTML, so untrusted content can't inject markup. Supports
+// headings, bold/italic/code, links, code fences, lists, blockquotes, rules, paragraphs.
 
-// ── Inline ──────────────────────────────────────────────────────────────────
+// Inline
 
 const INLINE_RE = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
 
@@ -39,9 +37,8 @@ function renderInline(text: string, keyBase: string): React.ReactNode[] {
   });
 }
 
-// Split a pipe-table row into trimmed cells, tolerating optional leading/
-// trailing pipes. Mirrors splitRow in shared/markdown-to-html.ts so the preview
-// and the exported HTML render the same table.
+// Split a pipe-table row into trimmed cells (optional leading/trailing pipes).
+// Mirrors splitRow in shared/markdown-to-html.ts.
 function splitRow(line: string): string[] {
   let s = line.trim();
   if (s.startsWith('|')) s = s.slice(1);
@@ -49,7 +46,7 @@ function splitRow(line: string): string[] {
   return s.split('|').map(c => c.trim());
 }
 
-// ── Blocks ──────────────────────────────────────────────────────────────────
+// Blocks
 
 export function renderMarkdown(md: string): React.ReactNode {
   const lines = md.replaceAll('\r\n', '\n').split('\n');
@@ -68,8 +65,7 @@ export function renderMarkdown(md: string): React.ReactNode {
       i++;
       while (i < lines.length && !lines[i].trim().startsWith("```")) { buf.push(lines[i]); i++; }
       i++; // consume closing fence
-      // A `flow` / `flowchart` fence is a flowchart: render it with the app's
-      // graph canvas instead of showing the source as text.
+      // A `flow` / `flowchart` fence renders on the graph canvas, not as text.
       if (lang === 'flow' || lang === 'flowchart') {
         blocks.push(
           <div key={k()} className="border border-surface-700 rounded overflow-hidden bg-surface-900 p-2">

@@ -1,13 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// IPC for Performance (load) testing. The load generation runs in a dedicated
-// utilityProcess (perf-worker) so a heavy run never blocks the main event loop
-// (IPC, menus, dialogs stay responsive). This handler resolves env vars in the
-// main process (OS keychain), hands the run to the worker, relays live progress
-// to the renderer, resolves with the aggregate, aborts on perf:stop, and
-// exports an HTML report. The orchestration itself lives in perf-run.ts (shared
-// with the CLI, which runs it directly in its own process).
+// IPC for load testing. Load generation runs in a utilityProcess (perf-worker) so a
+// heavy run doesn't block the main event loop; orchestration lives in perf-run.ts (shared with the CLI).
 
 import { type IpcMain, type IpcMainInvokeEvent, dialog, utilityProcess, type UtilityProcess } from 'electron';
 import { writeFile } from 'node:fs/promises';
@@ -43,8 +38,8 @@ function runInWorker(payload: PerfRunPayload, onProgress: (p: unknown) => void):
 
 export function registerPerfHandlers(ipc: IpcMain): void {
   handleIpc(ipc, IPC.perf.run, async (event: IpcMainInvokeEvent, payload: PerfRunPayload): Promise<PerfResult> => {
-    // Resolve env vars here (the worker can't reach the OS keychain), so a
-    // sequence/flow run gets fully-resolved values and the worker stays Node-only.
+    // Resolve env vars here (the worker can't reach the OS keychain) so a
+    // sequence/flow run gets fully-resolved values.
     if ((payload.plan.target.kind === 'sequence' || payload.plan.target.kind === 'flow') && !payload.resolvedEnvVars) {
       payload.resolvedEnvVars = await buildEnvVars(payload.environment ?? null);
     }

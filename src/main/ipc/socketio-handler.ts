@@ -1,11 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Socket.IO connections, managed in the main process and keyed by requestId —
-// the same model as the WebSocket handler. We use the official socket.io-client
-// so the full protocol (Engine.IO handshake + upgrade, namespaces, handshake
-// auth, acknowledgement callbacks, binary, reconnection) is handled for us.
-// The renderer only emits events and renders the streamed session log.
+// Socket.IO connections in the main process, keyed by requestId (same model as the
+// WebSocket handler). Uses socket.io-client; the renderer emits events and renders the log.
 
 import { type IpcMain, type IpcMainInvokeEvent } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
@@ -15,7 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { SocketIoMessage } from '../../shared/types';
 import { runSocketIoTest, type SocketIoTestConfig, type RealtimeTestResult } from '../realtime-test';
 
-// ─── Connection registry ──────────────────────────────────────────────────────
+// Connection registry
 
 const connections = new Map<string, Socket>();
 
@@ -30,7 +27,7 @@ interface ConnectOpts {
   url: string
   /** Namespace, e.g. "/admin". Defaults to the root namespace "/". */
   namespace?: string
-  /** Handshake auth, a JSON object as text (e.g. '{"token":"abc"}'). */
+  /** Handshake auth, a JSON object as text. */
   auth?: string
   /** Handshake headers (applied to the underlying transport). */
   headers?: Record<string, string>
@@ -40,16 +37,16 @@ interface ConnectOpts {
 
 interface EmitOpts {
   event: string
-  /** Emit arguments as a JSON value; an array is spread, anything else is sent
-   *  as a single argument. Empty means no arguments. */
+  /** Emit arguments as a JSON value; an array is spread, anything else sent as
+   *  a single argument. Empty means no arguments. */
   args?: string
   /** When true, request an acknowledgement callback and stream its payload back. */
   withAck?: boolean
   ackTimeoutMs?: number
 }
 
-// Join an origin URL with a namespace path (socket.io-client reads the namespace
-// from the URI path, while the Engine.IO endpoint is the `path` option).
+// Join an origin URL with a namespace path; socket.io-client reads the namespace
+// from the URI path, the Engine.IO endpoint from the `path` option.
 function targetUrl(url: string, namespace?: string): string {
   const ns = (namespace ?? '').trim();
   if (!ns || ns === '/') return url;
@@ -60,10 +57,10 @@ function jsonText(value: unknown): string {
   try { return JSON.stringify(value); } catch { return String(value); }
 }
 
-// ─── IPC handlers ─────────────────────────────────────────────────────────────
+// IPC handlers
 
 export function registerSocketIoHandlers(ipc: IpcMain): void {
-  // socketio:connect — open (or re-open) a connection for this request.
+  // socketio:connect - open (or re-open) a connection for this request.
   handleIpc(ipc, IPC.socketio.connect, async (event: IpcMainInvokeEvent, requestId: string, opts: ConnectOpts) => {
     const existing = connections.get(requestId);
     if (existing) {
@@ -71,8 +68,8 @@ export function registerSocketIoHandlers(ipc: IpcMain): void {
       connections.delete(requestId);
     }
 
-    // Guard sends: the renderer may be destroyed (tab/window closed or reloaded)
-    // while the socket is still open, and WebContents.send then throws.
+    // Guard sends: the renderer may be destroyed while the socket is still open,
+    // and WebContents.send then throws.
     const alive = () => !event.sender.isDestroyed();
     const send = (message: SocketIoMessage) => { if (alive()) event.sender.send(IPC.socketio.message, { requestId, message }); };
     const status = (s: string, error?: string) => { if (alive()) event.sender.send(IPC.socketio.status, { requestId, status: s, error }); };
@@ -108,8 +105,8 @@ export function registerSocketIoHandlers(ipc: IpcMain): void {
 
     connections.set(requestId, socket);
 
-    // If the renderer goes away (tab/window closed or reloaded), close the
-    // socket so it doesn't stream into a destroyed sender indefinitely.
+    // If the renderer goes away, close the socket so it doesn't stream into a
+    // destroyed sender.
     event.sender.once('destroyed', () => { try { socket.disconnect(); } catch { /* ignore */ } connections.delete(requestId); });
 
     socket.on('connect', () => {
@@ -123,13 +120,13 @@ export function registerSocketIoHandlers(ipc: IpcMain): void {
     socket.on('connect_error', (err: Error) => {
       status('error', err.message);
     });
-    // Every inbound event (any name, including reserved ones the app didn't name).
+    // Every inbound event, any name.
     socket.onAny((eventName: string, ...args: unknown[]) => {
       send({ id: uuidv4(), direction: 'received', kind: 'event', event: eventName, data: jsonText(args), timestamp: Date.now() });
     });
   });
 
-  // socketio:emit — emit an event on an existing connection.
+  // socketio:emit - emit an event on an existing connection.
   handleIpc(ipc, IPC.socketio.emit, async (event: IpcMainInvokeEvent, requestId: string, opts: EmitOpts) => {
     const socket = connections.get(requestId);
     if (!socket || !socket.connected) {
@@ -156,7 +153,7 @@ export function registerSocketIoHandlers(ipc: IpcMain): void {
     }
   });
 
-  // socketio:test — run a one-shot Socket.IO test (its own connection) and assert.
+  // socketio:test - run a one-shot Socket.IO test (its own connection) and assert.
   handleIpc(ipc, IPC.socketio.test, async (_event: IpcMainInvokeEvent, cfg: SocketIoTestConfig): Promise<RealtimeTestResult> => {
     const t0 = Date.now();
     const res = await runSocketIoTest(cfg);
@@ -164,7 +161,7 @@ export function registerSocketIoHandlers(ipc: IpcMain): void {
     return res;
   });
 
-  // socketio:disconnect — close a connection.
+  // socketio:disconnect - close a connection.
   handleIpc(ipc, IPC.socketio.disconnect, async (_event: IpcMainInvokeEvent, requestId: string) => {
     const socket = connections.get(requestId);
     if (socket) {

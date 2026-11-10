@@ -1,12 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Tiny dependency-free i18n for the renderer. Keys ARE the English source
-// string (so an untranslated key renders as English automatically); catalogs
-// are flat JSON of key -> translation. Interpolation uses `:name` tokens;
-// pluralization uses Laravel-style `singular|plural` forms selected per locale
-// via Intl.PluralRules. The chosen locale is persisted to localStorage and
-// mirrored onto <html lang>. No external dependencies — this app ships to npm.
+// Tiny dependency-free i18n. Keys are the English source; catalogs are flat
+// key -> translation JSON. `:name` interpolation; `singular|plural` pluralization.
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import en from './locales/en.json';
@@ -36,10 +32,8 @@ export type Locale = keyof typeof LOCALES;
 
 const STORAGE_KEY = 'locale';
 
-/** Explicitly-chosen locale if the user picked one; English otherwise.
- *  English is the default so the app is predictable on first run regardless of
- *  the OS language — users switch via Settings → Appearance → Language, and the
- *  choice persists in localStorage. */
+/** The locale the user picked, else English. English is the default so first
+ *  run is predictable regardless of OS language. */
 export function detectLocale(): Locale {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -57,7 +51,7 @@ function interpolate(str: string, vars?: TVars): string {
   return str.replaceAll(/:([a-zA-Z][a-zA-Z0-9]*)/g, (m, k) => (k in vars ? String(vars[k]) : m));
 }
 
-/** Look up a key in the locale (falling back to English source), then apply
+/** Look up a key (falling back to the English source), then apply
  *  pluralization (on `count`) and `:token` interpolation. */
 export function translate(locale: Locale, key: string, vars?: TVars): string {
   let msg = CATALOGS[locale]?.[key] ?? key;

@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── Git ──────────────────────────────────────────────────────────────────────
+// Git
 
 export type GitFileStatus = 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked'
 
@@ -11,12 +11,10 @@ export interface GitFile {
 }
 
 /** Where the open workspace stands relative to a git repository.
- *  - `none`: not in any repo (offer to initialize one here).
- *  - `own`: the workspace dir is itself the repo root (classic behavior).
- *  - `scoped`: the workspace is a subfolder of an enclosing repo and scoped
- *    mode is enabled — git operations are limited to this subtree.
- *  - `enclosing-available`: inside an enclosing repo but scoped mode is off;
- *    the panel offers to enable it (or initialize a separate repo here). */
+ *  - `none`: not in any repo.
+ *  - `own`: the workspace dir is the repo root.
+ *  - `scoped`: a subfolder of an enclosing repo, scoped mode on - git ops limited to this subtree.
+ *  - `enclosing-available`: inside an enclosing repo but scoped mode off. */
 export type GitRepoState = 'none' | 'own' | 'scoped' | 'enclosing-available'
 
 export interface GitRepoInfo {
@@ -54,7 +52,7 @@ export interface GitBranch {
   remote: boolean
   /** For local branches: their upstream short ref (e.g. "origin/main"). */
   upstream?: string
-  /** Commits ahead/behind upstream — informational, only set for tracking branches. */
+  /** Commits ahead/behind upstream - informational, only set for tracking branches. */
   ahead?: number
   behind?: number
 }

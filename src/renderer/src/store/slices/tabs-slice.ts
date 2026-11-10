@@ -13,18 +13,17 @@ import type {
 } from '../../../../shared/types';
 import type { FullState } from '../index';
 
-// ─── Tab model ───────────────────────────────────────────────────────────────
+// Tab model
 
-/** What a tab shows. A collection and a folder now open as tabs too (not a
- *  separate panel that drew over the request tabs), so the whole main area is
- *  one consistent tab strip. */
+/** What a tab shows; collections and folders open as tabs too, so the whole main
+ *  area is one tab strip. */
 export type TabKind = 'request' | 'folder' | 'collection'
 
 export interface AppTab {
   id: string
   kind: TabKind
   requestId: string | null
-  /** Set on a folder tab — the folder it shows. */
+  /** Set on a folder tab - the folder it shows. */
   folderId?: string | null
   /** When set, this tab is editing an EXAMPLE of `requestId` (its overrides +
    *  saved response), not the base request. Null/undefined = the base request. */
@@ -37,9 +36,8 @@ export interface AppTab {
   lastHookResults: RunRequestResult[] | null
   isSending: boolean
   requestTab: 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'schema' | 'contract' | 'stream' | 'docs' | 'variables'
-  /** jq filter applied to this tab's JSON response. Kept per tab (not local to
-   *  the response view) so it survives re-sends and tab switches, which remount
-   *  the response pane. */
+  /** jq filter on this tab's JSON response, kept per tab so it survives re-sends and
+   *  tab switches (which remount the response pane). */
   jqExpr: string
 }
 
@@ -64,9 +62,8 @@ export function makeTab(requestId: string, collectionId: string, opts: { protoco
     requestId,
     folderId: null,
     exampleId: opts.exampleId ?? null,
-    // Examples have no Docs tab and fall back to Body (see RequestBuilder).
-    // Otherwise open on the workspace's configured default sub-tab (Docs unless
-    // the workspace overrides it).
+    // Examples have no Docs tab, so fall back to Body; otherwise use the workspace's
+    // configured default sub-tab.
     requestTab: opts.exampleId ? 'body' : (opts.defaultTab ?? 'docs'),
   };
 }
@@ -79,10 +76,8 @@ export function makeCollectionTab(collectionId: string): AppTab {
   return { ...baseTab(collectionId), kind: 'collection', requestId: null, folderId: null, exampleId: null, requestTab: 'docs' };
 }
 
-/** Keep the legacy panel flags (`folderPanel`, `collectionPanelOpen`) and
- *  `activeCollectionId` in lockstep with whatever the active tab is, so the
- *  main area (which still switches on those flags) shows the active tab's
- *  content and nothing overlaps. Call this anywhere `activeTabId` changes. */
+/** Keep the legacy panel flags (folderPanel, collectionPanelOpen) and activeCollectionId
+ *  in lockstep with the active tab. Call anywhere activeTabId changes. */
 export function syncPanelsToActiveTab(s: {
   tabs: AppTab[]
   activeTabId: string | null
@@ -105,8 +100,8 @@ export function syncPanelsToActiveTab(s: {
   }
 }
 
-/** Look up a request's protocol by id across all loaded collections.
- *  Returns undefined for unknown ids — caller defaults to HTTP behavior. */
+/** A request's protocol by id across all collections; undefined if unknown (caller
+ *  defaults to HTTP). */
 export function protocolFor(
   state: { collections: Record<string, { relPath: string; data: Collection; dirty: boolean }> },
   requestId: string,
@@ -118,7 +113,7 @@ export function protocolFor(
   return undefined;
 }
 
-// ─── Slice ───────────────────────────────────────────────────────────────────
+// Slice
 
 export interface TabsSliceState {
   tabs: AppTab[]
@@ -147,7 +142,7 @@ export interface TabsSliceActions {
 
   // Navigation
   setActiveCollection: (id: string) => void
-  /** @deprecated use openInTab — kept for backwards compat */
+  /** @deprecated use openInTab - kept for backwards compat */
   setActiveRequest: (id: string) => void
   /** Operates on the active tab */
   setLastResponse: (r: ResponsePayload | null) => void
@@ -215,7 +210,7 @@ export const createTabsSlice: StateCreator<
     s.activeTabId = null;
     s.collectionPanelOpen = false;
     s.folderPanel = null;
-    // Don't clear activeCollectionId — the sidebar selection should stay put.
+    // Don't clear activeCollectionId - the sidebar selection should stay put.
   }),
 
   closeOtherTabs: (keepTabId) => set(s => {
@@ -264,7 +259,7 @@ export const createTabsSlice: StateCreator<
     if (t) t.jqExpr = jqExpr;
   }),
 
-  // ── Navigation ──────────────────────────────────────────────────────────────
+  // Navigation
   setActiveCollection: id => set(s => {
     s.activeCollectionId = id;
     // If active tab has a request in a different collection, clear it
@@ -275,8 +270,7 @@ export const createTabsSlice: StateCreator<
     }
   }),
 
-  // Backwards compat: opens or switches to a tab for this request.
-  // Delegates to openInTab after resolving which collection owns the request.
+  // Backwards compat: resolve which collection owns the request, then openInTab.
   setActiveRequest: (id) => {
     const state = get();
     const colEntry = Object.values(state.collections).find(c => c.data.requests[id]);

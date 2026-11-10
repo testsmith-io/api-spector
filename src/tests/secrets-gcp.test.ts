@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { hasSecretScheme, resolveExternalSecret, setSecretsConfig } from '../main/secrets';
 import { _resetGcpCache } from '../main/secrets/providers/gcp';
 
-// ─── Fake Secret Manager over a mocked fetch ──────────────────────────────────
+// Fake Secret Manager over a mocked fetch
 // Each route sees (url, init) and returns a body (match) or undefined (skip).
 
 type Route = (url: string, init: any) => unknown | undefined;
@@ -98,7 +98,7 @@ describe('gcp provider (access-token auth)', () => {
 
     await expect(resolveExternalSecret('gcp:proj/db-creds#password')).resolves.toBe('pw');
     await expect(resolveExternalSecret('gcp:proj/db-creds#user')).resolves.toBe('u');
-    // second read is served from the payload cache — no extra fetch
+    // second read is served from the payload cache - no extra fetch
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 

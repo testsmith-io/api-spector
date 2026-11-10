@@ -160,7 +160,10 @@ The end-to-end flow in the desktop app:
      token that the app holds **in memory** for the session; or
    - launch the app from a shell that already has `VAULT_TOKEN`, a `vault login`
      token at `~/.vault-token`, or AppRole env vars set. The app inherits that
-     ambient context.
+     ambient context. (A desktop app launched by double-clicking its icon does
+     **not** inherit a variable exported only in your shell profile; see
+     [Making an OS variable visible per platform](../gui/environments.md#os-environment-reference-envref)
+     for the Windows/macOS/Linux details.)
 
 4. **Send.** On each send the resolver reads the reference's scheme, dispatches to
    the matching provider, fetches the value with the session token, caches it in

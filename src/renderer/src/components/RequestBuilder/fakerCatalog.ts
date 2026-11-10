@@ -1,9 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 //
-// Auto-generated from @faker-js/faker v10.6.0. The full catalogue of faker
-// namespaces and methods, used to drive {{faker....}} autocomplete. Regenerate
-// when faker is upgraded (see scripts/gen-faker-catalog or the enumeration in git log).
+// Auto-generated from @faker-js/faker v10.6.0: namespaces/methods driving {{faker....}} autocomplete. Regenerate on upgrade (scripts/gen-faker-catalog).
 
 export const FAKER_NS_ALL: string[] = ["airline","animal","book","color","commerce","company","database","datatype","date","finance","food","git","hacker","helpers","image","internet","location","lorem","music","number","person","phone","science","string","system","vehicle","word"];
 

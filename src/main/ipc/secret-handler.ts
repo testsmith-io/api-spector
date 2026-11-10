@@ -11,19 +11,13 @@ import { join } from 'node:path';
 
 const MASTER_KEY_ENV = 'API_SPECTOR_MASTER_KEY';
 
-// ─── OS-encrypted secret store (safeStorage) ─────────────────────────────────
-//
-// Secrets are encrypted with Electron's safeStorage (OS keychain on macOS/Win,
-// libsecret on Linux) and persisted to <userData>/secrets.json.
-// The CLI cannot access this store — it falls back to process.env only.
+// OS-encrypted secret store: Electron safeStorage (OS keychain / libsecret),
+// persisted to <userData>/secrets.json. The CLI can't access it (process.env only).
 
 let secretStore: Record<string, string> = {};
 let secretStorePath: string | null = null;
 
-/**
- * Load the safeStorage-backed secret store from disk.
- * Must be called after app.whenReady() in the main process, before IPC handlers fire.
- */
+/** Load the secret store from disk. Call after app.whenReady(), before IPC handlers fire. */
 export async function initSecretStore(userDataPath: string): Promise<void> {
   secretStorePath = join(userDataPath, 'secrets.json');
   try {
@@ -39,10 +33,7 @@ async function persistSecretStore(): Promise<void> {
   await writeFile(secretStorePath, JSON.stringify(secretStore, null, 2), 'utf8');
 }
 
-/**
- * Lazily access Electron's safeStorage. Returns null in CLI (non-Electron) context
- * where require('electron') resolves to the binary path string, not the API.
- */
+/** Electron safeStorage, or null in CLI where require('electron') is the binary path, not the API. */
 function getSafeStorage(): typeof SafeStorageType | null {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -54,41 +45,30 @@ function getSafeStorage(): typeof SafeStorageType | null {
   }
 }
 
-// ─── Master key IPC ───────────────────────────────────────────────────────────
+// Master key IPC
 
 export function registerSecretHandlers(ipc: IpcMain): void {
-  /** Returns whether the master password env var is currently set in this process. */
+  /** Whether the master-password env var is set in this process. */
   handleIpc(ipc, IPC.secret.checkMasterKey, () => {
     return { set: Boolean(process.env[MASTER_KEY_ENV]) };
   });
 
-  /**
-   * Sets the master password in the current process environment.
-   * This lasts for the lifetime of the Electron process. Users should also
-   * export API_SPECTOR_MASTER_KEY in their shell profile for persistence.
-   */
+  /** Set the master password for this process's lifetime; export
+   *  API_SPECTOR_MASTER_KEY in a shell profile to persist across restarts. */
   handleIpc(ipc, IPC.secret.setMasterKey, (_e, value: string) => {
     process.env[MASTER_KEY_ENV] = value;
   });
 
-  /**
-   * Encrypt a plaintext using the master password already present in this
-   * process (API_SPECTOR_MASTER_KEY). Lets the renderer encrypt a secret
-   * WITHOUT prompting for the password when the env var is set — the renderer
-   * can't read the key back, but main can use it directly. Output matches the
-   * renderer's own encryptSecret() (PBKDF2-SHA256 100k → AES-256-GCM, ciphertext
-   * with the 16-byte tag appended), so decryptSecret round-trips either path.
-   */
+  /** Encrypt using the master password already in this process, so the renderer
+   *  needn't prompt for it. Output matches the renderer's encryptSecret(), so
+   *  decryptSecret round-trips either path. */
   handleIpc(ipc, IPC.secret.encryptWithMasterKey, (_e, plaintext: string) => {
     const password = process.env[MASTER_KEY_ENV];
     if (!password) throw new Error('Master password is not set in this process.');
     return encryptSecret(plaintext, password);
   });
 
-  /**
-   * Save a named secret to the OS-encrypted store.
-   * The renderer calls this when the user clicks "Save" on a token/credential field.
-   */
+  /** Save a named secret to the OS-encrypted store. */
   handleIpc(ipc, IPC.secret.set, async (_e, ref: string, value: string) => {
     const ss = getSafeStorage();
     if (!ss?.isEncryptionAvailable()) {
@@ -98,8 +78,7 @@ export function registerSecretHandlers(ipc: IpcMain): void {
     await persistSecretStore();
   });
 
-  /** Whether a secret is available (keychain store or env fallback) — never
-   *  returns the value itself, so the renderer can gate UI without holding it. */
+  /** Whether a secret exists (store or env); never returns the value itself. */
   handleIpc(ipc, IPC.secret.has, async (_e, ref: string) => {
     return { has: (await getSecret(ref)) != null };
   });
@@ -113,14 +92,10 @@ export function registerSecretHandlers(ipc: IpcMain): void {
   });
 }
 
-// ─── Encrypt / decrypt utilities ─────────────────────────────────────────────
+// Encrypt / decrypt utilities
 
-/**
- * Encrypt a plaintext with AES-256-GCM using a PBKDF2-derived key. Byte-for-byte
- * compatible with the renderer's Web Crypto encryptSecret(): the returned
- * `secretEncrypted` is base64(ciphertext + 16-byte auth tag), matching the
- * layout decryptSecret() expects.
- */
+/** AES-256-GCM with a PBKDF2-derived key; matches the renderer's encryptSecret().
+ *  `secretEncrypted` is base64(ciphertext + 16-byte auth tag). */
 export function encryptSecret(plaintext: string, password: string): {
   secretEncrypted: string
   secretSalt: string
@@ -143,15 +118,10 @@ export function encryptSecret(plaintext: string, password: string): {
   };
 }
 
-// ─── Decrypt utility (used internally by interpolation.ts) ───────────────────
+// Decrypt utility (used internally by interpolation.ts)
 
-/**
- * Decrypt an AES-256-GCM secret.
- * @param encrypted  base64(ciphertext + 16-byte auth-tag)
- * @param salt       base64(16-byte PBKDF2 salt)
- * @param iv         base64(12-byte GCM IV)
- * @param password   master password (from API_SPECTOR_MASTER_KEY)
- */
+/** Decrypt an AES-256-GCM secret. `encrypted` is base64(ciphertext + 16-byte tag);
+ *  `salt`/`iv` are base64; `password` is the master password (API_SPECTOR_MASTER_KEY). */
 export function decryptSecret(
   encrypted: string,
   salt: string,
@@ -171,15 +141,10 @@ export function decryptSecret(
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
 }
 
-/**
- * Look up a secret by ref name.
- * Priority: safeStorage store → process.env fallback.
- * The CLI only ever reaches the process.env fallback since the store is never initialised.
- */
+/** Look up a secret: safeStorage store, then process.env (the CLI only reaches env). */
 export async function getSecret(ref: string): Promise<string | null> {
-  // External secret managers (HashiCorp Vault, ...) via a registered scheme,
-  // e.g. `vault:secret/data/app#token`. Ordinary keychain / env refs have no
-  // registered scheme and fall through to the store + process.env below.
+  // External secret managers via a registered scheme (e.g. `vault:...#token`);
+  // ordinary refs fall through to the store + process.env below.
   if (hasSecretScheme(ref)) {
     return resolveExternalSecret(ref);
   }
@@ -191,7 +156,7 @@ export async function getSecret(ref: string): Promise<string | null> {
       try {
         return ss.decryptString(Buffer.from(stored, 'base64'));
       } catch {
-        // corrupted entry — fall through to env
+        // corrupted entry - fall through to env
       }
     }
   }

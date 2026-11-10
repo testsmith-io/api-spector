@@ -1,10 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Branch listing must classify local vs remote by ref namespace, not by a '/'
-// in the name — local branch names routinely contain slashes (feat/…, fix/…),
-// and the old check wrongly hid those from the local list (so a freshly created
-// `feat/x` branch never appeared on the Branches tab).
+// Branch listing must classify local vs remote by ref namespace, not by a '/' in the name:
+// local names routinely contain slashes (feat/…, fix/…), which the old check wrongly hid as remote.
 import { describe, it, expect } from 'vitest';
 import { parseBranchRefs } from '../main/git-branch-parse';
 

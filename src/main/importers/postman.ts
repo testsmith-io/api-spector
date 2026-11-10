@@ -7,7 +7,7 @@ import type { Collection, ApiRequest, AuthConfig, RequestBody, KeyValuePair, Fol
 import { normalizeHttpMethod } from '../../shared/types';
 import { translateScript } from './script-translator';
 
-// ─── Postman v2.1 importer ────────────────────────────────────────────────────
+// Postman v2.1 importer
 
  
 
@@ -20,12 +20,9 @@ function parseHeaders(raw: any[]): KeyValuePair[] {
   }));
 }
 
-/**
- * Collection-level variables (`collection.variable[]` in a v2.1 export) → our
- * collection scope. Postman's `disabled: true` entries are kept in the parallel
- * disabled map so a round-trip preserves them (and the toggle) rather than
- * silently dropping them.
- */
+/** Collection-level variables (`collection.variable[]`) -> our collection scope.
+ *  `disabled: true` entries go in the parallel disabled map so a round-trip
+ *  preserves them. */
 function parseCollectionVariables(raw: any[]): { variables: Record<string, string>; disabled: Record<string, string> } {
   const variables: Record<string, string> = {};
   const disabled: Record<string, string> = {};
@@ -53,10 +50,9 @@ function parseUrl(urlObj: any): string {
   if (!urlObj) return '';
   if (typeof urlObj === 'string') return urlObj;
   const raw = urlObj.raw ?? '';
-  // Postman's `raw` URL includes the query string, but those params are also
-  // captured separately by parseParams into the Params panel. Strip the query
-  // here so they are not sent twice (the runner re-appends the Params). Only
-  // strip when there is a structured query to avoid dropping a lone `?`.
+  // Postman's `raw` URL includes the query string, but parseParams also captures
+  // those into the Params panel. Strip the query here so they aren't sent twice,
+  // but only when there's a structured query, to avoid dropping a lone `?`.
   if (Array.isArray(urlObj.query) && urlObj.query.length) {
     const q = raw.indexOf('?');
     if (q !== -1) return raw.slice(0, q);
@@ -81,9 +77,8 @@ function parseBody(body: any): RequestBody {
     };
   }
   if (mode === 'formdata') {
-    // Postman form-data: each item is a text field or a file. A file item
-    // carries `src` (the path on the exporting machine, often absent) and
-    // `type: 'file'`; `contentType` is an optional per-part override.
+    // Postman form-data: each item is a text field or a file. A file item carries
+    // `src` and `type: 'file'`; `contentType` is an optional per-part override.
     return {
       mode: 'multipart',
       multipart: (body.formdata ?? []).map((p: any) => {
@@ -161,9 +156,8 @@ function parseRequest(item: any, collectionAuth: any): ApiRequest {
 }
 
 /** Postman saved examples: item.response[] carries the originating request
- *  variation (originalRequest) plus the captured response. Maps each to a
- *  RequestExample. Defensive: skips malformed entries, returns undefined when
- *  there are none, so requests without examples import exactly as before. */
+ *  (originalRequest) plus the captured response. Skips malformed entries;
+ *  undefined when there are none. */
 function parseExamples(
   item: any,
   parent: { method: string; url: string; headers: KeyValuePair[]; params: KeyValuePair[]; body: RequestBody },
@@ -175,9 +169,8 @@ function parseExamples(
   for (const r of responses) {
     if (!r || typeof r !== 'object') continue;
 
-    // A full snapshot of the request this example sends: the originating request
-    // variation if present, else the parent request. Examples fully define what
-    // they send, so every field is captured.
+    // Full snapshot of the request this example sends: the originating request if
+    // present, else the parent. Examples fully define what they send.
     const orig = r.originalRequest;
     const request = orig ? {
       method: (orig.method ?? parent.method).toUpperCase() as ApiRequest['method'],

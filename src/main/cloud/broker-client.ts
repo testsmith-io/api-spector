@@ -1,9 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Headless client for the API Spector Cloud broker, used by the CLI in CI (and
-// reusable by the desktop app). Auth is an env bearer token — the desktop
-// keychain is not available in a pipeline — with the endpoint overridable for a
+// Headless client for the API Spector Cloud broker, used by the CLI in CI. Auth
+// is an env bearer token (no keychain in a pipeline); endpoint overridable for a
 // local stack. No Electron imports, so it bundles into the plain-Node CLI.
 
 import { fetch } from 'undici';
@@ -109,9 +108,8 @@ export async function recordDeployment(cfg: BrokerConfig, input: { pacticipant: 
 
 export interface CompatCheck { interaction: string; passed: boolean; error: string | null; mismatches?: Array<{ location: string; consumer: string; provider: string; reason: string }> }
 
-/** Compatibility check: can provider@version satisfy consumer@version? Read-only
- *  (no verification recorded, no deployment considered). 200 = compatible,
- *  409 = incompatible; both carry the per-interaction checks. */
+/** Compatibility check: can provider@version satisfy consumer@version? Read-only.
+ *  200 = compatible, 409 = incompatible; both carry per-interaction checks. */
 export async function checkCompatibility(cfg: BrokerConfig, input: { consumer: string; consumerVersion: string; provider: string; providerVersion: string }): Promise<{ compatible: boolean; checks: CompatCheck[] }> {
   const q = new URLSearchParams({ consumer: input.consumer, consumerVersion: input.consumerVersion, provider: input.provider, providerVersion: input.providerVersion }).toString();
   const r = await brokerFetch(cfg, '/api/compatibility?' + q, 'GET');
@@ -137,9 +135,8 @@ export async function publishVerification(cfg: BrokerConfig, input: { contractId
     providerVersion: input.providerVersion,
     success: input.success,
     ...(input.buildUrl ? { buildUrl: input.buildUrl } : {}),
-    // Full per-interaction detail (a ContractReport) so the cloud can show WHY
-    // a verification failed, not just pass/fail. Optional — omitted when no
-    // report is supplied.
+    // Full per-interaction detail (a ContractReport) so the cloud shows WHY a
+    // verification failed, not just pass/fail. Omitted when no report is supplied.
     ...(input.results !== undefined ? { results: input.results } : {}),
   });
   if (!r.ok) fail(r, 'Publish verification failed');

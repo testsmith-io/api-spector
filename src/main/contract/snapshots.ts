@@ -8,12 +8,9 @@ import { fetch } from 'undici';
 import { load as yamlLoad } from 'js-yaml';
 import type { ContractSnapshot } from '../../shared/types';
 
-// ─── Contract snapshot storage ───────────────────────────────────────────────
-//
-// Snapshots live under `<workspace>/contracts/<id>.contract.json`, so users can
-// version-control them alongside collections and environments. Each snapshot
-// embeds the spec text verbatim, so replaying a run against a pinned version
-// doesn't depend on the network or upstream availability.
+// Contract snapshot storage under `<workspace>/contracts/<id>.contract.json` (version
+// controlled alongside collections). Each embeds the spec text verbatim, so replaying a
+// pinned version doesn't depend on the network.
 
 const SNAPSHOT_DIR = 'contracts';
 
@@ -38,11 +35,11 @@ function tryExtractSpecVersion(specText: string, format: 'yaml' | 'json'): strin
     const parsed = format === 'yaml' ? yamlLoad(specText) : JSON.parse(specText);
     const info = (parsed as { info?: { version?: unknown } } | null)?.info;
     if (info && typeof info.version === 'string') return info.version;
-  } catch { /* spec may be malformed — we still snapshot the bytes */ }
+  } catch { /* spec may be malformed - we still snapshot the bytes */ }
   return undefined;
 }
 
-// ─── Capture ────────────────────────────────────────────────────────────────
+// Capture
 
 export interface CaptureOptions {
   /** HTTP URL to fetch the spec from. */
@@ -76,8 +73,7 @@ export async function captureSnapshot(workspaceDir: string, opts: CaptureOptions
   const id = randomUUID();
   const specVersion = tryExtractSpecVersion(specText, format);
 
-  // Build a readable name: prefer the user-supplied label, else derive from
-  // the source hostname/filename and include the spec's own version if known.
+  // Readable name: user label, else source hostname/filename, plus spec version if known.
   let name = opts.name?.trim();
   if (!name) {
     try { name = new URL(source).hostname; } catch { name = source.split(/[\\/]/).pop() ?? 'spec'; }
@@ -101,8 +97,7 @@ export async function captureSnapshot(workspaceDir: string, opts: CaptureOptions
   await mkdir(join(workspaceDir, SNAPSHOT_DIR), { recursive: true });
   await writeFile(absPath, JSON.stringify(snapshot, null, 2), 'utf8');
 
-  // Stash the relPath on the snapshot object so callers can immediately
-  // register it in the workspace manifest without re-deriving the path.
+  // Stash relPath on the snapshot so callers can register it without re-deriving.
   Object.defineProperty(snapshot, '__relPath', { value: relPath, enumerable: false });
   return snapshot;
 }
@@ -112,16 +107,15 @@ export function relPathOf(snapshot: ContractSnapshot): string | undefined {
   return hidden;
 }
 
-// ─── Load / list / delete ───────────────────────────────────────────────────
+// Load / list / delete
 
 export async function loadSnapshot(workspaceDir: string, relPath: string): Promise<ContractSnapshot> {
   const raw = await readFile(resolve(workspaceDir, relPath), 'utf8');
   return JSON.parse(raw) as ContractSnapshot;
 }
 
-/** Lists snapshots referenced by the workspace AND any `.contract.json` files
- *  discovered under `<workspace>/contracts/` (so orphan files aren't silently
- *  ignored when users drop them in by hand). */
+/** Snapshots referenced by the workspace plus any `.contract.json` files found under
+ *  `<workspace>/contracts/`, so hand-dropped orphans aren't ignored. */
 export async function listSnapshots(
   workspaceDir: string,
   registered: string[] = [],
@@ -147,5 +141,5 @@ export async function listSnapshots(
 
 export async function deleteSnapshot(workspaceDir: string, relPath: string): Promise<void> {
   try { await unlink(resolve(workspaceDir, relPath)); }
-  catch { /* already gone — treat as success so callers can remove the manifest entry */ }
+  catch { /* already gone - treat as success so callers can remove the manifest entry */ }
 }

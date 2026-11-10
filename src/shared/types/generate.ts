@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── Code generation ─────────────────────────────────────────────────────────
+// Code generation
 
 import type { Collection, Environment } from './collection';
 

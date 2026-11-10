@@ -5,7 +5,7 @@
 // dependency-free, so it is safe to import from main, renderer, and CLI.
 
 /** Escape the five markup-significant characters for HTML text/attributes.
- *  Accepts anything and coerces to string (null/undefined → ""). */
+ *  Accepts anything and coerces to string (null/undefined -> ""). */
 export function escapeHtml(s: unknown): string {
   return String(s ?? '')
     .replaceAll('&', '&amp;')

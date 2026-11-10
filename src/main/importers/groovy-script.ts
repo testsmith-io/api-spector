@@ -1,28 +1,10 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── Groovy → sp.* converter (SoapUI / ReadyAPI import) ───────────────────────
-//
-// SoapUI and ReadyAPI scripts (Groovy Script test steps, Script Assertions,
-// Setup/TearDown scripts) are a *constrained* dialect of Groovy written against
-// a small, well-known API surface (log, context, messageExchange, JsonSlurper,
-// assert, …). This converts that dialect to API Spector's sp.* JavaScript
-// sandbox (see script-runner.ts) on a best-effort basis, and — crucially —
-// reports what it could and could NOT map so the import UI can show the user a
-// reviewable, accept/adjust/reject suggestion rather than silently breaking.
-//
-// It is deliberately NOT a full Groovy parser: like the Postman/Bruno/Insomnia
-// script-translator it is regex- and scan-based, covering the ~80% of patterns
-// that actually appear in SoapUI projects. Anything it cannot map is left in
-// place, tagged with a `// TODO[soapui]` marker, and recorded in `unmapped` for
-// the review step. Two documented limitations of the scan-based approach:
-//   • simple identifier rewrites (def→let) run on the whole text, so in the rare
-//     case a keyword appears inside a string literal it may be touched — the
-//     review step is the safety net.
-//   • brace/string matching handles the common cases, not every pathological
-//     nesting; unmatched constructs degrade to a TODO rather than a crash.
+// Groovy to sp.* converter (SoapUI / ReadyAPI import). Regex/scan-based, not a full parser;
+// tags anything it can't map with a `// TODO[soapui]` marker. Caveat: rewrites can touch keywords inside strings.
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// Public API
 
 export type GroovyConversionStatus = 'clean' | 'partial' | 'unsupported'
 
@@ -49,9 +31,7 @@ export interface GroovyConversion {
 
 type Rule = [RegExp, string]
 
-// ─── SoapUI property scope → sp.* variable scope ──────────────────────────────
-// SoapUI exposes properties at Project / TestSuite / TestCase / Global / Env
-// tiers. The closest sp.* analogues (documented as an approximation):
+// SoapUI property scope -> closest sp.* variable scope.
 const SCOPE_MAP: Record<string, string> = {
   Project: 'collectionVariables',
   TestSuite: 'collectionVariables',
@@ -61,16 +41,15 @@ const SCOPE_MAP: Record<string, string> = {
   Environment: 'environment',
 };
 
-// ─── Rules applied to the whole script (statement-leading / specific enough
-// that the risk of touching string contents is negligible) ────────────────────
+// Whole-script rules, specific enough not to touch string contents.
 const API_RULES: Rule[] = [
-  // Logging → captured console.*
+  // Logging -> captured console.*
   [/\blog\.info\s*\(/g, 'console.log('],
   [/\blog\.warn\s*\(/g, 'console.warn('],
   [/\blog\.error\s*\(/g, 'console.error('],
   [/\blog\.debug\s*\(/g, 'console.log('],
 
-  // JSON — slurper/output/builder
+  // JSON - slurper/output/builder
   [/\bnew\s+groovy\.json\.JsonSlurper\s*\(\s*\)\s*\.parseText\s*\(/g, 'JSON.parse('],
   [/\bnew\s+JsonSlurper\s*\(\s*\)\s*\.parseText\s*\(/g, 'JSON.parse('],
   [/\bnew\s+groovy\.json\.JsonSlurper\s*\(\s*\)\s*\.parse\s*\(/g, 'JSON.parse('],
@@ -100,17 +79,17 @@ const API_RULES: Rule[] = [
   [/([\w.$)\]]+)\.toFloat\s*\(\s*\)/g, 'parseFloat($1)'],
 ];
 
-// Language-level rules (also whole-text; see limitation note in the header).
+// Language-level rules (whole-text; see header caveat).
 const LANG_RULES: Rule[] = [
-  // `def x` → `let x` (declaration form only, to avoid bare `def` in prose)
+  // `def x` -> `let x` (declaration form only)
   [/\bdef\s+(?=[A-Za-z_$])/g, 'let '],
-  // Groovy Elvis `a ?: b` → `a || b` (both truthy-based; see note emitted below)
+  // Groovy Elvis `a ?: b` -> `a || b`, both truthy-based
   [/\s*\?:\s*/g, ' || '],
-  // `for (x in list)` → `for (const x of list)`
+  // `for (x in list)` -> `for (const x of list)`
   [/\bfor\s*\(\s*(?:def\s+)?([A-Za-z_$]\w*)\s+in\s+/g, 'for (const $1 of '],
 ];
 
-// ─── context.expand('${#Scope#name}') → sp.<scope>.get('name') ────────────────
+// context.expand('${#Scope#name}') -> sp.<scope>.get('name')
 // Only the *static token* form can be mapped; a dynamic expand() is flagged.
 function convertContextExpand(src: string, notes: Set<string>, risky: Set<string>): string {
   return src.replace(
@@ -129,12 +108,11 @@ function convertContextExpand(src: string, notes: Set<string>, risky: Set<string
   );
 }
 
-// ─── assert → sp.expect ───────────────────────────────────────────────────────
+// assert -> sp.expect
 // `assert <expr>` and `assert <expr> : "<msg>"` become a truthy expectation.
 function convertAsserts(src: string): string {
   return src.replace(/^([ \t]*)assert\s+(.+)$/gm, (_m, indent: string, rest: string) => {
-    // Split a trailing `: message` that isn't part of a ternary. Heuristic:
-    // a top-level " : " with no unmatched "?" before it is an assert message.
+    // Trailing `: message` (not a ternary): top-level ':' with no '?' before it.
     let expr = rest.trim();
     let msg = '';
     const colon = findAssertMessageColon(expr);
@@ -147,8 +125,7 @@ function convertAsserts(src: string): string {
   });
 }
 
-// Index of the ':' that introduces an assert message, or -1. Skips ':' that
-// belongs to a ternary by requiring the number of '?' before it to be 0.
+// Index of the assert-message ':' (0 unmatched '?' before it), or -1.
 function findAssertMessageColon(expr: string): number {
   let q = 0;
   let str: string | null = null;
@@ -174,7 +151,7 @@ function stripQuotes(s: string): string {
   return t;
 }
 
-// ─── Regex match: `str ==~ /pat/` → `/pat/.test(str)` ─────────────────────────
+// Regex match: `str ==~ /pat/` -> `/pat/.test(str)`
 function convertRegexMatch(src: string, notes: Set<string>): string {
   let changed = false;
   const out = src.replace(/([\w.$)\]]+)\s*==~\s*\/((?:\\.|[^/\n])*)\//g, (_m, subject: string, pat: string) => {
@@ -185,7 +162,7 @@ function convertRegexMatch(src: string, notes: Set<string>): string {
   return out;
 }
 
-// ─── Closures on iteration methods → arrow functions ──────────────────────────
+// Closures on iteration methods -> arrow functions
 const CLOSURE_METHODS: Record<string, string> = {
   each: 'forEach',
   eachWithIndex: 'forEach',
@@ -200,8 +177,7 @@ function convertClosures(src: string, notes: Set<string>, risky: Set<string>): s
   const methodAlt = Object.keys(CLOSURE_METHODS).join('|');
   const opener = new RegExp(`\\.(${methodAlt})\\s*\\{`);
   let out = src;
-  // Repeatedly rewrite the first remaining closure until none are left. Each
-  // pass re-scans from the start, so nested closures are handled outer-first.
+  // Rewrite the first remaining closure each pass (outer-first), until none left.
   for (let guard = 0; guard < 1000; guard++) {
     const m = opener.exec(out);
     if (!m) break;
@@ -209,7 +185,7 @@ function convertClosures(src: string, notes: Set<string>, risky: Set<string>): s
     const braceIdx = m.index + m[0].length - 1;
     const close = findMatchingBrace(out, braceIdx);
     if (close < 0) {
-      // Unbalanced / unsupported nesting — stop touching closures, leave as-is.
+      // Unbalanced nesting: stop touching closures, leave as-is.
       risky.add('A closure body could not be parsed and was left for manual review.');
       break;
     }
@@ -226,8 +202,7 @@ function convertClosures(src: string, notes: Set<string>, risky: Set<string>): s
   return out;
 }
 
-// Split a closure's interior into its parameter list and body. `{ a, b -> … }`
-// → params ['a','b']; no arrow → implicit params based on the method.
+// Split a closure interior into params + body; no arrow -> implicit params.
 function splitClosure(inner: string, method: string): { params: string[]; body: string } {
   const arrowIdx = topLevelArrow(inner);
   if (arrowIdx >= 0) {
@@ -241,8 +216,7 @@ function splitClosure(inner: string, method: string): { params: string[]; body: 
 function buildArrow(params: string[], body: string): string {
   const head = `(${params.join(', ')})`;
   const trimmed = body.trim();
-  // Single expression (no statements) → expression-bodied arrow, which keeps
-  // the implicit return Groovy relies on for collect/find*.
+  // Single expression -> expression-bodied arrow, keeping Groovy's implicit return.
   if (trimmed && !/[;\n]/.test(trimmed)) return `${head} => ${trimmed}`;
   return `${head} => {${body}}`;
 }
@@ -264,8 +238,7 @@ function topLevelArrow(s: string): number {
   return -1;
 }
 
-// Find the index of the `}` matching the `{` at `openIdx`, skipping braces that
-// occur inside strings or comments. Returns -1 if unbalanced.
+// Index of the `}` matching the `{` at `openIdx` (skips strings/comments), or -1.
 function findMatchingBrace(src: string, openIdx: number): number {
   let depth = 0;
   let i = openIdx;
@@ -289,7 +262,7 @@ function findMatchingBrace(src: string, openIdx: number): number {
   return -1;
 }
 
-// ─── GString → template literal (string segments only) ────────────────────────
+// GString -> template literal (string segments only)
 type Seg = { type: 'code' | 'str' | 'comment'; text: string }
 
 function splitSegments(src: string): Seg[] {
@@ -318,9 +291,8 @@ function splitSegments(src: string): Seg[] {
   return segs;
 }
 
-// Turn a Groovy string literal into its JS equivalent. Double / triple-double
-// strings with interpolation become template literals; single-quoted strings
-// stay literal; triple-single become (literal) template literals.
+// Groovy string literal -> JS: double/triple-double with interpolation become
+// template literals; single-quoted stay literal.
 function convertStringLiteral(lit: string, notes: Set<string>): string {
   if (lit.startsWith('"""')) {
     const body = lit.slice(3, lit.endsWith('"""') ? lit.length - 3 : lit.length);
@@ -351,13 +323,12 @@ function escapeTemplate(s: string): string {
   return s.replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
 }
 
-// Convert Groovy `$ident` / `$ident.prop` to `${ident}` / `${ident.prop}`.
-// Leaves existing `${…}` untouched ($ followed by `{` is not an identifier).
+// Groovy `$ident` / `$ident.prop` -> `${ident}`; existing `${...}` untouched.
 function interpolate(s: string): string {
   return s.replace(/\$([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)/g, '${$1}');
 }
 
-// ─── Unsupported-construct detection (post-conversion line scan) ──────────────
+// Unsupported-construct detection (post-conversion line scan)
 interface Detector { re: RegExp; reason: string; note?: boolean }
 
 const DETECTORS: Detector[] = [
@@ -381,12 +352,11 @@ function stripForScan(line: string): string {
     .replace(/'(?:\\.|[^'\\])*'/g, "''");
 }
 
-// ─── Orchestrator ─────────────────────────────────────────────────────────────
+// Orchestrator
 
 export function convertGroovyScript(source: string): GroovyConversion {
-  // `notes` are informational (routine, safe conversions); `risky` are
-  // approximations worth a human glance. Only `risky` (or unmapped lines)
-  // downgrades a fully-converted script from `clean` to `partial`.
+  // `notes` are informational; `risky` approximations (or unmapped lines)
+  // downgrade a converted script from `clean` to `partial`.
   const notes = new Set<string>();
   const risky = new Set<string>();
   let src = source.replace(/\r\n/g, '\n');
@@ -397,7 +367,7 @@ export function convertGroovyScript(source: string): GroovyConversion {
     return `// (removed) ${m.trim()}`;
   });
 
-  // 2. println / print and log.* in Groovy's paren-free call form → console.*(…)
+  // 2. Paren-free println / print / log.* -> console.*
   src = src.replace(/^([ \t]*)println\s+(?!\()(.+)$/gm, '$1console.log($2)');
   src = src.replace(/^([ \t]*)print\s+(?!\()(.+)$/gm, '$1console.log($2)');
   src = src.replace(/\bprintln\s*\(/g, 'console.log(');
@@ -419,7 +389,7 @@ export function convertGroovyScript(source: string): GroovyConversion {
   for (const [re, rep] of LANG_RULES) src = src.replace(re, rep);
   if (hadElvis) risky.add('Groovy Elvis `?:` was mapped to `||` (both are truthy-based; verify for 0/"" values).');
 
-  // 6. GString → template literal (string segments only).
+  // 6. GString -> template literal (string segments only).
   src = splitSegments(src)
     .map(seg => (seg.type === 'str' ? convertStringLiteral(seg.text, notes) : seg.text))
     .join('');
@@ -440,8 +410,7 @@ export function convertGroovyScript(source: string): GroovyConversion {
   }
   const js = lines.join('\n');
 
-  // 8. Classify. Routine conversions (GString, regex-match, import removal) stay
-  // `clean`; only risky approximations or unmapped lines require review.
+  // 8. Classify: routine conversions stay `clean`; risky/unmapped need review.
   const meaningful = lines.filter(l => { const t = stripForScan(l).trim(); return t && !t.startsWith('//'); }).length || 1;
   let status: GroovyConversionStatus;
   if (unmapped.length === 0) status = risky.size === 0 ? 'clean' : 'partial';

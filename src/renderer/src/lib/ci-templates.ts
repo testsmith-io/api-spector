@@ -16,10 +16,9 @@ const NODE_LTS = 'lts/*';
 // External secret managers a workspace can reference (vault:, bao:, aws:, azure:, gcp:, op://).
 export type SecretManagerKind = 'vault' | 'bao' | 'aws' | 'azure' | 'gcp' | 'op';
 
-// The environment each provider reads to authenticate. Kept in sync with
-// docs/reference/secrets-vault.md. On GitHub, Vault is authenticated with the
-// OIDC action instead (VAULT_TOKEN is exported by the step), so only VAULT_ADDR
-// is passed through there — see githubVaultStep / the github branch below.
+// The env vars each provider reads to authenticate (in sync with
+// docs/reference/secrets-vault.md). On GitHub, Vault uses the OIDC action and
+// only VAULT_ADDR is passed through; see the github branch below.
 const PROVIDER_ENV: Record<SecretManagerKind, string[]> = {
   vault: ['VAULT_ADDR', 'VAULT_ROLE_ID', 'VAULT_SECRET_ID'],
   bao:   ['BAO_ADDR', 'BAO_ROLE_ID', 'BAO_SECRET_ID'],
@@ -29,7 +28,7 @@ const PROVIDER_ENV: Record<SecretManagerKind, string[]> = {
   op:    ['OP_CONNECT_HOST', 'OP_CONNECT_TOKEN'],
 };
 
-// Map a secret-manager reference (from an env var's secretRef) to its provider.
+// A secret-manager reference -> its provider.
 export function secretManagerOf(ref: string): SecretManagerKind | null {
   if (ref.startsWith('op://')) return 'op';
   const scheme = ref.split(':', 1)[0];
@@ -37,9 +36,8 @@ export function secretManagerOf(ref: string): SecretManagerKind | null {
   return null;
 }
 
-// Inline references are written as {{vault:...}} / {{aws:...}} / {{azure:...}} /
-// {{gcp:...}} / {{op://...}} and can appear anywhere a variable can: URL, headers,
-// params, body, auth fields, and pre/post-request scripts.
+// Inline references ({{vault:...}} etc.) can appear anywhere a variable can:
+// URL, headers, params, body, auth fields, scripts.
 const INLINE_REF_RE = /\{\{\s*(vault:|bao:|aws:|azure:|gcp:|op:\/\/)/g;
 
 export function inlineSecretManagers(text: string | null | undefined): SecretManagerKind[] {
@@ -51,9 +49,8 @@ export function inlineSecretManagers(text: string | null | undefined): SecretMan
   return [...kinds];
 }
 
-// Every secret manager a request references inline. Serializing the whole request
-// covers URL, headers, params, body, auth, and the pre/post/introspection
-// scripts in one pass, and stays correct as new text fields are added.
+// Every secret manager a request references inline. Serializing the whole
+// request covers all text fields in one pass and stays correct as fields are added.
 export function requestSecretManagers(req: ApiRequest): SecretManagerKind[] {
   return inlineSecretManagers(JSON.stringify(req));
 }
@@ -80,13 +77,13 @@ export function generateCiContent(
   const managers = [...new Set(secretManagers)];
   const usesVault = managers.includes('vault');
 
-  // API_SPECTOR_MASTER_KEY is only needed to decrypt at-rest secrets; a
-  // secret-manager reference has no stored value to decrypt.
+  // API_SPECTOR_MASTER_KEY decrypts at-rest secrets only; a manager reference
+  // has no stored value to decrypt.
   const encryptedVars = secretVars.length ? ['API_SPECTOR_MASTER_KEY', ...secretVars] : [];
 
   if (platform === 'github') {
-    // On GitHub, Vault uses OIDC (the vault-action step exports VAULT_TOKEN), so
-    // only VAULT_ADDR is passed through; the other providers pass their creds.
+    // Vault uses OIDC here (vault-action exports VAULT_TOKEN), so only VAULT_ADDR
+    // passes through; other providers pass their creds.
     const ghProviderEnv = providerEnvVars(managers).filter(v => v !== 'VAULT_ROLE_ID' && v !== 'VAULT_SECRET_ID');
     const allSecretVars = [...encryptedVars, ...ghProviderEnv.filter(v => v !== 'VAULT_ADDR')];
     const hintLines = [
@@ -97,8 +94,7 @@ export function generateCiContent(
       ? `      # ⚠ Add these in: Settings → Secrets and variables → Actions\n${hintLines.join('\n')}\n`
       : '';
 
-    // Vault via workload identity: exchange the job's OIDC token for a
-    // short-lived Vault token (exported as VAULT_TOKEN). Nothing is stored.
+    // Exchange the job's OIDC token for a short-lived VAULT_TOKEN. Nothing stored.
     const vaultStep = usesVault
       ? `      - name: Authenticate to Vault (OIDC)
         uses: hashicorp/vault-action@v3
@@ -149,8 +145,8 @@ ${vaultStep}${secretHint}      - name: Run API tests
   }
 
   if (platform === 'gitlab') {
-    // No turnkey OIDC action here — Vault authenticates with AppRole from CI
-    // variables (VAULT_ADDR + VAULT_ROLE_ID + VAULT_SECRET_ID).
+    // No turnkey OIDC action here; Vault uses AppRole from CI variables
+    // (VAULT_ADDR + VAULT_ROLE_ID + VAULT_SECRET_ID).
     const allSecretVars = [...encryptedVars, ...providerEnvVars(managers)];
     const secretHint = allSecretVars.length
       ? `  # ⚠ Add these in: Settings → CI/CD → Variables\n` +

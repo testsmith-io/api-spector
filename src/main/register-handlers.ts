@@ -1,11 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// All IPC handler registrations in one composable call. Extracted from the
-// app's startup so the same backend can be hosted by another Electron process
-// (e.g. the webinar presenter, which embeds the app's renderer in a <webview>
-// and re-hosts these handlers). The normal app calls this during whenReady; its
-// behaviour is unchanged.
+// All IPC handler registrations in one composable call, so the same backend can be
+// hosted by another Electron process (e.g. the webinar presenter) as well as the app.
 
 import { BrowserWindow, type IpcMain, type WebContents } from 'electron';
 import { IPC } from '../shared/ipc-channels';
@@ -41,7 +38,7 @@ export interface RegisterHandlersOptions {
   getRecordWebContents?: () => WebContents | null
   /** Open an external URL; defaults to shell.openExternal. */
   openExternal?: (url: string) => void
-  /** Update-check hooks (no-ops by default — only the shipped app wires these). */
+  /** Update-check hooks (no-ops by default - only the shipped app wires these). */
   checkUpdate?: () => unknown
   updateMode?: () => unknown
   installUpdate?: () => unknown

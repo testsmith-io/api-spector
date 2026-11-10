@@ -25,9 +25,8 @@ import {
 import { getWorkspaceDir } from './file-handler';
 import { validateContractRunPayload } from './ipc-validate';
 
-/** If the caller picked a pinned snapshot, materialize it to a temp file so
- *  the existing provider-verifier flow (which wants a URL or a file path)
- *  doesn't need to change. Returns `{ specPath }` to feed back into the payload. */
+/** Materialize a pinned snapshot to a temp file so the provider-verifier flow
+ *  (which wants a URL or file path) stays unchanged. */
 async function resolveSnapshotSpec(relPath: string): Promise<{ specPath: string }> {
   const dir = getWorkspaceDir();
   if (!dir) throw new Error('No workspace open - cannot resolve snapshot.');
@@ -45,8 +44,8 @@ export function registerContractHandlers(ipc: IpcMain): void {
     let { specUrl, specPath } = payload;
 
     // Design-first contracts (Contract Designer + pacts/) run directly in the
-    // contract-bearing modes — no pact-import — exactly like the CLI. Provider
-    // mode validates all requests against a spec, so it is left untouched.
+    // contract-bearing modes, like the CLI. Provider mode validates against a
+    // spec, so it is left untouched.
     if (mode !== 'provider') {
       const designReqs = await loadDesignContractRequests(
         { designContracts: payload.designContracts },
@@ -57,7 +56,7 @@ export function registerContractHandlers(ipc: IpcMain): void {
       const fresh = designReqs.filter(r => !seen.has(keyOf(r)));
       if (fresh.length) {
         requests = [...requests, ...fresh];
-        // Imported pacts use {{baseUrl}}; default it to empty so the path resolves
+        // Imported pacts use {{baseUrl}}; default it empty so the path resolves
         // and provider-live / bidirectional rebase onto the real provider.
         if (envVars['baseUrl'] === undefined && collectionVars['baseUrl'] === undefined) {
           collectionVars['baseUrl'] = '';
@@ -104,11 +103,9 @@ export function registerContractHandlers(ipc: IpcMain): void {
     return true;
   });
 
-  // Compile a design-first consumer contract to a Pact v3 file inside the
-  // workspace (pacts/<consumer>-<provider>.pact.json), so it travels with the
-  // project and commits to git. Local-first, no cloud needed: this pact can be
-  // imported or verified locally with `contract run`. Returns the path written,
-  // relative to the workspace dir.
+  // Compile a design-first consumer contract to a Pact v3 file in the workspace
+  // (pacts/<consumer>-<provider>.pact.json) so it commits to git and verifies
+  // locally with `contract run`. Returns the path, relative to the workspace.
   handleIpc(ipc, IPC.contract.exportDesignPact, async (_e, contract: ConsumerContract): Promise<string> => {
     const dir = getWorkspaceDir();
     if (!dir) throw new Error('No workspace open — open or save a workspace first.');
@@ -120,7 +117,7 @@ export function registerContractHandlers(ipc: IpcMain): void {
     return relPath;
   });
 
-  // ── Snapshots (pinned spec versions) ───────────────────────────────────────
+  // Snapshots (pinned spec versions)
 
   handleIpc(ipc, IPC.contract.captureSnapshot, async (
     _e,
@@ -155,9 +152,8 @@ export function registerContractHandlers(ipc: IpcMain): void {
     await deleteSnapshot(dir, relPath);
   });
 
-  // Spec-driven fuzzing: generate malformed request variants, send them, and
-  // report responses that crash (5xx) or accept invalid input. Reuses the same
-  // snapshot resolution as contract runs.
+  // Spec-driven fuzzing: send malformed request variants, report responses that
+  // crash (5xx) or accept invalid input. Same snapshot resolution as contract runs.
   handleIpc(ipc, IPC.contract.fuzz, async (
     _e,
     payload: Omit<FuzzOptions, 'onProgress'> & { specSnapshotRelPath?: string },
@@ -171,9 +167,9 @@ export function registerContractHandlers(ipc: IpcMain): void {
     return runFuzz({ ...payload, specUrl, specPath });
   });
 
-  // Persist a run for the dashboard / can-i-deploy gate — same results-store
+  // Persist a run for the dashboard / deploy gate, into the same results-store
   // the CLI's `contract run --record` writes to, so GUI-recorded runs show up
-  // in the exported dashboard (`contract report --html`) and can-i-deploy.
+  // in the exported dashboard (`contract report --html`).
   handleIpc(ipc, IPC.contract.recordResult, async (
     _e,
     opts: { pacticipant: string; version: string; report: ContractReport },

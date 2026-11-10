@@ -29,11 +29,9 @@ interface PushFlowInput {
   globals: Record<string, string>
 }
 
-/** Build a self-contained, runnable flow definition for the cloud: the graph,
- *  the referenced requests (resolved with inherited auth/headers, templates
- *  left intact for run-time), referenced sub-flows, the resolved environment
- *  vars + globals. The cloud stores this blob; the Node flow runtime executes
- *  it with the shared engine (identical semantics to desktop/CLI). */
+/** Self-contained flow definition for the cloud: graph, referenced requests
+ *  (inherited auth/headers resolved, templates left for run-time), sub-flows,
+ *  resolved env vars + globals. Cloud runs it with the shared engine. */
 async function buildFlowDefinition(input: PushFlowInput): Promise<unknown> {
   const envVars = await buildEnvVars(input.environment);
   const colById = new Map(input.collections.map(c => [c.id, c]));
@@ -60,25 +58,22 @@ async function buildFlowDefinition(input: PushFlowInput): Promise<unknown> {
   return {
     flow: input.flow, flows: input.flows ?? [], requests, envVars, collectionVars,
     globals: input.globals ?? {},
-    // Record which environment's values were baked (for the cloud UI). null when
-    // no environment was active at push time — a common cause of "works locally,
-    // fails in the cloud" when requests rely on environment variables.
+    // Which environment's values were baked; null when none was active at push
+    // time, a common cause of "works locally, fails in the cloud".
     environmentName: input.environment?.name ?? null,
     envVarCount: Object.keys(envVars).length,
   };
 }
 
-/** Keychain ref the cloud API token is stored under (see secret-handler). */
+/** Keychain ref the cloud API token is stored under. */
 export const CLOUD_TOKEN_REF = 'cloud:token';
 
-/** The cloud API base URL. Fixed to production for end users; the developer can
- *  point it at a local stack via the API_SPECTOR_CLOUD_ENDPOINT env var. Not a
- *  user-facing setting. */
+/** Cloud API base URL. Production by default; override with API_SPECTOR_CLOUD_ENDPOINT. */
 const CLOUD_ENDPOINT = resolveCloudEndpoint();
 
 interface PushMonitorInput {
   request: ApiRequest
-  /** "before" hook requests (e.g. authenticate) to run before the check. */
+  /** "before" hook requests to run before the check. */
   setup?: ApiRequest[]
   environment: Environment | null
   collectionVars: Record<string, string>
@@ -88,8 +83,8 @@ interface PushMonitorInput {
   expectedStatus?: number
 }
 
-/** POST/GET JSON to the cloud API with the stored bearer token. Throws a
- *  human-readable Error on any non-2xx so the renderer can surface it. */
+/** JSON call to the cloud API with the stored bearer token; throws a readable
+ *  Error on any non-2xx. */
 async function cloudFetch(path: string, method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', body?: unknown): Promise<any> {
   const token = await getSecret(CLOUD_TOKEN_REF);
   if (!token) throw new Error('No cloud API token set. Add one in Settings → Cloud.');
@@ -123,21 +118,18 @@ async function cloudFetch(path: string, method: 'GET' | 'POST' | 'PUT' | 'PATCH'
 
   if (!res.ok) {
     let detail = json?.error || json?.message || (res.status === 401 ? 'Unauthorized (check your token)' : `HTTP ${res.status}`);
-    // Plan-limit rejections come back as 403 { error, limit } — surface the cap.
+    // Plan-limit rejections come back as 403 { error, limit } - surface the cap.
     if (res.status === 403 && json?.limit != null) detail += ` (plan limit: ${json.limit})`;
-    // 405 almost always means the endpoint isn't the broker API (e.g. the default
-    // marketing site rejecting PUT). Point the developer at the endpoint override.
+    // 405 usually means the endpoint isn't the broker API; point at the override.
     if (res.status === 405) detail = `HTTP 405 from ${CLOUD_ENDPOINT} — this does not look like the API Spector Cloud API (set API_SPECTOR_CLOUD_ENDPOINT to your broker URL).`;
     throw new Error(detail);
   }
   return json;
 }
 
-/** Resolve only static {{vars}} (environment / collection / global). Dynamic
- *  builtins like {{$randomInt}} and inline faker/dayjs expressions like
- *  {{faker.lorem.slug()}} are deliberately LEFT TEMPLATED so the cloud runner
- *  regenerates a fresh value on every check, instead of freezing one value at
- *  push time (which would, e.g., make a "create" call 409 on the second run). */
+/** Resolve only static {{vars}}. Dynamic builtins ({{$randomInt}}) and inline
+ *  faker/dayjs are left templated so the cloud runner regenerates them each
+ *  check; freezing one would make a "create" call 409 on the second run. */
 function interpolateStatic(str: string, vars: Record<string, string>): string {
   return str.replaceAll(/\{\{([^}]+)\}\}/g, (m, key) => {
     const trimmed = String(key).trim();
@@ -145,9 +137,8 @@ function interpolateStatic(str: string, vars: Record<string, string>): string {
   });
 }
 
-/** Build the api-spector request the cloud runs: static {{vars}} folded in,
- *  dynamic/faker templates and setup-provided tokens left to resolve at run
- *  time, auth passed through, scripts kept. */
+/** The request the cloud runs: static {{vars}} folded in, dynamic/faker and
+ *  setup tokens left to resolve at run time, auth and scripts passed through. */
 function resolveRequest(req: ApiRequest, vars: Record<string, string>) {
   return {
     id: req.id,
@@ -173,8 +164,8 @@ function resolveHeaders(
     .map(h => ({ key: interpolateStatic(h.key, vars), value: interpolateStatic(h.value ?? '', vars), enabled: true }));
 }
 
-/** Resolve static {{var}} in the body's text fields; dynamic/faker templates are
- *  left in place so the runner regenerates fresh data on every check. */
+/** Resolve static {{var}} in the body's text fields; dynamic/faker left for the
+ *  runner to regenerate each check. */
 function resolveBody(body: ApiRequest['body'] | undefined, vars: Record<string, string>): ApiRequest['body'] {
   if (!body?.mode || body.mode === 'none') return { mode: 'none' };
   const b: ApiRequest['body'] = { ...body };
@@ -201,10 +192,8 @@ function resolveBody(body: ApiRequest['body'] | undefined, vars: Record<string, 
   return b;
 }
 
-/** Variable names a setup chain SETS at run time (sp.environment.set('x', ...),
- *  sp.collectionVariables.set(...), sp.variables.set(...), sp.globals.set(...)).
- *  These must stay templated at push time so the setup's fresh value (e.g. a
- *  freshly fetched auth token) is used on each check, not a stale baked one. */
+/** Variable names a setup chain SETS at run time (sp.*.set(...)). Kept templated
+ *  at push time so the setup's fresh value (an auth token) is used each check. */
 function setVarNames(reqs: ApiRequest[]): Set<string> {
   const names = new Set<string>();
   const re = /sp\.(?:environment|collectionVariables|variables|globals)\.set\(\s*['"`]([^'"`]+)['"`]/g;
@@ -233,12 +222,8 @@ function slugify(name: string): string {
     .slice(0, 63) || 'mock';
 }
 
-// ─── One-click connect ("Sign in with API Spector") ───────────────────────────
-//
-// Public-client OAuth: open the cloud consent page in the browser with a loopback
-// callback, receive a single-use code, exchange it (with the PKCE verifier) for a
-// Sanctum token. No client secret — PKCE binds the code to this flow. The caller
-// (renderer) stores the returned token in the OS keychain, same as a pasted one.
+// One-click connect ("Sign in with API Spector"): public-client OAuth with a loopback callback,
+// exchanging a single-use code (PKCE, no client secret) for a Sanctum token the renderer keychains.
 
 const b64url = (buf: Buffer): string =>
   buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -320,8 +305,8 @@ export function registerCloudHandlers(ipc: IpcMain): void {
     return cloudFetch('/api/mocks', 'POST', payload);
   });
 
-  // Look up an existing cloud mock's routes (by the slug derived from the name)
-  // so the UI can warn before overwriting. Returns { exists, routes? }.
+  // Look up a cloud mock's routes by slug so the UI can warn before overwriting.
+  // Returns { exists, routes? }.
   handleIpc(ipc, IPC.cloud.getMock, async (_e, name: string) => {
     return cloudFetch('/api/mocks/' + encodeURIComponent(slugify(name)), 'GET');
   });
@@ -338,10 +323,8 @@ export function registerCloudHandlers(ipc: IpcMain): void {
     });
   });
 
-  // Publish a design-first consumer contract. It compiles to the same Pact v3
-  // document `pushPact` sends, so it flows through the identical broker /
-  // verification / can-i-deploy machinery — the difference is only that it was
-  // authored up front rather than captured from a live call.
+  // Publish a design-first consumer contract. Compiles to the same Pact v3
+  // document `pushPact` sends, authored up front rather than captured live.
   handleIpc(ipc, IPC.cloud.pushDesignContract, async (_e, input: { contract: ConsumerContract; consumerVersion: string }) => {
     const pact = designContractToPact(input.contract);
     return cloudFetch('/api/contracts', 'PUT', {
@@ -352,8 +335,7 @@ export function registerCloudHandlers(ipc: IpcMain): void {
     });
   });
 
-  // Publish a provider OpenAPI spec (raw JSON or YAML text) for bi-directional
-  // verification.
+  // Publish a provider OpenAPI spec (JSON or YAML) for bi-directional verification.
   handleIpc(ipc, IPC.cloud.pushSpec, async (_e, input: { pacticipant: string; version: string; spec?: string; specUrl?: string }) => {
     let specText = input.spec;
     if (! specText && input.specUrl) {
@@ -385,7 +367,7 @@ export function registerCloudHandlers(ipc: IpcMain): void {
     await shell.openExternal(CLOUD_ENDPOINT + '/matrix');
   });
 
-  // ─── Flows ─────────────────────────────────────────────────────────────────
+  // Flows
   // Upload a self-contained flow definition (graph + resolved requests + env).
   handleIpc(ipc, IPC.cloud.pushFlow, async (_e, input: PushFlowInput) => {
     const definition = await buildFlowDefinition(input);
@@ -396,8 +378,7 @@ export function registerCloudHandlers(ipc: IpcMain): void {
     });
   });
 
-  // Trigger a server-side run (the Node flow runtime picks it up). Returns the
-  // queued run record ({ id, status }).
+  // Trigger a server-side run. Returns the queued run record ({ id, status }).
   handleIpc(ipc, IPC.cloud.runFlow, async (_e, name: string) => {
     return cloudFetch('/api/flows/' + encodeURIComponent(slugify(name)) + '/run', 'POST');
   });
@@ -412,22 +393,26 @@ export function registerCloudHandlers(ipc: IpcMain): void {
     await shell.openExternal(CLOUD_ENDPOINT + '/flows/' + encodeURIComponent(slugify(name)));
   });
 
-  // ─── Share collection / request as a public link ─────────────────────────────
-  // The payload is a definition, not data: requests carry {{variable}} refs, and
-  // environment secret values live outside the collection entirely. We ALSO strip
-  // data sets (CSV rows, which can hold real test data) and saved examples
-  // (captured responses, which can hold tokens) before upload — belt and braces.
+  // Share collection / request as a public link. The payload is a definition (requests carry {{var}} refs),
+  // but still strip data sets, saved examples, and the cached OAuth token before upload; the IPC copy is safe to mutate.
+  const cleanAuth = (holder: { auth?: unknown } | undefined): void => {
+    const a = holder?.auth as Record<string, unknown> | undefined;
+    if (a && a['type'] === 'oauth2') { delete a['oauth2CachedToken']; delete a['oauth2TokenExpiry']; }
+  };
   const stripRequest = (r: ApiRequest): ApiRequest => {
     const { examples: _examples, ...rest } = r as ApiRequest & { examples?: unknown };
+    cleanAuth(rest);
     return rest as ApiRequest;
   };
   const stripFolder = (f: Record<string, unknown> | undefined): Record<string, unknown> => {
     const { dataSet: _d, dataSetRef: _r, ...rest } = (f ?? {}) as Record<string, unknown>;
+    cleanAuth(rest);
     const folders = Array.isArray(rest['folders']) ? (rest['folders'] as Record<string, unknown>[]).map(stripFolder) : [];
     return { ...rest, folders };
   };
   const stripCollection = (col: Collection): Record<string, unknown> => {
     const { dataSet: _d, dataSetRef: _r, ...rest } = col as Collection & { dataSet?: unknown; dataSetRef?: unknown };
+    cleanAuth(rest);
     const requests: Record<string, ApiRequest> = {};
     for (const [id, req] of Object.entries(col.requests ?? {})) requests[id] = stripRequest(req);
     return { ...rest, requests, rootFolder: stripFolder(col.rootFolder as unknown as Record<string, unknown>) };
@@ -465,7 +450,7 @@ export function registerCloudHandlers(ipc: IpcMain): void {
     return cloudFetch('/api/share/' + encodeURIComponent(clean), 'DELETE');
   });
 
-  // ─── Cloud-synced workspaces (collaborate without git) ───────────────────────
+  // Cloud-synced workspaces (collaborate without git)
   handleIpc(ipc, IPC.cloud.workspaceList, async () => cloudFetch('/api/workspaces', 'GET'));
 
   handleIpc(ipc, IPC.cloud.workspaceCreate, async (_e, arg: { name: string; payload: unknown; author?: string }) =>
@@ -498,9 +483,8 @@ export function registerCloudHandlers(ipc: IpcMain): void {
     return { conflict: false as const, version: json.version };
   });
 
-  // Import a shared collection/request by token. This endpoint is PUBLIC (the
-  // token is the capability), so it is fetched WITHOUT the Sanctum bearer — a
-  // recipient need not have a cloud account to receive a share.
+  // Import a shared collection/request by token. Public endpoint (the token is
+  // the capability), fetched without the bearer so no account is needed.
   handleIpc(ipc, IPC.cloud.importShare, async (_e, token: string) => {
     const cleaned = String(token).replace(/[^a-z0-9]/gi, '');
     if (!cleaned) throw new Error('Invalid share link.');
@@ -518,27 +502,22 @@ export function registerCloudHandlers(ipc: IpcMain): void {
     return res.json() as Promise<{ type: 'collection' | 'request'; name: string; payload: unknown }>;
   });
 
-  // Push a request as a monitor. The URL is resolved to a concrete value here
-  // (path + query variables folded in) exactly like a normal send, so the cloud
-  // runner hits the real endpoint. Auth and headers pass through unresolved: the
-  // pre-request (setup) script re-authenticates on each check instead of baking
-  // in a token that would expire.
+  // Push a request as a monitor. URL resolved to a concrete value here (path +
+  // query folded in) so the runner hits the real endpoint. Auth/headers pass
+  // through unresolved: the setup script re-authenticates each check.
   handleIpc(ipc, IPC.cloud.pushMonitor, async (_e, input: PushMonitorInput) => {
     const { request, environment, collectionVars, globals } = input;
 
     const envVars = await buildEnvVars(environment);
     const liveGlobals = { ...globals, ...getGlobals() };
-    // Only static vars are folded in. Dynamic builtins ({{$randomInt}}) and inline
-    // faker/dayjs expressions ({{faker.lorem.slug()}}) are intentionally NOT
-    // resolved here: they stay templated so the cloud runner regenerates a fresh
-    // value on every check (freezing one would make e.g. a create call 409 on the
-    // second run).
+    // Only static vars folded in. Dynamic builtins and inline faker/dayjs stay
+    // templated so the runner regenerates them each check; freezing one would
+    // make a create call 409 on the second run.
     const staticVars = mergeVars(envVars, collectionVars ?? {}, liveGlobals, {}, {});
 
-    // "before" hooks (e.g. authenticate) run first in the cloud, threading the
-    // variables they set (a token) into the check. Static vars resolve now, but
-    // any variable a setup step SETS is kept templated so its fresh run-time
-    // value is used each check (not a stale one baked at push time).
+    // "before" hooks run first in the cloud, threading the variables they set
+    // into the check. A variable a setup step SETS stays templated so its fresh
+    // run-time value is used each check.
     const setup = input.setup ?? [];
     const resolveVars = omitKeys(staticVars, setVarNames(setup));
 

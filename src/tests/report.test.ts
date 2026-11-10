@@ -35,7 +35,7 @@ const meta = {
   timestamp:   '2025-01-01T00:00:00.000Z',
 };
 
-// ─── buildJsonReport ─────────────────────────────────────────────────────────
+// buildJsonReport
 
 describe('buildJsonReport', () => {
   it('returns valid JSON', () => {
@@ -72,7 +72,7 @@ describe('buildJsonReport', () => {
   });
 });
 
-// ─── buildJUnitReport ────────────────────────────────────────────────────────
+// buildJUnitReport
 
 describe('buildJUnitReport', () => {
   it('returns a string starting with XML declaration', () => {
@@ -131,7 +131,7 @@ describe('buildJUnitReport', () => {
   });
 });
 
-// ─── buildHtmlReport ─────────────────────────────────────────────────────────
+// buildHtmlReport
 
 describe('buildHtmlReport', () => {
   it('returns a valid HTML document', () => {
@@ -168,9 +168,8 @@ describe('buildHtmlReport', () => {
   });
 
   it('counts skipped requests against the pass rate denominator', () => {
-    // 5 passed + 1 skipped → 5/6 ≈ 83%, not 100%. An unverified request
-    // is a coverage gap, and a green "100%" next to a skipped row would
-    // hide it.
+    // 5 passed + 1 skipped -> 5/6 ≈ 83%, not 100%. An unverified request is a
+    // coverage gap.
     const s: RunSummary = { total: 6, passed: 5, failed: 0, errors: 0, skipped: 1, durationMs: 363 };
     expect(buildHtmlReport([], s, meta)).toContain('>83%<');
   });
@@ -228,7 +227,7 @@ describe('buildHtmlReport', () => {
   it('omits folder heading for requests directly under the root', () => {
     const results = [makeResult({ scopePath: [] })];
     const html = buildHtmlReport(results, summary, meta);
-    // No heading element should be emitted — the CSS rule itself is fine
+    // No heading element should be emitted
     expect(html).not.toContain('<div class="scope-heading">');
   });
 
@@ -314,7 +313,7 @@ describe('buildHtmlReport', () => {
   });
 });
 
-// ─── OWASP classification + SARIF ────────────────────────────────────────────
+// OWASP classification + SARIF
 
 describe('owaspRuleForName', () => {
   it('maps a known test-name prefix to its OWASP rule', () => {

@@ -6,25 +6,15 @@ import { createSign } from 'node:crypto';
 import { getSecretsConfig } from '../config';
 import type { SecretProvider } from '../types';
 
-// GCP Secret Manager provider. References look like:
-//   gcp:<project>/<secret>                     latest version
-//   gcp:<project>/<secret>/<version>           a numeric version or "latest"
+// GCP Secret Manager provider. Reference forms:
+//   gcp:<project>/<secret>[/<version>]         version defaults to latest
 //   gcp:<secret>                               uses the default project
-//   gcp:projects/<p>/secrets/<s>/versions/<v>  a full resource name
-// and, when the secret payload is JSON, a trailing `#<key>` extracts one field:
-//   gcp:prod/db-creds#password
-//
-// Authentication, in priority order, so the same workspace runs unchanged on a
-// laptop and in CI:
-//   1. GCP_ACCESS_TOKEN / GOOGLE_OAUTH_ACCESS_TOKEN — a pre-obtained OAuth token
-//      (`gcloud auth print-access-token`, or exported by a Workload Identity
-//      Federation step in CI). Used as-is.
-//   2. A service-account key, as inline JSON in GCP_SERVICE_ACCOUNT_KEY /
-//      GOOGLE_APPLICATION_CREDENTIALS_JSON, or a path in the standard
-//      GOOGLE_APPLICATION_CREDENTIALS. API Spector mints a signed JWT and
-//      exchanges it for an access token (no google-cloud SDK needed).
-// The default project comes from GCP_PROJECT / GOOGLE_CLOUD_PROJECT, else
-// settings.secrets.gcp.project, else the key's own project_id.
+//   gcp:projects/<p>/secrets/<s>/versions/<v>  full resource name
+//   trailing #<key>                            extract one field from a JSON payload
+// Auth, in priority order: 1) GCP_ACCESS_TOKEN / GOOGLE_OAUTH_ACCESS_TOKEN used as-is;
+// 2) a service-account key (GCP_SERVICE_ACCOUNT_KEY / GOOGLE_APPLICATION_CREDENTIALS_JSON
+//    inline, or GOOGLE_APPLICATION_CREDENTIALS path) minted into a signed JWT.
+// Default project: GCP_PROJECT / GOOGLE_CLOUD_PROJECT, else settings.secrets.gcp.project, else key's project_id.
 
 interface ServiceAccountKey {
   client_email: string;

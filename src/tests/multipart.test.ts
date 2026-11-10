@@ -16,7 +16,7 @@ import { generateHttpFile } from '../main/generators/http-file';
 import { generateSupertestJs } from '../main/generators/supertest-js';
 import type { ApiRequest, Collection, Folder, MultipartPart } from '../shared/types';
 
-// ─── Executor: multipart/form-data body assembly ──────────────────────────────
+// Executor: multipart/form-data body assembly
 
 describe('buildMultipartBody (executor)', () => {
   let dir = '';
@@ -79,7 +79,7 @@ describe('buildMultipartBody (executor)', () => {
   });
 });
 
-// ─── Importers ────────────────────────────────────────────────────────────────
+// Importers
 
 describe('multipart import — Postman form-data', () => {
   let dir = '';
@@ -274,7 +274,7 @@ describe('multipart import — Bruno multipart-form', () => {
   });
 });
 
-// ─── Code generation ──────────────────────────────────────────────────────────
+// Code generation
 
 function multipartRequest(): ApiRequest {
   return {

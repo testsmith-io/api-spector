@@ -3,7 +3,7 @@
 
 import { useRef, useState } from 'react';
 
-// ─── Toast ────────────────────────────────────────────────────────────────────
+// Toast
 
 export function useToast(durationMs = 3000) {
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
@@ -17,10 +17,8 @@ export function useToast(durationMs = 3000) {
 }
 
 export function Toast({ toast }: { readonly toast: { msg: string; ok: boolean } | null }) {
-  // The container is always in the DOM so it is a live region screen readers are
-  // already observing when the text appears (WCAG 4.1.3). Errors are assertive +
-  // role="alert"; successes are polite + role="status". When empty it collapses
-  // to sr-only so it takes no layout space. aria-atomic reads the whole message.
+  // Always-in-DOM live region (WCAG 4.1.3): errors assertive + role="alert",
+  // successes polite + role="status"; collapses to sr-only when empty.
   const isError = toast?.ok === false;
   return (
     <div

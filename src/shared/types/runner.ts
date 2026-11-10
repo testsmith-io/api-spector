@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── Runner ───────────────────────────────────────────────────────────────────
+// Runner
 
 import type { ApiRequest, Environment } from './collection';
 import type { TestResult } from './execution';
@@ -11,10 +11,10 @@ export interface RunnerItem {
   /** Name of the collection this item belongs to (top level of the run tree). */
   collection?: string
   collectionVars: Record<string, string>
-  /** Variables from this request's folder chain (root→leaf, innermost wins),
+  /** Variables from this request's folder chain (root->leaf, innermost wins),
    *  readable and writable in scripts as `sp.folder`. */
   folderVars?: Record<string, string>
-  /** Id of the folder that directly owns this request — where `sp.folder.set`
+  /** Id of the folder that directly owns this request - where `sp.folder.set`
    *  writes land so sibling requests in the same folder see them. */
   folderId?: string
   /** Per-iteration variable values (from data-driven dataset). */
@@ -27,7 +27,7 @@ export interface RunnerItem {
   /** From a data-table row's reserved `owasp` column: tags the expected-status
    *  assertion (e.g. BOLA) so it flows into the SARIF report. */
   owaspTag?: string
-  // ── Hook metadata ─────────────────────────────────────────────────────────
+  // Hook metadata
   isHook?: boolean
   hookType?: 'beforeAll' | 'before' | 'afterAll' | 'after'
   /** The folder/collection this hook belongs to. */
@@ -36,11 +36,8 @@ export interface RunnerItem {
   scopeAncestors?: string[]
   /** For before/after hooks: the main request this hook wraps. */
   mainRequestId?: string
-  /**
-   * Folder names from (just below) the root to the folder that owns this
-   * request/hook. Used for grouped rendering in the runner UI and reports.
-   * Empty array = direct child of the collection root.
-   */
+  /** Folder names from below the root to this request/hook's folder, for
+   *  grouped rendering. Empty = direct child of the root. */
   scopePath?: string[]
 }
 
@@ -61,24 +58,20 @@ export interface RunnerPayload {
   piiMaskPatterns?: string[]
   /** Milliseconds to wait between requests (0 = no delay). Sequential runs only. */
   requestDelay?: number
-  /** How many requests may run at the same time (1 = sequential, the default).
-   *  Lifecycle hooks (beforeAll/before/after/afterAll) act as barriers, and
-   *  concurrent requests start from the same variable snapshot, so a parallel
-   *  run suits independent requests rather than chained workflows. */
+  /** Max concurrent requests (1 = sequential, default). Hooks act as barriers
+   *  and concurrent requests share a variable snapshot, so parallel runs suit
+   *  independent requests, not chained workflows. */
   concurrency?: number
 }
 
 /**
- * Status of a single request inside a runner pass.
- *
- * - `pending`  — queued, not started yet
- * - `running`  — request in flight
- * - `passed`   — HTTP 2xx/3xx AND every test passed
- * - `failed`   — at least one test failed, OR HTTP 4xx/5xx
- * - `error`    — pre/post script crashed or transport failure
- * - `skipped`  — request completed (HTTP 2xx/3xx) but had no assertions to
- *                check; "we ran it, we didn't verify anything." Distinct
- *                from `passed` so users notice gaps in their test coverage.
+ * Status of a single request in a runner pass.
+ * - `pending`  queued, not started
+ * - `running`  in flight
+ * - `passed`   2xx/3xx and every test passed
+ * - `failed`   a test failed, or 4xx/5xx
+ * - `error`    pre/post script crashed or transport failure
+ * - `skipped`  ran (2xx/3xx) but had no assertions; distinct from `passed` so coverage gaps show
  */
 export type RunStatus = 'pending' | 'running' | 'passed' | 'failed' | 'error' | 'skipped'
 

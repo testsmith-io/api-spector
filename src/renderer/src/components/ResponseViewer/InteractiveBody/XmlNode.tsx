@@ -18,7 +18,7 @@ export function XmlNode({ element, depth, onLeaf }: Props) {
   const childEls = Array.from(element.children);
   const tag = element.tagName;
 
-  /* ── leaf element (no child elements, only text) ── */
+  /* leaf element (no child elements, only text) */
   if (childEls.length === 0) {
     const text = element.textContent ?? '';
     const selector = buildSelector(element);

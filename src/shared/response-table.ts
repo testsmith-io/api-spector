@@ -1,14 +1,12 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Turning an array in a JSON/XML response into table data: find the array,
-// address it by path, derive columns, and sort rows. Pure and dependency-free
-// so it's unit-testable; the component handles parsing and rendering.
+// A response array as table data: find the array, address it by path, derive
+// columns, sort rows. Pure and dependency-free; the component renders.
 
 export type CellKind = 'null' | 'array' | 'object' | 'primitive';
 
-/** Read a value at a dotted/indexed path, e.g. "data.items[0].tags". Empty
- *  path returns the root. */
+/** Value at a dotted/indexed path, e.g. "data.items[0].tags"; empty = root. */
 export function getByPath(data: unknown, path: string): unknown {
   if (!path) return data;
   const tokens = path.match(/[^.[\]]+|\[\d+\]/g) ?? [];
@@ -22,17 +20,16 @@ export function getByPath(data: unknown, path: string): unknown {
   return cur;
 }
 
-/** Append a row index (and optional key) to a path: joinPath("data.items", 2,
- *  "tags") -> "data.items[2].tags". Used for drilling into a nested cell. */
+/** joinPath("data.items", 2, "tags") -> "data.items[2].tags", for drill-down. */
 export function joinPath(base: string, index: number, key?: string): string {
   return `${base}[${index}]${key ? `.${key}` : ''}`;
 }
 
 const PREFERRED = /^(data|items|results|records|rows|list|content|entries|values|payload|elements)$/i;
 
-/** Auto-pick the array most likely to be "the data": the root if it's an array,
- *  else the shallowest array under a data-ish key, preferring arrays of objects
- *  and larger arrays. Returns its path (for the starting-point input). */
+/** Pick the array most likely to be "the data": the root if an array, else the
+ *  shallowest array under a data-ish key, preferring arrays of objects and
+ *  larger arrays. */
 export function findPrimaryArray(data: unknown): { path: string; array: unknown[] } | null {
   if (Array.isArray(data)) return { path: '', array: data };
 
@@ -63,8 +60,8 @@ export function findPrimaryArray(data: unknown): { path: string; array: unknown[
   return { path: found[0].path, array: found[0].array };
 }
 
-/** Column keys for a set of rows: the union of object keys in first-seen order.
- *  Empty means the rows are primitives/arrays (render a single value column). */
+/** Union of object keys across rows, first-seen order. Empty = primitive/array
+ *  rows (single value column). */
 export function tableColumns(rows: unknown[], cap = 60): string[] {
   const cols: string[] = [];
   const seen = new Set<string>();
@@ -85,8 +82,7 @@ export function classify(v: unknown): CellKind {
   return 'primitive';
 }
 
-/** Compact text for a cell: primitives as-is, arrays as "[n]", objects as
- *  truncated JSON. */
+/** Compact cell text: primitives as-is, arrays as "[n]", objects as truncated JSON. */
 export function cellPreview(v: unknown): string {
   switch (classify(v)) {
     case 'null': return '';
@@ -96,8 +92,7 @@ export function cellPreview(v: unknown): string {
   }
 }
 
-/** Compare two cell values: numeric when both are numbers, else string
- *  compare; nulls sort last. */
+/** Numeric compare when both are numbers, else string; nulls sort last. */
 export function compareValues(x: unknown, y: unknown): number {
   if (x == null && y == null) return 0;
   if (x == null) return 1;
@@ -112,48 +107,45 @@ export function cellAt(row: unknown, col: string): unknown {
   return col === '$value' ? row : (row && typeof row === 'object' ? (row as Record<string, unknown>)[col] : undefined);
 }
 
-/** Row indices in sorted order, so a sorted view can still map a display row
- *  back to its original index (for drill-down paths). */
+/** Row indices in sorted order, so a sorted view maps back to original indices
+ *  for drill-down. */
 export function sortedIndices(rows: unknown[], col: string, dir: 'asc' | 'desc'): number[] {
   const idx = rows.map((_, i) => i);
   idx.sort((a, b) => compareValues(cellAt(rows[a], col), cellAt(rows[b], col)));
   return dir === 'desc' ? idx.reverse() : idx;
 }
 
-/** Sort rows by a column (or the whole row for a primitive column, key
- *  "$value"). Returns a new array. */
+/** Sort rows by a column (key "$value" sorts by the whole row). New array. */
 export function sortRows<T>(rows: T[], col: string, dir: 'asc' | 'desc'): T[] {
   return sortedIndices(rows as unknown[], col, dir).map(i => rows[i]);
 }
 
-// ─── Export (copy / CSV) ─────────────────────────────────────────────────────
+// Export (copy / CSV)
 
-/** A cell rendered for CSV/TSV export: empty for null/undefined, compact JSON
- *  for nested arrays/objects, otherwise the plain string form. */
+/** A cell for CSV/TSV export: empty for null, compact JSON for arrays/objects,
+ *  else the plain string. */
 export function exportCell(value: unknown): string {
   if (value == null) return '';
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 }
 
-/** Header row + string-cell matrix for a tabular view. An empty `columns` means
- *  primitive rows, so the single column is "value" and each row is itself. */
+/** Header row + string-cell matrix. Empty `columns` = primitive rows: one
+ *  "value" column, each row itself. */
 export function tableMatrix(rows: unknown[], columns: string[]): { headers: string[]; rows: string[][] } {
   if (columns.length === 0) return { headers: ['value'], rows: rows.map(r => [exportCell(r)]) };
   return { headers: columns, rows: rows.map(r => columns.map(c => exportCell(cellAt(r, c)))) };
 }
 
-/** RFC-4180-style CSV: fields containing a comma, quote, or newline are wrapped
- *  in double quotes with inner quotes doubled; CRLF line endings so Excel and
- *  other spreadsheet tools import it cleanly. */
+/** RFC-4180 CSV: fields with comma/quote/newline are double-quoted (inner
+ *  quotes doubled); CRLF endings for clean spreadsheet import. */
 export function tableToCsv(headers: string[], rows: string[][]): string {
   const esc = (s: string) => /[",\r\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
   return [headers, ...rows].map(r => r.map(esc).join(',')).join('\r\n');
 }
 
-/** Tab-separated text for the clipboard: pastes straight into Excel / Google
- *  Sheets as a grid. A tab or newline inside a cell would split the grid, so
- *  those collapse to a single space. */
+/** Tab-separated text for the clipboard (pastes into Excel/Sheets as a grid).
+ *  Tabs/newlines inside a cell collapse to a space so they don't split the grid. */
 export function tableToTsv(headers: string[], rows: string[][]): string {
   const clean = (s: string) => s.replace(/[\t\r\n]+/g, ' ');
   return [headers, ...rows].map(r => r.map(clean).join('\t')).join('\n');

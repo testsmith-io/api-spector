@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { validateConsumerResponse } from '../main/contract/consumer-verifier';
 import type { ContractExpectation } from '../../shared/types';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// Helpers
 
 function noViolations(
   contract: ContractExpectation,
@@ -28,7 +28,7 @@ function firstViolation(
   return v[0];
 }
 
-// ─── Status code ──────────────────────────────────────────────────────────────
+// Status code
 
 describe('validateConsumerResponse — status code', () => {
   it('passes when status matches expectation', () => {
@@ -54,7 +54,7 @@ describe('validateConsumerResponse — status code', () => {
   });
 });
 
-// ─── Required headers ─────────────────────────────────────────────────────────
+// Required headers
 
 describe('validateConsumerResponse — required headers', () => {
   it('passes when required header is present', () => {
@@ -136,7 +136,7 @@ describe('validateConsumerResponse — required headers', () => {
   });
 });
 
-// ─── Body schema ──────────────────────────────────────────────────────────────
+// Body schema
 
 describe('validateConsumerResponse — body schema', () => {
   it('passes when body matches schema', () => {
@@ -188,7 +188,7 @@ describe('validateConsumerResponse — body schema', () => {
   });
 });
 
-// ─── Combined violations ──────────────────────────────────────────────────────
+// Combined violations
 
 describe('validateConsumerResponse — combined', () => {
   it('returns multiple violations from different checks', () => {

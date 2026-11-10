@@ -1,13 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Schedule a run plan with bounded concurrency while respecting barriers.
-// Non-barrier items run up to `concurrency` at a time; a barrier item waits for
-// every in-flight item to finish, runs alone, then scheduling resumes. The
-// collection runner uses this so lifecycle hooks (beforeAll/before/after/
-// afterAll) stay ordered relative to the requests around them while independent
-// requests still run in parallel. `run` performs the item's work (and records
-// its result); this function only orders the calls.
+// Schedule a run plan with bounded concurrency and barriers: non-barrier items run
+// up to `concurrency` at once; a barrier waits for all in-flight, runs alone, then
+// scheduling resumes (keeps the runner's lifecycle hooks ordered). Only orders calls.
 
 export async function runPlanConcurrent<T>(
   concurrency: number,

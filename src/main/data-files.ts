@@ -6,10 +6,8 @@ import { readFile, writeFile, mkdir, unlink } from 'node:fs/promises';
 import type { Collection, Folder, DataSet } from '../shared/types';
 import { toCSV, parseCSV } from '../shared/data-csv';
 
-// Data tables (DataSet) defined on a collection or folder are stored as separate
-// CSV files under a `data/` folder next to the collection, rather than inline in
-// the .spector JSON — so they are git-diffable and editable. On disk the holder
-// carries a `dataSetRef` (path to the CSV); in memory only `dataSet` is used.
+// DataSets on a collection/folder are stored as CSV files under a `data/` folder
+// (not inline) so they stay git-diffable: on disk a `dataSetRef`, in memory `dataSet`.
 
 const DATA_DIR = 'data';
 const hasRows = (ds?: DataSet): boolean => !!ds && ds.columns.length > 0;
@@ -17,10 +15,9 @@ const refFor = (id: string): string => `${DATA_DIR}/${id}.csv`;
 
 interface DataHolder { id: string; dataSet?: DataSet; dataSetRef?: string }
 
-/** Deep-clone `col` for persistence: write each non-empty data table to a CSV
- *  under <colDir>/data/ and replace the inline `dataSet` with a `dataSetRef`.
- *  The in-memory collection is never mutated. Emptied tables drop their ref and
- *  their stale CSV is removed. */
+/** Deep-clone `col` for persistence: write each non-empty table to a CSV under
+ *  <colDir>/data/ and replace inline `dataSet` with a `dataSetRef`; emptied tables
+ *  drop their ref and stale CSV. The in-memory collection is never mutated. */
 export async function externalizeDataSets(col: Collection, colDir: string): Promise<Collection> {
   const clone: Collection = structuredClone(col);
   const writes: { path: string; content: string }[] = [];
@@ -57,7 +54,7 @@ export async function inlineDataSets(col: Collection, colDir: string): Promise<C
     try {
       const text = await readFile(join(colDir, h.dataSetRef), 'utf8');
       h.dataSet = parseCSV(text);
-    } catch { /* missing data file → treat as no dataset */ }
+    } catch { /* missing data file -> treat as no dataset */ }
     delete h.dataSetRef;
   };
   await load(col as unknown as DataHolder);

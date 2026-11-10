@@ -1,17 +1,14 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── JSON Schema inferrer ─────────────────────────────────────────────────────
+// JSON Schema inferrer
 // Generates a JSON Schema (draft-07) from a sample value.
 // Used by the Contract tab's "Infer from response" button.
 
 export type JSONSchema = Record<string, unknown>
 
-/**
- * Infer a JSON Schema from an arbitrary JavaScript value.
- * Arrays use the first element as a representative item schema.
- * All non-null object properties are added to `required`.
- */
+/** Infer a JSON Schema from a value. Arrays use the first element as the item
+ *  schema; all non-null object properties go in `required`. */
 export function inferSchema(data: unknown): JSONSchema {
   if (data === null || data === undefined) return { type: 'null' };
 
@@ -25,7 +22,6 @@ export function inferSchema(data: unknown): JSONSchema {
 
   if (Array.isArray(data)) {
     if (data.length === 0) return { type: 'array', items: {} };
-    // Merge schemas of all elements for a more representative items schema
     return { type: 'array', items: inferSchema(data[0]) };
   }
 
@@ -47,10 +43,7 @@ export function inferSchema(data: unknown): JSONSchema {
   return {};
 }
 
-/**
- * Parse a JSON string and infer a schema from it.
- * Returns null if the string is not valid JSON.
- */
+/** Parse a JSON string and infer a schema, or null if invalid JSON. */
 export function inferSchemaFromJson(json: string): JSONSchema | null {
   try {
     return inferSchema(JSON.parse(json));

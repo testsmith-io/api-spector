@@ -8,7 +8,7 @@ import type {
   RecorderConfig, RecordedEntry, RecordingSession, MockServer, MockRoute,
 } from '../shared/types';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// Constants
 
 const DEFAULT_MASK_HEADERS = new Set([
   'authorization', 'cookie', 'set-cookie', 'x-api-key',
@@ -26,7 +26,7 @@ const STRIP_FROM_MOCK_RESPONSE = new Set([
   'cf-ray', 'cf-cache-status',
 ]);
 
-// ─── State ────────────────────────────────────────────────────────────────────
+// State
 
 let activeServer:   Server | null = null;
 let activeConfig:   RecorderConfig | null = null;
@@ -36,7 +36,7 @@ let activeMaskSet:  Set<string> = new Set();
 let _activeIgnoreSet: Set<string> = new Set();
 let hitCallback: ((entry: RecordedEntry) => void) | null = null;
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// Public API
 
 export function isRecorderRunning(): boolean {
   return activeServer !== null;
@@ -80,7 +80,7 @@ export async function startRecorder(config: RecorderConfig): Promise<void> {
     const query   = parseQuery(parsed.search);
     const method  = (req.method ?? 'GET').toUpperCase();
 
-    // Silently ignore browser noise — not part of the API under test
+    // Ignore browser noise, not part of the API under test
     if (path === '/favicon.ico') {
       res.writeHead(204); res.end(); return;
     }
@@ -245,7 +245,7 @@ export function entriesToMockServer(
   return { version: '1.0', id: randomUUID(), name, port, routes };
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// Helpers
 
 function readBody(req: IncomingMessage): Promise<Buffer> {
   return new Promise((ok, fail) => {

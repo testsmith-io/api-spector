@@ -2,23 +2,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-/**
- * API Tester CLI Runner
- *
- * Usage:
- *   api-spector run --workspace ./my-workspace.spector [options]
- *
- * Options:
- *   --workspace  <path>      Path to workspace.json (required)
- *   --environment <name>     Environment name to activate (also accepted: --env)
- *   --tags       <a,b>       Comma-separated tag filter
- *   --collection <name>      Limit to a specific collection by name (optional)
- *   --output     <path>      Write results to a file (e.g. results.json or results.xml)
- *   --format     json|junit|html|sarif  Output format (default: json; inferred from --output extension)
- *   --verbose                Print per-request console output and test details
- *   --bail                   Stop after first failure
- *   --help                   Show this message
- */
+/** API Tester CLI runner: `api-spector run --workspace <path> [options]`.
+ *  Run with --help for the full option list. */
 
 import { writeFile } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
@@ -50,7 +35,7 @@ import {
   loadWorkspace, loadCollections, loadEnvironments,
 } from './cli-common';
 
-// ─── Result printing ──────────────────────────────────────────────────────────
+// Result printing
 
 function printResult(r: RunRequestResult, verbose: boolean) {
   const icon  = r.status === 'passed'  ? color('✓', C.green, C.bold)
@@ -77,7 +62,7 @@ function printResult(r: RunRequestResult, verbose: boolean) {
   if (r.error) console.log(color(`     Error: ${r.error}`, C.red));
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// Main
 
 async function main() {
   // `--ask`, `--var`, `--env-var` and `--global-var` may be given more than
@@ -141,9 +126,8 @@ async function main() {
 
   await loadGlobals(wsDir);
 
-  // Apply external secret-manager connection config (Vault, ...) from the
-  // workspace. Environment variables override it, so the same workspace runs
-  // unchanged locally and in CI.
+  // Apply external secret-manager config (Vault, ...). Env vars override it, so
+  // one workspace runs unchanged locally and in CI.
   setSecretsConfig(workspace.settings?.secrets);
 
   const collections  = await loadCollections(workspace, wsDir, {
@@ -151,9 +135,8 @@ async function main() {
   });
   const environments = await loadEnvironments(workspace, wsDir);
 
-  // Resolve environment: --environment flag, else the workspace's default
-  // environment (settings.defaultEnvironment). Inheritance chains
-  // (`extends`) are merged by selectEnvironment.
+  // Resolve environment: --environment flag, else settings.defaultEnvironment.
+  // selectEnvironment merges extends chains.
   const env = selectEnvironment(workspace, environments, envName);
 
   if (envName && !env) {
@@ -162,8 +145,7 @@ async function main() {
     console.warn(color(`Warning: default environment "${workspace.settings.defaultEnvironment}" not found. Running without environment.`, C.yellow));
   }
 
-  // Print header — include the package version (injected by electron-vite's
-  // `define`) so CI logs show exactly which API Spector ran the suite.
+  // Print header with the package version so CI logs show which API Spector ran.
   const version = typeof __APP_VERSION__ === 'string' && __APP_VERSION__ ? `v${__APP_VERSION__}` : '';
   console.log('');
   console.log(color('  API Test Runner' + (version ? ` ${version}` : ''), C.bold, C.white));
@@ -193,21 +175,19 @@ async function main() {
     return out;
   };
 
-  // --var "key=value" (repeatable): a scope-agnostic override at the CLI tier of
-  // the precedence chain — above environment/collection/folder/request/example,
-  // below data-row and runtime (script-set) values. Injected as the initial
-  // value of each request's local vars; a script that sets the key takes over.
+  // --var "key=value" (repeatable): CLI-tier override. Above
+  // env/collection/folder/request, below data-row and script-set values. Seeds
+  // each request's local vars; a script that sets the key wins.
   const cliVars = parseKeyVals(args['var']);
-  // --env-var / --global-var "key=value" (repeatable): Postman/Bruno-style scope
-  // seeds. They set the INITIAL value of the environment / globals scope (over
-  // the stored value), resolve at that scope's precedence, and are overridden by
-  // a script `sp.environment.set` / `sp.globals.set` later in the run.
+  // --env-var / --global-var "key=value" (repeatable): seed the INITIAL value of
+  // the environment / globals scope, overridden by a later sp.environment.set /
+  // sp.globals.set during the run.
   const envVarOverrides    = parseKeyVals(args['env-var']);
   const globalVarOverrides = parseKeyVals(args['global-var']);
 
-  // Concurrency: run this many requests at once (1 = sequential). Hooks are
-  // barriers and concurrent requests share the pre-batch variable snapshot, so
-  // a parallel run suits independent requests.
+  // Concurrency: requests at once (1 = sequential). Hooks are barriers;
+  // concurrent requests share the pre-batch variable snapshot, so parallel suits
+  // independent requests.
   const concurrency = Math.max(1, Math.min(20, Math.floor(Number(args['concurrency'] ?? 1) || 1)));
 
   // Collect resolved secret values so we can redact them from reports
@@ -223,11 +203,9 @@ async function main() {
     return out;
   }
 
-  // Pattern-based PII redaction — applied to *both* sent and received traffic
-  // so reports never leak credentials. Defaults mirror the UI's
-  // WorkspaceSettingsModal so CLI runs of an unconfigured workspace still
-  // get sane masking. `maskHeaders` always redacts authorization/cookie even
-  // with an empty list, but we keep the explicit defaults for body fields.
+  // Pattern-based PII redaction on both sent and received traffic. Defaults
+  // mirror WorkspaceSettingsModal so an unconfigured workspace still masks.
+  // maskHeaders always redacts authorization/cookie; the defaults cover bodies.
   const DEFAULT_PII_PATTERNS = ['authorization', 'password', 'token', 'secret', 'api-key', 'x-api-key'];
   const piiPatterns = workspace.settings?.piiMaskPatterns ?? DEFAULT_PII_PATTERNS;
 
@@ -258,8 +236,7 @@ async function main() {
   for (const col of collections) {
     if (colName && col.name.toLowerCase() !== colName.toLowerCase()) continue;
     if (col.disabled) {
-      // Excluded from the run, but recorded (per collection) so it is visible
-      // both in the console and in the exported report rather than vanishing.
+      // Excluded from the run but recorded, so it shows in the console and report.
       console.log(color(`  ┌ ${col.name}  (disabled)`, C.gray));
       allResults.push({
         requestId:   col.id,
@@ -275,39 +252,32 @@ async function main() {
       continue;
     }
 
-    // Use the same plan builder the in-app runner uses, so before/beforeAll
-    // hooks (e.g. a "fetch token" request) actually execute and propagate
-    // their extracted variables to subsequent requests. `collectTagged`
-    // silently dropped hooks, which is why CLI runs of an authed request
-    // came back 401 even though the UI runner worked.
+    // Same plan builder as the in-app runner, so before/beforeAll hooks run and
+    // propagate their extracted vars. collectTagged dropped hooks, which 401'd
+    // authed CLI runs.
     let items = buildRunPlan(col, null, filterTags);
     if (items.length === 0) continue;
 
     if (!firstColName) firstColName = col.name;
 
-    // Seed the environment / globals scopes with the Postman/Bruno-style CLI
-    // overrides (--env-var / --global-var). They override the stored values but
-    // stay in the scope accumulators, so a script's sp.environment.set /
-    // sp.globals.set during the run overrides them for later requests.
+    // Seed the env / globals scopes with --env-var / --global-var. They override
+    // stored values but stay in the accumulators, so a script's set wins for
+    // later requests.
     let runEnvVars        = { ...(await buildEnvVars(env)), ...envVarOverrides };
     let runGlobals        = { ...getGlobals(), ...globalVarOverrides };
     let runCollectionVars: Record<string, string> = { ...col.collectionVariables };
     let runLocalVars:     Record<string, string> = {};
-    // Folder-scoped variables accumulated during the run, keyed by folder id, so
-    // sp.folder.set in one request is visible to later requests in the same
-    // folder (mirrors the GUI runner).
+    // Folder-scoped vars keyed by folder id, so sp.folder.set is visible to
+    // later requests in the same folder.
     const runFolderVars: Record<string, Record<string, string>> = {};
-    // CLI `--var` is the *initial* value for a variable, not a hard override:
-    // per the precedence chain, a runtime script-set outranks it. So once a
-    // script writes a key (in any scope) during this collection's run, we stop
-    // re-seeding the CLI value for it and let the script's value carry forward.
+    // --var is the initial value, not a hard override: a script-set outranks it.
+    // Once a script writes a key, stop re-seeding the CLI value for it.
     const cliOverridden = new Set<string>();
     const cliSeed = (): Record<string, string> =>
       Object.fromEntries(Object.entries(cliVars).filter(([k]) => !cliOverridden.has(k)));
-    // The CLI seed is re-applied fresh each request via cliSeed(); it must NOT
-    // stick in the threaded local vars (the executor echoes the localVars we
-    // pass back as updatedLocalVars), or it would shadow a later script write to
-    // the same key in another scope. So strip CLI keys from the threaded state.
+    // cliSeed() re-applies the CLI seed each request; it must NOT stick in the
+    // threaded local vars (echoed back as updatedLocalVars) or it would shadow a
+    // later script write to the same key in another scope.
     const stripCliSeed = (m: Record<string, string>): Record<string, string> => {
       const copy = { ...m };
       for (const k of Object.keys(cliVars)) delete copy[k];
@@ -350,11 +320,9 @@ async function main() {
       }
     }
 
-    // Expansion — identical to the in-app runner so CLI/CI runs (and the
-    // report) match the tree. Done after the auth/header merge so each request
-    // is merged once, not once per iteration: each folder's own data table,
-    // then the collection's. A data table can carry `expectStatus`/`owasp`
-    // columns to double as an access-control matrix.
+    // Expansion, identical to the in-app runner so CLI/CI matches the tree; after
+    // the auth/header merge so each request merges once. Folder data tables, then
+    // the collection's (expectStatus/owasp columns double as an access matrix).
     items = expandFolderDataSets(items, col);
     items = expandRunPlanWithData(items, col.dataSet);
 
@@ -363,11 +331,10 @@ async function main() {
     // Same propagation rules as the GUI runner: a beforeAll failure poisons
     // its scope, a before failure poisons its single main request.
     const skipTracker = new HookSkipTracker();
-    // Built once per collection — shared across digest/ntlm retries.
+    // Built once per collection - shared across digest/ntlm retries.
     const dispatcher = await buildDispatcher(undefined, effectiveTls);
 
-    // Prints pre/post script console output live in verbose mode, matching
-    // the old inline behavior.
+    // Print pre/post script output live in verbose mode.
     const onScriptOutput = (phase: 'pre' | 'post', lines: string[], error?: string): void => {
       if (verbose && lines.length) lines.forEach(l => console.log(color(`    [${phase}] ${l}`, C.gray)));
       if (phase === 'pre' && error) console.error(color(`    [pre-script error] ${error}`, C.red));
@@ -378,8 +345,7 @@ async function main() {
 
       const skipReason = skipTracker.shouldSkip(item);
 
-      // Ask variables ({{@Message}}) that were not supplied via --ask: skip this
-      // request in the non-interactive run rather than send a blank value.
+      // Ask vars ({{@Message}}) not supplied via --ask: skip rather than send blank.
       const itemAsks = askVarsInRequest(item.request);
       const missingAsks = itemAsks.length ? missingAskMessages(itemAsks, askAnswers) : [];
 
@@ -475,8 +441,8 @@ async function main() {
       }
     }
     else {
-      // ── Parallel: run requests concurrently with hooks as barriers, then
-      // print the collected results in plan order. ─────────────────────────────
+      // Parallel: run requests concurrently with hooks as barriers, then
+      // print the collected results in plan order.
       const resultsByIndex: (RunRequestResult | undefined)[] = new Array(items.length);
       const preResult = (item: typeof items[number], status: RunRequestResult['status'], error?: string): RunRequestResult => ({
         requestId: item.request.id, name: item.request.name, method: item.request.method,

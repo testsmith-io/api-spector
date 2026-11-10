@@ -2,11 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 // Shared "collect a window, then assert" test UI for the realtime panels
-// (WebSocket, Socket.IO, GraphQL subscription). Mirrors the MQTT panel's Test
-// section: a collect-seconds field, an optional protocol-specific control
-// (passed as children), an sp.* assertion script, a Run button with a live
-// countdown, and the pass/fail results. The connection + script run in the main
-// process; this component only drives the config and renders the outcome.
+// (WebSocket, Socket.IO, GraphQL subscription); connection + script run in main.
 
 import React, { useState } from 'react';
 import { useT } from '../../i18n';
@@ -52,8 +48,8 @@ export function RealtimeTestSection({
   testScript, collectMs, onChangeScript, onChangeCollectMs,
   running, remaining, result, onRun, runDisabled, defaultOpen,
 }: {
-  /** Full literal Tailwind classes for the Run button bg/hover (so they are not
-   *  purged): e.g. "bg-cyan-700 hover:bg-cyan-600". */
+  /** Full literal Tailwind classes for the Run button bg/hover so they aren't purged,
+   *  e.g. "bg-cyan-700 hover:bg-cyan-600". */
   readonly buttonClass: string
   /** Full literal class for the "has script" dot, e.g. "text-cyan-500/70". */
   readonly dotClass: string
@@ -70,8 +66,7 @@ export function RealtimeTestSection({
   readonly result: RealtimeTestResult | null
   readonly onRun: () => void
   readonly runDisabled?: boolean
-  /** Expand the Test section on first render (defaults to: open if a script
-   *  already exists). */
+  /** Expand the Test section on first render (default: open if a script exists). */
   readonly defaultOpen?: boolean
 }) {
   const t = useT();

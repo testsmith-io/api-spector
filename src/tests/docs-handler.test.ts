@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { generateMarkdown, generateHtml, escMd, escHtml, type DocsPayload } from '../main/ipc/docs-handler';
 import { makeCollection } from './fixtures/collection';
 
-// ─── Fixture ──────────────────────────────────────────────────────────────────
+// Fixture
 
 const col = makeCollection();
 
@@ -14,7 +14,7 @@ const payload: DocsPayload = {
   collections: [{ collection: col, requests: col.requests }],
 };
 
-// ─── escMd ────────────────────────────────────────────────────────────────────
+// escMd
 
 describe('escMd', () => {
   it('escapes pipe characters', () => {
@@ -34,7 +34,7 @@ describe('escMd', () => {
   });
 });
 
-// ─── escHtml ──────────────────────────────────────────────────────────────────
+// escHtml
 
 describe('escHtml', () => {
   it('escapes ampersands', () => {
@@ -58,7 +58,7 @@ describe('escHtml', () => {
   });
 });
 
-// ─── generateMarkdown ─────────────────────────────────────────────────────────
+// generateMarkdown
 
 describe('generateMarkdown', () => {
   const md = generateMarkdown(payload);
@@ -117,7 +117,7 @@ describe('generateMarkdown', () => {
   });
 });
 
-// ─── generateHtml ─────────────────────────────────────────────────────────────
+// generateHtml
 
 describe('generateHtml', () => {
   const html = generateHtml(payload);

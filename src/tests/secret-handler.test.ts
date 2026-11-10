@@ -5,7 +5,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { createCipheriv, pbkdf2Sync, randomBytes } from 'node:crypto';
 import { decryptSecret, getSecret } from '../main/ipc/secret-handler';
 
-// ─── Helper: encrypt with the same algorithm used by the renderer ─────────────
+// Helper: encrypt with the same algorithm used by the renderer
 
 function encryptForTest(plaintext: string, password: string): {
   secretEncrypted: string
@@ -27,7 +27,7 @@ function encryptForTest(plaintext: string, password: string): {
   };
 }
 
-// ─── decryptSecret ────────────────────────────────────────────────────────────
+// decryptSecret
 
 describe('decryptSecret', () => {
   it('decrypts a value encrypted with the correct password', () => {
@@ -76,7 +76,7 @@ describe('decryptSecret', () => {
   });
 });
 
-// ─── getSecret ────────────────────────────────────────────────────────────────
+// getSecret
 
 describe('getSecret', () => {
   const TEST_KEY = '__SPECTOR_TEST_SECRET__';

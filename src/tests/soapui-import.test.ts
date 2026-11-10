@@ -4,10 +4,8 @@
 import { describe, it, expect } from 'vitest';
 import { importSoapUiProject } from '../main/importers/soapui';
 
-// A compact but representative SoapUI project: project properties, one test
-// suite / test case, a case-level setup script, a REST request with a Script
-// Assertion and a non-script assertion, a standalone Groovy step, a SOAP
-// request, and an unsupported Property Transfer step.
+// A compact but representative SoapUI project: properties, suite/case, setup
+// script, REST request with assertions, Groovy step, SOAP request, transfer step.
 const PROJECT = `<?xml version="1.0" encoding="UTF-8"?>
 <con:soapui-project name="Orders API" xmlns:con="http://eviware.com/soapui/config">
   <con:properties>
@@ -142,7 +140,7 @@ describe('importSoapUiProject — real export structure', () => {
     // A test step exists, so interface definitions are NOT also imported.
     expect(r.report.requests).toBe(1);
     const create = Object.values(r.collection.requests)[0];
-    expect(create.method).toBe('POST'); // resolved via methodName → interface
+    expect(create.method).toBe('POST'); // resolved via methodName -> interface
     expect(create.url).toBe('https://api.example.com/users');
   });
 

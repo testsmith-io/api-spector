@@ -1,11 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 //
-// JSONC support: locate // line comments and /* block */ comments in a JSON
-// string, respecting string literals (a `//` or `/*` inside a "quoted string"
-// such as a URL is not a comment) and backslash escapes. `jsonCommentRanges`
-// returns the spans (used by the editor to colour them); `stripJsonComments`
-// removes them so a commented body can be sent as valid JSON.
+// JSONC support: find // and /* */ comments in JSON, respecting string literals
+// and escapes. jsonCommentRanges returns the spans (editor colouring);
+// stripJsonComments removes them so a commented body is valid JSON.
 
 export interface JsonCommentRange {
   from: number;

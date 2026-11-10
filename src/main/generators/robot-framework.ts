@@ -6,7 +6,7 @@ import { resolveInheritedAuthAndHeaders } from '../../shared/request-collection'
 import { parsePostScript, accessorToJsonPath } from './script-parser';
 import { resolveEffectiveAuth, mergeHeaders, hasBody, renderTree, ROBOT_REQUESTS_METHODS } from './generator-utils';
 
-// ─── Robot Framework generator ────────────────────────────────────────────────
+// Robot Framework generator
 
 function safeName(name: string): string {
   return name.replaceAll(/[^\w\s]/g, ' ').split(/\s+/).filter(Boolean)
@@ -29,10 +29,8 @@ function interpolate(value: string, vars: Map<string, EnvVariable>): string {
   });
 }
 
-/**
- * Pre-generate a unique keyword name for every request in the collection.
- * Both the keywords file and the test suite must use the same map so names stay in sync.
- */
+/** Pre-generate a unique keyword name per request, shared by the keywords file
+ *  and the test suite so names stay in sync. */
 function buildNameMap(root: Folder, requests: Collection['requests']): Map<string, string> {
   const map  = new Map<string, string>();
   const used = new Set<string>();
@@ -75,13 +73,9 @@ function buildVariablesFile(environment: Environment | null): string {
   return lines.join('\n') + '\n';
 }
 
-/**
- * Collapse a (pretty-printed) JSON body onto a single line so it occupies one
- * Robot Framework cell. Multi-line JSON written straight after `VAR ${body}` has
- * no `...` continuation, so Robot parses each line as a keyword call. Compact
- * JSON stays valid as one cell (Robot splits cells on 2+ spaces or tabs, which
- * compact JSON does not contain).
- */
+/** Collapse a JSON body onto one line so it is a single Robot cell. Multi-line
+ *  JSON after `VAR ${body}` lacks `...` continuation and parses as keyword calls;
+ *  compact JSON has no 2+ space runs, so it stays one cell. */
 function compactJsonBody(json: string): string {
   try { return JSON.stringify(JSON.parse(json)); } catch { return json.replace(/\s*\r?\n\s*/g, ' ').trim(); }
 }
@@ -91,24 +85,17 @@ function isNestedPath(jp: string): boolean {
   return /[.[]/.test(jp);
 }
 
-/**
- * Convert a JSONPath accessor (`address.street`, `matches[0]`, `users[0].name`,
- * `['my key'].v`) into Python subscripts on the parsed body, e.g.
- * `['address']['street']`, `['matches'][0]`. Used with `Evaluate    $response...`
- * so nested paths work (Robot's `Get From Dictionary` only takes a flat key).
- */
+/** Convert a JSONPath accessor into Python subscripts, e.g. `address.street` becomes
+ *  `['address']['street']`, for `Evaluate` (Robot's `Get From Dictionary` is flat-key only). */
 function pyIndex(jp: string): string {
   return jp
     .replaceAll(/\.([A-Za-z_$][\w$]*)/g, "['$1']")
     .replace(/^([A-Za-z_$][\w$]*)/, "['$1']");
 }
 
-/**
- * JSONPath extractions use Jayway/jsonpath-plus syntax, which Robot's available
- * JSONPath libraries (jsonpath-ng) do not parse the same way (filters especially).
- * Rather than emit a query that silently resolves wrong, define the variable as
- * empty and point the user at the manual step, keeping the suite runnable.
- */
+/** jsonpath-plus syntax (filters especially) doesn't match Robot's jsonpath-ng.
+ *  Rather than emit a query that resolves wrong, define the var empty and point
+ *  the user at the manual step, keeping the suite runnable. */
 function jsonPathPlaceholder(name: string, query: string): string[] {
   return [
     `    # JSONPath not auto-translated to Robot: ${query}`,
@@ -126,10 +113,8 @@ function readJsonValue(name: string, jp: string): string[] {
   return [`    \${${name}}=    Get From Dictionary    \${response.json()}    ${jp}`];
 }
 
-/**
- * Try to render a JSON object body as RF VAR dict pairs (`k=v    k=v`).
- * Returns null for arrays or nested objects — those fall back to a scalar ${body}.
- */
+/** Render a JSON object body as RF VAR dict pairs (`k=v    k=v`), or null for
+ *  arrays / nested objects (those fall back to a scalar ${body}). */
 function jsonToRfDictPairs(json: string, vars: Map<string, EnvVariable>): string | null {
   try {
     const parsed = JSON.parse(json);
@@ -231,7 +216,7 @@ function buildKeywordsFile(
         continue;
       }
 
-      // ── Collect header pairs (inherited auth + custom) ─────────────────────
+      // Collect header pairs (inherited auth + custom)
       const inherited = resolveInheritedAuthAndHeaders(reqId, collection);
       const effectiveAuth = resolveEffectiveAuth(req, inherited);
       const allHeaders = mergeHeaders(req, inherited);
@@ -272,14 +257,14 @@ function buildKeywordsFile(
         lines.push(`    VAR    &{headers}    ${headerPairs.join('    ')}`);
       }
 
-      // ── Query params ────────────────────────────────────────────────────────
+      // Query params
       const enabledParams = req.params.filter(p => p.enabled && p.key);
       if (enabledParams.length) {
         const pairs = enabledParams.map(p => `${p.key}=${interpolate(p.value, varMap)}`).join('    ');
         lines.push(`    VAR    &{params}    ${pairs}`);
       }
 
-      // ── Request body ────────────────────────────────────────────────────────
+      // Request body
       const { body } = req;
       if (hasBody(req) && body.mode === 'json' && body.json) {
         const bodyPairs = jsonToRfDictPairs(body.json, varMap);
@@ -290,7 +275,7 @@ function buildKeywordsFile(
         }
       }
 
-      // ── HTTP call ───────────────────────────────────────────────────────────
+      // HTTP call
       const method   = req.method.charAt(0) + req.method.slice(1).toLowerCase();
       const callArgs: string[] = [];
       if (headerPairs.length)                    callArgs.push('headers=${headers}');
@@ -323,8 +308,7 @@ function buildTestSuite(
     (environment?.variables ?? []).map(v => [v.key, v])
   );
 
-  // Collect beforeAll/afterAll hooks from every folder in the collection
-  // (root + nested) so they fire as Suite Setup/Teardown.
+  // Collect beforeAll/afterAll hooks from every folder, for Suite Setup/Teardown.
   const beforeAllHooks: ApiRequest[] = [];
   const afterAllHooks:  ApiRequest[] = [];
   function collectAll(folder: Folder) {
@@ -412,7 +396,7 @@ function buildTestSuite(
   return lines.join('\n');
 }
 
-// ─── README ───────────────────────────────────────────────────────────────────
+// README
 
 function buildReadme(collectionName: string, filePaths: string[]): string {
   const tree = renderTree(filePaths);

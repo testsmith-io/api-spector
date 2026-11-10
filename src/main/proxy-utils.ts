@@ -7,10 +7,8 @@ export interface ProxyConfigInput {
 }
 
 /**
- * Normalize user-provided proxy URL into a URL that undici ProxyAgent accepts.
- * Handles common Windows/manual formats:
- * - "proxy.local:8080"            -> "http://proxy.local:8080/"
- * - "http=proxy:8080;https=..."   -> picks https, then http, then first token
+ * Normalize a user-provided proxy URL into one undici ProxyAgent accepts.
+ * Handles bare "host:port" and Windows "http=...;https=..." lists (prefers https).
  */
 export function buildProxyUri(proxy: ProxyConfigInput): string {
   const raw = proxy.url.trim();

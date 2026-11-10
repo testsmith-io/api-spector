@@ -7,18 +7,8 @@ import type { Workspace, ApiRequest } from '../../shared/types';
 import { importPact } from './pact-format';
 import { designContractToPact } from './design-pact';
 
-/**
- * Design-first consumer contracts as runnable, contract-bearing requests - so a
- * contract authored in the Contract Designer is verifiable directly (in the CLI
- * and the app), with no manual `pact-import` into a collection.
- *
- * Two sources are merged and de-duplicated (the same interaction from both is
- * kept once): the workspace's inline `designContracts`, and any `pacts/*.json`
- * files in the workspace directory (read only when `dir` is given). Each is
- * normalized through the same Pact importer the CLI already uses, so the results
- * carry a `contract` and run in the consumer / provider-live / bidirectional
- * modes exactly like imported ones.
- */
+/** Design-first consumer contracts as runnable requests (no manual pact-import).
+ *  Merges + de-dupes the workspace's inline `designContracts` and `pacts/*.json` in `dir`. */
 export async function loadDesignContractRequests(
   workspace: Pick<Workspace, 'designContracts'>,
   dir?: string,

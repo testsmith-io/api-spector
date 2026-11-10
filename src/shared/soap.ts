@@ -3,10 +3,8 @@
 
 import type { KeyValuePair } from './types';
 
-// ─── Shared SOAP constants & helpers ─────────────────────────────────────────
-//
-// Lives in `shared/` so renderer (SoapEditor), main process (wsdl-import,
-// soap-handler), and the CLI all reference the same source of truth.
+// Shared SOAP constants & helpers, in `shared/` so renderer, main process, and
+// the CLI all reference one source of truth.
 
 export const SOAP_11_CONTENT_TYPE = 'text/xml; charset=utf-8';
 export const SOAP_12_CONTENT_TYPE = 'application/soap+xml; charset=utf-8';

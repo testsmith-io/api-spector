@@ -13,8 +13,7 @@ import { GearIcon } from './icons';
 import { Tooltip } from './Tooltip';
 import { useT } from '../../i18n';
 
-// Small document icon for the "Generate docs" action (stroke style matches the
-// shared icon set). Kept local since it is only used here.
+// Document icon for the "Generate docs" action.
 function DocIcon () {
   return (
     <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
@@ -34,7 +33,7 @@ function ImportIcon () {
   );
 }
 
-// ─── Workspace-action icons (stroke style matches the shared set) ────────────
+// Workspace-action icons (stroke style matches the shared set)
 function Svg ({ children }: { readonly children: ReactNode }) {
   return (
     <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
@@ -53,7 +52,7 @@ const SaveIcon = () => <Svg><path strokeLinecap="round" strokeLinejoin="round" d
 
 const { electron } = window;
 
-// ─── Toolbar ──────────────────────────────────────────────────────────────────
+// Toolbar
 
 export function Toolbar({ onOpenDocs: _onOpenDocs }: { readonly onOpenDocs?: () => void }) {
   const t = useT();
@@ -106,8 +105,7 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { readonly onOpenDocs?: () 
       useStore.setState({ workspace: updated });
       await electron.saveWorkspace(updated);
     }
-    // Arazzo import also brings flows — register each, open the last, and switch
-    // the sidebar to the Flows view so the imported workflow is visible.
+    // Arazzo import also brings flows: register each, open the last, show Flows.
     if (extras?.flows?.length) {
       const store = useStore.getState();
       let lastId = '';
@@ -117,8 +115,8 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { readonly onOpenDocs?: () 
     }
   }
 
-  // Guard so rapid clicks on Open/New WS can't stack multiple native dialogs.
-  // busyRef is the race-free guard (synchronous); wsBusy drives the disabled UI.
+  // Guard against rapid Open/New WS clicks stacking native dialogs: busyRef is the
+  // synchronous race-free guard, wsBusy drives the disabled UI.
   const wsBusyRef = useRef(false);
   const [wsBusy, setWsBusy] = useState(false);
 
@@ -158,7 +156,7 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { readonly onOpenDocs?: () 
         <ImportModal onImport={afterImport} onClose={() => setImportOpen(false)} />
       )}
       <div className="flex items-center min-w-0">
-        {/* ── Scrollable left section ── */}
+        {/* Scrollable left section */}
         <div className="flex items-center gap-2 px-3 py-1.5 overflow-x-auto min-w-0 flex-1">
           {/* App logo */}
           <style>{`
@@ -237,7 +235,7 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { readonly onOpenDocs?: () 
           <EnvironmentBar inline />
         </div>
 
-        {/* ── Fixed right section (popovers live here, no overflow clipping) ── */}
+        {/* Fixed right section (popovers live here, no overflow clipping) */}
         <div className="flex items-center gap-2 px-3 py-1.5 shrink-0 border-l border-surface-800">
           {/* Workspace group: open / new / close / save, then a separator + import */}
           <span className="text-surface-600 text-xs shrink-0">{t('Workspace')}</span>

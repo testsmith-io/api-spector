@@ -1,9 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 //
-// Renderer helpers for "Push to cloud". They assemble the same variable /
-// auth / header context the normal send uses, then hand off to the main
-// process (cloud-handler) which resolves the URL and POSTs to the cloud API.
+// Renderer helpers for "Push to cloud": assemble the same var/auth/header
+// context as a normal send, then hand off to cloud-handler in the main process.
 
 import { useStore } from '../store';
 import { resolveEnvironmentById } from '../hooks/useActiveEnvironment';
@@ -14,7 +13,7 @@ import type { MockServer } from '../../../shared/types/mock';
 import type { KeyValuePair } from '../../../shared/types/http';
 import type { FlowRunSummary } from '../../../shared/flow-engine';
 
-/** Whether a request carries a usable contract (so it can become a pact interaction). */
+/** Whether a request carries a usable contract (can become a pact interaction). */
 export function hasContract(r: ApiRequest): boolean {
   const c = r.contract;
   return !!c && (
@@ -66,11 +65,10 @@ export function openCloudMatrix(): void {
   void electron.cloudOpenMatrix();
 }
 
-// ─── Flows ────────────────────────────────────────────────────────────────
+// Flows
 
-/** Upload a flow to the cloud as a self-contained definition (graph + the
- *  referenced requests + resolved environment/globals). The main process bakes
- *  the definition; the cloud stores it and a Node runtime runs it. */
+/** Upload a flow as a self-contained definition (graph + referenced requests +
+ *  resolved environment/globals), baked by the main process. */
 export async function pushFlowToCloud(flow: Flow): Promise<{ url?: string; slug: string }> {
   assertEnabled();
   const s = useStore.getState();
@@ -94,7 +92,6 @@ export async function runFlowInCloud(
   onStatus?.(started.status);
   const deadlineMs = 2 * 60 * 1000;
   const t0 = Date.now();
-  // Poll the run until it reaches a terminal state.
   for (;;) {
     const run = await electron.cloudGetFlowRun({ name: flow.name, runId: started.id });
     onStatus?.(run.status);
@@ -112,14 +109,14 @@ export function openCloudFlow(flow: Flow): void {
   void electron.cloudOpenFlow(flow.name);
 }
 
-// ─── Share collections / requests (public read-only links) ──────────────────
+// Share collections / requests (public read-only links)
 
 export type ShareResult = { token: string; url: string; deep_link: string; expires_at?: string | null };
 export type ShareLookup = { exists: boolean; token?: string; url?: string; deep_link?: string; expires_at?: string | null };
 
 /** Share a whole collection as a public read-only link. The main process strips
  *  data sets / saved examples; the definition carries only {{variable}} refs.
- *  Idempotent: re-sharing the same collection refreshes its one link. */
+ *  Idempotent: re-sharing refreshes the one link. */
 export async function shareCollectionToCloud(collection: Collection): Promise<ShareResult> {
   assertEnabled();
   return electron.cloudShareCollection(collection);
@@ -136,9 +133,8 @@ function collectFolderRequestIds(folder: Folder): string[] {
   return [...folder.requestIds, ...folder.folders.flatMap(collectFolderRequestIds)];
 }
 
-/** Share a folder subtree as a public read-only link. Assembled as a
- *  collection-shaped payload (the folder as its root + the subtree's requests)
- *  so the viewer and importer reuse the collection path. */
+/** Share a folder subtree as a public read-only link, assembled as a
+ *  collection-shaped payload so the viewer and importer reuse the collection path. */
 export async function shareFolderToCloud(collection: Collection, folder: Folder): Promise<ShareResult> {
   assertEnabled();
   const ids = new Set(collectFolderRequestIds(folder));
@@ -177,8 +173,7 @@ export async function revokeShare(token: string): Promise<void> {
 }
 
 /** Fetch a shared collection/request by token (from a spector://import link).
- *  No cloud account needed on the receiving side, so this does NOT assert that
- *  cloud is enabled. */
+ *  No cloud account needed on the receiving side, so it does not assert enabled. */
 export async function importShareFromCloud(
   token: string,
 ): Promise<{ type: 'collection' | 'request'; name: string; payload: unknown }> {
@@ -197,8 +192,7 @@ export async function getCloudMockRoutes(name: string): Promise<{ method: string
   }
 }
 
-/** Push a mock. When routeIds is given, only those routes are sent (the cloud
- *  mock ends up with just the selected endpoints). */
+/** Push a mock. When routeIds is given, only those routes are sent. */
 export async function pushMockToCloud(server: MockServer, routeIds?: string[]): Promise<{ id: number; url: string }> {
   assertEnabled();
   const routes = routeIds
@@ -207,9 +201,8 @@ export async function pushMockToCloud(server: MockServer, routeIds?: string[]): 
   return electron.cloudPushMock({ ...server, routes });
 }
 
-/** Push a request as a monitor. The main process resolves the URL variables to
- *  concrete values; auth/headers pass through so the request's pre-request
- *  (setup) script re-authenticates on each check. */
+/** Push a request as a monitor. The main process resolves URL variables;
+ *  auth/headers pass through so the setup script re-authenticates each check. */
 export async function pushRequestAsMonitor(
   request: ApiRequest,
   opts?: { intervalSeconds?: number; expectedStatus?: number },
@@ -217,9 +210,9 @@ export async function pushRequestAsMonitor(
   assertEnabled();
   const s = useStore.getState();
 
-  // Collection vars: collection-level + folder-chain + any session script values
-  // (sp.*.set from earlier sends). The monitor re-runs its setup chain, so these
-  // are a seed; its own setup hooks refresh them at run time.
+  // Collection vars: collection-level + folder-chain + session script values
+  // (sp.*.set from earlier sends). A seed only; the monitor's setup hooks
+  // refresh them at run time.
   const colEntry = Object.values(s.collections).find(c => c.data.requests[request.id]);
   const collectionVars: Record<string, string> = {
     ...colEntry?.data.collectionVariables,
@@ -230,15 +223,15 @@ export async function pushRequestAsMonitor(
     ...s.sessionScriptVars.folder,
   };
 
-  // "before" hooks in this request's folder chain (e.g. an authenticate step)
-  // become the monitor's setup chain, run in order before the check.
+  // "before" hooks in the folder chain become the monitor's setup chain,
+  // run in order before the check.
   const setup = colEntry ? getHooksForRequest(request.id, colEntry.data).before : [];
 
   const environment = resolveEnvironmentById(s.environments, s.activeEnvironmentId);
   const globals = { ...s.globals };
 
-  // Fold inherited (folder/collection) auth + headers into the request, exactly
-  // like the send path, so a monitor authenticates the same way.
+  // Fold inherited folder/collection auth + headers in, like the send path,
+  // so a monitor authenticates the same way.
   const inherited = s.getInheritedAuthAndHeaders(request.id);
   const mergedAuth = authIsConfigured(request.auth) ? request.auth : (inherited.auth ?? request.auth);
   const mergedHeaders: KeyValuePair[] = [

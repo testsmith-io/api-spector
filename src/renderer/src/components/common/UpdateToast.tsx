@@ -6,17 +6,9 @@ import { useT } from '../../i18n';
 import { STORAGE_KEYS } from '../../lib/storage-keys';
 import { useCopyFeedback } from '../../hooks/useCopyFeedback';
 
-// Unobtrusive "a newer release is available" corner toast, shown at startup.
-//
-// Two modes, decided by how the app is running:
-//  • 'auto'  — packaged desktop app. electron-updater downloads the signed
-//    installer in-app (no browser, no admin) with a progress bar, then offers
-//    "Restart to update". If the download fails, a dismissible error with a
-//    manual-download link is shown (never a stuck "Downloading…").
-//  • 'npm'   — run from the npm package. The app can't self-update, so we show
-//    the "npm update -g" command to copy.
-//
-// Best-effort: an update *check* that fails (offline/blocked) stays silent.
+// Startup "newer release available" toast. Two modes: 'auto' (packaged app;
+// electron-updater downloads in-app, then "Restart to update"), 'npm' (shows the
+// "npm update -g" command to copy). A failed check stays silent.
 
 const { electron } = window;
 const DISMISS_KEY = STORAGE_KEYS.updateSkipped;
@@ -56,9 +48,8 @@ export function UpdateToast() {
           if (cancelled) return;
           console.error('Auto-update error:', message);
           setErrorMsg(message);
-          // Only surface as an error if a download was actually in progress; a
-          // failed *check* (offline/blocked) shouldn't nag, and don't clobber a
-          // ready-to-install state.
+          // Only surface an error if a download was in progress; a failed check
+          // shouldn't nag, and don't clobber a ready-to-install state.
           setPhase(prev => (prev === 'downloading' ? 'error' : prev));
         });
         return;
@@ -71,12 +62,12 @@ export function UpdateToast() {
           try { skipped = localStorage.getItem(DISMISS_KEY) ?? ''; } catch { /* storage disabled */ }
           if (u.latest !== skipped) setNpm(u);
         })
-        .catch(() => { /* offline / rate-limited — say nothing */ });
-    }).catch(() => { /* no update mode — say nothing */ });
+        .catch(() => { /* offline / rate-limited */ });
+    }).catch(() => { /* no update mode */ });
     return () => { cancelled = true; };
   }, []);
 
-  // ── Packaged: downloading, with progress bar ──────────────────────────────
+  // Packaged: downloading
   if (phase === 'downloading') {
     return (
       <div className={shellCls}>
@@ -96,7 +87,7 @@ export function UpdateToast() {
     );
   }
 
-  // ── Packaged: downloaded, ready to install ────────────────────────────────
+  // Packaged: downloaded, ready to install
   if (phase === 'ready') {
     return (
       <div className={shellCls}>
@@ -122,7 +113,7 @@ export function UpdateToast() {
     );
   }
 
-  // ── Packaged: download failed — show why + a manual fallback ──────────────
+  // Packaged: download failed, with a manual fallback
   if (phase === 'error') {
     return (
       <div className={shellCls}>
@@ -149,7 +140,7 @@ export function UpdateToast() {
     );
   }
 
-  // ── npm: copyable update command ──────────────────────────────────────────
+  // npm: copyable update command
   if (!npm) return null;
 
   const later = (): void => setNpm(null);

@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── Mock server ──────────────────────────────────────────────────────────────
+// Mock server
 
 import type { HttpMethod } from './http';
 
@@ -16,11 +16,10 @@ export interface MockRoute {
   description?: string
   /** JavaScript that runs before the response is sent.
    *  Context: { request, response, metadata, faker, dayjs, console }
-   *  Mutate `response.statusCode`, `response.body`, `response.headers` to customise output. */
+   *  Mutate `response.statusCode`/`body`/`headers` to shape the output. */
   script?: string
-  /** Free-form data exposed to `script` as `metadata`. Used by the WSDL importer
-   *  to externalize per-operation SOAP envelopes so the script body stays compact
-   *  (`metadata.soapEnvelopes[opName]` instead of a giant JSON literal). */
+  /** Free-form data exposed to `script` as `metadata`. The WSDL importer uses it
+   *  to externalize per-operation SOAP envelopes (`metadata.soapEnvelopes[opName]`). */
   metadata?: Record<string, unknown>
 }
 
@@ -30,9 +29,8 @@ export interface MockServer {
   name: string
   port: number
   routes: MockRoute[]
-  /** Set once the mock has been pushed to the cloud: its public shareable URL
-   *  and the cloud record id. Lets the UI surface the share link without a
-   *  re-push. Cleared is fine; it is refreshed on the next push. */
+  /** Set once the mock is pushed to the cloud: public share URL + record id, so
+   *  the UI can show the link without re-pushing. Refreshed on the next push. */
   cloud?: { id: number; url: string; pushedAt: number }
 }
 

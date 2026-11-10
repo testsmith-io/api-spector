@@ -15,24 +15,12 @@ import { VarInput } from './VarInput';
 import { Oauth2Form } from './Oauth2Form';
 import { useT } from '../../i18n';
 
-// ─── Shared auth field editor ─────────────────────────────────────────────────
-//
-// Renders the per-auth-type form (none/bearer/basic/digest/ntlm/apikey) shared
-// by the request AuthTab and the folder/collection settings modals.
-//
-// Two flavours, chosen by the `secrets` prop:
-//  - without `secrets` (folder/collection inheritance): plain inputs writing
-//    straight into the auth config.
-//  - with `secrets` (request AuthTab): keychain-backed secret inputs with a
-//    Save button, VarInput bearer token, and NTLM/digest usage notes.
-//
-// OAuth 2.0 (token fetch/refresh + fields) is rendered here via the shared
-// Oauth2Form, so every level (request / folder / collection) offers it.
+// Shared per-auth-type form (request AuthTab + folder/collection modals). The
+// `secrets` prop switches plain inputs for keychain-backed secret inputs.
 
-/** Flat patch shape covering every auth type's fields. Unlike `AuthPatch`
- *  (whose discriminant intersection collapses to `never`), this is a real
- *  object type, so `onChange({ token: v })` typechecks. Consumers still cast
- *  the merged result back to `AuthConfig`. */
+/** Flat patch shape over every auth type's fields. Unlike `AuthPatch` (whose
+ *  discriminant intersection collapses to `never`), this is a real object type
+ *  so `onChange({ token: v })` typechecks. */
 export type AuthEditorPatch = Partial<
   Omit<BasicAuth, 'type'> &
   Omit<BearerAuth, 'type'> &
@@ -97,7 +85,7 @@ export function AuthEditor({
         ))}
       </div>
 
-      {/* ── Bearer ── */}
+      {/* Bearer */}
       {auth.type === 'bearer' && (
         secrets ? (
           <BearerPanel
@@ -121,7 +109,7 @@ export function AuthEditor({
         )
       )}
 
-      {/* ── Basic ── */}
+      {/* Basic */}
       {auth.type === 'basic' && (
         secrets ? (
           <BasicCredentialsFields
@@ -138,7 +126,7 @@ export function AuthEditor({
         )
       )}
 
-      {/* ── Digest ── */}
+      {/* Digest */}
       {auth.type === 'digest' && (
         secrets ? (
           <BasicCredentialsFields
@@ -156,7 +144,7 @@ export function AuthEditor({
         )
       )}
 
-      {/* ── NTLM ── */}
+      {/* NTLM */}
       {auth.type === 'ntlm' && (
         secrets ? (
           <div className="flex flex-col gap-2">
@@ -183,7 +171,7 @@ export function AuthEditor({
         )
       )}
 
-      {/* ── API Key ── */}
+      {/* API Key */}
       {auth.type === 'apikey' && (
         <div className="flex flex-col gap-1.5">
           <div className="flex gap-2">
@@ -239,7 +227,7 @@ export function AuthEditor({
         </div>
       )}
 
-      {/* ── OAuth 2.0 ── */}
+      {/* OAuth 2.0 */}
       {auth.type === 'oauth2' && <Oauth2Form auth={auth} onChange={onChange} />}
 
       {children}
@@ -247,7 +235,7 @@ export function AuthEditor({
   );
 }
 
-// ─── Plain username/password pair (folder/collection flavour) ─────────────────
+// Plain username/password pair (folder/collection flavour)
 
 function PlainCredentialsFields({
   auth,
@@ -281,7 +269,7 @@ function PlainCredentialsFields({
   );
 }
 
-// ─── NTLM domain / workstation pair (variable-capable) ───────────────────────
+// NTLM domain / workstation pair (variable-capable)
 
 function NtlmDomainFields({
   auth,
@@ -315,7 +303,7 @@ function NtlmDomainFields({
   );
 }
 
-// ─── Shared username/password sub-component (keychain flavour) ────────────────
+// Shared username/password sub-component (keychain flavour)
 
 function BasicCredentialsFields({
   auth,
@@ -397,8 +385,8 @@ function BasicCredentialsFields({
             />
             <button
               onClick={() => {
-                // Commit the ref onto the auth so the request actually resolves
-                // it at send time, then store the value under that ref.
+                // Commit the ref onto the auth so the request resolves it at
+                // send time, then store the value under that ref.
                 const ref = auth.passwordSecretRef ?? secretRefDefault;
                 setAuth({ passwordSecretRef: ref });
                 void saveSecret(ref);
@@ -417,7 +405,7 @@ function BasicCredentialsFields({
   );
 }
 
-// ─── Bearer panel (keychain flavour) ──────────────────────────────────────────
+// Bearer panel (keychain flavour)
 
 function BearerPanel({
   auth, secretValue, setSecretValue, saved, setAuth, saveSecret,

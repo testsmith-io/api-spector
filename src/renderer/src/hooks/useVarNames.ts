@@ -8,7 +8,7 @@ import { DYNAMIC_VAR_NAMES } from '../components/RequestBuilder/atCompletions';
 import { collectFolderVars } from '../../../shared/folder-tree';
 import type { Folder } from '../../../shared/types';
 
-// Regex to extract keys from sp.*.set("key", ...) calls in scripts
+// Keys from sp.*.set("key", ...) calls in scripts
 const SCRIPT_SET_RE = /\bsp\.(?:variables|collectionVariables|environment|globals)\.set\(\s*["']([^"']+)["']/g;
 
 function extractScriptVarNames(script: string | undefined): string[] {
@@ -34,9 +34,8 @@ export function useVarNames(): string[] {
   return useMemo(() => {
     const names = new Set<string>();
 
-    // The active request's own scope: request-level variables and the variables
-    // of every folder on its path. Scoped to the active request because its
-    // editors are what autocomplete here.
+    // Active request's own scope: its request-level variables plus every folder
+    // on its path. (Its editors are what autocomplete here.)
     const tab = tabs.find(x => x.id === activeTabId);
     const tabCol = tab?.collectionId ? collections[tab.collectionId]?.data : undefined;
     const activeReq = tab?.requestId && tabCol ? tabCol.requests[tab.requestId] : undefined;
@@ -48,8 +47,7 @@ export function useVarNames(): string[] {
     // Globals
     Object.keys(globals).forEach(k => names.add(k));
 
-    // Session vars (sp.environment/collection/folder/globals.set from earlier
-    // sends this session — kept in memory, available to later requests).
+    // Session vars: sp.*.set from earlier sends this session, kept in memory.
     Object.keys(sessionScriptVars.env).forEach(k => names.add(k));
     Object.keys(sessionScriptVars.collection).forEach(k => names.add(k));
     Object.keys(sessionScriptVars.folder).forEach(k => names.add(k));
@@ -60,15 +58,15 @@ export function useVarNames(): string[] {
       const col = collections[activeCollectionId]?.data;
       if (col) {
         Object.keys(col.collectionVariables ?? {}).forEach(k => names.add(k));
-        // Data-table columns become {{variable}} placeholders per row, so offer
-        // them too — the collection's, and every folder's.
+        // Data-table columns become {{variable}} placeholders per row; offer
+        // the collection's and every folder's.
         (col.dataSet?.columns ?? []).forEach(c => { if (c) names.add(c); });
         const addFolderCols = (f: Folder): void => {
           (f.dataSet?.columns ?? []).forEach(c => { if (c) names.add(c); });
           f.folders.forEach(addFolderCols);
         };
         addFolderCols(col.rootFolder);
-        // Scan every request's pre/post scripts for .set("key", ...) calls
+        // Scan every request's pre/post scripts for .set() keys
         for (const req of Object.values(col.requests)) {
           extractScriptVarNames(req.preRequestScript).forEach(k => names.add(k));
           extractScriptVarNames(req.postRequestScript).forEach(k => names.add(k));

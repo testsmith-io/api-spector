@@ -1,10 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Right-hand drawer that edits the selected block's config. Request / sub-flow
-// targets are picked on the node itself; everything else (expressions, scripts,
-// delays, loop settings, condition cases, display/log) is edited here. Logic is
-// plain sp.* JavaScript, matching request pre/post scripts.
+// Right-hand drawer editing the selected block's config. Everything but request/sub-flow
+// targets (expressions, scripts, loops, cases, display/log) is edited here, as plain sp.* JS.
 
 import { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';

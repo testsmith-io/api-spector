@@ -3,10 +3,8 @@
 
 import { createHash, createHmac } from 'node:crypto';
 
-// Minimal AWS Signature Version 4 signer — enough to call a single JSON API
-// (e.g. Secrets Manager GetSecretValue) without pulling in the AWS SDK. The
-// clock is injected so it is deterministic and testable against AWS's published
-// signing vectors.
+// Minimal AWS Signature Version 4 signer - enough to call a single JSON API
+// without the AWS SDK. Clock is injected for deterministic, testable signing.
 
 export interface SigV4Input {
   method: string;

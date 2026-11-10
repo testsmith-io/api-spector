@@ -11,7 +11,7 @@ import {
 import type { ApiRequest } from '../../shared/types';
 import specJson from './fixtures/openapi-contract.json';
 
-// ─── Fixtures ─────────────────────────────────────────────────────────────────
+// Fixtures
 
 const _FIXTURE = path.resolve(__dirname, 'fixtures/openapi-contract.json');
 
@@ -32,7 +32,7 @@ function makeRequest(overrides: Partial<ApiRequest> = {}): ApiRequest {
   };
 }
 
-// ─── resolveSchema ────────────────────────────────────────────────────────────
+// resolveSchema
 
 describe('resolveSchema', () => {
   it('returns primitives unchanged', () => {
@@ -58,7 +58,6 @@ describe('resolveSchema', () => {
   it('handles circular refs by returning {}', () => {
     const circular: Record<string, unknown> = {};
     circular['self'] = circular;
-    // Should not throw
     expect(() => resolveSchema(spec, circular)).not.toThrow();
   });
 
@@ -70,7 +69,7 @@ describe('resolveSchema', () => {
   });
 });
 
-// ─── findOperation ────────────────────────────────────────────────────────────
+// findOperation
 
 describe('findOperation', () => {
   it('finds a GET operation by full URL', () => {
@@ -110,7 +109,7 @@ describe('findOperation', () => {
   });
 });
 
-// ─── validateRequestAgainstSpec ───────────────────────────────────────────────
+// validateRequestAgainstSpec
 
 describe('validateRequestAgainstSpec — path matching', () => {
   it('passes for a valid GET request matching the spec', () => {
@@ -146,11 +145,11 @@ describe('validateRequestAgainstSpec — required query parameters', () => {
   it('ignores disabled query parameters', () => {
     const req = makeRequest({
       params: [
-        { key: 'status', value: 'available', enabled: false },  // disabled
+        { key: 'status', value: 'available', enabled: false },
       ],
     });
     const violations = validateRequestAgainstSpec(spec, req, {});
-    // "status" is required but disabled → should fail
+    // required "status" is disabled, so it should still fail
     expect(violations.some(v => v.message.includes('"status"'))).toBe(true);
   });
 });
@@ -216,13 +215,13 @@ describe('validateRequestAgainstSpec — request body', () => {
       body: { mode: 'raw', raw: 'some text' },
       params: [],
     });
-    // raw body → no schema check; only required params
+    // raw body -> no schema check; only required params
     const violations = validateRequestAgainstSpec(spec, req, {});
     expect(violations.every(v => v.type !== 'request_body_invalid')).toBe(true);
   });
 });
 
-// ─── runProviderVerification: collection variables resolve in URLs ───────────
+// runProviderVerification: collection variables resolve in URLs
 
 import { runProviderVerification } from '../main/contract/provider-verifier';
 

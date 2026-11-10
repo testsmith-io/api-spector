@@ -1,16 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── HTTP semantics validation ────────────────────────────────────────────────
-//
-// Checks a response against the HTTP specification (RFC 9110 "HTTP Semantics"
-// and RFC 9111 "HTTP Caching"), independent of any user test or OpenAPI spec.
-// This catches responses that are malformed as HTTP regardless of what the API
-// is "supposed" to return. Every check is conservative to keep false positives
-// near zero: the value is trust, so we only flag clear violations.
-//
-// Pure and dependency-free so it runs identically in the renderer (a passive
-// "HTTP" panel on the response) and, later, in the CLI runner for CI gating.
+// Checks a response against the HTTP spec (RFC 9110/9111), independent of any user
+// test or OpenAPI spec. Conservative (only clear violations flagged), pure, dependency-free.
 
 export type HttpSeverity = 'error' | 'warning' | 'hint'
 
@@ -49,10 +41,9 @@ function hasBody(res: HttpResponseView): boolean {
 
 const REDIRECTS_NEEDING_LOCATION = new Set([301, 302, 303, 307, 308]);
 
-// Statuses whose responses must not carry content. HTTP clients discard the
-// body for these before the app sees it, so a declared Content-Length is the
-// reliable tell that a server wrongly sent one. HEAD is handled separately: its
-// Content-Length legitimately mirrors what a GET body would be.
+// Statuses whose responses must carry no content. Clients discard the body
+// before the app sees it, so a declared Content-Length is the tell that a
+// server wrongly sent one. HEAD is separate: its Content-Length is legitimate.
 const BODILESS: Record<number, { label: string; ref: string }> = {
   204: { label: 'No Content', ref: 'RFC 9110 §15.3.5' },
   205: { label: 'Reset Content', ref: 'RFC 9110 §15.3.6' },
@@ -60,17 +51,11 @@ const BODILESS: Record<number, { label: string; ref: string }> = {
 };
 
 export interface HttpSemanticsOptions {
-  /** Well-formedness check for XML bodies. Returns false when the body is not
-   *  well-formed XML. Injected by the caller (renderer uses DOMParser, the CLI
-   *  an XML parser) so this module stays dependency-free. */
+  /** XML well-formedness check, injected so this module stays dependency-free (renderer: DOMParser, CLI: XML parser). */
   checkXml?: (body: string) => boolean
 }
 
-/**
- * Validate a response against HTTP semantics. Returns findings ordered by
- * severity (errors first). Returns [] for transport failures (status 0) since
- * there is no real HTTP response to judge.
- */
+/** Findings ordered by severity (errors first); [] for transport failures (status 0). */
 export function validateHttpSemantics(res: HttpResponseView, opts: HttpSemanticsOptions = {}): HttpFinding[] {
   if (!res.status || res.status === 0) return [];
   const f: HttpFinding[] = [];
@@ -82,9 +67,7 @@ export function validateHttpSemantics(res: HttpResponseView, opts: HttpSemantics
   const clNum = Number(header(res.headers, 'content-length') ?? Number.NaN);
   const isBodiless = status in BODILESS || (status >= 100 && status < 200);
 
-  // ── Bodies that must be empty ─────────────────────────────────────────────
-  // The client strips the body for these statuses, so detect the violation via
-  // a non-zero Content-Length (or a body that somehow slipped through).
+  // Bodies that must be empty: the client strips them, so detect via a non-zero Content-Length.
   if (isBodiless) {
     const declaresBody = body || (Number.isFinite(clNum) && clNum > 0);
     if (declaresBody) {
@@ -102,7 +85,7 @@ export function validateHttpSemantics(res: HttpResponseView, opts: HttpSemantics
     f.push({ rule: 'no-body-head', severity: 'error', message: 'Response to a HEAD request must not include a body.', ref: 'RFC 9110 §9.3.2' });
   }
 
-  // ── Range responses ───────────────────────────────────────────────────────
+  // Range responses
   if (status === 206 && !header(res.headers, 'content-range')) {
     f.push({ rule: '206-no-content-range', severity: 'error', message: '206 Partial Content must include a Content-Range header.', ref: 'RFC 9110 §15.3.7' });
   }
@@ -110,12 +93,12 @@ export function validateHttpSemantics(res: HttpResponseView, opts: HttpSemantics
     f.push({ rule: '416-no-content-range', severity: 'warning', message: '416 Range Not Satisfiable should include a Content-Range header (e.g. "bytes */1234").', ref: 'RFC 9110 §15.5.17' });
   }
 
-  // ── Redirects ─────────────────────────────────────────────────────────────
+  // Redirects
   if (REDIRECTS_NEEDING_LOCATION.has(status) && !header(res.headers, 'location')) {
     f.push({ rule: 'redirect-no-location', severity: 'error', message: `${status} redirect has no Location header, so the client cannot follow it.`, ref: 'RFC 9110 §15.4' });
   }
 
-  // ── Auth / method-negotiation headers the spec requires ──────────────────
+  // Auth / method-negotiation headers the spec requires
   if (status === 401 && !header(res.headers, 'www-authenticate')) {
     f.push({ rule: '401-no-www-authenticate', severity: 'error', message: '401 Unauthorized must include a WWW-Authenticate header.', ref: 'RFC 9110 §15.5.2' });
   }
@@ -123,7 +106,7 @@ export function validateHttpSemantics(res: HttpResponseView, opts: HttpSemantics
     f.push({ rule: '405-no-allow', severity: 'error', message: '405 Method Not Allowed must include an Allow header listing valid methods.', ref: 'RFC 9110 §15.5.6' });
   }
 
-  // ── Content-Type and body correctness ────────────────────────────────────
+  // Content-Type and body correctness
   if (body && !contentType && status !== 204 && status !== 304) {
     f.push({ rule: 'body-no-content-type', severity: 'warning', message: 'Response has a body but no Content-Type header; clients must guess how to parse it.', ref: 'RFC 9110 §8.3' });
   }
@@ -141,7 +124,7 @@ export function validateHttpSemantics(res: HttpResponseView, opts: HttpSemantics
     f.push({ rule: 'text-no-charset', severity: 'hint', message: `"${contentType}" has no charset parameter; clients may misinterpret the encoding.`, ref: 'RFC 9110 §8.3.2' });
   }
 
-  // ── Content-Length accuracy (skip when compressed, HEAD, or bodiless) ─────
+  // Content-Length accuracy (skip when compressed, HEAD, or bodiless)
   const clRaw = header(res.headers, 'content-length');
   if (clRaw !== undefined && !contentEncoding && method !== 'HEAD' && !isBodiless) {
     const actual = res.bodySize ?? res.body.length;
@@ -150,7 +133,7 @@ export function validateHttpSemantics(res: HttpResponseView, opts: HttpSemantics
     }
   }
 
-  // ── General ───────────────────────────────────────────────────────────────
+  // General
   if (status < 100 || status > 599) {
     f.push({ rule: 'status-out-of-range', severity: 'warning', message: `${status} is not a valid HTTP status code (must be 100-599).`, ref: 'RFC 9110 §15' });
   }

@@ -2,13 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * Parse the user's post-request script to extract assertions and variable
- * extractions. These are then translated into the target framework's idiom
- * by each code generator.
- *
- * This is best-effort regex parsing — it covers the common patterns that the
- * app's tree-view "insert assertion" and "extract variable" buttons generate,
- * plus hand-written equivalents.
+ * Regex-parse a post-request script into assertions + variable extractions for each
+ * code generator to render. Covers the button-emitted patterns and hand-written ones.
  */
 
 export interface ParsedAssertion {
@@ -20,15 +15,13 @@ export interface ParsedAssertion {
 }
 
 /**
- * A `sp.jsonPath(json, '<query>')` query behind an extraction, with an optional
- * `[index]` element pick and `?? <fallback>` default. Jayway/`jsonpath-plus`
- * syntax, which translates faithfully to the JS targets (same engine), Karate,
- * and REST Assured (Jayway). See `src/main/script-runner.ts` `sp.jsonPath`.
+ * A sp.jsonPath(json, '<query>') behind an extraction, with optional [index] pick
+ * and ?? fallback. jsonpath-plus/Jayway syntax. See script-runner.ts sp.jsonPath.
  */
 export interface JsonPathQuery {
   /** The JSONPath expression, e.g. `$.data[?(@.name=="Widget")].id`. */
   query: string
-  /** Element index when the script picks one match (`matches[0]` → 0); null = whole result list. */
+  /** Element index when the script picks one match (`matches[0]` -> 0); null = whole result list. */
   index: number | null
   /** Default from a trailing `?? <value>` (the raw literal text), or null when absent. */
   fallback: string | null
@@ -50,18 +43,13 @@ export interface ParsedScript {
   extractions: ParsedExtraction[]
 }
 
-/**
- * Parse a post-request script and extract assertions + variable extractions.
- */
 export function parsePostScript(script: string | undefined): ParsedScript {
   const assertions: ParsedAssertion[] = [];
   const extractions: ParsedExtraction[] = [];
 
   if (!script?.trim()) return { assertions, extractions };
 
-  // ── Extract sp.test blocks ────────────────────────────────────────────────
-  // Pattern: sp.test('name', function() { ... sp.expect(...).to.xxx ... })
-  // The test name may contain escaped quotes, so we match more broadly.
+  // sp.test('name', fn) blocks; name may contain escaped quotes, so match broadly.
   const testBlockRegex = /sp\.test\(\s*(['"])((?:(?!\1).|\\.)*)\1\s*,\s*(?:function\s*\(\)|\(\)\s*=>)\s*\{([\s\S]*?)\}\s*\)/g;
   let match;
   while ((match = testBlockRegex.exec(script))) {
@@ -107,14 +95,14 @@ export function parsePostScript(script: string | undefined): ParsedScript {
     assertions.push({ name, accessor: '', kind: 'status' });
   }
 
-  // ── Status code assertions outside of sp.test ────────────────────────────
+  // Status code assertions outside of sp.test
   // sp.response.to.have.status(200)
   const statusMatch = /sp\.response\.to\.have\.status\((\d+)\)/.exec(script);
   if (statusMatch) {
     assertions.push({ name: `status is ${statusMatch[1]}`, accessor: '', kind: 'status', expected: statusMatch[1] });
   }
 
-  // ── Local JSONPath bindings ───────────────────────────────────────────────
+  // Local JSONPath bindings
   // const matches = sp.jsonPath(json, '$.data[?(@.name=="X")].id');
   const jsonPathLocals = new Map<string, string>();
   const localRegex = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*sp\.jsonPath\(\s*[^,]+,\s*(['"])((?:(?!\2).|\\.)*)\2\s*\)\s*;?/g;
@@ -122,7 +110,7 @@ export function parsePostScript(script: string | undefined): ParsedScript {
     jsonPathLocals.set(match[1], match[3]);
   }
 
-  // ── Variable extractions ──────────────────────────────────────────────────
+  // Variable extractions
   // sp.variables.set("name", expr)  /  sp.environment.set("name", expr)  /  sp.globals.set("name", expr)
   const extractRegex = /sp\.(variables|environment|globals)\.set\(\s*"([^"]+)"\s*,\s*(.+)\s*\)\s*;/g;
   while ((match = extractRegex.exec(script))) {
@@ -133,8 +121,7 @@ export function parsePostScript(script: string | undefined): ParsedScript {
     const stringWrap = /^String\((.+)\)$/.exec(accessor);
     if (stringWrap) accessor = stringWrap[1];
 
-    // A JSONPath query (local binding or inline sp.jsonPath(...)) translates to
-    // each target's JSONPath idiom, so keep it even though it is not a plain path.
+    // Keep JSONPath queries (local or inline sp.jsonPath): they map to each target's JSONPath idiom.
     const jsonPath = parseJsonPathAccessor(accessor, jsonPathLocals);
     if (jsonPath) {
       extractions.push({ varName, accessor: '', target, jsonPath });
@@ -143,11 +130,8 @@ export function parsePostScript(script: string | undefined): ParsedScript {
     }
   }
 
-  // Drop anything whose accessor is not a plain JSON path (and not a JSONPath
-  // query). Scripts can reference unresolvable locals, JS operators (`?? ''`),
-  // function calls, etc.; those would emit code that throws at runtime (e.g.
-  // `json.matches[0]` when `matches` was a local). Keeping only translatable
-  // reads means the request still runs with the checks we can map.
+  // Keep only plain JSON paths and JSONPath queries; other expressions (locals,
+  // ?? defaults, calls) would emit code that throws at runtime, so drop them.
   return {
     assertions: assertions.filter(a => a.kind === 'status' || isSimpleAccessor(a.accessor)),
     extractions: extractions.filter(e => e.jsonPath || isSimpleAccessor(e.accessor)),
@@ -155,13 +139,8 @@ export function parsePostScript(script: string | undefined): ParsedScript {
 }
 
 /**
- * Recognize an extraction value that is a `sp.jsonPath(...)` result: a local
- * bound to one earlier, or an inline call, optionally with an `[index]` pick and
- * a trailing `?? <fallback>`. Returns null when the accessor is not such a query.
- *
- *   matches[0] ?? ''                       (local `matches` = sp.jsonPath(...))
- *   matches                                 (whole result list)
- *   sp.jsonPath(json, '$.a[*].id')[0]       (inline)
+ * Recognize an extraction value backed by sp.jsonPath(...): a local binding or an
+ * inline call, with optional [index] pick and ?? fallback. Returns null otherwise.
  */
 function parseJsonPathAccessor(accessor: string, locals: Map<string, string>): JsonPathQuery | null {
   let core = accessor.trim();
@@ -193,12 +172,8 @@ function parseJsonPathAccessor(accessor: string, locals: Map<string, string>): J
 }
 
 /**
- * True when `accessor` is a plain field/path read we can translate to every
- * target (`json.user.id`, `sp.response.json().id`, `users[0].name`). Rejects JS
- * expressions we cannot turn into a response-field read: nullish/logical
- * operators and defaults (`matches[0] ?? ''`), arrow functions, template
- * literals. Those typically reference script locals (e.g. an `sp.jsonPath(...)`
- * result) and otherwise emit code that throws at runtime.
+ * True when accessor is a plain field/path read (json.user.id, users[0].name), not
+ * an expression (?? / || / && defaults, arrow functions, template literals).
  */
 export function isSimpleAccessor(accessor: string): boolean {
   if (!accessor) return false;
@@ -209,11 +184,7 @@ export function isSimpleAccessor(accessor: string): boolean {
 }
 
 /**
- * Convert a `json.users[0].name` accessor into a JSONPath-style string
- * for frameworks that use JSONPath (e.g. REST Assured's `jsonPath()`).
- *
- *   json.users[0].name  →  users[0].name
- *   json["my key"].val  →  ['my key'].val
+ * Convert a json.users[0].name accessor to a JSONPath-style string (REST Assured's jsonPath()).
  */
 export function accessorToJsonPath(accessor: string): string {
   return accessor.replace(/^json\.?/, '').replaceAll(/\["([^"]+)"\]/g, "['$1']");

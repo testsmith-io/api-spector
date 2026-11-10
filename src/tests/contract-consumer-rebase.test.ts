@@ -7,7 +7,7 @@ import type { AddressInfo } from 'node:net';
 import { runConsumerContracts } from '../main/contract/consumer-verifier';
 import type { ApiRequest } from '../shared/types';
 
-// A design-first contract carries only a path (no host), matched by type — the
+// A design-first contract carries only a path (no host), matched by type - the
 // same shape the Contract Designer emits. Consumer mode must be able to send it
 // once a base URL is supplied, and fail with an actionable message without one.
 

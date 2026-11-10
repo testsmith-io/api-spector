@@ -148,10 +148,9 @@ describe('sampleCases', () => {
 });
 
 describe('accepted-invalid gating (false-positive guard)', () => {
-  // The orchestrator only flags accepted-invalid when ajv confirms the mutated
-  // body violates the schema. A plain string field with no minLength/pattern
-  // must treat empty/unicode/whitespace strings as VALID, so a 2xx to them is
-  // not a finding. This locks that behavior at the schema level.
+  // accepted-invalid is only flagged when ajv confirms a violation, so a plain
+  // string field with no minLength/pattern treats empty/unicode/whitespace as
+  // valid (a 2xx to them is not a finding). Locked here at the schema level.
   const schema: JsonSchema = {
     type: 'object', required: ['name'],
     properties: { name: { type: 'string', maxLength: 20 } },
@@ -171,7 +170,7 @@ describe('accepted-invalid gating (false-positive guard)', () => {
   });
 });
 
-// ─── runFuzz integration: trace records every executed case ───────────────────
+// runFuzz integration: trace records every executed case
 
 import { createServer } from 'node:http';
 import { runFuzz } from '../main/contract/fuzz';
@@ -235,7 +234,7 @@ describe('runFuzz trace mode', () => {
   });
 });
 
-// ─── Query parameter mutations ────────────────────────────────────────────────
+// Query parameter mutations
 
 import { mutateQueryParams } from '../main/contract/fuzz-gen';
 import type { KeyValuePair } from '../shared/types';

@@ -5,13 +5,9 @@ import type { ContractReport, ContractResult, FuzzReport } from '../../shared/ty
 import type { RecordedResult, EnvironmentState } from './results-store';
 import { escapeHtml } from '../../shared/escape';
 
-// ─── HTML contract reports ────────────────────────────────────────────────────
-//
-// Self-contained, single-file HTML reports (inline CSS, no external assets) so
-// they can be opened straight from disk, attached as CI artifacts, or emailed.
-// Two surfaces, mirroring how PactFlow presents results:
-//   • reportToHtml    — one verification run, interaction-by-interaction
-//   • dashboardToHtml — a matrix of recorded results across versions
+// HTML contract reports: self-contained single-file HTML (inline CSS) for disk, CI
+// artifacts, or email. reportToHtml renders one verification run; dashboardToHtml
+// renders a matrix of recorded results across versions.
 
 export interface ReportMeta {
   title?: string
@@ -101,7 +97,7 @@ function page(title: string, body: string): string {
 </div></body></html>`;
 }
 
-// ─── Single-run report ────────────────────────────────────────────────────────
+// Single-run report
 
 function statusClass(code?: number): string {
   if (code === undefined) return '';
@@ -163,12 +159,11 @@ export function reportToHtml(report: ContractReport, meta: ReportMeta = {}): str
   return page(meta.title ?? 'Contract Verification Report', body);
 }
 
-// ─── Matrix dashboard ─────────────────────────────────────────────────────────
+// Matrix dashboard
 
-/** Render recorded results as a pacticipant × version matrix (can-i-deploy view).
- *  When `opts.runLinkBase` is set (the serve mode), each cell links to the full
- *  run report at `<runLinkBase>/<pacticipant>/<version>`; file exports stay
- *  link-free so they remain fully self-contained. */
+/** Render recorded results as a pacticipant × version matrix. With
+ *  `opts.runLinkBase` (serve mode) each cell links to its run report; file
+ *  exports stay link-free and self-contained. */
 export function dashboardToHtml(
   records: RecordedResult[],
   generatedAt?: string,
@@ -225,7 +220,7 @@ ${envSection}`;
   return page('Contract Dashboard', body);
 }
 
-// ─── Fuzz report ──────────────────────────────────────────────────────────────
+// Fuzz report
 
 const ORACLE_LABEL: Record<string, string> = {
   'never-5xx':           'server error',

@@ -8,19 +8,13 @@ import type {
 import { contentTypeForSoap, withContentType } from '../../shared/soap';
 import { parseWsdl, buildResponseEnvelope, buildMockDispatchScript, type WsdlResult } from '../ipc/soap-handler';
 
-// ─── WSDL → request collection ───────────────────────────────────────────────
-//
-// Lift each WSDL operation into a SOAP-typed ApiRequest, fully wired:
-//   • POST method
-//   • Content-Type header (1.1 vs 1.2)
-//   • Endpoint URL set from <soap:address>
-//   • Envelope pre-stubbed with parameter names from the schema
-//
-// Shared between UI (electron IPC) and CLI so they don't drift.
+// WSDL to request collection: lift each WSDL operation into a fully-wired SOAP-typed
+// ApiRequest (POST, Content-Type 1.1/1.2, endpoint from <soap:address>, pre-stubbed
+// envelope). Shared by UI and CLI.
 
 export function buildRequestsFromWsdl(parsed: WsdlResult): ApiRequest[] {
   const out: ApiRequest[] = [];
-  // Group operations by `name` and prefer SOAP 1.1; users can switch versions later.
+  // Group by `name`, preferring SOAP 1.1; users can switch versions later.
   const byName = new Map<string, typeof parsed.operations[number]>();
   for (const op of parsed.operations) {
     const existing = byName.get(op.name);
@@ -54,9 +48,8 @@ export function buildRequestsFromWsdl(parsed: WsdlResult): ApiRequest[] {
   return out;
 }
 
-/** Wrap the per-operation request list into a fresh Collection ready for
- *  workspace registration. Folder structure is flat — one folder named after
- *  the service, holding all operations. */
+/** Wrap the per-operation requests into a fresh Collection. Flat structure: one
+ *  root folder holding all operations. */
 export function buildCollectionFromWsdl(name: string, parsed: WsdlResult): {
   collection: Collection
   requestIds: string[]
@@ -82,16 +75,15 @@ export function buildCollectionFromWsdl(name: string, parsed: WsdlResult): {
   return { collection, requestIds: requests.map(r => r.id) };
 }
 
-// ─── WSDL → mock server ──────────────────────────────────────────────────────
+// WSDL to mock server
 
-/** Derive the `path` portion of a URL — defaults to `/` for hosts with no path. */
+/** The `path` portion of a URL; `/` when there is none. */
 function pathFromUrl(url: string): string {
   try { return new URL(url).pathname || '/'; } catch { return '/'; }
 }
 
-/** Pick a usable port for a generated mock server. We default to 3900 (matches
- *  the existing `addMock` default) but increment if the workspace already has
- *  a mock on that port. */
+/** Free port for a generated mock: 3900 (the addMock default), incremented past
+ *  any port the workspace already uses. */
 function pickFreePort(existing: number[]): number {
   let p = 3900;
   while (existing.includes(p)) p++;
@@ -125,9 +117,8 @@ export function buildMockFromWsdl(name: string, parsed: WsdlResult, existingPort
       body: '',
       description: `SOAP ${version} - dispatched per operation`,
       script: buildMockDispatchScript(opMap),
-      // Externalized so workspace JSON stays compact: the dispatch script reads
-      // these via the script-runner's `metadata` context binding instead of
-      // baking each envelope as a JS string literal.
+      // Kept off the script (read via the script-runner's `metadata` binding)
+      // so the workspace JSON stays compact.
       metadata: { soapEnvelopes: opMap, soapVersion: version },
     });
   }
@@ -141,7 +132,7 @@ export function buildMockFromWsdl(name: string, parsed: WsdlResult, existingPort
   };
 }
 
-// ─── Convenience: full pipeline from WSDL text ───────────────────────────────
+// Full pipeline from WSDL text
 
 export interface WsdlImportResult {
   parsed: WsdlResult

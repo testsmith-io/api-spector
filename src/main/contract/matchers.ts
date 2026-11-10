@@ -1,23 +1,10 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── Flexible matchers ────────────────────────────────────────────────────────
-//
-// Pact-style matchers layered on top of the existing ajv / JSON-Schema flow.
-// Instead of authoring a JSON Schema by hand, a contract can carry an
-// "example with matchers": a normal JSON document where any node may be wrapped
-// in a matcher marker. We compile that example into a draft-07 JSON Schema so
-// the rest of the pipeline (validateConsumerResponse) stays unchanged.
-//
-// Default semantics match Pact: a plain value means "exact match"; wrap it in a
-// matcher to relax that to type / regex / each-like etc.
-//
-//   like(x)            type matches x (recursively), values free
-//   eachLike(x, min)   array whose every item type-matches x
-//   regex(re, eg)      string matching the regex
-//   integer/decimal    numeric type matching
-//   boolean/string     primitive type matching
-//   datetime/date/time string with the corresponding format
+// Pact-style matchers over ajv / JSON-Schema. A contract's "example with matchers"
+// (JSON where any node may be matcher-wrapped) compiles to a draft-07 schema, so
+// validateConsumerResponse is unchanged. Pact semantics: plain value is exact match,
+// wrap it to relax (see the constructors below).
 
 export type JSONSchema = Record<string, unknown>
 
@@ -56,7 +43,7 @@ function isMatcher(node: unknown): node is MatcherNode {
   );
 }
 
-// ─── Ergonomic constructors (used by tests and the Pact importer) ─────────────
+// Ergonomic constructors (used by tests and the Pact importer)
 
 export const like      = (value: unknown): MatcherNode => ({ [MATCH_KEY]: 'type', value });
 export const eachLike  = (value: unknown, min = 1): MatcherNode => ({ [MATCH_KEY]: 'eachLike', value, min });
@@ -67,7 +54,7 @@ export const boolean   = (value = false): MatcherNode => ({ [MATCH_KEY]: 'boolea
 export const string    = (value = ''): MatcherNode => ({ [MATCH_KEY]: 'string', value });
 export const datetime  = (value = '', format = 'iso'): MatcherNode => ({ [MATCH_KEY]: 'datetime', value, format });
 
-// ─── Compilation ──────────────────────────────────────────────────────────────
+// Compilation
 
 function compileMatcher(m: MatcherNode): JSONSchema {
   switch (m[MATCH_KEY]) {
@@ -92,14 +79,8 @@ function compileMatcher(m: MatcherNode): JSONSchema {
   }
 }
 
-/**
- * Compile an "example with matchers" into a draft-07 JSON Schema.
- *
- * @param node   The example document (may contain matcher markers anywhere).
- * @param exact  When true (the default, top level), plain primitives compile to
- *               `const` (exact match). When false (inside a `type`/`eachLike`
- *               matcher) plain primitives compile to a type check only.
- */
+/** Compile an "example with matchers" into a draft-07 JSON Schema. `exact` (default
+ *  true) compiles plain primitives to `const`; false (inside a matcher) type-checks only. */
 export function compileMatcherExample(node: unknown, exact = true): JSONSchema {
   if (isMatcher(node)) return compileMatcher(node);
 

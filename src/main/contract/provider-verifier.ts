@@ -13,16 +13,12 @@ import type {
 } from '../../shared/types';
 import { interpolate } from '../interpolation';
 
-// ─── Provider contract verifier ───────────────────────────────────────────────
-//
-// Provider-driven contract testing: the provider publishes an OpenAPI spec.
-// We validate that each request in the collection conforms to what the spec
-// says the provider accepts — correct paths, methods, request body schema,
-// and required query parameters.  No live HTTP calls; pure static analysis.
+// Provider contract verifier: validates each request against the provider's OpenAPI
+// spec (paths, methods, body schema, required query params). No live HTTP.
 
 const ajv = new Ajv({ allErrors: true, strict: false });
 
-// ─── Spec loading ─────────────────────────────────────────────────────────────
+// Spec loading
 
 export async function loadSpec(specUrl?: string, specPath?: string): Promise<unknown> {
   if (specUrl) {
@@ -43,7 +39,7 @@ export async function loadSpec(specUrl?: string, specPath?: string): Promise<unk
   throw new Error('Either specUrl or specPath must be provided');
 }
 
-// ─── Spec helpers ─────────────────────────────────────────────────────────────
+// Spec helpers
 
 function resolveRef(spec: Record<string, unknown>, ref: string): unknown {
   const parts = ref.replace(/^#\//, '').split('/');
@@ -69,7 +65,7 @@ function getServerBases(spec: Record<string, unknown>): string[] {
   return servers.map(s => {
     const raw = s.url ?? '';
     try {
-      // Keep only the path prefix so the regex matches against urlPathname()
+      // Keep only the path prefix to match against urlPathname()
       return new URL(raw).pathname.replace(/\/$/, '');
     } catch {
       return raw.replace(/\/$/, '');
@@ -98,7 +94,7 @@ function pathTemplateToRegex(base: string, template: string): RegExp {
   return new RegExp('^' + pattern + '/?$');
 }
 
-// ─── Pure validation — exported for unit testing ──────────────────────────────
+// Pure validation (exported for unit testing)
 
 export interface MatchedOperation {
   pathTemplate: string
@@ -148,7 +144,7 @@ export function validateRequestAgainstSpec(
 
   const { operation } = match;
 
-  // ── Request body ──
+  // Request body
   if (req.body.mode === 'json' && req.body.json?.trim()) {
     const requestBody = resolveSchema(spec, (operation as Record<string, unknown>)['requestBody']) as Record<string, unknown> | null;
     const content     = (requestBody?.['content'] as Record<string, unknown>) ?? {};
@@ -177,7 +173,7 @@ export function validateRequestAgainstSpec(
     }
   }
 
-  // ── Required query parameters ──
+  // Required query parameters
   const parameters = resolveSchema(spec, (operation as Record<string, unknown>)['parameters'] ?? []) as unknown[];
   for (const param of parameters) {
     const p = param as Record<string, unknown>;
@@ -196,7 +192,7 @@ export function validateRequestAgainstSpec(
   return violations;
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// Public API
 
 export async function runProviderVerification(
   requests:         ApiRequest[],

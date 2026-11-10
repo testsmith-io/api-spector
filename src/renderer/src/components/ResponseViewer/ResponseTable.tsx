@@ -87,9 +87,8 @@ export function ResponseTable({ body, contentType }: Props) {
     setSort(s => s?.col === col ? (s.dir === 'asc' ? { col, dir: 'desc' } : null) : { col, dir: 'asc' });
   }
 
-  // Export the view currently shown: an array (in the active sort order, ALL
-  // rows — not capped at MAX_ROWS) or, when the path points at an object, its
-  // fields. Built on demand so there's no per-render cost on large tables.
+  // Export the current view: the array in sort order (ALL rows, not capped at
+  // MAX_ROWS) or, for an object path, its fields. Built on demand.
   const hasTable = rows !== null || classify(target) === 'object';
   function exportMatrix(): { headers: string[]; rows: string[][] } | null {
     if (rows) return tableMatrix(sort ? sortRows(rows, sort.col, sort.dir) : rows, columns);
@@ -114,10 +113,8 @@ export function ResponseTable({ body, contentType }: Props) {
     URL.revokeObjectURL(url);
   }
 
-  // Drill into a nested array/object cell (uses the ORIGINAL row index so the
-  // path stays correct even when the view is sorted).
-  // Any navigation (drill in, breadcrumb, edit) resets the sort, since the
-  // target - and thus its columns - changes.
+  // Drill into a nested cell using the ORIGINAL row index, so the path stays
+  // correct when sorted. Any navigation resets the sort, since the target changes.
   function navigate(p: string) { setPath(p); setSort(null); }
 
   function drill(originalIndex: number, col: string | null, value: unknown) {
@@ -268,8 +265,7 @@ function Cell({ value, onDrill }: { readonly value: unknown; readonly onDrill: (
     );
   }
   if (kind === 'null') return <span className="text-surface-600">null</span>;
-  // Keep cells to a single line and truncate long values (ids, tokens) with an
-  // ellipsis so a long id can't blow up the row height; full value on hover.
+  // Single-line cells; truncate long values so they can't blow up row height, full value on hover.
   const text = String(value);
   return (
     <span className="inline-block max-w-[26rem] truncate align-bottom text-surface-300" title={text.length > 40 ? text : undefined}>

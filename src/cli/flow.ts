@@ -3,20 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * API Spector CLI — flows
- *
- * Usage:
- *   api-spector flow list   --workspace <path>
- *   api-spector flow run <name> --workspace <path> [options]
- *
- * Options:
- *   --workspace   <path>   Path to the workspace (.spector file or its folder) (required)
- *   --environment <name>   Environment to activate (also accepted: --env)
- *   --output      <path>   Write the run report to a file (.json or .xml)
- *   --format      json|junit   Report format (default inferred from --output, else json)
- *   --verbose              Print script console output and per-test detail
- *   --help                 Show this message
- *
+ * API Spector CLI - flows. Subcommands `flow list` and `flow run <name>`.
+ * Requires --workspace; optional --environment, --output, --format json|junit, --verbose.
  * Exit code is non-zero when any block failed or errored.
  */
 
@@ -42,7 +30,7 @@ import {
   loadWorkspace, loadCollections, loadEnvironments, loadFlows,
 } from './cli-common';
 
-// ─── Report (our own shape; a flow isn't a flat request list) ───────────────
+// Report (our own shape; a flow isn't a flat request list)
 
 function buildJunit(flowName: string, summary: FlowRunSummary): string {
   const cases = summary.blocks
@@ -65,7 +53,7 @@ function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// ─── Main ────────────────────────────────────────────────────────────────
+// Main
 
 async function main() {
   const argv = process.argv.slice(2);
@@ -106,7 +94,7 @@ async function main() {
     console.error(color(`  [warn] Could not load flow: ${relPath}`, C.yellow)),
   )).map(normalizeFlow);
 
-  // ── flow list ──
+  // flow list
   if (sub === 'list') {
     if (flows.length === 0) { console.log(color('  No flows in this workspace.', C.gray)); process.exit(0); }
     console.log('');
@@ -118,7 +106,7 @@ async function main() {
     process.exit(0);
   }
 
-  // ── flow run <name> ──
+  // flow run <name>
   if (!name) { console.error(color('Error: a flow name is required: api-spector flow run <name>', C.red)); process.exit(1); }
   const flow = flows.find(f => f.name.toLowerCase() === name.toLowerCase());
   if (!flow) {
@@ -191,7 +179,7 @@ async function main() {
           req,
           collectionVars: { ...(col.collectionVariables ?? {}), ...input.collectionVars },
           envVars: input.envVars, globals: input.globals, localVars: input.localVars,
-          // Flows chain on the real response body (not the PII-masked report copy).
+          // Flows chain on the real response body, not the PII-masked report copy.
           dispatcher, piiMaskPatterns: [], proxy: workspace.settings?.proxy, tls: workspace.settings?.tls,
         });
       const rr = result.receivedResponse;

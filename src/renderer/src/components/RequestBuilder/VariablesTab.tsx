@@ -12,11 +12,9 @@ import type { VarLoc } from '../../lib/variableMove';
 import { TrashIcon } from '../common/icons';
 import { useT } from '../../i18n';
 
-// Scopes, from most general to most specific. Precedence (higher wins):
-// global < environment < collection < folder < request. Request variables are
-// the most specific static scope; they locally override any higher scope and
-// are available to the request's examples. (Data-row, runtime sp.set and CLI
-// --var values still override request variables at send time.)
+// Scopes, least to most specific; precedence (higher wins):
+// global < environment < collection < folder < request. Data-row, runtime
+// sp.set and CLI --var values still override request variables at send time.
 type Scope = 'global' | 'collection' | 'folder' | 'environment' | 'request'
 
 const SCOPE_BADGE: Record<Scope, string> = {
@@ -56,12 +54,9 @@ function collectUsedTokens(req: ApiRequest): string[] {
   return [...found];
 }
 
-/**
- * Variables available to a request, by scope, plus an editable request scope.
- * Shows which scope each variable resolves from (request > folder > collection
- * > environment > global), flags used-but-undefined tokens, and lets you define
- * request-local variables or locally override a higher-level one.
- */
+/** Variables available to a request, by scope, plus an editable request scope.
+ *  Shows each variable's resolving scope, flags used-but-undefined tokens, and
+ *  lets you define or override request-local variables. */
 export function VariablesTab({ request }: { readonly request: ApiRequest }) {
   const t = useT();
   const activeCollectionId = useStore(s => s.activeCollectionId);
@@ -74,7 +69,7 @@ export function VariablesTab({ request }: { readonly request: ApiRequest }) {
 
   const col = activeCollectionId ? collections[activeCollectionId]?.data : undefined;
 
-  // ── Scope maps ──────────────────────────────────────────────────────────────
+  // Scope maps
   const { envDisplay, envKeys, folderVars, collectionVars } = useMemo(() => {
     const envDisplay: Record<string, string> = {};
     const envKeys = new Set<string>();
@@ -92,10 +87,9 @@ export function VariablesTab({ request }: { readonly request: ApiRequest }) {
 
   const requestVars = useMemo(() => request.variables ?? {}, [request.variables]);
 
-  // When viewing an example, the editable section targets the EXAMPLE's own
-  // variables (stored on the example and overriding the request) instead of the
-  // request's — so an example can hold its own values. The read-only scope views
-  // above keep showing the effective (merged) request.variables.
+  // When viewing an example, the editable section targets the example's own
+  // variables instead of the request's. The read-only scope views keep showing
+  // the merged request.variables.
   const isExample = !!activeExampleId;
   // Seed rows from the editable scope's enabled + disabled maps, so a disabled
   // (unchecked) variable round-trips (toggle) instead of being deleted.
@@ -148,7 +142,7 @@ export function VariablesTab({ request }: { readonly request: ApiRequest }) {
     environment: t('environment'), request: t('request'),
   };
 
-  // ── Editable request-scope variables ─────────────────────────────────────────
+  // Editable request-scope variables
   // A local row buffer so a half-typed (empty-key) row survives; persisted to the
   // request as a Record on every edit. Resynced when the request changes.
   type VarRow = { key: string; value: string; enabled: boolean };
@@ -179,11 +173,8 @@ export function VariablesTab({ request }: { readonly request: ApiRequest }) {
     addRow(name, valueOf(name) === '••••••••' ? '' : `{{${name}}}`);
   };
 
-  // ── Move a variable to another scope ─────────────────────────────────────────
-  // The request's own context resolves every destination here (its collection,
-  // its folder chain, the active environment, globals). `locForScope` turns a
-  // shown scope into the concrete source location; `reseedRows` resyncs the
-  // editable buffer from the store after a move removes a request-level copy.
+  // Move a variable to another scope. locForScope maps a shown scope to its source
+  // location; reseedRows resyncs the editable buffer after a move.
   const folderChain = useMemo(() => (col ? findFolderPath(col.rootFolder, request.id) : []), [col, request.id]);
   const folderLocFor = (name: string): VarLoc | null => {
     if (!col) return null;
@@ -215,7 +206,7 @@ export function VariablesTab({ request }: { readonly request: ApiRequest }) {
 
   return (
     <div className="space-y-5 text-xs">
-      {/* ── Request variables (editable) ──────────────────────────────────── */}
+      {/* Request variables (editable) */}
       <section>
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-[11px] uppercase tracking-wider text-surface-400">
@@ -282,7 +273,7 @@ export function VariablesTab({ request }: { readonly request: ApiRequest }) {
         )}
       </section>
 
-      {/* ── Referenced by this request ────────────────────────────────────── */}
+      {/* Referenced by this request */}
       <section>
         <h3 className="text-[11px] uppercase tracking-wider text-surface-400 mb-2">
           {t('Referenced by this request')}
@@ -319,7 +310,7 @@ export function VariablesTab({ request }: { readonly request: ApiRequest }) {
         )}
       </section>
 
-      {/* ── All variables in scope ────────────────────────────────────────── */}
+      {/* All variables in scope */}
       <section>
         <h3 className="text-[11px] uppercase tracking-wider text-surface-400 mb-2">
           {t('All variables in scope')}

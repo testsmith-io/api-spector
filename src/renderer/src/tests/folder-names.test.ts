@@ -32,7 +32,7 @@ describe('folder name uniqueness at one level', () => {
     useStore.getState().addFolder(colId, rootId, 'Pets');
     useStore.getState().addFolder(colId, rootId, 'Orders');
     const orders = folders(colId).find(f => f.name === 'Orders')!;
-    useStore.getState().renameFolder(colId, orders.id, 'Pets');   // collision → no-op
+    useStore.getState().renameFolder(colId, orders.id, 'Pets');   // collision -> no-op
     expect(folders(colId).map(f => f.name).sort()).toEqual(['Orders', 'Pets']);
   });
 
@@ -46,7 +46,7 @@ describe('folder name uniqueness at one level', () => {
 
   it('duplicateFolder works and gives the copy a unique name', () => {
     // Regression: cloneAndReId used structuredClone on the immer draft (a Proxy),
-    // which threw DataCloneError — so "Duplicate folder" silently did nothing.
+    // which threw DataCloneError - so "Duplicate folder" silently did nothing.
     const { colId, rootId } = freshCollection();
     useStore.getState().addFolder(colId, rootId, 'Pets');
     const pets = folders(colId).find(f => f.name === 'Pets')!;

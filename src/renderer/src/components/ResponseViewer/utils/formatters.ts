@@ -10,12 +10,8 @@ export function prettyJson(raw: string): string {
   }
 }
 
-/**
- * Naive XML pretty-printer based on tag tokenization. Indents opening tags,
- * de-indents closing tags. Self-closing and processing-instruction tags are
- * emitted on their own line at the current depth. Returns the input unchanged
- * on any tokenization error.
- */
+/** Naive XML pretty-printer by tag tokenization; returns the input unchanged on
+ *  any tokenization error. */
 export function prettyXml(raw: string): string {
   try {
     const indent = '  ';

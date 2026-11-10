@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── Micro icons ──────────────────────────────────────────────────────────────
+// Micro icons
 
 export function DotsHorizontalIcon () {
   return (
@@ -39,7 +39,7 @@ export function FolderIcon ( { className = '' }: { readonly className?: string }
   );
 }
 // A document-with-code glyph used to mark saved request/response examples in
-// the tree. Neutral by design — examples are not independent requests, so this
+// the tree. Neutral by design - examples are not independent requests, so this
 // reads as a quiet child marker rather than a coloured method badge.
 export function FileCodeIcon ( { className = '' }: { readonly className?: string } ) {
   return (

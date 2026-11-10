@@ -3,22 +3,12 @@
 
 import type { Environment, EnvVariable, Workspace } from './types';
 
-// ─── Environment inheritance + default environment ────────────────────────────
-//
-// An environment may `extends` another by name; the child's variables win on
-// key collisions. Chains work (base <- staging <- staging-eu). Everything that
-// consumes an environment (request send, runner, contract runs, code
-// generation, variable autocompletion) should resolve it through
-// `resolveEnvironmentChain` first, so inheritance behaves identically in the
-// GUI and the CLI.
+// Environment inheritance + default environment: a child `extends` a parent by
+// name and wins on key collisions; chains work (base <- staging <- staging-eu).
 
-/**
- * Merge an environment with its `extends` chain. Parent variables come first,
- * overridden per key (case-sensitive) by descendants; the child's own
- * variables always win. Disabled variables still participate as overrides so
- * a child can deliberately disable an inherited key. Cycles and missing
- * parents are tolerated: resolution stops at the first repeat or unknown name.
- */
+/** Merge an environment with its `extends` chain: the child wins per key
+ *  (case-sensitive). Disabled variables still override, so a child can disable
+ *  an inherited key. Cycles / missing parents stop resolution. */
 export function resolveEnvironmentChain(env: Environment, all: Environment[]): Environment {
   if (!env.extends) return env;
 
@@ -35,7 +25,7 @@ export function resolveEnvironmentChain(env: Environment, all: Environment[]): E
   }
   if (chain.length === 1) return env;
 
-  // Root first, child last — later entries override earlier ones per key.
+  // Root first, child last - later entries override earlier ones per key.
   const merged = new Map<string, EnvVariable>();
   for (const link of [...chain].reverse()) {
     for (const v of link.variables) merged.set(v.key, v);
@@ -44,12 +34,8 @@ export function resolveEnvironmentChain(env: Environment, all: Environment[]): E
   return { ...env, variables: [...merged.values()] };
 }
 
-/**
- * Pick the environment for a run: the explicitly requested name, else the
- * workspace's default environment, else none. The returned environment is
- * already inheritance-resolved. `requestedName` matching is case-insensitive,
- * like the CLI's existing --environment lookup.
- */
+/** Pick the run environment: the requested name, else the workspace default,
+ *  else none; already inheritance-resolved. `requestedName` is case-insensitive. */
 export function selectEnvironment(
   workspace: Workspace,
   environments: Environment[],

@@ -9,10 +9,9 @@ import { escapeHtml } from '../../shared/escape';
 import { markdownToHtml } from '../../shared/markdown-to-html';
 import { flowchartToSvg } from '../../shared/flowchart-svg';
 
-// ─── Payload types ────────────────────────────────────────────────────────────
+// Payload types
 
-/** Captured "last successful round-trip" for a request. The renderer pulls
- *  these from open tabs at docs-generation time so the docs include an
+/** Captured "last successful round-trip" for a request, so docs include an
  *  example response body, not just the request template. */
 export interface ExampleSnapshot {
   sent?: SentRequest
@@ -25,19 +24,18 @@ export interface DocsPayload {
     requests: Record<string, ApiRequest>
   }>
   format: 'html' | 'markdown'
-  /** requestId → captured example. Optional — requests without a captured
-   *  exchange still render their template-only documentation. */
+  /** requestId -> captured example. Requests without one still render
+   *  template-only docs. */
   examples?: Record<string, ExampleSnapshot>
 }
 
-// ─── Body formatting helpers ────────────────────────────────────────────────
+// Body formatting helpers
 
 function isJsonContentType(ct: string | undefined): boolean {
   return !!ct && /\bjson\b/i.test(ct);
 }
 
-/** Pretty-print JSON bodies, fall through unchanged on parse failure. Trim
- *  excessively long bodies so docs stay readable. */
+/** Pretty-print JSON bodies (unchanged on parse failure); trim long bodies. */
 function formatBody(body: string, contentType?: string): string {
   if (!body) return '';
   const trimmed = body.length > 8000 ? body.slice(0, 8000) + '\n… (truncated)' : body;
@@ -55,7 +53,7 @@ function langForContentType(ct: string | undefined): string {
   return '';
 }
 
-// ─── Markdown generation ─────────────────────────────────────────────────────
+// Markdown generation
 
 export function escMd(s: string): string {
   return s.replaceAll(/[|\\`*_{}[\]()#+\-.!]/g, c => `\\${c}`);
@@ -107,7 +105,7 @@ function requestToMarkdown(req: ApiRequest, example?: ExampleSnapshot): string {
     lines.push('**Body** (SOAP)', '```xml', req.body.soap.envelope.trim(), '```', '');
   }
 
-  // ── Captured example exchange (sent body + response body) ─────────────────
+  // Captured example exchange (sent body + response body)
   if (example?.sent?.body?.trim()) {
     const ct   = example.sent.headers?.['Content-Type'] ?? example.sent.headers?.['content-type'];
     const lang = langForContentType(ct);
@@ -169,7 +167,7 @@ export function generateMarkdown(payload: DocsPayload): string {
   return lines.join('\n');
 }
 
-// ─── HTML generation ──────────────────────────────────────────────────────────
+// HTML generation
 
 export const escHtml = escapeHtml;
 
@@ -229,7 +227,7 @@ function requestToHtml(req: ApiRequest, example?: ExampleSnapshot): string {
     html += `<div class="label">Body (SOAP)</div><pre><code>${escHtml(req.body.soap.envelope.trim())}</code></pre>`;
   }
 
-  // ── Captured example exchange ─────────────────────────────────────────────
+  // Captured example exchange
   if (example?.sent?.body?.trim()) {
     const ct = example.sent.headers?.['Content-Type'] ?? example.sent.headers?.['content-type'];
     html += `<div class="label">Example Request Body</div><pre><code class="lang-${escHtml(langForContentType(ct))}">${escHtml(formatBody(example.sent.body, ct))}</code></pre>`;
@@ -329,7 +327,7 @@ ${body}
 </html>`;
 }
 
-// ─── IPC handler ─────────────────────────────────────────────────────────────
+// IPC handler
 
 export function registerDocsHandlers(ipc: IpcMain): void {
   handleIpc(ipc, IPC.docs.generate, async (_event, payload: DocsPayload): Promise<string> => {

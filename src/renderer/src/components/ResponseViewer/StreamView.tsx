@@ -7,7 +7,7 @@ import { useT } from '../../i18n';
 
 const { electron } = window;
 
-// Only render the tail of very long streams — the buffer can hold thousands of
+// Only render the tail of very long streams - the buffer can hold thousands of
 // frames and mounting them all would jank the UI.
 const RENDER_TAIL = 500;
 
@@ -41,7 +41,7 @@ function preview(ev: StreamEvent): string {
 interface Props {
   readonly events: StreamEvent[]
   readonly streaming: boolean
-  /** Present only while live — enables the Stop button. */
+  /** Present only while live - enables the Stop button. */
   readonly streamId?: string
   readonly streamClose?: StreamClose
   readonly firstEventMs?: number

@@ -5,12 +5,9 @@ import { randomUUID } from 'node:crypto';
 import type { ApiRequest, Collection, ContractExpectation, HttpMethod, KeyValuePair } from '../../shared/types';
 import { MATCH_KEY, type MatcherNode } from './matchers';
 
-// ─── Pact file interoperability (v2 / v3 / v4) ────────────────────────────────
-//
-// Lets API Spector interoperate with the wider Pact ecosystem: import a pact
-// file emitted by any Pact consumer library into runnable requests + contracts,
-// and export our contracts back out as a standard pact file. The bridge between
-// the two worlds is matchingRules <-> our matcher example format (matchers.ts).
+// Pact file interoperability (v2/v3/v4): import a pact into runnable requests +
+// contracts and export contracts back out. The bridge is matchingRules <-> our
+// matcher example format (matchers.ts).
 
 export interface PactImportResult {
   consumer: string
@@ -26,8 +23,7 @@ interface RuleMatcher {
   format?: string
 }
 
-// ─── JSONPath (Pact subset) ───────────────────────────────────────────────────
-// Supports: $, $.a.b, $.a[0].b, $.a[*].b  — enough for real-world pact bodies.
+// JSONPath (Pact subset): $, $.a.b, $.a[0].b, $.a[*].b
 
 type PathToken = { key: string } | { index: number | '*' }
 
@@ -43,7 +39,7 @@ function parsePath(path: string): PathToken[] {
   return tokens;
 }
 
-// ─── matchingRules → matcher example ──────────────────────────────────────────
+// matchingRules -> matcher example
 
 function ruleToMatcher(value: unknown, rule: RuleMatcher): unknown {
   switch (rule.match) {
@@ -62,7 +58,7 @@ function ruleToMatcher(value: unknown, rule: RuleMatcher): unknown {
     case 'timestamp':return { [MATCH_KEY]: 'datetime', value, format: rule.format } satisfies MatcherNode;
     case 'date':     return { [MATCH_KEY]: 'date', value } satisfies MatcherNode;
     case 'time':     return { [MATCH_KEY]: 'time', value } satisfies MatcherNode;
-    default:         return value; // equality / include / unsupported → exact
+    default:         return value; // equality / include / unsupported -> exact
   }
 }
 
@@ -104,7 +100,7 @@ export function bodyWithMatchers(body: unknown, matchingRules: Record<string, un
   return result;
 }
 
-// ─── Import ───────────────────────────────────────────────────────────────────
+// Import
 
 function providerStatesOf(interaction: Record<string, unknown>): string[] {
   // v3+: providerStates: [{ name, params }]; v2: providerState: "string"
@@ -236,7 +232,7 @@ export function pactToCollection(result: PactImportResult): Collection {
   };
 }
 
-// ─── Export ───────────────────────────────────────────────────────────────────
+// Export
 
 function isMatcher(node: unknown): node is MatcherNode {
   return typeof node === 'object' && node !== null && !Array.isArray(node) && typeof (node as Record<string, unknown>)[MATCH_KEY] === 'string';

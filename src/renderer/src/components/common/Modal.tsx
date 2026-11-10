@@ -3,20 +3,8 @@
 
 import React, { useEffect, useRef, useState, useCallback, useId } from 'react';
 
-// ─── Shared modal shell ───────────────────────────────────────────────────────
-//
-// Wraps the fixed inset-0 overlay + centered panel pattern used by every modal
-// in the app. Handles Escape-to-close and (opt-in) click-outside-to-close.
-// Backdrop-close is OFF by default so a stray click next to a dialog never
-// discards it; dialogs close via the × button, a Cancel/Close button, or Escape.
-//
-// The overlay and panel classes are full replacements (not appended) so call
-// sites keep pixel-identical styling — pass the exact classes the modal had
-// before. `fixed inset-0` is always applied to the overlay.
-//
-// The dialog opens centered and can be dragged by its title bar (when a `title`
-// is provided). The drag is a transform offset from the centered position, so
-// it reopens centered; the offset is clamped to keep the panel on screen.
+// Shared modal shell: fixed inset-0 overlay + centered panel. Escape closes;
+// backdrop-close is opt-in. overlayClassName/panelClassName replace the defaults. Draggable by the title bar.
 
 const DEFAULT_OVERLAY = 'bg-black/50 z-50 flex items-center justify-center';
 const DEFAULT_PANEL   = 'bg-surface-900 border border-surface-800 rounded-lg shadow-2xl flex flex-col';
@@ -25,7 +13,7 @@ interface ModalProps {
   readonly onClose: () => void
   /** When set, renders the standard title bar (title + × close button). */
   readonly title?: React.ReactNode
-  /** Small line under the title — only rendered when `title` is set. */
+  /** Small line under the title - only rendered when `title` is set. */
   readonly subtitle?: React.ReactNode
   /** Overlay classes (darkness, z-index, alignment). Replaces the default. */
   readonly overlayClassName?: string
@@ -59,9 +47,7 @@ export function Modal({
     return () => window.removeEventListener('keydown', onKey);
   }, [closeOnEscape, onClose]);
 
-  // ── Drag by the title bar ──────────────────────────────────────────────────
-  // The panel is centered by the overlay's flexbox; dragging stores an (x, y)
-  // offset applied as a transform, clamped so the dialog can't leave the screen.
+  // Drag by the title bar: an (x, y) offset applied as a transform, clamped on screen.
   const panelRef = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const drag = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
@@ -88,9 +74,8 @@ export function Modal({
     document.body.style.userSelect = '';
   }, [onDragMove]);
 
-  // Start a drag when the press lands on a drag region — the built-in title bar
-  // or anything marked `data-modal-drag` (so a modal with its own header is
-  // draggable too) — but not on a control inside it (button/input/…).
+  // Start a drag from a drag region (title bar or `data-modal-drag`), but not
+  // from a control inside it (button/input/...).
   const onPanelMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;           // left button only
     const el = e.target as HTMLElement;
@@ -102,13 +87,11 @@ export function Modal({
     window.addEventListener('mouseup', endDrag);
   }, [offset.x, offset.y, onDragMove, endDrag]);
 
-  // Safety: drop listeners if the modal unmounts mid-drag.
+  // Drop listeners if the modal unmounts mid-drag.
   useEffect(() => endDrag, [endDrag]);
 
-  // ── Focus management (WCAG 2.4.3 Focus Order / 2.1.2 no keyboard trap) ──────
-  // With aria-modal="true" set, focus must actually be moved into the dialog,
-  // contained while it is open, and returned to the opener on close — otherwise
-  // Tab walks out into the inert content the dialog covers. Runs once per open.
+  // Focus management (WCAG 2.4.3 / 2.1.2): with aria-modal, move focus into the
+  // dialog, trap it while open, and return it to the opener on close. Once per open.
   useEffect(() => {
     const panel = panelRef.current;
     if (!panel) return;
@@ -119,8 +102,7 @@ export function Modal({
     const tabbables = (): HTMLElement[] =>
       Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(el => el.offsetParent !== null);
 
-    // Move focus in — unless a child (e.g. CommandPalette, MasterKeyModal) has
-    // already focused its own field, in which case leave that choice alone.
+    // Move focus in, unless a child already focused its own field.
     if (!panel.contains(document.activeElement)) {
       const first = tabbables()[0];
       if (first) first.focus();
@@ -148,8 +130,7 @@ export function Modal({
     };
   }, []);
 
-  // Every dialog needs an accessible name (WCAG / axe aria-dialog-name): point at
-  // the title heading when there is one, else a generic label so it's never nameless.
+  // Accessible name (axe aria-dialog-name): the title heading, else a generic label.
   const titleId = useId();
 
   return (
@@ -158,8 +139,7 @@ export function Modal({
       tabIndex={closeOnBackdrop ? -1 : undefined}
       aria-label={closeOnBackdrop ? 'Close dialog' : undefined}
       className={`fixed inset-0 ${overlayClassName}`}
-      // Close only when the click/keypress lands on the backdrop itself, not on
-      // content bubbling up from the dialog — so the dialog needs no guard handlers.
+      // Close only when the event is on the backdrop itself, not bubbling from the dialog.
       onClick={closeOnBackdrop ? (e => { if (e.target === e.currentTarget) onClose(); }) : undefined}
       onKeyDown={closeOnBackdrop ? (e => { if (e.key === 'Escape') onClose(); }) : undefined}
     >

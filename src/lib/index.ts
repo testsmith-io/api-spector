@@ -1,23 +1,13 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── Engine library entry ─────────────────────────────────────────────────────
-//
-// Additive, Node-only surface that re-exports API Spector's mock engine and
-// request runner so other programs (e.g. the cloud) can embed them instead of
-// shelling out to the CLI. Nothing here changes behaviour; it only makes the
-// existing engine importable:
-//
-//   import { updateMockRoutes, handleRequest } from '@testsmith/api-spector/engine'
-//   import { executeRunnerRequest, buildDispatcher } from '@testsmith/api-spector/engine'
-//
-// Both graphs are the same ones the `mock` and `run` CLI commands use, so they
-// carry no Electron dependency.
+// Engine library entry. Node-only re-exports of the mock engine and request runner
+// so other programs (e.g. the cloud) can embed them instead of shelling out to the
+// CLI. Same graphs the `mock` and `run` CLI commands use; no Electron dependency.
 
-// ── Mock engine ──
-// Stateless use: updateMockRoutes(id, routes) to register a mock, then call
-// handleRequest(id, req, res, Date.now()) per incoming request. The engine does
-// path matching, per-route scripts, faker/dayjs body interpolation, and delays.
+// Mock engine. Stateless use: updateMockRoutes(id, routes) to register, then
+// handleRequest(id, req, res, Date.now()) per request. Handles path matching,
+// per-route scripts, faker/dayjs body interpolation, and delays.
 export {
   startMock,
   stopMock,
@@ -30,11 +20,9 @@ export {
   findRoute,
 } from '../main/mock-server';
 
-// ── Request runner engine ──
-// executeRunnerRequest() runs a single ApiRequest headlessly with pre/post
-// scripts, dynamic/faker variables ($randomInt, $uuid, ...), and assertions,
-// returning the response plus test results. This is what powers monitors that
-// run tests exported from the desktop app.
+// Request runner engine. executeRunnerRequest() runs one ApiRequest headlessly with
+// pre/post scripts, dynamic/faker variables, and assertions, returning the response
+// plus test results. Powers monitors running tests exported from the desktop app.
 export {
   executeRunnerRequest,
   performHttpExchange,
@@ -58,10 +46,9 @@ export type {
   TlsConfig,
 } from '../main/request-exec';
 
-// ── External secret managers (HashiCorp Vault, ...) ──
-// The engine resolves `vault:...` (and any registered scheme) references inside
-// auth and environment variables automatically. Register additional backends
-// via registerSecretProvider; set connection config with setSecretsConfig.
+// External secret managers (HashiCorp Vault, ...). The engine resolves `vault:...`
+// (and any registered scheme) references in auth and env vars automatically. Register
+// backends via registerSecretProvider; set connection config with setSecretsConfig.
 export {
   registerSecretProvider,
   registeredSchemes,
@@ -71,11 +58,9 @@ export {
 } from '../main/secrets';
 export type { SecretProvider, SecretResolveContext } from '../main/secrets';
 
-// ── Flow engine ──
-// runFlowHeadless() runs a whole flow (graph of request / logic / loop /
-// visualize blocks) headlessly, resolving request blocks from a pre-baked
-// requests map. This is what the cloud `runtime/flow` worker calls to execute
-// an uploaded flow with semantics identical to the desktop app and CLI.
+// Flow engine. runFlowHeadless() runs a whole flow (request/logic/loop/visualize
+// blocks) headlessly, resolving request blocks from a pre-baked map. Called by the
+// cloud `runtime/flow` worker, with semantics identical to the desktop app and CLI.
 export { runFlowHeadless } from '../main/flow-run';
 export type { HeadlessFlowInput } from '../main/flow-run';
 export { runFlow } from '../shared/flow-engine';
@@ -87,7 +72,7 @@ export type {
 } from '../shared/flow-engine';
 export { normalizeFlow, BLOCK_SPECS } from '../shared/flow-blocks';
 
-// ── Shared types ──
+// Shared types
 export type {
   MockServer,
   MockRoute,

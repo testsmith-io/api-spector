@@ -10,7 +10,7 @@ import {
   pushWorkspace, pullWorkspace, markPulled, listCloudWorkspaces, linkToCloudWorkspace,
 } from '../../lib/workspace-sync';
 
-// The "Sync" settings section: choose how this workspace collaborates — Local,
+// The "Sync" settings section: choose how this workspace collaborates - Local,
 // Git (the default, via the Git panel), or Cloud (push/pull through API Spector
 // Cloud for teams without git). Cloud actions run immediately (not on Save).
 export function SyncSettingsPanel() {

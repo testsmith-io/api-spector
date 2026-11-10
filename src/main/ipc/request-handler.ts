@@ -27,9 +27,7 @@ import {
   buildSchemaTestResults,
 } from '../request-exec';
 
-// The masking / schema / protocol-test helpers and the dispatcher builder
-// live in the shared execution core now; re-export them so existing import
-// sites (recorder, CLI, tests) keep working.
+// Re-export the shared-core helpers so existing import sites keep working.
 export {
   buildDispatcher,
   maskPii,
@@ -38,17 +36,16 @@ export {
   buildProtocolFaultTests,
 } from '../request-exec';
 
-// Only the entries a script actually changed (new or different) relative to the
-// inputs it was given. Returned to the renderer so it persists just those — not
-// the echoed inputs, which would otherwise write the sent session/request vars
-// back into the collection/environment and overwrite their stored values.
+// Entries a script actually changed vs. its inputs. Returned so the renderer
+// persists just those, not the echoed inputs (which would overwrite stored
+// collection/environment values).
 function scopeDelta(base: Record<string, string>, updated: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(updated)) if (base[k] !== v) out[k] = v;
   return out;
 }
 
-// ─── Error diagnostics ────────────────────────────────────────────────────────
+// Error diagnostics
 
 function asObject(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' ? value as Record<string, unknown> : null;
@@ -112,9 +109,8 @@ function formatRequestError(
     lines.push(`[request:send] cause=${causeMessage}${causeCode ? ` (code=${causeCode})` : ''}`);
   }
 
-  // TLS certificate rejections are the most common opaque "fetch failed" cause,
-  // especially behind an intercepting proxy that presents a self-signed cert.
-  // Point the user at the toggle that fixes it (it covers the proxy leg too).
+  // TLS cert rejections are the most common opaque "fetch failed". Point the
+  // user at the toggle that fixes it (covers the proxy leg too).
   const certCodes = new Set([
     'SELF_SIGNED_CERT_IN_CHAIN',
     'DEPTH_ZERO_SELF_SIGNED_CERT',
@@ -139,12 +135,12 @@ function formatRequestError(
   return lines.join('\n');
 }
 
-// ─── Streaming ────────────────────────────────────────────────────────────────
+// Streaming
 // Live-abort handles for in-flight streamed reads, keyed by the streamId the
 // renderer minted. The Stop button aborts through this map.
 const streamControllers = new Map<string, AbortController>();
 
-// ─── IPC handler ─────────────────────────────────────────────────────────────
+// IPC handler
 
 export function registerRequestHandler(ipc: IpcMain): void {
   // Stop an in-flight streamed read (the response viewer's Stop button).
@@ -156,9 +152,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
     _e,
     payload: SendRequestPayload,
   ): Promise<RequestExecutionResult> => {
-    // Reject malformed payloads before they reach any IO. Throws an Error
-    // with a useful path → reason mapping that ipcRenderer.invoke surfaces
-    // to the renderer.
+    // Reject malformed payloads before any IO; throws a path -> reason Error.
     validateSendRequestPayload(payload);
     const {
       request: req,
@@ -175,10 +169,9 @@ export function registerRequestHandler(ipc: IpcMain): void {
     } = payload;
     applyRequestDefaults(req);
 
-    // ── Streaming plumbing ─────────────────────────────────────────────────────
-    // Frames are coalesced and flushed on a short timer so a fast token stream
-    // can't flood IPC or thrash React. Masking is applied here too, so live and
-    // final frames are redacted identically to the buffered body.
+    // Streaming plumbing
+    // Frames coalesced and flushed on a timer so a fast stream can't flood IPC
+    // or thrash React. Masked here too, so live frames match the buffered body.
     const maskEvent = (ev: StreamEvent): StreamEvent =>
       piiMaskPatterns.length ? { ...ev, data: maskPii(ev.data, piiMaskPatterns), json: undefined } : ev;
     let abortController: AbortController | undefined;
@@ -217,7 +210,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
       }
     }
 
-    // Dynamic built-in vars ($uuid, $randomEmail, etc.) — generated once per send
+    // Dynamic built-in vars ($uuid, $randomEmail, etc.) - generated once per send
     const dynamicVars = await buildDynamicVars();
 
     // A chosen data-table row (running one request against a specific row) is
@@ -233,16 +226,15 @@ export function registerRequestHandler(ipc: IpcMain): void {
       localVars = { ...req.variables, ...localVars };
     }
 
-    // Baseline of the local vars we SEED (request-scoped + data-row). Anything a
-    // script leaves unchanged from this is not a script-set value, so it must not
-    // be persisted back into the session (which would leak a request/data value
-    // across requests and, via the session, into the collection screen).
+    // Baseline of the local vars we seed (request-scoped + data-row). What a
+    // script leaves unchanged here isn't a script-set value and must not persist
+    // back into the session.
     const seededLocalVars = { ...localVars };
 
     // Merge for pre-script
     let vars = mergeVars(envVars, collectionVars, mergedGlobals, localVars, dynamicVars, folderVars);
 
-    // ── Pre-request script ────────────────────────────────────────────────────
+    // Pre-request script
     let preScriptMeta: { error?: string; consoleOutput: string[] } = { consoleOutput: [] };
     let updatedCollectionVars = { ...collectionVars };
     let updatedEnvVars        = { ...envVars };
@@ -255,10 +247,9 @@ export function registerRequestHandler(ipc: IpcMain): void {
         collectionVars: { ...collectionVars },
         globals:        { ...mergedGlobals },
         folderVars:     { ...folderVars },
-        // Seed the script's local scope with the already-resolved local vars
-        // (request-scoped variables + any data-row) so they survive the script
-        // run — otherwise updatedLocalVars below would overwrite them with {} and
-        // {{request-level vars}} would go un-interpolated at send time.
+        // Seed the script's local scope with the resolved local vars so they
+        // survive the run; otherwise updatedLocalVars would overwrite them with
+        // {} and request-level vars would go un-interpolated at send time.
         localVars:      { ...localVars },
       });
       preScriptMeta         = { error: result.error, consoleOutput: result.consoleOutput };
@@ -273,23 +264,23 @@ export function registerRequestHandler(ipc: IpcMain): void {
       vars = mergeVars(updatedEnvVars, updatedCollectionVars, updatedGlobals, localVars, dynamicVars, updatedFolderVars);
     }
 
-    // ── Build & send HTTP request ─────────────────────────────────────────────
+    // Build & send HTTP request
     let response: ResponsePayload;
-    /** Unmasked response handed to the post-request script. The displayed
-     *  `response` has PII patterns + the always-mask headers (Authorization,
-     *  Cookie, Set-Cookie) replaced with `[REDACTED]` — but the *script*
-     *  needs the real bytes so it can extract real tokens via
-     *  `sp.response.json().access_token` and friends. */
+    /** Unmasked response for the post-script: the displayed `response` has PII
+     *  and auth headers redacted, but the script needs the real bytes to
+     *  extract tokens. */
     let scriptResponse: ResponsePayload;
     let sentRequest: SentRequest = { method: req.method, url: '', headers: {} };
     const resolvedUrl = buildUrl(req.url, req.params, vars);
 
-    // Collect decrypted secret values so we can redact them from the sent request display
+    // Decrypted secret values, to redact from the sent-request display. Only
+    // user-declared (encrypted) secrets are masked; a plain OS env reference
+    // ($env) stays visible, like a plain variable.
     const secretValues = new Set<string>();
     if (environment) {
       for (const v of environment.variables) {
         if (!v.enabled) continue;
-        if ((v.secret || v.envRef) && envVars[v.key]) {
+        if (v.secret && envVars[v.key]) {
           secretValues.add(envVars[v.key]);
         }
       }
@@ -318,7 +309,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
     }
 
     try {
-      // Build dispatcher once — shared across digest/ntlm retries
+      // Build dispatcher once - shared across digest/ntlm retries
       const dispatcher = await buildDispatcher(proxy, tls);
 
       const exchange = await performHttpExchange({
@@ -336,7 +327,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
           : undefined,
       });
 
-      // ── PII masking ────────────────────────────────────────────────────────
+      // PII masking
       const maskedBody    = maskPii(exchange.responseBody, piiMaskPatterns);
       const maskedHeaders = maskHeaders(exchange.rawHeaders, piiMaskPatterns);
       const bodySize      = Buffer.byteLength(exchange.responseBody, 'utf8');
@@ -355,9 +346,8 @@ export function registerRequestHandler(ipc: IpcMain): void {
         durationMs: exchange.durationMs,
         ...streamFields,
       };
-      // Same shape but with the unmasked bytes — used only for feeding the
-      // post-request script so `sp.response.json().access_token` returns the
-      // real value, not "[REDACTED]". Unmasked events back the future sp.stream.
+      // Same shape, unmasked, only for the post-request script so it extracts
+      // real values. Unmasked events back the future sp.stream.
       scriptResponse = {
         status:     exchange.status,
         statusText: exchange.statusText,
@@ -385,7 +375,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
         durationMs: Date.now() - start,
         error:      diagnostic,
       };
-      // Mirror for the script — same empty payload either way.
+      // Mirror for the script - same empty payload either way.
       scriptResponse = response;
     } finally {
       // Flush any buffered frames and release the abort handle.
@@ -396,18 +386,13 @@ export function registerRequestHandler(ipc: IpcMain): void {
       }
     }
 
-    // ── Schema validation ─────────────────────────────────────────────────────
-    // If the request has a standalone JSON Schema defined (Schema tab),
-    // validate the response body against it and surface the result as
-    // TestResults so it shows up in the runner output alongside post-script
-    // tests. Independent of `req.contract`. Run against the unmasked body —
-    // PII patterns can include keys the schema requires; masking would
-    // produce a false negative.
+    // Schema validation: against the request's standalone JSON Schema (Schema tab, not
+    // `req.contract`). Run on the unmasked body so PII masking isn't a false negative.
     const schemaTestResults = !response.error
       ? buildSchemaTestResults(req.schema, scriptResponse.body)
       : [];
 
-    // ── Post-request script ───────────────────────────────────────────────────
+    // Post-request script
     let postTestResults: TestResult[] = [];
     let postConsole: string[] = [];
     let postError: string | undefined;
@@ -434,10 +419,8 @@ export function registerRequestHandler(ipc: IpcMain): void {
       // Run-only: script variable writes (globals included) are not persisted.
     }
 
-    // If the HTTP response was a 4xx/5xx and the user has NO tests at all,
-    // surface a synthetic failed result so the user notices. But if the user
-    // wrote tests and they all passed, trust them — they intentionally tested
-    // for that status code (e.g. negative tests expecting 422).
+    // HTTP 4xx/5xx with no tests at all: surface a synthetic failure. If tests
+    // exist and passed, trust them (e.g. negative tests expecting 422).
     const combinedTestResults: TestResult[] = [...schemaTestResults, ...postTestResults];
     if (
       !response.error &&
@@ -470,7 +453,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
     return { response, scriptResult, sentRequest: redactSentRequest(sentRequest) };
   });
 
-  // ── Hook script runner ─────────────────────────────────────────────────────
+  // Hook script runner
   // Runs an arbitrary script with caller-supplied variable context and returns
   // the updated variable scopes. Used by the GraphQL introspection hook.
   handleIpc(ipc, IPC.script.runHook, async (

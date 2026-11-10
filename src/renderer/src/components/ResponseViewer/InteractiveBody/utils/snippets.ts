@@ -4,11 +4,10 @@
 import { esc, toLit } from './format';
 import { jsonAccessor, jsonPathLabel, toJsonPathExpr, varNameFromPath, type JsonPath } from './jsonPath';
 
-// ─── JSON assertions ──────────────────────────────────────────────────────────
+// JSON assertions
 
-// Snippets reference the `json` variable directly. `appendSnippetToScript`
-// hoists a single `const json = sp.response.json();` to the top of the
-// script so multiple assertions don't each redeclare it.
+// Snippets reference `json` directly; appendSnippetToScript hoists one
+// `const json = sp.response.json();` so assertions don't each redeclare it.
 
 export function makeJsonSnippet(
   path: JsonPath,
@@ -39,7 +38,7 @@ export function makeJsonPathSnippet(path: JsonPath, value: unknown, filterKey: s
   return `sp.test('${expr} equals ${lit}', function() {\n  const matches = sp.jsonPath(json, '${expr}');\n  sp.expect(matches.length).to.be.above(0);\n  sp.expect(matches[0]).to.equal(${lit});\n});`;
 }
 
-// ─── XML assertions ───────────────────────────────────────────────────────────
+// XML assertions
 
 export function makeXmlSnippet(
   selector: string,
@@ -57,14 +56,10 @@ export function makeXmlSnippet(
   }
 }
 
-// ─── Extract snippets ──────────────────────────────────────────────────────────
+// Extract snippets
 
-/**
- * Scope a response value can be extracted into, named exactly as the `sp.*`
- * accessor. `environment`, `collectionVariables`, `folder` and `globals` persist
- * for the session (available to the next request); `variables` (local) is
- * request-scoped and does NOT carry over — so the menu labels it accordingly.
- */
+/** Scope to extract a value into, named as the `sp.*` accessor. All persist for
+ *  the session except `variables` (local), which is request-scoped. */
 export type ExtractTarget = 'variables' | 'environment' | 'collectionVariables' | 'folder' | 'globals';
 
 export function makeJsonExtractSnippet(path: JsonPath, target: ExtractTarget): string {

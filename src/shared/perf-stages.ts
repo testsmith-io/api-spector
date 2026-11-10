@@ -1,10 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Turns a performance plan's pattern (basic / stepping / arrivals / custom) into
-// one unified schedule: an executor plus a list of stages (target value held or
-// ramped over a duration). Shared so the engine (main) schedules load from the
-// exact same profile the panel (renderer) draws as a preview.
+// Turns a perf plan's pattern (basic/stepping/arrivals/custom) into one schedule:
+// an executor plus stages (a target held or ramped over a duration). Shared so
+// the engine and the panel preview work from the same profile.
 
 import type { PerfPlan, PerfStage, PerfExecutor, PerfResult, PerfThreshold, PerfThresholdResult } from './types';
 
@@ -67,9 +66,8 @@ export function deriveLoad(plan: PerfPlan): DerivedLoad {
   return { executor, stages, maxVus, totalSec };
 }
 
-/** The scheduled target (VUs or iterations/sec) at elapsed time tSec. A ramp
- *  stage interpolates linearly from the previous stage's target; a hold stage
- *  stays flat. Used by the engine to schedule and by the panel to preview. */
+/** Scheduled target (VUs or iterations/sec) at elapsed time tSec. A ramp stage
+ *  interpolates linearly from the previous target; a hold stage stays flat. */
 export function targetAt(load: DerivedLoad, tSec: number): number {
   let start = 0;
   let prevTarget = 0;
@@ -88,7 +86,7 @@ export function targetAt(load: DerivedLoad, tSec: number): number {
   return 0;
 }
 
-// ─── Thresholds ───────────────────────────────────────────────────────────────
+// Thresholds
 
 /** The actual value a threshold metric takes in a finished result. */
 export function thresholdActual(result: Pick<PerfResult, 'iterationLatency' | 'requestLatency' | 'iterations' | 'iterationsFailed' | 'iterationsPerSec'>, metric: PerfThreshold['metric']): number {
@@ -112,7 +110,7 @@ function compare(actual: number, op: PerfThreshold['op'], value: number): boolea
   }
 }
 
-/** Evaluate a plan's thresholds against a result. Empty in / empty out. */
+/** Evaluate a plan's thresholds against a result. */
 export function evaluateThresholds(
   result: Parameters<typeof thresholdActual>[0],
   thresholds: PerfThreshold[],

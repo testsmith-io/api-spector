@@ -5,12 +5,8 @@ import type {
   Collection, Environment, GeneratedFile, ApiRequest, Folder, KeyValuePair, AuthConfig,
 } from '../../shared/types';
 
-// ─── cURL script exporter ─────────────────────────────────────────────────────
-//
-// Serialises a collection to a single runnable shell script: one `curl`
-// invocation per request. Collection + (non-secret) environment variables are
-// emitted as shell exports at the top, and `{{VAR}}` tokens are rewritten to
-// `${VAR}` so the script runs as-is once the user fills in any blanks.
+// cURL script exporter: serialises a collection to a runnable shell script, one `curl` per
+// request. Collection + non-secret env vars become shell exports up top, `{{VAR}}` rewritten to `${VAR}`.
 
 /** Rewrite `{{VAR}}` tokens to shell `${VAR}` so curl expands them at runtime. */
 function mapOut(s: string): string {
@@ -90,7 +86,7 @@ function safeParse(s: string): unknown {
 export function generateCurl(collection: Collection, environment: Environment | null): GeneratedFile[] {
   const lines: string[] = ['#!/usr/bin/env bash', 'set -euo pipefail', ''];
 
-  // ── Variable exports: environment first, collection variables override ──
+  // Variable exports: environment first, collection variables override
   const vars: Record<string, string> = {};
   for (const v of environment?.variables ?? []) {
     if (v.enabled && !v.secret) vars[v.key] = v.value;
@@ -123,8 +119,7 @@ export function generateCurl(collection: Collection, environment: Environment | 
     const ah = authHeader(req.auth);
     if (ah) headers.unshift(ah);
 
-    // multipart/form-data: emit -F flags; curl sets the Content-Type (with its
-    // own boundary), so we never inject one.
+    // multipart/form-data: emit -F flags; curl sets its own Content-Type/boundary.
     const isMultipart = req.body.mode === 'multipart' && !['get', 'head'].includes(req.method.toLowerCase());
     const body = isMultipart ? { contentType: undefined, text: undefined } : bodyOf(req);
     const hasCT = headers.some(h => h.key.toLowerCase() === 'content-type');

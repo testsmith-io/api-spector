@@ -5,16 +5,8 @@ import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { ContractReport } from '../../shared/types';
 
-// ─── Verification results store (local can-i-deploy) ──────────────────────────
-//
-// A lightweight, broker-free deployment gate. After a verification run, record
-// the report keyed by pacticipant + version under
-// `<workspace>/contracts/results/<pacticipant>/<version>.json`. `can-i-deploy`
-// then reads the recorded report and answers whether that version is safe to
-// ship (i.e. its last contract verification passed).
-//
-// This is intentionally local-first — no Pact Broker required — but mirrors the
-// same mental model so teams can graduate to a shared store later.
+// Verification results store: broker-free deployment gate. Records each run's report by
+// pacticipant+version under contracts/results/, read back by can-i-deploy to gate a ship.
 
 const RESULTS_DIR = 'contracts/results';
 
@@ -90,10 +82,8 @@ export interface CanIDeployVerdict {
   currentlyDeployed?: DeploymentRecord
 }
 
-/** Decide whether a pacticipant version is safe to deploy based on the last
- *  recorded verification. Unknown versions are NOT deployable (fail closed).
- *  With `env`, the verdict also reports what that environment currently runs
- *  so pipelines can log the upgrade they are about to perform. */
+/** Is a pacticipant version safe to deploy, per its last recorded verification?
+ *  Unknown versions fail closed. With `env`, also reports what that env runs. */
 export async function canIDeploy(
   dir: string,
   pacticipant: string,
@@ -132,13 +122,8 @@ export async function canIDeploy(
   };
 }
 
-// ─── Environment / deployment tracking ────────────────────────────────────────
-//
-// Records which pacticipant version is deployed in which environment, as
-// plain files under `<workspace>/contracts/environments/<env>.json`. Committed
-// to git like results, so "what runs in prod" has history and needs no server.
-// Recording documents a fact (the deploy happened), so it never gates; gating
-// belongs to can-i-deploy BEFORE the deploy.
+// Environment / deployment tracking: which pacticipant version is deployed where, as
+// files under contracts/environments/<env>.json (committed to git). Recording never gates.
 
 const ENV_DIR = 'contracts/environments';
 

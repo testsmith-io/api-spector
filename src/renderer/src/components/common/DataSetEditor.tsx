@@ -7,7 +7,7 @@ import { parseCSV, toCSV } from '../../../../shared/data-csv';
 import { VarInput } from './VarInput';
 import { useT } from '../../i18n';
 
-// ─── Editor ──────────────────────────────────────────────────────────────────
+// Editor
 
 interface Props {
   readonly ds: DataSet
@@ -24,7 +24,7 @@ export function DataSetEditor({ ds, onChange, exportName, scopeLabel = 'collecti
   const t = useT();
   const csvFileRef = useRef<HTMLInputElement>(null);
 
-  // ── Column ops ──
+  // Column ops
   function addColumn() {
     const name = `var${ds.columns.length + 1}`;
     onChange({ columns: [...ds.columns, name], rows: ds.rows.map(r => [...r, '']) });
@@ -36,7 +36,7 @@ export function DataSetEditor({ ds, onChange, exportName, scopeLabel = 'collecti
     onChange({ columns: ds.columns.filter((_, i) => i !== ci), rows: ds.rows.map(r => r.filter((_, i) => i !== ci)) });
   }
 
-  // ── Row ops ──
+  // Row ops
   function addRow() {
     onChange({ ...ds, rows: [...ds.rows, ds.columns.map(() => '')] });
   }
@@ -47,7 +47,7 @@ export function DataSetEditor({ ds, onChange, exportName, scopeLabel = 'collecti
     onChange({ ...ds, rows: ds.rows.filter((_, i) => i !== ri) });
   }
 
-  // ── CSV import / export ──
+  // CSV import / export
   function importCSV(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;

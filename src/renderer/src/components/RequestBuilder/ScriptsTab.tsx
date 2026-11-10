@@ -31,7 +31,7 @@ export function ScriptsTab({ request, onChange }: Props) {
   const setScriptType   = (t: ScriptType) => { if (activeTabId) setTabScriptTab(activeTabId, t); };
   const [expandedGroup, setExpandedGroup] = useState<string | null>(SNIPPET_GROUPS[0].group);
   // Persist Quick Inserts visibility across the whole session (and let the
-  // response-tree assertion flow auto-collapse it) — see store comment.
+  // response-tree assertion flow auto-collapse it) - see store comment.
   const snippetsOpen     = useStore(s => s.quickInsertsOpen);
   const setSnippetsOpen  = useStore(s => s.setQuickInsertsOpen);
 

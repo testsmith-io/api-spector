@@ -8,7 +8,7 @@ import { uniqueName } from '../../../../shared/naming-utils';
 import type { FullState } from '../index';
 import { STORAGE_KEYS } from '../../lib/storage-keys';
 
-/** Hand-rolled env slug — intentionally kept byte-compatible with the paths
+/** Hand-rolled env slug - intentionally kept byte-compatible with the paths
  *  this store has always written (it differs slightly from naming-utils'
  *  `envRelPath` around punctuation, and changing it would orphan files). */
 function envSlugRelPath(name: string): string {
@@ -96,7 +96,7 @@ export const createEnvironmentsSlice: StateCreator<
     const newName = uniqueName(src.data.name + ' (copy)', existingNames);
     const newId   = uuidv4();
     // Deep-clone variables; secrets are stored by reference (key) so we
-    // copy the reference too — the same OS keychain entry can back both
+    // copy the reference too - the same OS keychain entry can back both
     // environments without re-prompting.
     const env: Environment = {
       ...JSON.parse(JSON.stringify(src.data)),

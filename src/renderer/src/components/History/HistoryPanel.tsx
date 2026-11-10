@@ -86,10 +86,8 @@ export function HistoryPanel() {
 
   function open(entry: HistoryEntry) {
     setSelected(entry);
-    // Bring the request into the middle pane so it can be replayed, not just
-    // its response. If the request still exists in a collection, open/switch
-    // to its tab and load the historical response there. If it was deleted,
-    // fall back to showing the response in whatever tab is active.
+    // Open the request's tab and load its historical response if it still exists;
+    // otherwise show the response in the active tab.
     if (existingRequestIds.has(entry.request.id)) {
       setActiveRequest(entry.request.id);
       const tabId = useStore.getState().activeTabId;

@@ -1,10 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Drives a flow run from the UI. It ships the workspace's in-memory
-// collections/flows/environment to the main process (which runs the shared
-// flow engine) and maps the streamed per-block events into live node status +
-// an output log (log / display blocks) for the canvas.
+// Drives a flow run from the UI: ships in-memory collections/flows/environment
+// to the main process (which runs the shared flow engine) and maps streamed
+// per-block events into live node status + an output log for the canvas.
 
 import { useCallback, useState } from 'react';
 import { useStore } from '../../store';
@@ -41,7 +40,7 @@ export interface FlowLogEntry {
   atMs?: number
   message?: string
   value?: unknown
-  /** Request blocks: method + resolved URL and the captured request/response. */
+  /** Request blocks: method + resolved URL + captured request/response. */
   method?: string
   resolvedUrl?: string
   http?: FlowBlockRunRecord['http']
@@ -53,7 +52,7 @@ export interface FlowRunState {
   outputs: FlowOutput[]
   /** Full chronological run log (every block result + log/display output). */
   log: FlowLogEntry[]
-  /** Ids of edges traversed during the run — for highlighting the taken route. */
+  /** Ids of edges traversed, for highlighting the taken route. */
   traversedEdges: string[]
   summary: FlowRunSummary | null
   error: string | null
@@ -106,7 +105,7 @@ export function useFlowRunner() {
           const added = evt.edgeIds.filter(id => !seen.has(id));
           if (added.length) next.traversedEdges = [...prev.traversedEdges, ...added];
         }
-        // Run log: a chronological record of every meaningful event.
+        // Chronological record of every meaningful event.
         if (evt.kind === 'block-result' || evt.kind === 'log' || evt.kind === 'display') {
           const entry: FlowLogEntry = {
             kind: evt.kind === 'block-result' ? 'block' : evt.kind,
@@ -135,9 +134,8 @@ export function useFlowRunner() {
       const merged = summary.variables
         ? { ...summary.variables.globals, ...summary.variables.collectionVars, ...summary.variables.envVars, ...summary.variables.localVars }
         : undefined;
-      // Rebuild the run log + outputs from the summary's block records: these
-      // are the authoritative, complete record and recover any trailing
-      // progress events (display/log near the end) that raced run completion.
+      // Rebuild log + outputs from the summary's block records: the authoritative
+      // record, recovering trailing display/log events that raced completion.
       const rebuiltLog: FlowLogEntry[] = summary.blocks.map((b: FlowBlockRunRecord) => ({
         kind: b.type === 'log' ? 'log' : b.type === 'display' ? 'display' : 'block',
         blockId: b.blockId, type: b.type, label: b.label, status: b.status,
@@ -154,8 +152,8 @@ export function useFlowRunner() {
         ...prev, summary,
         variables: merged ?? prev.variables,
         data: summary.data ?? prev.data,
-        // Authoritative route from the summary — covers any streamed `edge`
-        // event that raced the run's completion (e.g. the final hop).
+        // Authoritative route from the summary, covering any `edge` event that
+        // raced completion.
         traversedEdges: summary.traversedEdges?.length ? summary.traversedEdges : prev.traversedEdges,
         log: rebuiltLog.length ? rebuiltLog : prev.log,
         outputs: rebuiltOutputs,

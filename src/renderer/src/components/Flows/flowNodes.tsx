@@ -1,12 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// React Flow node renderers for every flow block type. Node `type` maps to the
-// Flow model's block type; node `data` carries { config, label, status }. The
-// request/sub-flow blocks pick their target inline (per the UX requirement);
-// richer config (scripts, expressions) is edited in the canvas inspector. Each
-// node draws input/output handles straight from the block registry, so the
-// ports you can wire always match what the engine routes.
+// React Flow node renderers for every flow block type. Node `data` is { config, label,
+// status }; request/sub-flow blocks pick their target inline, handles come from the block registry.
 
 import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react';
 import { useStore } from '../../store';
@@ -94,13 +90,11 @@ function Frame({
   const spec = BLOCK_SPECS[type];
   const hasInput = inputsFor({ type }).length > 0;
   const statusRing = data.status ? STATUS_RING[data.status.status] ?? '' : '';
-  // A validation problem rings the block when it isn't currently showing a run
-  // status (so a live run still wins). The corner badge below always shows.
+  // A validation problem rings the block unless a run status is showing (run wins). Corner badge always shows.
   const problemRing = !data.status && data.problem
     ? (data.problem === 'error' ? '!border-red-500/70' : '!border-amber-500/70')
     : '';
-  // A custom color overrides the category border (inline style beats the
-  // tailwind class); a run status still wins via its !important border.
+  // A custom color overrides the category border (inline beats class); run status wins via !important.
   return (
     <div
       className={`relative rounded-md border bg-surface-900 shadow-lg ${CATEGORY_RING[spec.category]} ${statusRing} ${problemRing}`}
@@ -159,7 +153,7 @@ function summary(text?: string, fallback = '—'): string {
   return firstLine.length > 44 ? firstLine.slice(0, 44) + '…' : (firstLine || fallback);
 }
 
-// ─── Inline pickers ──────────────────────────────────────────────────────
+// Inline pickers
 
 function RequestPicker({ id, config }: { readonly id: string; readonly config?: FlowBlockConfig }) {
   const collections = useStore(s => s.collections);
@@ -213,7 +207,7 @@ function FlowPicker({ id, config }: { readonly id: string; readonly config?: Flo
   );
 }
 
-// ─── Node bodies ───────────────────────────────────────────────────────────
+// Node bodies
 
 function Line({ children }: { readonly children: React.ReactNode }) {
   return <p className="text-[10px] text-surface-400 font-mono truncate">{children}</p>;

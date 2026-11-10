@@ -85,7 +85,7 @@ export function RecorderPanel({ onImportMock, onClose, defaultTargetMockId }: Pr
   return (
     <div className="flex flex-col h-full bg-surface-950 text-surface-200 min-h-0">
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-surface-800 flex-shrink-0">
         <div className="flex items-center gap-2">
           {!stopped && (
@@ -142,14 +142,14 @@ export function RecorderPanel({ onImportMock, onClose, defaultTargetMockId }: Pr
         </div>
       </div>
 
-      {/* ── Stats bar ── */}
+      {/* Stats bar */}
       <div className="flex gap-4 px-4 py-1.5 border-b border-surface-800/50 flex-shrink-0 text-[11px]">
         <span className="text-surface-400">{t('Requests:')} <span className="text-surface-200 font-medium">{total}</span></span>
         <span className="text-surface-400">{t('Errors:')} <span className={errors > 0 ? 'text-red-400 font-medium' : 'text-surface-200 font-medium'}>{errors}</span></span>
         {total > 0 && <span className="text-surface-400">{t('Avg:')} <span className="text-surface-200 font-medium">{avgMs}ms</span></span>}
       </div>
 
-      {/* ── Content: entry list + detail ── */}
+      {/* Content: entry list + detail */}
       <div className="flex flex-1 min-h-0">
 
         {/* Entry list */}
@@ -209,7 +209,7 @@ export function RecorderPanel({ onImportMock, onClose, defaultTargetMockId }: Pr
   );
 }
 
-// ─── Entry detail ─────────────────────────────────────────────────────────────
+// Entry detail
 
 function EntryDetail({ entry }: { readonly entry: RecordedEntry }) {
   const t = useT();

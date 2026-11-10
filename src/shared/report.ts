@@ -11,7 +11,7 @@ export interface ReportMeta {
   timestamp?: string
 }
 
-// ─── JSON report ─────────────────────────────────────────────────────────────
+// JSON report
 
 export function buildJsonReport(
   results: RunRequestResult[],
@@ -48,7 +48,7 @@ export function buildJsonReport(
   }, null, 2);
 }
 
-// ─── HTML report ─────────────────────────────────────────────────────────────
+// HTML report
 
 export function buildHtmlReport(
   results: RunRequestResult[],
@@ -71,9 +71,8 @@ export function buildHtmlReport(
   const ts         = meta.timestamp ?? new Date().toISOString();
   const collection = meta.collection ?? 'API Tests';
   const env        = meta.environment ?? '—';
-  // Pass rate counts skipped requests against the denominator. A green
-  // "100%" next to "1 no tests" is misleading — an unverified request is
-  // a gap in your coverage, and the pass rate should make that visible.
+  // Pass rate counts skipped requests in the denominator: an unverified request
+  // is a coverage gap, so a green "100%" next to "1 no tests" would mislead.
   const passRate   = summary.total > 0 ? Math.round((summary.passed / summary.total) * 100) : 0;
 
   const HOOK_LABELS: Record<string, string> = {
@@ -83,10 +82,9 @@ export function buildHtmlReport(
     afterAll:  'AFTER ALL',
   };
 
-    // Emit nested collection / folder headings that mirror the tree in the UI:
-    // a collection heading (level 0) when the collection changes, then a folder
-    // heading for each new level of scopePath, indented by depth. The request
-    // card itself is indented under its deepest folder.
+    // Nested collection/folder headings that mirror the UI tree: a collection
+    // heading when the collection changes, then a folder heading per new
+    // scopePath level, indented by depth.
   let lastCollection: string | null = null;
   let lastPath: string[] = [];
   const cards = results.map((r, idx) => {
@@ -348,7 +346,7 @@ export function buildHtmlReport(
 `;
 }
 
-// ─── JUnit XML report ─────────────────────────────────────────────────────────
+// JUnit XML report
 // One <testcase> per request; failed test assertions become <failure> elements.
 // Follows the Jenkins/GitHub Actions JUnit schema so results appear natively.
 
@@ -375,8 +373,8 @@ export function buildJUnitReport(
     const hookPrefix = r.isHook && r.hookType ? `[${HOOK_JUNIT_LABELS[r.hookType] ?? 'Hook'}] ` : '';
     const name      = esc(hookPrefix + r.name + label);
     // classname carries the tree position (collection.folder.subfolder) so CI
-    // dashboards nest results the same way the app does. Dots in names are
-    // replaced so they don't read as extra nesting levels.
+    // dashboards nest results like the app. Dots in names are replaced so they
+    // don't read as extra nesting levels.
     const classname = esc([r.collection ?? meta.collection, ...(r.scopePath ?? [])]
       .filter(Boolean).map(s => String(s).replaceAll('.', '_')).join('.') || 'API Tests');
     const timeSec   = ((r.durationMs ?? 0) / 1000).toFixed(3);
@@ -390,8 +388,8 @@ export function buildJUnitReport(
     } else if (r.postScriptError) {
       failures.push(`      <error message="${esc(r.postScriptError)}" type="PostScriptError" />`);
     } else if (r.status === 'skipped') {
-      // No assertions defined — emit a JUnit <skipped/> so CI dashboards
-      // surface coverage gaps without flagging the run as failed.
+      // No assertions defined: emit <skipped/> so CI surfaces the coverage gap
+      // without failing the run.
       failures.push('      <skipped message="No assertions defined for this request" />');
     } else if (r.testResults?.length) {
       for (const t of r.testResults) {
@@ -420,13 +418,12 @@ export function buildJUnitReport(
   return lines.join('\n') + '\n';
 }
 
-// ─── OWASP API Top 10 (2023) classification + SARIF ───────────────────────────
+// OWASP API Top 10 (2023) classification + SARIF
 
 export interface OwaspRule { id: string; name: string; ref: string }
 
-/** Test-name prefix (e.g. "[BOLA]") → OWASP API Top 10 rule. Zero-config and
- *  optional: names without a known prefix simply carry no OWASP tag. This is
- *  the same tagging convention used by the security-testing guide/skill. */
+/** Test-name prefix (e.g. "[BOLA]") -> OWASP API Top 10 rule. Names without a
+ *  known prefix carry no OWASP tag. */
 const OWASP_BY_TAG: Record<string, OwaspRule> = {
   BOLA:          { id: 'API1:2023',  name: 'Broken Object Level Authorization',                 ref: 'https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/' },
   AUTH:          { id: 'API2:2023',  name: 'Broken Authentication',                             ref: 'https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/' },
@@ -446,9 +443,8 @@ export function owaspRuleForName(name: string): OwaspRule | null {
   return m ? OWASP_BY_TAG[m[1].toUpperCase()] ?? null : null;
 }
 
-/** SARIF 2.1.0 report of failing checks, tagged with OWASP rules where the test
- *  name carries a known prefix. Lets security findings flow into GitHub
- *  code-scanning / the Security tab. Opt-in: only produced when SARIF is chosen. */
+/** SARIF 2.1.0 report of failing checks, tagged with OWASP rules by name prefix,
+ *  for GitHub code-scanning. */
 export function buildSarifReport(
   results: RunRequestResult[],
   _summary: RunSummary,

@@ -3,20 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * API Spector compare CLI
- *
- * Diff two OpenAPI specs, classify breaking vs non-breaking changes, and (with a
- * workspace) analyse which tests a breaking change affects and give a deploy
- * verdict.
- *
- * Usage:
- *   api-spector compare <old-spec> <new-spec> [options]
- *
- * Options:
- *   --workspace <path>     Analyse impact: which requests/tests hit a changed operation.
- *   --fail-on-breaking     Exit 1 if there are any breaking changes (CI gate).
- *   --json                 Print the diff (+ impact) as JSON.
- *   --help                 Show this help.
+ * API Spector compare CLI: diff two OpenAPI specs, classify breaking vs non-breaking, and (with
+ * --workspace) analyse which tests a breaking change affects for a deploy verdict.
+ * Options: --workspace <path> (impact analysis), --fail-on-breaking (CI gate, exit 1), --json, --help.
  */
 
 import { readFile } from 'node:fs/promises';

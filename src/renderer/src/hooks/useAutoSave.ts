@@ -6,10 +6,7 @@ import { useStore } from '../store';
 
 const { electron } = window;
 
-/**
- * Watches for dirty collections and environments and persists them to disk.
- * Debounced so rapid edits (typing in URL bar) don't hammer the file system.
- */
+/** Persists dirty collections and environments to disk, debounced so rapid edits don't hammer the file system. */
 export function useAutoSave() {
   const collections = useStore(s => s.collections);
   const _environments = useStore(s => s.environments);

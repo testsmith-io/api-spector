@@ -1,10 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Session-scoped script writes. sp.environment/collection/folder/globals.set made
-// during a manual send are kept in memory (sessionScriptVars) so the NEXT
-// manually-sent request can read them, but are never written to disk and clear
-// on workspace close. sp.variables (local) is request-scoped and not recorded.
+// Session-scoped script writes: sp.environment/collection/folder/globals.set from a manual send
+// live in memory for the next manual send, never hit disk, clear on close; sp.variables isn't recorded.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '../store';
 import { withEnvOverrides } from '../hooks/useActiveEnvironment';

@@ -7,17 +7,12 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Collection, ApiRequest, AuthConfig, RequestBody, KeyValuePair, Folder } from '../../shared/types';
 import { translateScript } from './script-translator';
 
-// ─── Bruno collection importer ────────────────────────────────────────────────
-// Accepts a path to the root bruno.json file. Scans the directory tree for
-// .bru request files and reconstructs the collection hierarchy from the
-// directory structure.
+// Bruno collection importer. Takes the root bruno.json; scans the tree for .bru
+// files and rebuilds the hierarchy from the directory structure.
 
-// ─── .bru parser ─────────────────────────────────────────────────────────────
+// .bru parser
 
-/**
- * Extract the content of a named block from a .bru file.
- * Handles nested braces correctly (e.g. body:json contains JSON with braces).
- */
+/** Extract a named block's content from a .bru file, handling nested braces. */
 function extractBlock(content: string, blockName: string): string | null {
   const lines = content.split('\n');
   for (let i = 0; i < lines.length; i++) {
@@ -59,12 +54,8 @@ function parseKv(blockContent: string | null): Record<string, string> {
   return result;
 }
 
-/**
- * Parse a Bruno `vars:pre-request` block into enabled / disabled variable maps.
- * Bruno marks a disabled variable with a leading `~` on the key (e.g.
- * `~token: abc`); we keep those in the parallel disabled map so the toggle
- * survives the import instead of the value being dropped.
- */
+/** Parse a `vars:pre-request` block into enabled / disabled maps. Bruno marks a
+ *  disabled var with a leading `~`; keep those so the toggle survives import. */
 function parseVarsBlock(blockContent: string | null): { variables: Record<string, string>; disabled: Record<string, string> } {
   const variables: Record<string, string> = {};
   const disabled: Record<string, string> = {};
@@ -79,18 +70,17 @@ function parseVarsBlock(blockContent: string | null): { variables: Record<string
   return { variables, disabled };
 }
 
-// Bruno config files that live alongside requests but are not themselves
-// requests — they must not be parsed into the request tree.
+// Config files alongside requests that must not be parsed as requests.
 const BRU_CONFIG_FILES = new Set(['folder.bru', 'collection.bru']);
 
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'query'] as const;
 type _BruMethod = typeof HTTP_METHODS[number]
 
 export function parseBruFile(content: string, fileName: string): ApiRequest {
-  // ── meta block ──
+  // meta block
   const meta = parseKv(extractBlock(content, 'meta'));
 
-  // ── HTTP method block (block name is the method) ──
+  // HTTP method block (block name is the method)
   let method: string = 'GET';
   let methodAttrs: Record<string, string> = {};
   for (const m of HTTP_METHODS) {
@@ -106,25 +96,24 @@ export function parseBruFile(content: string, fileName: string): ApiRequest {
   const bodyMode  = methodAttrs['body'] ?? 'none';
   const authMode  = methodAttrs['auth'] ?? 'none';
 
-  // ── headers ──
+  // headers
   const headers: KeyValuePair[] = Object.entries(parseKv(extractBlock(content, 'headers'))).map(([k, v]) => ({
     key: k, value: v, enabled: true,
   }));
 
-  // ── query params ──
+  // query params
   const params: KeyValuePair[] = Object.entries(parseKv(extractBlock(content, 'params:query'))).map(([k, v]) => ({
     key: k, value: v, enabled: true,
   }));
 
-  // Bruno keeps the full URL (with its query string) in `url` and also lists the
-  // query under `params:query`. Strip the query from the URL so those params are
-  // not sent twice when the request runs (the runner re-appends the Params).
+  // Bruno keeps the query in both `url` and `params:query`. Strip it from the
+  // URL so params aren't sent twice (the runner re-appends them).
   if (params.length) {
     const q = url.indexOf('?');
     if (q !== -1) url = url.slice(0, q);
   }
 
-  // ── body ──
+  // body
   let body: RequestBody = { mode: 'none' };
   if (bodyMode === 'json') {
     const jsonContent = extractBlock(content, 'body:json') ?? '';
@@ -139,7 +128,7 @@ export function parseBruFile(content: string, fileName: string): ApiRequest {
     body = { mode: 'form', form };
   } else if (bodyMode === 'multipartForm') {
     // Bruno multipart: a file field's value is `@file(path)`; a plain value is a
-    // text field. `@file(a, b)` lists several files — we take the first path.
+    // text field. `@file(a, b)` lists several files - we take the first path.
     const multipart = Object.entries(parseKv(extractBlock(content, 'body:multipart-form'))).map(([k, v]) => {
       const fileMatch = /^@file\(\s*([^),]+)/.exec(v.trim());
       return fileMatch
@@ -152,7 +141,7 @@ export function parseBruFile(content: string, fileName: string): ApiRequest {
     body = { mode: 'graphql', graphql: { query: gqlContent.trim(), variables: '{}' } };
   }
 
-  // ── auth ──
+  // auth
   let auth: AuthConfig = { type: 'none' };
   if (authMode === 'bearer') {
     const bearerAttrs = parseKv(extractBlock(content, 'auth:bearer'));
@@ -170,7 +159,7 @@ export function parseBruFile(content: string, fileName: string): ApiRequest {
     };
   }
 
-  // ── request-scoped variables (vars:pre-request) ──
+  // request-scoped variables (vars:pre-request)
   const { variables, disabled: variablesDisabled } = parseVarsBlock(extractBlock(content, 'vars:pre-request'));
 
   return {
@@ -192,7 +181,7 @@ export function parseBruFile(content: string, fileName: string): ApiRequest {
   };
 }
 
-// ─── Directory scanner ────────────────────────────────────────────────────────
+// Directory scanner
 
 async function scanDir(
   dirPath:  string,
@@ -237,12 +226,9 @@ async function scanDir(
   return folder;
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// Public API
 
-/**
- * Import a Bruno collection.
- * @param filePath  Path to the root `bruno.json` file.
- */
+/** Import a Bruno collection from the root `bruno.json` path. */
 export async function importBruno(filePath: string): Promise<Collection> {
   const raw    = await readFile(filePath, 'utf8');
   const config = JSON.parse(raw) as { name?: string; ignore?: string[] };
@@ -252,8 +238,7 @@ export async function importBruno(filePath: string): Promise<Collection> {
   const requests: Record<string, ApiRequest> = {};
   const rootFolder = await scanDir(dirPath, 'root', requests, ignore);
 
-  // Collection-level variables live in `collection.bru` (vars:pre-request)
-  // alongside bruno.json. Optional — older/simple collections omit it.
+  // Collection-level vars live in `collection.bru` alongside bruno.json; optional.
   let collectionVariables: Record<string, string> = {};
   let collectionVariablesDisabled: Record<string, string> = {};
   try {
@@ -261,7 +246,7 @@ export async function importBruno(filePath: string): Promise<Collection> {
     const parsed = parseVarsBlock(extractBlock(colBru, 'vars:pre-request'));
     collectionVariables = parsed.variables;
     collectionVariablesDisabled = parsed.disabled;
-  } catch { /* no collection.bru — fine */ }
+  } catch { /* no collection.bru - fine */ }
 
   return {
     version:     '1.0',

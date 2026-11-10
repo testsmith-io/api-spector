@@ -5,13 +5,9 @@ import { getSecretsConfig } from '../config';
 import type { SecretProvider } from '../types';
 import { signSigV4 } from './sigv4';
 
-// AWS Secrets Manager provider. References look like `aws:<secretId>#<key>` when
-// the secret stores JSON, or `aws:<secretId>` when it is a plain string.
-//
-// Credentials come from the standard AWS environment (AWS_ACCESS_KEY_ID,
-// AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN) — so in CI you assume a role via
-// OIDC in a prior step and API Spector just uses the exported credentials, and
-// locally your existing `aws configure` / SSO env works. Region from AWS_REGION.
+// AWS Secrets Manager provider. References: `aws:<secretId>#<key>` for JSON secrets,
+// `aws:<secretId>` for plain strings. Credentials from the standard AWS env
+// (AWS_ACCESS_KEY_ID/SECRET_ACCESS_KEY/SESSION_TOKEN), region from AWS_REGION.
 
 interface AwsConn {
   region: string;

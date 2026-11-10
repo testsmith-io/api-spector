@@ -12,7 +12,7 @@ import { getSecret } from '../main/ipc/secret-handler';
 
 const mockGetSecret = vi.mocked(getSecret);
 
-// ─── buildDigestAuthHeader ────────────────────────────────────────────────────
+// buildDigestAuthHeader
 
 describe('buildDigestAuthHeader', () => {
   it('builds a basic Digest header without qop', () => {
@@ -81,7 +81,7 @@ describe('buildDigestAuthHeader', () => {
   });
 });
 
-// ─── buildAuthHeaders ─────────────────────────────────────────────────────────
+// buildAuthHeaders
 
 describe('buildAuthHeaders', () => {
   beforeEach(() => {
@@ -172,7 +172,7 @@ describe('buildAuthHeaders', () => {
   });
 });
 
-// ─── buildApiKeyParam ─────────────────────────────────────────────────────────
+// buildApiKeyParam
 
 describe('buildApiKeyParam', () => {
   beforeEach(() => {
@@ -210,7 +210,7 @@ describe('buildApiKeyParam', () => {
   });
 });
 
-// ─── fetchOAuth2Token — error branches ────────────────────────────────────────
+// fetchOAuth2Token - error branches
 
 describe('fetchOAuth2Token error branches', () => {
   it('throws for authorization_code flow (requires browser redirect)', async () => {

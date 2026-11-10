@@ -97,7 +97,7 @@ describe('layoutFlowchart', () => {
     }
   });
 
-  // Count edge crossings between nodes that sit on the same pair of layers —
+  // Count edge crossings between nodes that sit on the same pair of layers -
   // the visible "lines crossing each other" the barycenter ordering fixes.
   function layerCrossings(g: ReturnType<typeof flowchartFromMarkdown>): number {
     const pos = new Map(g.nodes.map(n => [n.id, n]));

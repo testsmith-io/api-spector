@@ -5,10 +5,9 @@ import { describe, it, expect } from 'vitest';
 import { runFlow, type FlowEngineDeps, type EngineScriptInput } from '../shared/flow-engine';
 import type { Flow, FlowBlock, FlowEdge } from '../shared/types';
 
-// ─── Test harness ─────────────────────────────────────────────────────────
-// Stub deps evaluate expressions against `response` / `data` / `vars` globals
-// (standing in for the real sp.* sandbox), so these tests exercise the engine's
-// control flow, not the script runner.
+// Test harness
+// Stub deps evaluate expressions against `response` / `data` / `vars` globals,
+// so these tests exercise the engine's control flow, not the script runner.
 
 function scopes(input: EngineScriptInput) {
   return {
@@ -46,7 +45,7 @@ function harness(resp: { status?: number } = {}): Harness {
       };
     },
     runScript: async (code, input) => {
-      // Treat the script as a boolean assertion: pass unless it throws / is false.
+      // Treat the script as a boolean assertion: pass unless it throws or is false.
       try {
         const ok = Boolean(evalIn(code || 'true', input));
         return { ...scopes(input), testResults: [{ name: code, passed: ok }] };
@@ -136,8 +135,8 @@ describe('runFlow', () => {
     const eFail = edge(a.id, bad.id, 'fail');
     const f = flow([s, a, ok, bad], [edge(s.id, a.id), eSuccess, eFail]);
     const summary = await runFlow(f, h.deps);
-    expect(edgeEvents).toContain(eFail.id);      // fail route was taken (500)
-    expect(edgeEvents).not.toContain(eSuccess.id); // success route was not
+    expect(edgeEvents).toContain(eFail.id);      // fail route taken (500)
+    expect(edgeEvents).not.toContain(eSuccess.id); // success route not
     // The summary carries the complete route (survives any event race).
     expect(summary.traversedEdges).toContain(eFail.id);
     expect(summary.traversedEdges).not.toContain(eSuccess.id);

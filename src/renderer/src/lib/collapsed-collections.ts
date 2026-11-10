@@ -1,12 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Remembers which collections the user has collapsed in the sidebar, so the
-// tree opens the same way next launch. Only collapsed ids are stored (the
-// default is expanded), keyed by the stable collection id. All access is
-// read-modify-write against a single localStorage key; effect calls run
-// sequentially on the JS thread, so concurrent writes (e.g. collapse-all
-// toggling every node at once) don't clobber each other.
+// Persists which collections are collapsed in the sidebar (default expanded, only
+// collapsed ids stored) in one localStorage key. Read-modify-write is safe since
+// effect calls run sequentially on the JS thread.
 
 import { STORAGE_KEYS } from './storage-keys';
 

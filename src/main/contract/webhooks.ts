@@ -6,16 +6,10 @@ import { join } from 'node:path';
 import { fetch } from 'undici';
 import type { RecordedResult, EnvironmentState } from './results-store';
 
-// ─── Outbound webhooks (Pact-Broker style "contract changed" notifications) ───
-//
-// Webhooks are OUTBOUND ONLY. Configuration lives in `contracts/webhooks.json`
-// (committed to git); `contract webhooks --test` sends a sample event to each
-// configured URL. Secrets do not belong in the file: `$NAME` tokens in URLs and
-// header values are replaced from the process environment at fire time.
-//
-// snapshotState/diffState compute the events representing what changed between
-// two snapshots of the contract data (used to build payloads from recorded
-// results and deployments).
+// Outbound webhooks (Pact-Broker style "contract changed" notifications). Config in
+// `contracts/webhooks.json` (git-committed). Keep secrets out of the file: `$NAME`
+// tokens in URLs/headers resolve from process env at fire time. snapshotState/diffState
+// compute what changed between two snapshots.
 
 const WEBHOOKS_FILE = 'contracts/webhooks.json';
 
@@ -85,12 +79,12 @@ export async function fireWebhooks(
   }));
 }
 
-// ─── Change detection ─────────────────────────────────────────────────────────
+// Change detection
 
 export interface ContractDataState {
-  /** pacticipant@@version → recordedAt */
+  /** pacticipant@@version -> recordedAt */
   results: Record<string, string>
-  /** env@@pacticipant → version@@recordedAt */
+  /** env@@pacticipant -> version@@recordedAt */
   deployments: Record<string, string>
 }
 

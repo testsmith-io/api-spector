@@ -34,8 +34,7 @@ import { useT } from '../../i18n';
 
 const { electron } = window;
 
-/** XML well-formedness via the browser's native DOMParser. Injected into the
- *  HTTP-semantics check and used for the body parse-error indicator. */
+/** XML well-formedness via the browser's native DOMParser. */
 function xmlWellFormed(body: string): boolean {
   try {
     const doc = new DOMParser().parseFromString(body, 'application/xml');
@@ -123,11 +122,9 @@ function HistoryTabRow({ entry, onLoad, onResend }: { readonly entry: HistoryEnt
 
 type RespTab = 'body' | 'headers' | 'tests' | 'console' | 'request' | 'history' | 'http' | 'error'
 
-// Progressive disclosure driven by the PANEL width (a container query on the
-// toolbar), not the viewport — the response panel is independently resizable.
-// Primary tabs stay inline; the rest fold into "More" as the panel narrows.
-// `@min-[520px]` = medium+, `@min-[720px]` = large. The active tab is always
-// forced inline (and dropped from the menu) so it never hides.
+// Progressive disclosure by PANEL width (container query on the toolbar), not
+// viewport. Primary tabs stay inline; the rest fold into "More" as it narrows.
+// The active tab is always forced inline so it never hides.
 const TAB_INLINE_VIS: Record<RespTab, string> = {
   error: 'flex', request: 'flex', body: 'flex', headers: 'flex',
   tests: 'hidden @min-[520px]:flex', console: 'hidden @min-[520px]:flex',
@@ -168,8 +165,7 @@ export function ResponseViewer() {
   const upsertEnvVar = useStore(s => s.upsertEnvVar);
   const [tab, setTab] = useState<RespTab>('body');
 
-  // Keyboard sub-tab navigation (Cmd/Ctrl+Alt+Up/Down). App bumps subTabCycle;
-  // when it targets the response pane we step through the currently visible
+  // Keyboard sub-tab navigation (Cmd/Ctrl+Alt+Up/Down). Step through the visible
   // response tabs (kept in a ref since the list depends on the response).
   const subTabCycle = useStore(s => s.subTabCycle);
   const lastSubTabCycle = useRef(subTabCycle.nonce);
@@ -206,9 +202,8 @@ export function ResponseViewer() {
     : [], [response, sentRequest]);
   const httpErrors = httpFindings.filter(x => x.severity === 'error').length;
 
-  // Body parsing is expensive on large payloads and was re-run on every render
-  // (toast timers, resize, dialog keystrokes). Memoize it on the body itself so
-  // it parses once per response, not once per render.
+  // Body parsing is expensive on large payloads; memoize on the body so it
+  // parses once per response, not once per render.
   const bodyMeta = useMemo(() => {
     if (!response || response.error) return null;
     const contentType = response.headers['content-type'] ?? '';
@@ -236,10 +231,8 @@ export function ResponseViewer() {
     }
   }, [scriptResult?.preScriptError, scriptResult?.postScriptError]);
 
-  // A transport-level failure (no HTTP response) lands on the Error tab, but
-  // Request and History stay reachable so you can still inspect what was sent
-  // or jump back to a past response. Leave the Error tab once a real response
-  // replaces the failure.
+  // A transport-level failure lands on the Error tab, but Request and History
+  // stay reachable. Leave the Error tab once a real response replaces the failure.
   useEffect(() => {
     if (response?.error) {
       if (tab !== 'request' && tab !== 'history') setTab('error');
@@ -253,11 +246,9 @@ export function ResponseViewer() {
   const [showMockModal, setShowMockModal] = useState(false);
   const [bodyView, setBodyView] = useState<'tree' | 'raw' | 'table'>('raw');
 
-  // jq filter over a JSON response body. Runs the real jq (wasm) in main,
-  // debounced; an empty expression shows the normal body views. The expression
-  // lives on the tab (store), not in local state, so it survives the response
-  // pane remounting on each re-send and tab switch. The result/error below stay
-  // local and are recomputed from the restored expression by the effect.
+  // jq filter over a JSON response body, run (wasm) in main, debounced; empty
+  // shows the normal views. The expression lives on the tab (store) so it
+  // survives the pane remounting; result/error stay local.
   const jqExpr = activeTab?.jqExpr ?? '';
   const [jqResult, setJqResult] = useState<string | null>(null);
   const [jqError, setJqError] = useState<string | null>(null);
@@ -280,8 +271,7 @@ export function ResponseViewer() {
     ? Object.values(s.collections).find(c => c.data.requests[requestId])?.data.requests[requestId] ?? null
     : null);
 
-  // Auto-check: if a schema is stored and we have a JSON response, validate it
-  // so the response header shows a pass / fail badge on every send.
+  // Auto-check a stored schema against a JSON response, for the pass/fail badge.
   const schemaCheck = currentRequest?.schema?.trim() && response && !response.error
     ? validateBodyAgainstSchema(currentRequest.schema, response.body)
     : null;
@@ -297,8 +287,7 @@ export function ResponseViewer() {
     schemaToast.show(t('✓ Schema saved'), true);
   }
 
-  // Seed a new design-first contract interaction from this request/response and
-  // open the Contract Designer (replaces the old response-capture-to-contract).
+  // Seed a design-first contract from this request/response, open the Designer.
   function sendToDesigner() {
     if (!response) return;
     const rawUrl = sentRequest?.url ?? '';
@@ -308,7 +297,7 @@ export function ResponseViewer() {
       const u = new URL(rawUrl);
       path = u.pathname;
       query = [...u.searchParams.entries()].map(([key, value]) => ({ key, value, enabled: true }));
-    } catch { /* relative or templated URL — keep the path as-is */ }
+    } catch { /* relative or templated URL - keep the path as-is */ }
     const contentType = response.headers['content-type'];
     const seed: Partial<DesignInteraction> = {
       description: sentRequest ? `${sentRequest.method} ${path}` : path,
@@ -339,17 +328,14 @@ export function ResponseViewer() {
       setTabRequestTab(activeTabId, 'scripts');
       setTabScriptTab(activeTabId, 'post');
     }
-    // Coming from the response tree means the user already chose what to
-    // insert — fold the Quick Inserts sidebar so it doesn't crowd the editor
-    // they're now looking at. They can reopen it with the Snippets toggle.
+    // The user already chose what to insert, so fold the Quick Inserts sidebar
+    // (reopen with the Snippets toggle).
     state.setQuickInsertsOpen(false);
     assertToast.show(t('✓ Assertion added'), true);
   }
 
-  // GraphQL subscription: the Response pane is where the live stream + tests
-  // render, exactly where a query's response would appear. This takes over the
-  // whole pane (it has its own Subscribe/Stop control) and is independent of the
-  // HTTP response state, so it shows whether or not anything was "sent".
+  // GraphQL subscription: the live stream + tests render in the Response pane.
+  // Takes over the whole pane and is independent of HTTP response state.
   const gqlSub = currentRequest?.body?.mode === 'graphql' && currentRequest.body.graphql
     && isSubscriptionQuery(currentRequest.body.graphql.query)
     ? currentRequest.body.graphql
@@ -392,8 +378,7 @@ export function ResponseViewer() {
     );
   }
 
-  // Derived from the memoized body parse above (bodyMeta is non-null here since
-  // we've passed the !response / streaming early returns).
+  // From the memoized body parse above (non-null past the early returns).
   const { contentType, isJson, isXml, supportsTree, showTable, bodyParseError, displayBody } =
     bodyMeta ?? { contentType: '', isJson: false, isXml: false, supportsTree: false, showTable: false, bodyParseError: false, displayBody: response.body };
 
@@ -438,9 +423,8 @@ export function ResponseViewer() {
     </div>
   );
 
-  // One response tab, rendered either inline in the bar or as a row inside the
-  // "More" menu; container-query classes pick which, and the active tab is
-  // always forced inline (and removed from the menu) so it can never hide.
+  // One response tab, rendered inline or as a "More" menu row (container-query
+  // classes pick which); the active tab is always forced inline so it can't hide.
   function renderTabButton(def: typeof tabList[number], variant: 'inline' | 'menu') {
     const active = tab === def.id;
     const badge = def.badge !== undefined ? (
@@ -499,10 +483,9 @@ export function ResponseViewer() {
         <HookResultsPanel results={hookResults} />
       )}
 
-      {/* Response toolbar. A container query on this wrapper makes the controls
-          respond to the PANEL width (it is independently resizable), so the bar
-          never scrolls horizontally: tabs and actions fold into overflow menus
-          as it narrows. Row 1 = metadata + tabs; row 2 = view label + actions. */}
+      {/* Response toolbar. A container query on this wrapper sizes the controls
+          to the PANEL width, so the bar never scrolls: tabs and actions fold
+          into overflow menus. Row 1 = metadata + tabs; row 2 = label + actions. */}
       <div className="@container flex-shrink-0 border-b border-surface-800">
         {/* Row 1: response metadata + tabs (+ "More" overflow) */}
         <div className="flex items-center gap-3 px-4 py-1.5 min-w-0">
@@ -514,8 +497,8 @@ export function ResponseViewer() {
             <span className="text-xs text-[var(--text-muted)]">{(response.bodySize / 1024).toFixed(1)} KB</span>
           </div>
 
-          {/* The overflow menu is a SIBLING of the tablist, not a child: a
-              role="tablist" may only contain role="tab" children (aria-required-children). */}
+          {/* The overflow menu is a SIBLING of the tablist: role="tablist" may
+              only contain role="tab" children (aria-required-children). */}
           <div className="flex items-center gap-0 min-w-0 ml-1">
             <div role="tablist" tabIndex={-1} aria-label={t('Response sections')} onKeyDown={onTablistKey} className="flex items-center gap-0 min-w-0">
               {tabList.map(def => renderTabButton(def, 'inline'))}
@@ -571,7 +554,7 @@ export function ResponseViewer() {
             )}
 
             <div className="ml-auto flex items-center gap-1 shrink-0">
-              {/* Tree / Raw / Table — a segmented view-mode control (body tab) */}
+              {/* Tree / Raw / Table - a segmented view-mode control (body tab) */}
               {tab === 'body' && supportsTree && !response.streamed && (
                 <div role="group" aria-label={t('Body view mode')} className="flex rounded overflow-hidden border border-surface-800 mr-1">
                   <button
@@ -603,7 +586,7 @@ export function ResponseViewer() {
                 </div>
               )}
 
-              {/* Pin — always visible */}
+              {/* Pin - always visible */}
               <button
                 onClick={() => setPinned(response)}
                 aria-pressed={pinnedResponse === response}
@@ -613,9 +596,8 @@ export function ResponseViewer() {
                 {t('Pin')}
               </button>
 
-              {/* Diff / Contract / Mock — inline while there is room; they are
-                  few and small, so they only fold into "…" on a genuinely narrow
-                  panel. */}
+              {/* Diff / Contract / Mock - inline while there's room, folding into
+                  "…" only on a narrow panel. */}
               {pinnedResponse && (
                 <button
                   onClick={() => setDiffMode(d => !d)}
@@ -648,8 +630,8 @@ export function ResponseViewer() {
                 → {t('Designer')}
               </button>
 
-              {/* "…" overflow — only appears below the width where the actions
-                  stop fitting; hidden entirely (no empty button) above it. */}
+              {/* "…" overflow - only appears below the width where the actions
+                  stop fitting. */}
               <OverflowMenu
                 wrapperClassName="flex @min-[350px]:hidden"
                 buttonClassName="px-1.5 py-1 text-[10px] rounded bg-surface-800 hover:bg-surface-700 text-surface-300 flex items-center"
@@ -698,7 +680,7 @@ export function ResponseViewer() {
 
       {showMockModal && <SaveAsMockModal onClose={() => setShowMockModal(false)} />}
 
-      {/* Content — flex-col so each panel can fill remaining height cleanly */}
+      {/* Content - flex-col so each panel can fill remaining height cleanly */}
       <div id={panelId} role="tabpanel" aria-labelledby={`${panelId}-tab-${tab}`} aria-label={tabList.find(x => x.id === tab)?.label} className="flex-1 min-h-0 flex flex-col overflow-y-auto">
         {response.error ? (
           tab === 'request' ? (

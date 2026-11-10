@@ -1,11 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Scoped git mode translates paths at the git boundary: the renderer always
-// sees workspace-relative paths, while git commands run at the enclosing repo
-// root and need repo-root-relative pathspecs. These pure helpers do that
-// translation; getting the prefix math wrong would stage/commit/diff the wrong
-// files (or files outside the workspace), so they are worth pinning down.
+// Scoped git mode translates paths at the git boundary: the renderer sees workspace-relative
+// paths, git commands need repo-root-relative pathspecs. Pure helpers; wrong prefix math stages the wrong files.
 
 import { describe, it, expect } from 'vitest';
 import {

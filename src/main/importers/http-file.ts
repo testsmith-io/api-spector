@@ -8,18 +8,13 @@ import type {
   Collection, ApiRequest, Folder, KeyValuePair, RequestBody, AuthConfig, HttpMethod,
 } from '../../shared/types';
 
-// ─── .http / .rest file importer ──────────────────────────────────────────────
-//
-// Parses the request format shared by the VSCode REST Client and IntelliJ HTTP
-// Client. A file is a flat list of requests separated by `###`, each with an
-// optional name, a `METHOD URL` line, headers, and a body. File-level variables
-// (`@name = value`) become collection variables; `{{$dynamic}}` system variables
-// are mapped onto API Spector's equivalents.
+// .http / .rest importer (VSCode REST Client, IntelliJ HTTP Client). Requests
+// separated by `###`; `@name = value` become collection variables and
+// `{{$dynamic}}` system variables map onto API Spector's equivalents.
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'QUERY'];
 
-/** REST Client / IntelliJ dynamic variables → API Spector dynamic variables.
- *  Shared with the exporter (reverse direction) so a round-trip stays stable. */
+/** REST Client / IntelliJ dynamic vars -> API Spector; shared with the exporter for stable round-trips. */
 export const HTTP_TO_SPECTOR: Record<string, string> = {
   $guid:          '$uuid',
   $randomInt:     '$randomInt',
@@ -35,14 +30,13 @@ export const SPECTOR_TO_HTTP: Record<string, string> = {
   $isoTimestamp: '$datetime iso8601',
 };
 
-/** Rewrite `{{$dynamic ...}}` tokens from REST Client names to API Spector names.
- *  Arguments we can't represent (e.g. `$randomInt 1 100`) are dropped. */
+/** Rewrite {{$dynamic ...}} tokens to API Spector names; unrepresentable args are dropped. */
 export function mapDynamicVars(s: string): string {
   return s.replaceAll(/\{\{\s*(\$[A-Za-z]+)[^}]*\}\}/g, (_m, name: string) =>
     `{{${HTTP_TO_SPECTOR[name] ?? name}}}`);
 }
 
-// ─── Body / auth helpers ──────────────────────────────────────────────────────
+// Body / auth helpers
 
 function contentTypeOf(headers: KeyValuePair[]): string {
   return headers.find(h => h.key.toLowerCase() === 'content-type')?.value.toLowerCase() ?? '';
@@ -68,8 +62,7 @@ function toRequestBody(bodyText: string, headers: KeyValuePair[]): RequestBody {
   return { mode: 'raw', raw: bodyText, rawContentType: ct || 'text/plain' };
 }
 
-/** Lift `Authorization: Bearer …` into structured auth; leave other schemes as a
- *  plain header. Returns the (possibly reduced) header list and the auth config. */
+/** Lift `Authorization: Bearer` into structured auth; leave other schemes as a plain header. */
 function extractAuth(headers: KeyValuePair[]): { headers: KeyValuePair[]; auth: AuthConfig } {
   const authHeader = headers.find(h => h.key.toLowerCase() === 'authorization');
   if (authHeader) {
@@ -95,7 +88,7 @@ function stripScriptBlocks(bodyLines: string[]): string {
     .trim();
 }
 
-// ─── Block parsing ────────────────────────────────────────────────────────────
+// Block parsing
 
 interface Block { label?: string; lines: string[] }
 
@@ -130,7 +123,7 @@ function parseBlock(block: Block): ApiRequest | null {
     if (named) { name = named[1].trim(); continue; }
     if (t.startsWith('#') || t.startsWith('//')) continue;      // plain comment / directive
     if (/^@\w+\s*=/.test(t)) continue;                // file variable
-    break;                                                       // → request line
+    break;                                                       // -> request line
   }
   if (i >= lines.length) return null;
 
@@ -168,9 +161,9 @@ function parseBlock(block: Block): ApiRequest | null {
   };
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// Public API
 
-/** Parse `.http` file text into a Collection (pure — no filesystem). */
+/** Parse `.http` file text into a Collection (pure - no filesystem). */
 export function parseHttpFile(text: string, name: string): Collection {
   // File-level variables: @name = value (collected across the whole file).
   const collectionVariables: Record<string, string> = {};

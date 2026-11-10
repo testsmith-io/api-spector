@@ -8,7 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Collection, ApiRequest, AuthConfig, RequestBody, KeyValuePair, Folder, RequestExample } from '../../shared/types';
 import { normalizeHttpMethod } from '../../shared/types';
 
-// ─── OpenAPI 3.x importer ─────────────────────────────────────────────────────
+// OpenAPI 3.x importer
 
  
 
@@ -38,7 +38,7 @@ function resolveRef(spec: any, ref: string): any {
 
 function resolve(spec: any, obj: any, seen = new Set<any>()): any {
   if (!obj || typeof obj !== 'object') return obj;
-  if (seen.has(obj)) return {};           // circular — return empty object rather than looping
+  if (seen.has(obj)) return {};           // circular ref
   if (Array.isArray(obj)) {
     seen.add(obj);
     return obj.map(item => resolve(spec, item, seen));
@@ -70,18 +70,8 @@ function schemaToExample(schema: any): any {
   }
 }
 
-/**
- * Pick the most useful 2xx response from `operation.responses` and return its
- * JSON-ish content schema as a pretty-printed JSON string. Returns undefined
- * if there's no JSON response schema to extract.
- *
- * Status preference: 200 → 201 → any other 2xx (numeric, sorted) → `2XX`
- * (OpenAPI range form) → `default`.
- *
- * Content type matching: any media type whose subtype contains `json`
- * (`application/json`, `application/json; charset=utf-8`,
- * `application/vnd.api+json`, `application/problem+json`, …).
- */
+/** Best 2xx response schema as a pretty-printed JSON string, or undefined.
+ *  Status preference: 200 -> 201 -> other 2xx -> 2XX range -> default; any JSON media type. */
 function buildResponseSchema(operation: any, spec: any): string | undefined {
   const responses = operation.responses;
   if (!responses || typeof responses !== 'object') return undefined;
@@ -94,21 +84,15 @@ function buildResponseSchema(operation: any, spec: any): string | undefined {
   for (const code of codes) {
     if (/^2\d\d$/.test(code) && !ordered.includes(code)) ordered.push(code);
   }
-  // OpenAPI range form (case-insensitive in the spec, but Swagger UI / many
-  // generators emit uppercase X)
+  // range form, usually uppercase 2XX
   for (const code of codes) {
     if (/^2xx$/i.test(code) && !ordered.includes(code)) ordered.push(code);
   }
   if (codes.includes('default')) ordered.push('default');
 
   for (const code of ordered) {
-    // IMPORTANT: must resolve with a fresh `seen` set. The caller passes us
-    // the *unresolved* operation precisely so we can do this — pre-resolved
-    // trees can have $refs replaced by `{}` when the same component is
-    // referenced more than once under the same parent.
-    //
-    // The response object itself may be a $ref to #/components/responses/X,
-    // so resolve it first before reading `.content`.
+    // Resolve fresh: a pre-resolved tree collapses repeated $refs to {}. The
+    // response itself may be a $ref, so resolve before reading `.content`.
     const responseObj = resolve(spec, responses[code]);
     const content = responseObj?.content;
     if (!content || typeof content !== 'object') continue;
@@ -135,9 +119,8 @@ function buildResponseSchema(operation: any, spec: any): string | undefined {
 }
 
 function buildBody(rawOperation: any, params: any[], spec: any): RequestBody {
-  // OpenAPI 3: requestBody (which may itself be a $ref to
-  // #/components/requestBodies/X) → content. Resolve the whole requestBody fresh
-  // so a $ref body and repeated schema $refs aren't collapsed to {}.
+  // Resolve the whole requestBody fresh so a $ref body and repeated schema
+  // $refs aren't collapsed to {}.
   const requestBody = resolve(spec, rawOperation?.requestBody ?? {}, new Set());
   const content = requestBody?.content ?? {};
   const jsonKey = Object.keys(content).find(k => k.includes('json'));
@@ -145,9 +128,8 @@ function buildBody(rawOperation: any, params: any[], spec: any): RequestBody {
     return { mode: 'json', json: JSON.stringify(schemaToExample(content[jsonKey].schema ?? {}), null, 2) };
   }
 
-  // OpenAPI 3: multipart/form-data → a multipart body. Each schema property
-  // becomes a part; a `string`/`format: binary` (or an array of them) is a file
-  // part, everything else a text field seeded with an example value.
+  // multipart/form-data: each property a part; binary format = file part, rest
+  // = text fields seeded with an example.
   const multipartKey = Object.keys(content).find(k => k.toLowerCase().includes('multipart/form-data'));
   if (multipartKey) {
     const schema = resolve(spec, content[multipartKey].schema ?? {}, new Set());
@@ -171,8 +153,7 @@ function buildBody(rawOperation: any, params: any[], spec: any): RequestBody {
     return { mode: 'json', json: JSON.stringify(schemaToExample(schema), null, 2) };
   }
 
-  // Swagger 2.0 formData. With a `type: file` param it's a multipart upload;
-  // otherwise it's a urlencoded form (one row per field).
+  // Swagger 2.0 formData: multipart if any `type: file` param, else urlencoded.
   const formParams = params.filter(p => p?.in === 'formData');
   if (formParams.length) {
     if (formParams.some(p => p?.type === 'file')) {
@@ -199,18 +180,12 @@ function buildBody(rawOperation: any, params: any[], spec: any): RequestBody {
   return { mode: 'none' };
 }
 
-/**
- * Named example request payloads. OpenAPI attaches `examples` (a name→example
- * map) to the request body and to individual parameters; by convention the same
- * example NAME across body + params describes one scenario. We build a
- * RequestExample per scenario name, overriding the body and/or params it names.
- * Returns undefined when the spec carries no named examples (so nothing changes
- * for specs that only have schemas / single examples baked into the request).
- */
+/** Named example payloads -> one RequestExample per scenario name. OpenAPI keys
+ *  `examples` by name on body and params; the same name = one scenario; undefined if none. */
 function buildExamples(operation: any, spec: any, baseParams: KeyValuePair[], baseHeaders: KeyValuePair[], baseBody: RequestBody): RequestExample[] | undefined {
   const json = resolve(spec, operation.requestBody?.content ?? {})['application/json'];
 
-  // Body examples: name → value.
+  // Body examples: name -> value.
   const bodyExamples: Record<string, unknown> = {};
   if (json?.examples && typeof json.examples === 'object') {
     for (const [name, ex] of Object.entries<any>(json.examples)) {
@@ -218,7 +193,7 @@ function buildExamples(operation: any, spec: any, baseParams: KeyValuePair[], ba
     }
   }
 
-  // Parameter examples: paramName → (name → value).
+  // Parameter examples: paramName -> (name -> value).
   const paramExamples: Record<string, Record<string, unknown>> = {};
   for (const p of (operation.parameters ?? [])) {
     if (!p?.name || (p.in !== 'query' && p.in !== 'path')) continue;
@@ -238,10 +213,8 @@ function buildExamples(operation: any, spec: any, baseParams: KeyValuePair[], ba
 
   const examples: RequestExample[] = [];
   for (const name of names) {
-    // A full snapshot: the example fully defines what it sends. Fields this
-    // scenario names are overridden; the rest are captured from the base request
-    // (headers, and body/params when the scenario doesn't specify them) so the
-    // example is a complete, runnable request on its own.
+    // A full, runnable snapshot: fields the scenario names are overridden, the
+    // rest captured from the base request.
     const body: RequestBody = (name in bodyExamples && bodyExamples[name] !== undefined)
       ? { mode: 'json', json: typeof bodyExamples[name] === 'string' ? String(bodyExamples[name]) : JSON.stringify(bodyExamples[name], null, 2) }
       : baseBody;
@@ -264,8 +237,7 @@ function buildExamples(operation: any, spec: any, baseParams: KeyValuePair[], ba
   return examples.length ? examples : undefined;
 }
 
-/** Capture an OpenAPI `enum` as a list of allowed values for the params table's
- *  dropdown. Values are stringified; returns undefined when there is no enum. */
+/** An `enum` as a list of stringified allowed values, or undefined. */
 function enumChoices(schema: any): string[] | undefined {
   if (!schema || !Array.isArray(schema.enum) || !schema.enum.length) return undefined;
   return schema.enum
@@ -282,8 +254,7 @@ function buildParams(operation: any): KeyValuePair[] {
       const choices = enumChoices(schema);
       return {
         key: p.name,
-        // When the schema is an enum, default to its first value so the dropdown
-        // starts on a valid choice; otherwise use the usual example.
+        // enum defaults to its first value, else the usual example
         value: choices ? choices[0] : String(schemaToExample(schema) ?? ''),
         enabled: p.required ?? false,
         description: p.description ?? '',
@@ -292,17 +263,8 @@ function buildParams(operation: any): KeyValuePair[] {
     });
 }
 
-/**
- * Build path-parameter rows for the request's `params` table. Each row carries
- * `paramType: 'path'` so `buildUrl()` substitutes it into the URL via
- * `{{name}}` interpolation rather than appending it to the querystring.
- *
- * Default value is taken (in order of preference) from:
- *   1. the parameter's own `example` (OpenAPI param-level example)
- *   2. the schema's `example` or `default`
- *   3. the first `enum` value, if any
- *   4. a type-based placeholder (1 for numbers, true for booleans, '' for strings)
- */
+/** Path-param rows tagged `paramType: 'path'` so buildUrl() interpolates them into
+ *  the URL. Default preference: param example -> schema example/default -> first enum -> type placeholder. */
 function buildPathParamRows(operation: any): KeyValuePair[] {
   return (operation.parameters ?? [])
     .filter((p: any) => p.in === 'path' && p.name)
@@ -333,11 +295,8 @@ function buildPathParamRows(operation: any): KeyValuePair[] {
     });
 }
 
-/**
- * Rewrite OpenAPI path-template syntax (`/users/{id}`) into the project's
- * variable interpolation syntax (`/users/{{id}}`), so the path params resolve
- * from collection/environment variables at send-time.
- */
+/** Rewrite OpenAPI path templates (`/users/{id}`) to interpolation syntax
+ *  (`/users/{{id}}`). */
 function rewritePathTemplate(url: string): string {
   return url.replaceAll(/\{([^/{}]+)\}/g, (_m, name) => `{{${name}}}`);
 }
@@ -378,9 +337,8 @@ function buildAuth(security: any[], securitySchemes: any): AuthConfig {
 // 'query' is an OpenAPI 3.2+ operation (HTTP QUERY, RFC 10008)
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'query'] as const;
 
-/** The API's base URL, from OpenAPI 3 `servers` or Swagger 2.0
- *  `schemes`/`host`/`basePath`. Inlined into each request URL so the import
- *  preview can detect it and offer to extract it into an environment variable. */
+/** Base URL from OpenAPI 3 `servers` or Swagger 2.0 `schemes`/`host`/`basePath`.
+ *  Inlined into each request URL so the import preview can offer to extract it. */
 function resolveBaseUrl(spec: any): string {
   if (Array.isArray(spec.servers) && spec.servers[0]?.url) return String(spec.servers[0].url).replace(/\/$/, '');
   if (spec.host) {
@@ -414,25 +372,21 @@ function buildCollection(spec: any): Collection {
       const tags: string[] = operation.tags?.length ? operation.tags : ['default'];
       const tag = tags[0];
 
-      // Resolve each parameter with its OWN fresh seen set: the shared seen set
-      // on `resolved` collapses a $ref used by more than one operation in this
-      // pathItem to `{}`, which would silently drop repeated parameters. Swagger
-      // 2.0 parameters carry type/enum/default on the parameter itself (no
-      // nested `schema`), so the builders fall back to the parameter.
+      // Resolve each param with its own fresh seen set: the shared set on
+      // `resolved` collapses a $ref shared by operations in this pathItem to {},
+      // dropping repeated params.
       const rawOperation = pathItem[method] ?? {};
       const rawParams = [...(pathItem.parameters ?? []), ...(rawOperation.parameters ?? [])];
       const allParams = rawParams.map(p => resolve(spec, p, new Set()));
       const opWithParams = { ...operation, parameters: allParams };
 
       const security = operation.security ?? globalSecurity;
-      // Path params are listed first in the params table so users see them
-      // immediately on the Params tab (since they're the ones requiring action).
+      // Path params first so they're the first thing on the Params tab.
       const params: KeyValuePair[] = [
         ...buildPathParamRows(opWithParams),
         ...buildParams(opWithParams),
       ];
-      // buildResponseSchema / buildBody re-resolve from the raw operation with a
-      // fresh seen set (the resolved tree above collapses repeat $refs to {}).
+      // Re-resolve from the raw operation (the resolved tree collapses repeat $refs).
       const responseSchema = buildResponseSchema(rawOperation, spec);
       const headers = buildHeaders(opWithParams);
       const body = buildBody(rawOperation, allParams, spec);
@@ -478,22 +432,19 @@ export async function importOpenApiFromUrl(url: string): Promise<Collection> {
   return buildCollection(await loadSpecFromUrl(url));
 }
 
-// ─── Schema extraction (for sync without re-import) ────────────────────────
+// Schema extraction (for sync without re-import)
 
 export interface SpecSchemaEntry {
-  method: string                // uppercase: GET, POST, etc.
+  method: string                // uppercase
   pathTemplate: string          // raw OpenAPI path, e.g. /users/{id}
-  /** The same rewritten path used in imported requests, e.g. /users/{{id}} */
+  /** Rewritten path as used in imported requests, e.g. /users/{{id}} */
   pathRewritten: string
   schema: string                // pretty-printed JSON Schema (response body)
   operationId?: string
   summary?: string
 }
 
-/**
- * Extract all response-body schemas from an OpenAPI spec.
- * Returns one entry per operation that has a JSON response schema.
- */
+/** One entry per operation that has a JSON response schema. */
 function extractSchemas(spec: any): SpecSchemaEntry[] {
   const entries: SpecSchemaEntry[] = [];
   for (const [pathStr, pathItem] of Object.entries<any>(spec.paths ?? {})) {

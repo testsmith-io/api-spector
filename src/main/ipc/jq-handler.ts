@@ -18,7 +18,7 @@ function getJq(): Promise<JqModule> {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const mod = require('jq-web');
       // jq-web resolves to the ready module synchronously once the wasm is
-      // compiled, but exposes a thenable during init — await it to be safe.
+      // compiled, but exposes a thenable during init - await it to be safe.
       return (mod && typeof mod.json === 'function') ? mod : await mod;
     })();
   }

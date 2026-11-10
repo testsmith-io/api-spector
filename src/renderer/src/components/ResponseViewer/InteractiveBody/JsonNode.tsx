@@ -13,10 +13,8 @@ interface Props {
   readonly onLeaf: (e: React.MouseEvent, path: JsonPath, value: unknown) => void
 }
 
-// Memoized: a large response tree shouldn't re-render when the ResponseViewer
-// re-renders for unrelated reasons (toast timers, resize, dialog keystrokes).
-// Collapsed branches keep their own `expanded` state, so only the visible
-// subtree pays any cost. Recursion references the memoized const below.
+// Memoized so a large response tree doesn't re-render for unrelated reasons;
+// collapsed branches keep their own `expanded` state. Recursion uses the const below.
 export const JsonNode = React.memo(function JsonNode({ nodeKey, value, path, depth, onLeaf }: Props) {
   const t = useT();
   // Auto-expand the first two levels for readability
@@ -30,7 +28,7 @@ export const JsonNode = React.memo(function JsonNode({ nodeKey, value, path, dep
       </span>
     ) : null;
 
-  /* ── leaf ── */
+  /* leaf */
   if (value === null || typeof value !== 'object') {
     const display =
       value === null
@@ -62,7 +60,7 @@ export const JsonNode = React.memo(function JsonNode({ nodeKey, value, path, dep
     );
   }
 
-  /* ── branch ── */
+  /* branch */
   const isArr = Array.isArray(value);
   const entries: [string | number, unknown][] = isArr
     ? (value as unknown[]).map((v, i) => [i, v])

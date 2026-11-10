@@ -12,8 +12,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import type { GrpcServiceInfo, GrpcMessage } from '../../shared/types';
 
-// ─── Call registry ────────────────────────────────────────────────────────────
-// One in-flight call per requestId, so a second invoke or a cancel supersedes it.
+// One in-flight call per requestId; a second invoke or a cancel supersedes it.
 interface ActiveCall {
   cancel: () => void
 }
@@ -26,7 +25,7 @@ export function closeAllGrpcConnections(): void {
   calls.clear();
 }
 
-// ─── Proto loading ────────────────────────────────────────────────────────────
+// Proto loading
 
 interface ProtoSource {
   protoSource?: string
@@ -43,8 +42,7 @@ const LOADER_OPTS: protoLoader.Options = {
 };
 
 // Resolve the proto to a filename + import dirs proto-loader can read. Pasted
-// source is written to a throwaway temp file so its `import` statements still
-// resolve against importPaths.
+// source goes to a temp file so its `import` statements resolve against importPaths.
 function resolveProtoFile(src: ProtoSource): { file: string; includeDirs: string[] } {
   const importPaths = (src.importPaths ?? []).filter(Boolean);
 
@@ -65,8 +63,8 @@ function loadPackage(src: ProtoSource): protoLoader.PackageDefinition {
   return protoLoader.loadSync(file, { ...LOADER_OPTS, includeDirs });
 }
 
-// A package-definition entry is a service when its members look like gRPC
-// methods (they carry requestStream / responseStream flags).
+// A package-definition entry is a service when its members carry
+// requestStream / responseStream flags.
 function enumerateServices(pkgDef: protoLoader.PackageDefinition): GrpcServiceInfo[] {
   const services: GrpcServiceInfo[] = [];
   for (const [name, def] of Object.entries(pkgDef)) {
@@ -81,7 +79,7 @@ function enumerateServices(pkgDef: protoLoader.PackageDefinition): GrpcServiceIn
   return services;
 }
 
-// Walk a dotted service name (e.g. "helloworld.Greeter") into the loaded object.
+// Walk a dotted service name into the loaded object.
 function resolveService(grpcObj: grpc.GrpcObject, serviceName: string): grpc.ServiceClientConstructor {
   let node: unknown = grpcObj;
   for (const part of serviceName.split('.')) {
@@ -97,16 +95,16 @@ function normalizeTarget(url: string): string {
   return url.replace(/^[a-z0-9+.-]+:\/\//i, '').replace(/\/+$/, '');
 }
 
-// ─── IPC handlers ─────────────────────────────────────────────────────────────
+// IPC handlers
 
 export function registerGrpcHandlers(ipc: IpcMain): void {
-  // grpc:loadProto — parse a proto and list its services + methods.
+  // grpc:loadProto - list a proto's services + methods.
   handleIpc(ipc, IPC.grpc.loadProto, async (_e: IpcMainInvokeEvent, src: ProtoSource): Promise<{ services: GrpcServiceInfo[] }> => {
     return { services: enumerateServices(loadPackage(src)) };
   });
 
-  // grpc:invoke — call one method. Unary sends one message + a status; server
-  // streaming sends many messages then a status. Both stream back over
+  // grpc:invoke - call one method. Unary returns one message + a status; server
+  // streaming returns many messages then a status. Both stream back over
   // IPC.grpc.message / IPC.grpc.status keyed by requestId.
   handleIpc(ipc, IPC.grpc.invoke, async (
     event: IpcMainInvokeEvent,
@@ -149,7 +147,7 @@ export function registerGrpcHandlers(ipc: IpcMain): void {
       return;
     }
 
-    // Find the method (proto names are kept as-is; match case-insensitively too).
+    // Match the method, falling back to case-insensitive.
     const serviceDef = ServiceCtor.service as Record<string, { requestStream: boolean; responseStream: boolean }>;
     const methodKey = Object.keys(serviceDef).find(k => k === opts.methodName)
       ?? Object.keys(serviceDef).find(k => k.toLowerCase() === opts.methodName.toLowerCase());
@@ -160,7 +158,7 @@ export function registerGrpcHandlers(ipc: IpcMain): void {
     const def = serviceDef[methodKey];
 
     if (def.requestStream) {
-      // Client-streaming and bidi need an interactive send loop (a follow-up).
+      // Client-streaming and bidi need an interactive send loop.
       sendStatus('error', { error: 'Client-streaming methods are not supported yet.' });
       return;
     }
@@ -173,7 +171,7 @@ export function registerGrpcHandlers(ipc: IpcMain): void {
     const metadata = new grpc.Metadata();
     for (const [k, v] of Object.entries(opts.metadata ?? {})) metadata.set(k, v);
 
-    // Map a gRPC status to a friendly code name for the UI.
+    // gRPC status code to its name for the UI.
     const statusName = (code: number): string =>
       Object.keys(grpc.status).find(k => (grpc.status as unknown as Record<string, number>)[k] === code) ?? String(code);
 
@@ -216,7 +214,7 @@ export function registerGrpcHandlers(ipc: IpcMain): void {
     }
   });
 
-  // grpc:cancel — abort an in-flight call.
+  // grpc:cancel - abort an in-flight call.
   handleIpc(ipc, IPC.grpc.cancel, async (_e: IpcMainInvokeEvent, requestId: string): Promise<void> => {
     calls.get(requestId)?.cancel();
     calls.delete(requestId);

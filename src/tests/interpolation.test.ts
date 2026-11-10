@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { interpolate, buildUrl, mergeVars, buildDynamicVars, resolveDataRow } from '../main/interpolation';
 import type { KeyValuePair } from '../shared/types';
 
-// ─── interpolate ─────────────────────────────────────────────────────────────
+// interpolate
 
 describe('interpolate', () => {
   it('replaces a single variable', () => {
@@ -42,7 +42,7 @@ describe('interpolate', () => {
   });
 });
 
-// ─── buildUrl ─────────────────────────────────────────────────────────────────
+// buildUrl
 
 describe('buildUrl', () => {
   function p(key: string, value: string, enabled = true): KeyValuePair {
@@ -176,7 +176,7 @@ describe('buildUrl', () => {
   });
 });
 
-// ─── mergeVars ───────────────────────────────────────────────────────────────
+// mergeVars
 
 describe('mergeVars', () => {
   it('merges all scopes', () => {
@@ -225,7 +225,7 @@ describe('mergeVars', () => {
   });
 });
 
-// ─── resolveDataRow (variables + faker in collection/folder data tables) ──────
+// resolveDataRow (variables + faker in collection/folder data tables)
 
 describe('resolveDataRow', () => {
   it('resolves {{variable}} references in cell values', async () => {

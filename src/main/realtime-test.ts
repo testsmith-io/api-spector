@@ -1,24 +1,19 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Run a realtime request (WebSocket, Socket.IO or a GraphQL subscription) as a
-// test: open a one-shot connection, optionally send something, collect what
-// arrives for a window, then run an sp.* assertion script over the collected
-// items (exposed as sp.messages). The same model as the MQTT test (mqtt-test.ts)
-// and used by the panels' "Run test" buttons and the collection runner.
-//
-// Each collected item becomes an sp.messages entry with .json()/.text() plus
-// protocol-specific fields:
-//   WebSocket  → .data (the frame text)
-//   Socket.IO  → .event (name), .args (array); .json() is the first argument
-//   GraphQL    → .data (the subscription payload's data object)
+// Run a realtime request (WebSocket, Socket.IO, GraphQL subscription) as a test:
+// connect, optionally send, collect for a window, assert with sp.* over sp.messages.
+// Per-protocol fields on each sp.messages item:
+//   WebSocket  -> .data (frame text)
+//   Socket.IO  -> .event (name), .args (array); .json() is the first argument
+//   GraphQL    -> .data (the subscription payload's data object)
 
 import WebSocket from 'ws';
 import { io, type Socket } from 'socket.io-client';
 import { runScript } from './script-runner';
 import type { TestResult } from '../shared/types';
 
-// ─── Shared types ───────────────────────────────────────────────────────────
+// Shared types
 
 /** One collected item. `payload` is the serialized form behind .json()/.text();
  *  any other fields are passed through onto the sp.messages entry. */
@@ -67,7 +62,7 @@ function parseJsonObject(text: string | undefined, label: string): Record<string
   return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : undefined;
 }
 
-// ─── WebSocket ──────────────────────────────────────────────────────────────
+// WebSocket
 
 export interface WsTestConfig extends ScriptScopes {
   url: string
@@ -123,7 +118,7 @@ export async function runWsTest(cfg: WsTestConfig): Promise<RealtimeTestResult> 
   });
 }
 
-// ─── Socket.IO ──────────────────────────────────────────────────────────────
+// Socket.IO
 
 export interface SocketIoTestConfig extends ScriptScopes {
   url: string
@@ -199,7 +194,7 @@ export async function runSocketIoTest(cfg: SocketIoTestConfig): Promise<Realtime
   });
 }
 
-// ─── GraphQL subscriptions (graphql-ws) ──────────────────────────────────────
+// GraphQL subscriptions (graphql-ws)
 
 export interface GraphqlWsTestConfig extends ScriptScopes {
   url: string

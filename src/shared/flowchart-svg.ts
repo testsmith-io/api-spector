@@ -1,9 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 //
-// Renders a flowchart code block to a self-contained <svg> string. Used by the
-// documentation export (main process), where the React/@xyflow renderer can't
-// run. Parsing + layout are shared with the in-app preview.
+// Flowchart code block -> self-contained <svg> string, for the doc export (main process)
+// where the React/@xyflow renderer can't run. Parsing + layout shared with the in-app preview.
 
 import { flowchartFromMarkdown, type FlowShape, type PositionedNode } from './flowchart-markdown';
 
@@ -19,7 +18,7 @@ function esc(s: string): string {
 }
 
 /** Point on a node's bounding box (half-size hw×hh, centred at `c`) in the
- *  direction of `toward` — so edges meet the border, not the centre. */
+ *  direction of `toward` - so edges meet the border, not the centre. */
 function borderPoint(c: [number, number], toward: [number, number], hw: number, hh: number): [number, number] {
   const dx = toward[0] - c[0];
   const dy = toward[1] - c[1];
@@ -134,9 +133,8 @@ export function flowchartToSvg(code: string): string {
     nodes += shapeSvg(n.shape, x, y, W, H) + labelSvg(n.label, x + W / 2, y + H / 2);
   }
 
-  // Intrinsic width caps at 900; `max-width:100%` + `height:auto` then let a
-  // wide chart scale down to the page column (instead of overflowing) and keep
-  // a narrow one at a readable natural size, centred in the column either way.
+  // Intrinsic width caps at 900; max-width:100% + height:auto scale a wide chart
+  // down to the column and keep a narrow one at natural size, centred either way.
   const drawnWidth = Math.min(width, 900);
   const style = 'display:block;height:auto;max-width:100%;margin:0.5rem auto';
   return `<svg class="flowchart" viewBox="0 0 ${width.toFixed(0)} ${height.toFixed(0)}" width="${drawnWidth.toFixed(0)}" style="${style}" role="img" xmlns="http://www.w3.org/2000/svg">`

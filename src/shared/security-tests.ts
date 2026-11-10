@@ -1,19 +1,15 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Opt-in OWASP API Top 10 test generator. Given a normal request, produce a set
-// of security test requests pre-loaded with attack payloads and a post-request
-// script that asserts the expected *safe* behaviour. Test names carry the
-// `[TAG]` prefix used by the security guide and by the SARIF exporter, so
-// findings map straight onto the OWASP category. Nothing here runs unless the
-// user explicitly invokes "Generate security tests".
+// Opt-in OWASP API Top 10 test generator: from a normal request, produce security
+// tests pre-loaded with attack payloads and a safe-behaviour assertion. Test names
+// carry the `[TAG]` prefix the SARIF exporter maps onto the OWASP category.
 
 import type { ApiRequest, KeyValuePair } from './types';
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH']);
 
-/** Deterministic-ish id — callers may re-id, but this keeps the tests valid
- *  standalone. Uses crypto.randomUUID (available in renderer and main). */
+/** id so the tests are valid standalone; callers may re-id. */
 function newId(): string {
   try { return crypto.randomUUID(); } catch { return `sec-${Math.random().toString(36).slice(2)}`; }
 }
@@ -28,8 +24,7 @@ function clone(base: ApiRequest, patch: Partial<ApiRequest>): ApiRequest {
   return { ...copy, ...patch };
 }
 
-/** Whether the URL looks like it targets a specific object (path param), which
- *  is what BOLA/object-level authorization tests need. */
+/** Whether the URL targets a specific object (path param), as BOLA tests need. */
 function hasObjectId(url: string): boolean {
   return /\/:[A-Za-z_]/.test(url) || /\{\{[^}]+\}\}/.test(url) || /\/\d+(\/|$|\?)/.test(url);
 }
@@ -38,17 +33,14 @@ function firstEnabledParam(params: KeyValuePair[]): KeyValuePair | undefined {
   return (params ?? []).find(p => p.enabled && p.key);
 }
 
-/**
- * Generate OWASP-tagged security tests for a single request. Returns an empty
- * array only if the base request is unusable. The set adapts to the request:
- * mass-assignment only for JSON writes, injection only when there is a query
- * param, BOLA only for object-scoped URLs.
- */
+/** Generate OWASP-tagged security tests for one request. The set adapts: mass
+ *  assignment only for JSON writes, injection only with a query param, BOLA only
+ *  for object-scoped URLs. */
 export function generateSecurityTests(base: ApiRequest): ApiRequest[] {
   const out: ApiRequest[] = [];
   const name = base.name || base.method;
 
-  // API2 — Broken Authentication: missing credential.
+  // API2 - Broken Authentication: missing credential.
   out.push(clone(base, {
     name: `[AUTH] ${name} - missing token`,
     auth: { type: 'none' },
@@ -59,7 +51,7 @@ export function generateSecurityTests(base: ApiRequest): ApiRequest[] {
       "});\n",
   }));
 
-  // API2 — Broken Authentication: garbage bearer token.
+  // API2 - Broken Authentication: garbage bearer token.
   out.push(clone(base, {
     name: `[AUTH] ${name} - invalid token`,
     auth: { type: 'bearer', token: 'invalid.token.value' },
@@ -69,7 +61,7 @@ export function generateSecurityTests(base: ApiRequest): ApiRequest[] {
       "});\n",
   }));
 
-  // API8 — Security Misconfiguration: headers + error verbosity.
+  // API8 - Security Misconfiguration: headers + error verbosity.
   out.push(clone(base, {
     name: `[CONFIG] ${name} - security headers & error hygiene`,
     postRequestScript:
@@ -83,7 +75,7 @@ export function generateSecurityTests(base: ApiRequest): ApiRequest[] {
       "});\n",
   }));
 
-  // API1 — BOLA: object-scoped URL accessed as another identity.
+  // API1 - BOLA: object-scoped URL accessed as another identity.
   if (hasObjectId(base.url)) {
     out.push(clone(base, {
       name: `[BOLA] ${name} - access another user's object`,
@@ -95,7 +87,7 @@ export function generateSecurityTests(base: ApiRequest): ApiRequest[] {
     }));
   }
 
-  // API3 — Mass assignment: privileged fields in a JSON write body.
+  // API3 - Mass assignment: privileged fields in a JSON write body.
   if (WRITE_METHODS.has(base.method) && base.body?.mode === 'json') {
     let mutated = base.body.json ?? '{}';
     try {
@@ -104,7 +96,7 @@ export function generateSecurityTests(base: ApiRequest): ApiRequest[] {
       obj.is_admin = true;
       mutated = JSON.stringify(obj, null, 2);
     } catch {
-      // Non-object / template body — fall back to the original; the assertion
+      // Non-object / template body - fall back to the original; the assertion
       // still documents the intent.
     }
     out.push(clone(base, {
@@ -122,7 +114,7 @@ export function generateSecurityTests(base: ApiRequest): ApiRequest[] {
     }));
   }
 
-  // API10 — Injection: SQL payload in the first query parameter.
+  // API10 - Injection: SQL payload in the first query parameter.
   const param = firstEnabledParam(base.params);
   if (param) {
     out.push(clone(base, {

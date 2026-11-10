@@ -3,15 +3,13 @@
 
 import React from 'react';
 
-// A render-time crash anywhere below this boundary is caught here and shown as a
-// recoverable panel instead of a blank white window (React unmounts the whole
-// tree on an uncaught render error). Inline styles are used deliberately so the
-// fallback still renders even if the failure is CSS/theme-related.
+// Catches a render-time crash below this boundary and shows a recoverable panel
+// instead of a blank window (React unmounts the whole tree on an uncaught render
+// error). Inline styles so the fallback renders even if the failure is CSS/theme.
 
 interface Props {
   readonly children: React.ReactNode;
-  /** When this value changes, a caught error is cleared (e.g. on a new request
-   *  or tab switch) so a scoped boundary auto-recovers without a full reload. */
+  /** Changing this clears a caught error (new request, tab switch), so the boundary auto-recovers. */
   readonly resetKey?: unknown;
   /** Custom fallback; defaults to the full-screen panel. */
   readonly fallback?: (error: Error, reset: () => void) => React.ReactNode;
@@ -29,7 +27,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
-    // Keep the underlying bug diagnosable (visible in the devtools console).
+    // Keep the underlying bug visible in the devtools console.
     console.error('[renderer] uncaught error:', error, info.componentStack);
   }
 
@@ -51,8 +49,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         gap: 16, height: '100vh', padding: 24, textAlign: 'center',
-        // Theme tokens with hard-coded fallbacks, so the crash screen matches the
-        // active theme yet still renders if the stylesheet itself failed to load.
+        // Theme tokens with hard-coded fallbacks: matches the theme, still renders if the stylesheet failed to load.
         background: 'var(--bg-app, #0b0f14)', color: 'var(--text-primary, #e5e7eb)',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}>

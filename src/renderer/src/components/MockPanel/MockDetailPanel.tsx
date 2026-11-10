@@ -23,7 +23,7 @@ const { electron } = window;
 
 const METHODS_PLUS_ANY = ['ANY', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'QUERY'] as const;
 
-// ─── Route row ────────────────────────────────────────────────────────────────
+// Route row
 
 function RouteRow({
   route,
@@ -43,7 +43,7 @@ function RouteRow({
   const [draft,        setDraft]        = useState(route);
   const [scriptOpen,   setScriptOpen]   = useState(!!(route.script?.trim()));
 
-  // Derive path param names (e.g. /users/:id → ['id'])
+  // Derive path param names (e.g. /users/:id -> ['id'])
   const pathParamNames = useMemo(
     () => draft.path.split('/').filter(p => p.startsWith(':')).map(p => p.slice(1)),
     [draft.path],
@@ -261,7 +261,7 @@ function RouteRow({
   );
 }
 
-// ─── Request log ──────────────────────────────────────────────────────────────
+// Request log
 
 function timeAgo(ts: number, t: ReturnType<typeof useT>): string {
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -403,7 +403,7 @@ function RequestLog({ serverId, routes, running }: { readonly serverId: string; 
   );
 }
 
-// ─── MockDetailPanel ──────────────────────────────────────────────────────────
+// MockDetailPanel
 
 export function MockDetailPanel({ mockId }: { readonly mockId: string }) {
   const t          = useT();

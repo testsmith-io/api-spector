@@ -1,9 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 //
-// Renders a flowchart code block (from a markdown description) as a read-only
-// diagram, reusing the app's existing @xyflow/react canvas — no new diagram
-// dependency. Parsing + layout live in shared/flowchart-markdown.
+// Renders a flowchart code block (from markdown) as a read-only diagram, reusing the
+// app's @xyflow/react canvas. Parsing + layout live in shared/flowchart-markdown.
 
 import { useMemo } from 'react';
 import {
@@ -76,8 +75,8 @@ export function FlowchartPreview({ code, className }: { readonly code: string; r
     const g = flowchartFromMarkdown(code);
     const sp = posFor(g.direction, 'source');
     const tp = posFor(g.direction, 'target');
-    // Natural pixel extent of the laid-out graph, so the box can match the
-    // diagram's shape instead of squeezing a tall chart into a fixed strip.
+    // Natural pixel extent of the laid-out graph, so the box matches the diagram's
+    // shape instead of squeezing a tall chart into a fixed strip.
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const n of g.nodes) {
       minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
@@ -116,10 +115,9 @@ export function FlowchartPreview({ code, className }: { readonly code: string; r
     return <div className={`text-xs text-surface-500 p-4 ${className ?? ''}`}>Nothing to diagram.</div>;
   }
 
-  // Size the box to the diagram's own aspect ratio, centred, and capped at the
-  // available width and a sensible max height. A tall top-down chart then gets
-  // vertical room (readable nodes) instead of being shrunk into a thin strip,
-  // and a wide chart scales down uniformly without overflowing.
+  // Size the box to the diagram's aspect ratio, centred, capped at available width
+  // and a max height. A tall top-down chart gets vertical room; a wide one scales
+  // down uniformly without overflowing.
   return (
     <div
       className={`mx-auto ${className ?? ''}`}

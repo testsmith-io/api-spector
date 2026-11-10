@@ -1,10 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Headless unary gRPC caller for load testing. Loads the proto and opens one
-// client, then does repeated unary calls over the same channel. Pure Node
-// (@grpc/grpc-js is not a native addon), so it runs in the perf utilityProcess.
-// Only unary methods are supported — streaming is a different load shape.
+// Headless unary gRPC caller for load testing: loads the proto, opens one client, then
+// repeats unary calls over the same channel. Pure Node (runs in the perf utilityProcess),
+// unary methods only.
 
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';

@@ -21,9 +21,8 @@ import { importSoapUiProject }                              from '../importers/s
 import { basename }                                         from 'node:path';
 
 export function registerImportHandlers(ipc: IpcMain): void {
-  // WSDL -> a collection of SOAP requests (one per operation). From a URL (e.g.
-  // http://www.dneonline.com/calculator.asmx?WSDL) or a local .wsdl/.xml file;
-  // routed through the import picker for selective import.
+  // WSDL -> a collection of SOAP requests (one per operation), from a URL or a
+  // local .wsdl/.xml file, routed through the import picker.
   handleIpc(ipc, IPC.import.wsdl, async (_event, opts: { url?: string } = {}) => {
     let wsdlText: string;
     let name: string | undefined;
@@ -120,10 +119,9 @@ export function registerImportHandlers(ipc: IpcMain): void {
     return importHar(result.filePaths[0]);
   });
 
-  // SoapUI / ReadyAPI project XML -> a collection, with its Groovy scripts
-  // converted to the sp.* sandbox. Returns the parse report (suite/case/request
-  // counts, script conversion tally, warnings) so the import summary can show
-  // what converted cleanly and what needs a look.
+  // SoapUI / ReadyAPI project XML -> a collection, Groovy scripts converted to
+  // the sp.* sandbox. Returns the parse report (counts, conversion tally,
+  // warnings) for the import summary.
   handleIpc(ipc, IPC.import.soapui, async () => {
     const result = await dialog.showOpenDialog({
       title: 'Import SoapUI / ReadyAPI Project',
@@ -148,10 +146,8 @@ export function registerImportHandlers(ipc: IpcMain): void {
     return importArazzoFiles(result.filePaths);
   });
 
-  // Import an existing API Spector collection file (as saved in a workspace's
-  // collections/ folder, or a collection mistakenly saved with a .spector
-  // extension). Validated by shape, then given a fresh id so it does not
-  // collide with a collection already in the workspace.
+  // Import an existing API Spector collection file. Validated by shape, then
+  // given a fresh id so it doesn't collide with one already in the workspace.
   handleIpc(ipc, IPC.import.spector, async (): Promise<Collection | null> => {
     const result = await dialog.showOpenDialog({
       title: 'Import API Spector Collection',
@@ -177,7 +173,7 @@ export function registerImportHandlers(ipc: IpcMain): void {
     return collection;
   });
 
-  // ─── Schema sync (extract schemas without full import) ─────────────────────
+  // Schema sync (extract schemas without full import)
   handleIpc(ipc, IPC.import.openapiSchemas, async () => {
     const result = await dialog.showOpenDialog({
       title: 'Load OpenAPI spec for schema sync',

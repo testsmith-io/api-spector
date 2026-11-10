@@ -1,11 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Canary component test — exercises the SoapEditor empty-state and
-// fallback-when-saved-data render paths.
-//
+// Canary component test for the SoapEditor empty-state and saved-data render paths.
 // Run with: npx vitest --config vitest.renderer.config.ts
-// Requires: @testing-library/react, @testing-library/jest-dom, jsdom
 
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';

@@ -1,11 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Import an HTTP Archive (.har) file — the request/response capture format that
-// browser devtools, proxies (Charles, mitmproxy, Fiddler) and many tools export.
-// A HAR is a flat list of recorded exchanges, usually dominated by static assets
-// and repeats, so we keep the API-like calls, drop the noise, dedupe, and group
-// what's left by host into one collection the user can trim in the import picker.
+// Import an HTTP Archive (.har). A HAR is a flat list dominated by static assets and
+// repeats, so we keep the API-like calls, dedupe, and group by host into one collection.
 
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
@@ -29,8 +26,8 @@ interface HarEntry {
 
 // Asset URLs and headers that are noise for an API client.
 const STATIC_EXT = /\.(?:js|mjs|cjs|css|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf|eot|map|mp4|webm|mp3|wav)(?:\?|#|$)/i;
-// Dropped headers: auto/transport ones, plus cookies (session cookies are
-// sensitive and the collection is saved to disk, so we never persist them).
+// Dropped headers: auto/transport ones, plus cookies (sensitive, and the
+// collection is saved to disk).
 const SKIP_HEADER = new Set(['host', 'connection', 'content-length', 'accept-encoding', 'cookie']);
 
 function isApiLike(entry: HarEntry): boolean {
@@ -51,9 +48,9 @@ function bodyFrom(postData: HarPostData | undefined): RequestBody {
     return { mode: 'form', form: postData.params.map(p => ({ key: p.name, value: p.value ?? '', enabled: true })) };
   }
   if (postData.params && postData.params.length && mime.includes('multipart/form-data')) {
-    // A recorded multipart part with a `fileName` was a file upload. HAR does
-    // not capture the file bytes, only the name, so we carry it as the filePath
-    // hint; the user re-points it to a local file before re-sending.
+    // A multipart part with a `fileName` was a file upload. HAR has no file
+    // bytes, only the name, so carry it as a filePath hint for the user to
+    // re-point before re-sending.
     return {
       mode: 'multipart',
       multipart: postData.params.map(p => (

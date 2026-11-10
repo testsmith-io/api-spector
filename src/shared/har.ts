@@ -3,17 +3,9 @@
 
 import type { HistoryEntry, RequestBody } from './types';
 
-// ─── HAR 1.2 export ───────────────────────────────────────────────────────────
-//
-// Converts request/response history into the HTTP Archive (HAR) format, the
-// standard interchange used by browser devtools, Charles, Insomnia, etc. Lets
-// a session's traffic be saved and opened in any HAR viewer.
-//
-// Note: history stores the request DEFINITION plus the resolved URL and the
-// received response, not the exact bytes sent (auth-injected headers are
-// computed at send time and not captured). The HAR request is therefore
-// reconstructed from the request definition, which is faithful for everything
-// the user typed.
+// HAR 1.2 export: converts request/response history into HTTP Archive format.
+// History stores the request definition (not the exact bytes sent, so auth-injected
+// headers aren't captured), so the HAR request is rebuilt from that definition.
 
 interface HarNameValue { name: string; value: string }
 

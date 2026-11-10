@@ -15,17 +15,15 @@ import {
 } from './git-scope';
 import { BRANCH_REF_FORMAT, parseBranchRefs } from '../git-branch-parse';
 
-// True when a rebase is mid-flight (stopped on conflicts, or otherwise paused).
-// git keeps its state in `rebase-merge` / `rebase-apply` inside the git dir;
-// `rev-parse --git-path` resolves those correctly even for linked worktrees.
-// `repoRoot` is the working-tree root (the enclosing repo in scoped mode).
+// True when a rebase is mid-flight. State lives in `rebase-merge`/`rebase-apply`;
+// `rev-parse --git-path` resolves those even for linked worktrees.
 async function isRebasing(g: SimpleGit, repoRoot: string): Promise<boolean> {
   for (const name of ['rebase-merge', 'rebase-apply']) {
     try {
       const rel = (await g.raw(['rev-parse', '--git-path', name])).trim();
       await stat(resolveFromRoot(repoRoot, rel));
       return true;
-    } catch { /* not present — check the next marker */ }
+    } catch { /* not present */ }
   }
   return false;
 }
@@ -33,12 +31,9 @@ async function isRebasing(g: SimpleGit, repoRoot: string): Promise<boolean> {
 export function registerGitHandlers(ipc: IpcMain): void {
 
   handleIpc(ipc, IPC.git.isRepo, async () => {
-    // Check the workspace directory itself — NOT `git rev-parse --git-dir`,
-    // which walks up the directory tree and may pick up an ancestor repo
-    // (e.g. a `~/.git` dotfiles repo). When that happens, every subsequent
-    // git command in the panel ends up running against the ancestor's
-    // working tree (the entire home directory), which is what caused the
-    // panel to wedge on Loading… while `git status` walked huge subtrees.
+    // Check the workspace dir itself, NOT `git rev-parse --git-dir`, which walks
+    // up and may pick up an ancestor repo (a `~/.git` dotfiles repo); every git
+    // command then runs against its working tree and wedges the panel on Loading.
     const dir = getWorkspaceDir();
     if (!dir) return false;
     try {
@@ -49,10 +44,8 @@ export function registerGitHandlers(ipc: IpcMain): void {
     }
   });
 
-  // Richer repo detection for the panel: distinguishes a standalone repo
-  // ('own'), a workspace scoped into an enclosing repo ('scoped'), an enclosing
-  // repo that scoped mode could be enabled for ('enclosing-available'), and no
-  // repo ('none'). Runs no working-tree command, so it cannot wedge.
+  // Repo detection for the panel: 'own' | 'scoped' | 'enclosing-available' |
+  // 'none'. Runs no working-tree command, so it cannot wedge.
   handleIpc(ipc, IPC.git.repoInfo, async (): Promise<GitRepoInfo> => detectRepoInfo());
 
   handleIpc(ipc, IPC.git.init, async () => {
@@ -61,17 +54,14 @@ export function registerGitHandlers(ipc: IpcMain): void {
     // Initialize a repo in the workspace dir itself (a standalone 'own' repo).
     await simpleGit(dir).init();
     clearGitScopeCache(); // the dir just became a repo root
-    // Ensure secrets / generated artifacts aren't committed when the user
-    // initializes git on an existing workspace that pre-dates the auto-write.
+    // Keep secrets / generated artifacts out of git on a pre-existing workspace.
     await ensureGitignore(dir);
   });
 
   handleIpc(ipc, IPC.git.status, async (): Promise<GitStatus> => {
     const { git: g, scope, repoRoot } = await resolveGitScope();
-    // Scope file entries to the workspace subtree; branch/ahead/behind in the
-    // porcelain header are unaffected by the pathspec (and stay repo-global,
-    // which is correct — git topology is shared). Own mode passes no pathspec
-    // so behavior is byte-identical to before.
+    // Scope file entries to the workspace subtree; branch/ahead/behind stay
+    // repo-global (git topology is shared). Own mode passes no pathspec.
     const result = await g.status(scope ? ['--', scope] : []);
     return {
       staged:     result.staged.map(f => ({ path: fromRepoPath(scope, f), status: resolveStatus(result, f, true) })),
@@ -107,10 +97,8 @@ export function registerGitHandlers(ipc: IpcMain): void {
     await g.add([toRepoPath(scope, filePath)]);
   });
 
-  // Read a conflicted file's current content (with <<<<<<< / ======= / >>>>>>>
-  // markers) so the conflict editor can show and resolve it in place. The path
-  // is workspace-relative, so it resolves against the workspace dir in both
-  // own and scoped mode.
+  // Read a conflicted file's content (with conflict markers) for the editor.
+  // Path is workspace-relative in both own and scoped mode.
   handleIpc(ipc, IPC.git.readConflict, async (_e, filePath: string): Promise<string> => {
     const dir = getWorkspaceDir();
     if (!dir) throw new Error('No workspace open');
@@ -153,11 +141,8 @@ export function registerGitHandlers(ipc: IpcMain): void {
     await g.add([scopePathspec(scope)]);
   });
 
-  // Discard working-tree changes. Destructive and irreversible: tracked
-  // files are restored to their HEAD version (`checkout -- <path>`, which
-  // also brings back a deleted file), and never-committed files are removed
-  // from disk (`clean -fd`, limited to the given pathspecs). The renderer
-  // guards this behind a confirmation dialog.
+  // Discard working-tree changes. Destructive: tracked files restored to HEAD
+  // (`checkout`), untracked removed from disk (`clean -fd`, scoped to pathspecs).
   handleIpc(ipc, IPC.git.discard, async (_e, files: GitFile[]) => {
     const { git: g, scope } = await resolveGitScope();
     const tracked   = files.filter(f => f.status !== 'untracked').map(f => toRepoPath(scope, f.path));
@@ -168,9 +153,8 @@ export function registerGitHandlers(ipc: IpcMain): void {
 
   handleIpc(ipc, IPC.git.commit, async (_e, message: string) => {
     const { git: g, scope } = await resolveGitScope();
-    // In scoped mode the panel only ever stages within the subtree, so the
-    // only way a staged path lands outside it is external tooling. Refuse
-    // rather than sweep the user's unrelated staged work into our commit.
+    // In scoped mode, refuse staged paths outside the subtree (from external
+    // tooling) rather than sweep unrelated work into our commit.
     if (scope) {
       const full = await g.status();
       const outside = full.staged.filter(p => !isWithinScope(scope, p));
@@ -184,9 +168,8 @@ export function registerGitHandlers(ipc: IpcMain): void {
     await g.commit(message);
   });
 
-  // Amend the last commit's message / staged content. Disabled in scoped mode:
-  // the previous commit may span folders outside this workspace, so rewriting
-  // it from here would touch the rest of the project.
+  // Amend the last commit. Disabled in scoped mode: the commit may span folders
+  // outside this workspace.
   handleIpc(ipc, IPC.git.amend, async (_e, message: string) => {
     const { git: g, scope } = await resolveGitScope();
     if (scope) throw new Error('Amend is disabled in scoped mode (it would rewrite history across the whole repository).');
@@ -202,7 +185,7 @@ export function registerGitHandlers(ipc: IpcMain): void {
   });
 
   // The diff a commit introduced, scoped to the workspace subtree so the Log
-  // tab shows only this folder's part of a (possibly repo-wide) commit.
+  // tab shows only this folder's part of the commit.
   handleIpc(ipc, IPC.git.show, async (_e, sha: string): Promise<string> => {
     const { git: g, scope } = await resolveGitScope();
     const args = ['show', '--format=fuller', sha];
@@ -211,7 +194,7 @@ export function registerGitHandlers(ipc: IpcMain): void {
   });
 
   // Read the configured author identity (nearest scope wins). Empty strings
-  // when unset — that is what blocks a commit, and the panel prompts to fix it.
+  // when unset - that is what blocks a commit, and the panel prompts to fix it.
   handleIpc(ipc, IPC.git.getIdentity, async (): Promise<GitIdentity> => {
     const { git: g } = await resolveGitScope();
     const read = async (key: string): Promise<string> => {
@@ -221,7 +204,7 @@ export function registerGitHandlers(ipc: IpcMain): void {
     return { name: await read('user.name'), email: await read('user.email') };
   });
 
-  // Set the author identity for this repository (local scope, not global).
+  // Set the author identity for this repository, local scope.
   handleIpc(ipc, IPC.git.setIdentity, async (_e, name: string, email: string) => {
     const { git: g } = await resolveGitScope();
     await g.addConfig('user.name', name);
@@ -243,10 +226,8 @@ export function registerGitHandlers(ipc: IpcMain): void {
   });
 
   handleIpc(ipc, IPC.git.branches, async (): Promise<GitBranch[]> => {
-    // The previous implementation passed a `--format=…` arg but then read
-    // `result.all` (which simple-git doesn't honor when --format is set),
-    // so upstream/ahead/behind were silently dropped. Run the format flag
-    // via `raw` and parse line-by-line so we get the real metadata.
+    // simple-git ignores `result.all` when `--format` is set, dropping
+    // upstream/ahead/behind - so run the format via `raw` and parse by hand.
     const { git: g } = await resolveGitScope();
     const raw = await g.raw([
       'for-each-ref', `--format=${BRANCH_REF_FORMAT}`, 'refs/heads', 'refs/remotes',
@@ -262,10 +243,8 @@ export function registerGitHandlers(ipc: IpcMain): void {
       return;
     }
 
-    // If `branch` looks like a remote ref (e.g. "origin/feature-x") and no
-    // local branch with that name exists, create a tracking branch instead
-    // of erroring out. Matches the user expectation of clicking a remote
-    // branch in the sidebar to "switch to it".
+    // A remote ref ("origin/feature-x") with no matching local branch: create a
+    // tracking branch instead of erroring, matching "click remote to switch".
     const m = /^([^/]+)\/(.+)$/.exec(branch);
     if (m) {
       const remote     = m[1];
@@ -275,8 +254,7 @@ export function registerGitHandlers(ipc: IpcMain): void {
         await g.checkoutBranch(localName, `${remote}/${localName}`);
         return;
       }
-      // local exists with the same name — fall through to plain checkout of
-      // the local one, which is what users almost always want.
+      // local exists with the same name - plain checkout of the local one.
       await g.checkout(localName);
       return;
     }
@@ -290,17 +268,13 @@ export function registerGitHandlers(ipc: IpcMain): void {
     await g.deleteLocalBranch(name, force);
   });
 
-  // Rename the current branch (`git branch -m <newName>`).
   handleIpc(ipc, IPC.git.renameBranch, async (_e, newName: string) => {
     const { git: g } = await resolveGitScope();
     await g.raw(['branch', '-m', newName]);
   });
 
-  // Rebase the current branch onto `onto` (another local or remote branch).
-  // A clean rebase returns { conflict: false }. When it stops on conflicts we
-  // return { conflict: true } instead of throwing, so the panel can send the
-  // user to the Changes tab to resolve and then continue. Any other failure
-  // (unknown branch, unexpected git error) propagates so it surfaces as an error.
+  // Rebase onto `onto`. A conflict returns { conflict: true } (not thrown) so the
+  // panel can route to the Changes tab; other failures propagate.
   handleIpc(ipc, IPC.git.rebase, async (_e, onto: string): Promise<{ conflict: boolean }> => {
     const { git: g, repoRoot } = await resolveGitScope();
     try {
@@ -330,10 +304,8 @@ export function registerGitHandlers(ipc: IpcMain): void {
     await g.raw(['rebase', '--abort']);
   });
 
-  // Merge another branch into the current one. Like rebase, a conflict is
-  // reported as { conflict: true } (not thrown) so the panel can route the user
-  // to the Changes tab. Merge is repo-wide (git has no per-subtree merge); the
-  // panel labels this in scoped mode.
+  // Merge a branch into the current one. Conflict returns { conflict: true } (not
+  // thrown). Repo-wide (no per-subtree merge); the panel labels this in scoped mode.
   handleIpc(ipc, IPC.git.merge, async (_e, branch: string): Promise<{ conflict: boolean }> => {
     const { git: g } = await resolveGitScope();
     try {
@@ -347,9 +319,8 @@ export function registerGitHandlers(ipc: IpcMain): void {
   });
 
   handleIpc(ipc, IPC.git.stashList, async (): Promise<GitStash[]> => {
-    // `--format` with NUL-ish separators we can split safely. The branch name
-    // lives inside the subject ("WIP on <branch>: …" / "On <branch>: …"), so
-    // parse it out rather than relying on a dedicated field git doesn't expose.
+    // Branch name lives in the subject ("WIP on <branch>: …" / "On <branch>: …");
+    // parse it out - git exposes no dedicated field.
     const { git: g } = await resolveGitScope();
     const raw = await g.raw(['stash', 'list', '--format=%gd\u001f%gs']);
     return raw.split('\n').filter(Boolean).map((line, index) => {
@@ -365,10 +336,8 @@ export function registerGitHandlers(ipc: IpcMain): void {
   });
 
   handleIpc(ipc, IPC.git.stash, async (_e, message?: string) => {
-    // `-u` includes untracked files so switching branches afterwards can't be
-    // blocked by an untracked path the target branch tracks. In scoped mode a
-    // trailing pathspec parks only this subtree, leaving the rest of the
-    // project's working tree alone.
+    // `-u` includes untracked files so a later branch switch can't be blocked. In
+    // scoped mode a trailing pathspec parks only this subtree.
     const { git: g, scope } = await resolveGitScope();
     const args = ['stash', 'push', '-u'];
     if (message && message.trim()) args.push('-m', message.trim());
@@ -377,22 +346,20 @@ export function registerGitHandlers(ipc: IpcMain): void {
   });
 
   handleIpc(ipc, IPC.git.stashPop, async (_e, ref?: string) => {
-    // No ref → most recent (stash@{0}). git refuses to pop onto a dirty path it
+    // No ref -> most recent (stash@{0}). git refuses to pop onto a dirty path it
     // would clobber; the error propagates to the panel so the user can resolve.
     const { git: g } = await resolveGitScope();
     await g.raw(['stash', 'pop', ...(ref ? [ref] : [])]);
   });
 
   handleIpc(ipc, IPC.git.stashApply, async (_e, ref?: string) => {
-    // Like pop, but keeps the stash in the list so it can be applied again or
-    // dropped later.
+    // Like pop, but keeps the stash in the list.
     const { git: g } = await resolveGitScope();
     await g.raw(['stash', 'apply', ...(ref ? [ref] : [])]);
   });
 
-  // The diff a stash holds. `git stash show` does not accept a pathspec, so to
-  // scope to the subtree we diff the stash commit against its first parent
-  // (which is exactly what `stash show -p` does) and apply the pathspec there.
+  // `git stash show` takes no pathspec, so to scope to the subtree we diff the
+  // stash commit against its first parent and apply the pathspec there.
   handleIpc(ipc, IPC.git.stashShow, async (_e, ref?: string): Promise<string> => {
     const { git: g, scope } = await resolveGitScope();
     if (scope) {
@@ -408,7 +375,7 @@ export function registerGitHandlers(ipc: IpcMain): void {
   });
 
   handleIpc(ipc, IPC.git.fetch, async () => {
-    // Update remote-tracking refs (so ahead/behind is accurate) without merging.
+    // Update remote-tracking refs without merging; keeps ahead/behind accurate.
     const { git: g } = await resolveGitScope();
     await g.fetch(['--prune']);
   });
@@ -421,9 +388,8 @@ export function registerGitHandlers(ipc: IpcMain): void {
 
   handleIpc(ipc, IPC.git.push, async (_e, setUpstream: boolean, force: boolean = false) => {
     const { git: g } = await resolveGitScope();
-    // --force-with-lease refuses to overwrite remote commits the local repo
-    // has never seen, so a force push after a rebase/amend can't clobber a
-    // teammate's work the way a bare --force would.
+    // --force-with-lease refuses to overwrite remote commits the local repo hasn't
+    // seen, so a force push can't clobber a teammate's work like bare --force.
     const forceArgs = force ? ['--force-with-lease'] : [];
     if (setUpstream) {
       const status = await g.status();
@@ -435,7 +401,6 @@ export function registerGitHandlers(ipc: IpcMain): void {
     }
   });
 
-  // Delete a branch on the remote (`git push <remote> --delete <name>`).
   handleIpc(ipc, IPC.git.deleteRemoteBranch, async (_e, remote: string, name: string) => {
     const { git: g } = await resolveGitScope();
     await g.push([remote, '--delete', name]);
@@ -498,10 +463,8 @@ export function registerGitHandlers(ipc: IpcMain): void {
   });
 
   handleIpc(ipc, IPC.git.writeCiFile, async (_e, relPath: string, content: string) => {
-    // CI workflows must live at the repository root (e.g. `.github/workflows/`)
-    // so the provider actually runs them — that is the enclosing repo root in
-    // scoped mode, the workspace dir otherwise. Fall back to the workspace dir
-    // when there is no repo yet.
+    // CI workflows must live at the repo root (enclosing repo in scoped mode,
+    // workspace dir otherwise) so the provider runs them; fall back to workspace dir.
     let base: string;
     try {
       base = (await resolveGitScope()).repoRoot;
@@ -516,7 +479,7 @@ export function registerGitHandlers(ipc: IpcMain): void {
   });
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// Helpers
 
 type FileStatus = 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked';
 

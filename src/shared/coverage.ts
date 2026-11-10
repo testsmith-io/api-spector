@@ -1,15 +1,10 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// OpenAPI test-coverage engine.
-//
-// Given a parsed OpenAPI 3.x document and the requests in a workspace, work out
-// which operations are exercised, which declared response codes are asserted,
-// and which operations lack a negative test. Pure and dependency-free so the
-// CLI, the desktop app, and the tests can all share it — the caller parses the
-// spec (YAML/JSON) and maps requests into CoverageRequestInput.
+// OpenAPI test-coverage engine: which operations are exercised, which response
+// codes are asserted, which lack a negative test. Pure; the caller parses the spec.
 
-// ─── Inputs ─────────────────────────────────────────────────────────────────
+// Inputs
 
 /** A workspace request, reduced to what coverage needs. */
 export interface CoverageRequestInput {
@@ -22,9 +17,8 @@ export interface CoverageRequestInput {
   expectedStatus?: number
 }
 
-/** An actual execution observed from run history: what status came back and
- *  which response-body property paths were present. Lets coverage credit codes
- *  and response shape that were exercised for real, not just declared. */
+/** An execution observed from run history: status returned and which response
+ *  property paths were present. Credits codes and shape exercised for real. */
 export interface CoverageObservation {
   method: string
   url: string
@@ -35,7 +29,7 @@ export interface CoverageObservation {
 
 const HTTP_METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
 
-// ─── Outputs ────────────────────────────────────────────────────────────────
+// Outputs
 
 export interface OperationCoverage {
   method: string            // upper-case, e.g. "GET"
@@ -80,7 +74,7 @@ export interface CoverageReport {
   operations: OperationCoverage[]
 }
 
-// ─── Path matching ────────────────────────────────────────────────────────────
+// Path matching
 
 /** Reduce an authored URL to a comparable path: drop query/hash, {{vars}}, and
  *  any scheme://host, collapse slashes. Base paths differ between environments,
@@ -115,7 +109,7 @@ export function pathMatches(requestUrl: string, template: string): boolean {
   return tplSegs.every((seg, i) => (isParam(seg) ? tail[i] !== undefined && tail[i] !== '' : tail[i] === seg));
 }
 
-// ─── Spec enumeration ─────────────────────────────────────────────────────────
+// Spec enumeration
 
 interface OpenApiLike {
   info?: { title?: string; version?: string }
@@ -212,7 +206,7 @@ export function enumerateOperations(spec: unknown): SpecOperation[] {
   return ops;
 }
 
-// ─── Coverage ───────────────────────────────────────────────────────────────
+// Coverage
 
 function round(n: number): number {
   return Math.round(n * 10) / 10;

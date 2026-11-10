@@ -10,7 +10,7 @@ import { resolveInlineSecrets } from '../main/request-exec';
 import type { ApiRequest } from '../shared/types';
 import type { Environment } from '../shared/types';
 
-// ─── Fake Vault over a mocked fetch ───────────────────────────────────────────
+// Fake Vault over a mocked fetch
 
 type Route = (url: string, init: any) => unknown | undefined;
 
@@ -33,8 +33,8 @@ const ENV_KEYS = [
   'VAULT_ADDR', 'VAULT_TOKEN', 'VAULT_NAMESPACE', 'VAULT_ROLE_ID', 'VAULT_SECRET_ID',
   'VAULT_JWT', 'VAULT_JWT_ROLE', 'VAULT_AUTH_METHOD', 'VAULT_KV_VERSION', 'VAULT_PATH_PREFIX',
 ];
-// HOME/USERPROFILE are redirected to a bogus dir so the provider's ~/.vault-token
-// fallback never picks up the developer's real Vault token during tests.
+// HOME/USERPROFILE point at a bogus dir so the ~/.vault-token fallback can't
+// pick up a developer's real token.
 const HOME_KEYS = ['HOME', 'USERPROFILE'];
 let savedEnv: Record<string, string | undefined>;
 let savedFetch: typeof fetch;
@@ -57,7 +57,7 @@ afterEach(() => {
   setSecretsConfig(undefined);
 });
 
-// ─── scheme detection ─────────────────────────────────────────────────────────
+// scheme detection
 
 describe('secret scheme detection', () => {
   it('recognises registered schemes only', () => {
@@ -69,7 +69,7 @@ describe('secret scheme detection', () => {
   });
 });
 
-// ─── Vault provider ───────────────────────────────────────────────────────────
+// Vault provider
 
 describe('vault provider', () => {
   it('reads a KV v2 secret with token auth', async () => {
@@ -144,7 +144,7 @@ describe('vault provider', () => {
   });
 });
 
-// ─── configurable path prefix ─────────────────────────────────────────────────
+// configurable path prefix
 
 describe('vault path prefix', () => {
   it('prepends a configured prefix to the reference path', async () => {
@@ -224,8 +224,8 @@ describe('vault path prefix', () => {
     const env: Environment = {
       version: '1.0', id: 'e1', name: 'prod',
       variables: [
-        // secretRef declared BEFORE the plain var it depends on — the two-pass
-        // resolution in buildEnvVars must still find `stackFolder`.
+        // secretRef declared before the var it depends on: buildEnvVars's
+        // two-pass resolution must still find `stackFolder`.
         { key: 'EMAIL', value: '', enabled: true, secretRef: 'vault:applications/api#email' },
         { key: 'stackFolder', value: 'team-7', enabled: true },
       ],
@@ -236,7 +236,7 @@ describe('vault path prefix', () => {
   });
 });
 
-// ─── environment-variable resolution (buildEnvVars) ───────────────────────────
+// environment-variable resolution (buildEnvVars)
 
 describe('inline {{vault:...}} references in a request', () => {
   it('resolves refs found in body, url and scripts, then interpolate() substitutes them', async () => {
@@ -258,7 +258,7 @@ describe('inline {{vault:...}} references in a request', () => {
     expect(resolved['vault:secret/data/app#token']).toBe('s3cr3t');
     expect(resolved['vault:secret/data/app#host']).toBe('api.example.com');
 
-    // The synchronous interpolate() then substitutes them like any other var.
+    // interpolate() then substitutes them like any other var.
     expect(interpolate(req.body!.raw!, resolved)).toBe('{"apiKey":"s3cr3t"}');
     expect(interpolate(req.url, resolved)).toBe('https://api.example.com/v1/pay');
   });

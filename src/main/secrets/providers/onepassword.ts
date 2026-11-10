@@ -4,13 +4,9 @@
 import { getSecretsConfig } from '../config';
 import type { SecretProvider } from '../types';
 
-// 1Password provider, using a 1Password Connect server and the standard secret
-// reference syntax:
-//   op://<vault>/<item>/<field>
-//   op://<vault>/<item>/<section>/<field>
-//
-// Config: OP_CONNECT_HOST (the Connect server URL) + OP_CONNECT_TOKEN (a Connect
-// access token). Vault and item may be given by name or id.
+// 1Password provider via a 1Password Connect server. Reference syntax:
+//   op://<vault>/<item>/<field>  or  op://<vault>/<item>/<section>/<field>
+// Config: OP_CONNECT_HOST + OP_CONNECT_TOKEN. Vault/item may be name or id.
 
 interface OpConn {
   host: string;
@@ -79,7 +75,7 @@ async function itemId(conn: OpConn, vid: string, item: string): Promise<string> 
 }
 
 async function resolve(refBody: string): Promise<string> {
-  // refBody is the part after `op:` — i.e. `//<vault>/<item>/.../<field>`.
+  // refBody is the part after `op:` - i.e. `//<vault>/<item>/.../<field>`.
   const parts = refBody.replace(/^\/\//, '').replace(/^\/+/, '').split('/').filter(Boolean);
   if (parts.length < 3) {
     throw new Error(`1Password reference must be 'op://<vault>/<item>/<field>' (got 'op:${refBody}')`);

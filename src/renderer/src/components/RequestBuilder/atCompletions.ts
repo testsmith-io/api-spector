@@ -6,7 +6,7 @@ import { autocompletion } from '@codemirror/autocomplete';
 import { hoverTooltip } from '@codemirror/view';
 import { FAKER_NS_ALL, FAKER_ALL } from './fakerCatalog';
 
-// ─── Built-in dynamic variables ──────────────────────────────────────────────
+// Built-in dynamic variables
 
 export const DYNAMIC_VAR_NAMES: string[] = [
   '$uuid',
@@ -48,7 +48,7 @@ export const DYNAMIC_VAR_INFO: Record<string, string> = {
   $randomHexColor:  'Random hex color (e.g. #a3f1c2)',
 };
 
-// ─── sp API ──────────────────────────────────────────────────────────────────
+// sp API
 
 const AT_TOP: Completion[] = [
   { label: 'test',                type: 'function', detail: '(name, fn)',    info: 'Define a named test' },
@@ -85,12 +85,9 @@ const HEADERS_METHODS: Completion[] = [
   { label: 'toObject', type: 'function', detail: '()',     info: 'Return all headers as a plain object' },
 ];
 
-// ─── chai assertion chain (sp.expect(...).to.be.equal(...)) ───────────────────
-//
-// The assertion returned by sp.expect() is a chai `expect`. Language chains
-// (to/be/have/not/deep/…) read naturally and mostly pass through; the leaf
-// methods/getters do the checking. We offer context-aware members after each
-// link in the chain so `sp.expect(x).` keeps completing.
+// chai assertion chain (sp.expect(...).to.be.equal(...))
+// Language chains pass through; leaf methods/getters check. We offer context-aware
+// members after each chain link so `sp.expect(x).` keeps completing.
 
 const CHAI_METHODS: Completion[] = [
   { label: 'equal',    type: 'function', detail: '(value)',       info: 'Strict (===) equality' },
@@ -156,7 +153,7 @@ function chaiChainCompletion(textBefore: string, pos: number): CompletionResult 
   if (start === -1) return null;
 
   // Scan for the matching ')' of expect( so the argument can itself contain
-  // parens/dots (e.g. sp.expect(sp.response.code)).
+  // parens/dots.
   let depth = 0, close = -1;
   for (let i = start + 'sp.expect'.length; i < textBefore.length; i++) {
     const ch = textBefore[i];
@@ -178,10 +175,9 @@ function chaiChainCompletion(textBefore: string, pos: number): CompletionResult 
   return { from: pos - m[2].length, options, validFor: /^\w*$/ };
 }
 
-// ─── faker ───────────────────────────────────────────────────────────────────
+// faker
 
-// Short descriptions for the common namespaces; the rest fall back to a generic
-// hint. Overlaid on the full generated catalogue below.
+// Short descriptions for common namespaces; the rest fall back to a generic hint.
 const CURATED_NS_INFO: Record<string, string> = {
   string: 'String generators', number: 'Number generators', person: 'Names, titles, etc.',
   internet: 'Emails, URLs, IPs, etc.', date: 'Date generators', lorem: 'Lorem ipsum text',
@@ -191,8 +187,7 @@ const CURATED_NS_INFO: Record<string, string> = {
   system: 'File names, MIME types, semver', helpers: 'Utility helpers (slugify, arrayElement, …)',
 };
 
-// Hand-written detail/info for the most-used generators; merged over the full
-// catalogue so common methods keep their nicer hints and the rest still appear.
+// Hand-written detail/info for the most-used generators, merged over the full catalogue.
 const CURATED_SUB: Record<string, Completion[]> = {
   string: [
     { label: 'uuid',         type: 'function', detail: '()',         info: 'Random UUID v4' },
@@ -297,8 +292,7 @@ const CURATED_SUB: Record<string, Completion[]> = {
   ],
 };
 
-// Full catalogue: every faker namespace and method from the installed version,
-// with the curated detail/info overlaid where we have it.
+// Full catalogue: every faker namespace/method from the installed version, with curated info overlaid.
 export const FAKER_NAMESPACES: Completion[] = FAKER_NS_ALL.map(ns => ({
   label: ns,
   type:  'property',
@@ -314,14 +308,14 @@ export const FAKER_SUB: Record<string, Completion[]> = Object.fromEntries(
   }),
 );
 
-// ─── Completion source factory ────────────────────────────────────────────────
+// Completion source factory
 
 export function makeAtCompletionSource(varNames: string[]) {
   return function atSource(context: CompletionContext): CompletionResult | null {
     const line       = context.state.doc.lineAt(context.pos);
     const textBefore = line.text.slice(0, context.pos - line.from);
 
-    // {{varname}} — must be highest priority so it works inside strings too
+    // {{varname}} - must be highest priority so it works inside strings too
     const varMatch = /\{\{(\w*)$/.exec(textBefore);
     if (varMatch) {
       const q = varMatch[1].toLowerCase();
@@ -339,7 +333,7 @@ export function makeAtCompletionSource(varNames: string[]) {
       };
     }
 
-    // sp.expect(...).to.be.xxx — chai assertion chain
+    // sp.expect(...).to.be.xxx - chai assertion chain
     const chai = chaiChainCompletion(textBefore, context.pos);
     if (chai) return chai;
 
@@ -389,12 +383,9 @@ export function atCompletionExtension(varNames: string[]) {
   return autocompletion({ override: [makeAtCompletionSource(varNames)] });
 }
 
-// ─── Hover tooltip ────────────────────────────────────────────────────────────
+// Hover tooltip
 
-/**
- * CodeMirror extension: shows a tooltip with the resolved value when
- * hovering over a {{varname}} token.
- */
+/** CodeMirror extension: tooltip with the resolved value when hovering a {{varname}} token. */
 export function varHoverTooltipExtension(varValues: Record<string, string>) {
   return hoverTooltip((view, pos) => {
     const line      = view.state.doc.lineAt(pos);
@@ -432,9 +423,8 @@ export function varHoverTooltipExtension(varValues: Record<string, string>) {
             arrow.textContent = '→';
 
             const valEl = document.createElement('span');
-            // Long values (tokens, URLs, JWTs) wrap and break so the whole value
-            // stays readable instead of being cut off at 60 chars; the container
-            // scrolls for very large values.
+            // Long values wrap/break so the whole value stays readable; the
+            // container scrolls for very large values.
             valEl.style.cssText = 'flex:1 1 auto;min-width:0;white-space:pre-wrap;word-break:break-all;';
             if (resolved !== undefined) {
               valEl.style.color = '#34d399';
@@ -470,7 +460,7 @@ export function varCompletionExtension(varNames: string[]) {
         const line       = context.state.doc.lineAt(context.pos);
         const textBefore = line.text.slice(0, context.pos - line.from);
 
-        // {{faker.namespace.method( — show faker sub-methods
+        // {{faker.namespace.method( - show faker sub-methods
         const fakerSubMatch = /\{\{faker\.(\w+)\.(\w*)$/.exec(textBefore);
         if (fakerSubMatch) {
           const subs = FAKER_SUB[fakerSubMatch[1]] ?? [];
@@ -484,7 +474,7 @@ export function varCompletionExtension(varNames: string[]) {
           };
         }
 
-        // {{faker.namespace — show faker namespaces
+        // {{faker.namespace - show faker namespaces
         const fakerNsMatch = /\{\{faker\.(\w*)$/.exec(textBefore);
         if (fakerNsMatch) {
           const q = fakerNsMatch[1].toLowerCase();
@@ -497,7 +487,7 @@ export function varCompletionExtension(varNames: string[]) {
           };
         }
 
-        // {{dayjs — suggest dayjs expression starter
+        // {{dayjs - suggest dayjs expression starter
         const dayjsMatch = /\{\{(dayjs\b[^}]*)$/.exec(textBefore);
         if (dayjsMatch) {
           const partial = dayjsMatch[1];
@@ -545,7 +535,7 @@ export function varCompletionExtension(varNames: string[]) {
   });
 }
 
-// ─── Mock body completions ────────────────────────────────────────────────────
+// Mock body completions
 
 const REQUEST_SUB: Completion[] = [
   { label: 'params',  type: 'property', apply: 'params.',   info: 'URL path params (e.g. :id → request.params.id)' },
@@ -557,12 +547,7 @@ const REQUEST_SUB: Completion[] = [
   { label: 'headers', type: 'property', apply: 'headers.',  info: 'Request headers object' },
 ];
 
-/**
- * CodeMirror extension for mock response body editors.
- * Provides {{request.params.xxx}}, {{request.query.xxx}}, {{faker.xxx()}}, {{dayjs()…}}.
- * @param pathParamNames  param names extracted from the route pattern (e.g. ['id', 'slug'])
- * @param varNames        environment / collection variable names
- */
+/** CodeMirror extension for mock response body editors ({{request.*}}, {{faker.*}}, {{dayjs()}}). */
 export function mockBodyCompletionExtension(pathParamNames: string[] = [], varNames: string[] = []) {
   const allVarNames = [...DYNAMIC_VAR_NAMES, ...varNames];
 
@@ -572,7 +557,7 @@ export function mockBodyCompletionExtension(pathParamNames: string[] = [], varNa
         const line       = context.state.doc.lineAt(context.pos);
         const textBefore = line.text.slice(0, context.pos - line.from);
 
-        // {{request.params.xxx — suggest path param names
+        // {{request.params.xxx - suggest path param names
         const paramsMatch = /\{\{request\.params\.(\w*)$/.exec(textBefore);
         if (paramsMatch) {
           const q = paramsMatch[1].toLowerCase();
@@ -585,7 +570,7 @@ export function mockBodyCompletionExtension(pathParamNames: string[] = [], varNa
           };
         }
 
-        // {{request.query.xxx / {{request.body.xxx / {{request.headers.xxx — generic key hints
+        // {{request.query.xxx / {{request.body.xxx / {{request.headers.xxx - generic key hints
         const reqSubMatch = /\{\{request\.(query|body|headers)\.(\w*)$/.exec(textBefore);
         if (reqSubMatch) {
           const q = reqSubMatch[2].toLowerCase();
@@ -597,7 +582,7 @@ export function mockBodyCompletionExtension(pathParamNames: string[] = [], varNa
           return { from: context.pos - reqSubMatch[2].length, options: generic, validFor: /^\w*$/ };
         }
 
-        // {{request.xxx — suggest sub-properties
+        // {{request.xxx - suggest sub-properties
         const requestMatch = /\{\{request\.(\w*)$/.exec(textBefore);
         if (requestMatch) {
           const q = requestMatch[1].toLowerCase();
@@ -674,7 +659,7 @@ export function mockBodyCompletionExtension(pathParamNames: string[] = [], varNa
   });
 }
 
-// ─── Mock script completions ──────────────────────────────────────────────────
+// Mock script completions
 
 const RESPONSE_MEMBERS: Completion[] = [
   { label: 'statusCode', type: 'property', detail: 'number', info: 'HTTP status code to send' },
@@ -692,10 +677,7 @@ const REQUEST_SCRIPT_MEMBERS: Completion[] = [
   { label: 'headers', type: 'property', info: 'Request headers object' },
 ];
 
-/**
- * CodeMirror extension for mock pre-response script editors.
- * Provides completions for request.xxx, response.xxx, faker.xxx, dayjs().
- */
+/** CodeMirror extension for mock pre-response script editors (request.*, response.*, faker.*, dayjs()). */
 export function mockScriptCompletionExtension() {
   return autocompletion({
     override: [
@@ -709,7 +691,7 @@ export function mockScriptCompletionExtension() {
           return { from: context.pos - responseMatch[1].length, options: RESPONSE_MEMBERS, validFor: /^\w*$/ };
         }
 
-        // request.params.xxx / request.query.xxx etc — just hint at generic keys
+        // request.params.xxx / request.query.xxx etc - just hint at generic keys
         if (/\brequest\.(params|query|body|headers)\.(\w*)$/.test(textBefore)) {
           return null; // let the user type freely
         }

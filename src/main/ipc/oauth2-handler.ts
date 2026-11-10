@@ -12,17 +12,16 @@ import { fetchOAuth2Token } from '../auth-builder';
 
 interface OAuth2TokenResult { accessToken: string; expiresAt: number; refreshToken?: string }
 
-// Resolve the full {{var}} map from the renderer-supplied scope, the same way
-// the send path does: environment variables (incl. secret-manager refs and
-// encrypted values, resolved here in main), collection variables, globals and
-// dynamic ($timestamp etc.) vars.
+// Resolve the full {{var}} map like the send path: environment variables (incl.
+// secret refs and encrypted values), collection variables, globals and dynamic
+// ($timestamp etc.) vars.
 async function resolveVars(ctx: VarResolveContext | undefined, auth: AuthConfig): Promise<Record<string, string>> {
   const envVars = await buildEnvVars(ctx?.environment ?? null);
   const dynamic = await buildDynamicVars();
   const scope = mergeVars(envVars, ctx?.collectionVars ?? {}, ctx?.globals ?? {}, {}, dynamic);
   // Inline secret tokens used directly in an auth field, e.g.
-  // `{{vault:secret/data/app#clientSecret}}` in the Client Secret. Keyed by the
-  // full reference so interpolate() picks them up, mirroring the send path.
+  // `{{vault:secret/data/app#clientSecret}}`. Keyed by the full reference so
+  // interpolate() picks them up, like the send path.
   const inline = await resolveInlineSecretRefs(JSON.stringify(auth ?? {}), scope);
   return { ...scope, ...inline };
 }
@@ -37,11 +36,8 @@ async function resolveClientSecret(auth: Oauth2Auth, vars: Record<string, string
   return interpolate(secret, vars);
 }
 
-// ─── Browser-redirect flows (authorization_code, implicit) ─────────────────────
-// Opens the system browser and runs a one-shot localhost server to catch the
-// redirect. authorization_code returns a `code` (exchanged for a token below);
-// implicit returns the token directly in the URL fragment (relayed to the
-// server by a tiny page, since fragments never reach the server otherwise).
+// Browser-redirect flows (authorization_code, implicit): open the system browser
+// and run a one-shot localhost redirect server (implicit relays its fragment token via a tiny page).
 async function browserFlow(
   auth: Oauth2Auth,
   vars: Record<string, string>,
@@ -108,7 +104,7 @@ async function browserFlow(
     }, 5 * 60 * 1000);
   });
 
-  // Implicit: the access token comes straight back — no exchange.
+  // Implicit: the access token comes straight back - no exchange.
   if (flow === 'implicit') {
     const accessToken = captured['access_token'] ?? '';
     if (!accessToken) throw new Error('OAuth 2.0: no access_token in implicit callback.');
@@ -155,10 +151,10 @@ async function browserFlow(
   };
 }
 
-// ─── OAuth 2.0 IPC handlers ───────────────────────────────────────────────────
+// OAuth 2.0 IPC handlers
 
 export function registerOAuth2Handlers(ipc: IpcMain): void {
-  // ── oauth2:startFlow — dispatches on the selected grant type ────────────────
+  // oauth2:startFlow - dispatches on the selected grant type
   // authorization_code / implicit run through the browser; client_credentials /
   // password are a direct server-to-server token request (no browser).
   handleIpc(ipc, IPC.oauth2.startFlow, async (
@@ -173,11 +169,11 @@ export function registerOAuth2Handlers(ipc: IpcMain): void {
     if (flow === 'authorization_code' || flow === 'implicit') {
       return browserFlow(auth, vars, flow);
     }
-    // client_credentials or password — no browser round-trip needed.
+    // client_credentials or password - no browser round-trip needed.
     return fetchOAuth2Token(auth, vars);
   });
 
-  // ── oauth2:refreshToken ────────────────────────────────────────────────────
+  // oauth2:refreshToken
   handleIpc(ipc, IPC.oauth2.refreshToken, async (
     _e,
     auth: AuthConfig,

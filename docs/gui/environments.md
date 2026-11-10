@@ -49,9 +49,41 @@ API_VERSION = v2
 
 ### OS environment reference (`envRef`)
 
-The value is read from an OS environment variable at send time, never stored on disk.
+The value is read from an OS environment variable at send time, never stored on disk. Set `envRef` to the name of an OS variable, e.g. `MY_API_TOKEN`; at send time the main process reads `process.env.MY_API_TOKEN`. This is ideal for CI/CD and for values you never want written to a file.
 
-Set `envRef` to the name of an OS variable, e.g. `MY_API_TOKEN`. At send time, the main process reads `process.env.MY_API_TOKEN`.
+A `$env` value is treated like a plain variable: it is shown in full in the sent-request preview and history. It is not masked, because an OS variable is often not a secret (for example `LOGNAME`). For a value that must be masked in the preview, use the **encrypted secret** type below.
+
+> **A desktop app only sees the environment it was launched with.** If you `export MY_API_TOKEN=...` in your shell profile and then start API Spector by double-clicking its icon (Finder, Dock, Start menu), the app does **not** inherit that variable, and the `$ Env var` reference resolves to an empty value. A GUI-launched app gets the desktop session's environment, not your interactive shell's. The same caveat applies to `API_SPECTOR_MASTER_KEY` (see [Master password](#master-password)) and to secret-manager variables such as `VAULT_ADDR` / `VAULT_TOKEN`. How to make the variable visible depends on the platform.
+
+#### macOS
+
+The reliable option is to **launch from a terminal** where the variable is exported, so the app inherits that terminal's environment:
+
+```bash
+export MY_API_TOKEN="your-value"      # or keep this line in ~/.zshrc
+open -a "API Spector"                 # inherits this terminal's environment
+```
+
+Double-clicking the icon in Finder or the Dock will not pick up a variable from `~/.zshrc`, because those files are read by interactive shells, not by the GUI launch. (`launchctl setenv MY_API_TOKEN "your-value"` can expose a variable to the GUI session on some macOS versions, but its effect on Dock-launched apps is inconsistent across releases, so prefer launching from a terminal.)
+
+#### Windows
+
+Set it as a **user or system environment variable** so GUI-launched apps inherit it:
+
+- Settings → search "Edit environment variables for your account", add it there, or
+- run `setx MY_API_TOKEN "your-value"` in a terminal (persistent; applies to new processes).
+
+Then **restart API Spector** — a running app keeps the environment it started with, and only processes started *after* the change see it. A variable set with `set` in one `cmd` window, or `$env:MY_API_TOKEN` in one PowerShell window, is visible only to apps launched from that same window, not to the icon.
+
+#### Linux
+
+Either **launch from a terminal** where the variable is exported (as on macOS), or set it for the whole desktop session in `~/.config/environment.d/*.conf` or `~/.profile`, then log out and back in so the session picks it up.
+
+#### CI/CD and the CLI
+
+Headless runs (`api-spector run`, pipeline jobs) inherit the environment of the process that starts them, so a pipeline variable or masked secret of the same name is read with no extra setup. This is the intended home for `envRef` variables.
+
+> **Quick check:** if an `$ Env var` row resolves to an empty value, the app almost certainly did not inherit the variable. Launch it from a terminal where the variable is exported to confirm, then make the variable visible to the GUI session (above) for day-to-day use.
 
 ### Encrypted secret
 
@@ -129,7 +161,7 @@ Encrypted secrets require a master password to decrypt at send time.
 export API_SPECTOR_MASTER_KEY="your-password"
 ```
 
-Then launch the app or CLI from that terminal session.
+Then launch the app or CLI **from that terminal session** so it inherits the variable. Double-clicking the app icon will not pick it up; see [the platform note above](#os-environment-reference-envref) for why, and for the Windows/macOS/Linux equivalents.
 
 **Option 2: Enter in the app** (per session):
 

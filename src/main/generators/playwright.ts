@@ -10,9 +10,9 @@ import {
   jsJsonPathExpr, folderUsesJsonPath, collectionUsesJsonPath,
 } from './generator-utils';
 
-// ─── Playwright TypeScript generator ─────────────────────────────────────────
+// Playwright TypeScript generator
 
-// ─── playwright.config.ts ─────────────────────────────────────────────────────
+// playwright.config.ts
 
 function buildPlaywrightConfig(environment: Environment | null): string {
   const baseUrl = getEnvBaseUrl(environment, 'http://localhost:3000');
@@ -34,14 +34,10 @@ export default defineConfig({
 `;
 }
 
-// ─── Test spec ────────────────────────────────────────────────────────────────
+// Test spec
 
-/**
- * Build lines for a hook request inside a beforeAll/beforeEach/afterAll/afterEach
- * block. Parses the hook's post-script to extract variables from the response
- * (e.g. tokens), and populates `sharedVars` so the caller can declare them at
- * the describe scope.
- */
+/** Lines for a hook request (beforeAll/beforeEach/afterAll/afterEach). Parses the
+ *  hook's post-script for response-variable extractions and adds them to `sharedVars`. */
 function buildHookLines(req: ApiRequest, sharedVars: Set<string>): string[] {
   const method = req.method.toLowerCase();
   const path = req.url.replace(/^https?:\/\/[^/]+/, '').replace(/^\{\{[^}]+\}\}/, '') || '/';
@@ -70,8 +66,8 @@ function buildHookLines(req: ApiRequest, sharedVars: Set<string>): string[] {
       optionParts.push(`data: ${renderJsValue(JSON.parse(req.body.json), '        ')}`);
     } catch { /* skip */ }
   }
-  // Non-standard verbs (e.g. QUERY, RFC 10008) go through fetch() with an
-  // explicit method option — APIRequestContext has no helper for them.
+  // Non-standard verbs go through fetch() with an explicit method option;
+  // APIRequestContext has no helper for them.
   const nativeVerb = PLAYWRIGHT_VERBS.includes(method);
   if (!nativeVerb) optionParts.unshift(`method: '${req.method}'`);
   const opts = optionParts.length ? `, { ${optionParts.join(', ')} }` : '';
@@ -105,7 +101,7 @@ function buildSpec(folderName: string, folder: Folder, collection: Collection, n
   const requests = collection.requests;
   const tests: string[] = [];
 
-  // Collect hooks from this folder + all ancestors (root/collection-level too)
+  // Hooks from this folder and all ancestors (root/collection-level too)
   const hooks = getAllApplicableHooks(folder.id, collection);
   const beforeAllHooks = hooks.beforeAll;
   const beforeHooks    = hooks.before;
@@ -115,7 +111,7 @@ function buildSpec(folderName: string, folder: Folder, collection: Collection, n
   // Shared variables extracted by hooks (declared at describe scope)
   const sharedVars = new Set<string>();
 
-  // Generate hook blocks — buildHookLines populates sharedVars
+  // buildHookLines populates sharedVars
   const hookBlocks: string[] = [];
   if (beforeAllHooks.length) {
     const lines = beforeAllHooks.flatMap(h => buildHookLines(h, sharedVars));
@@ -211,8 +207,8 @@ function buildSpec(folderName: string, folder: Folder, collection: Collection, n
       }
     }
 
-    // Non-standard verbs (e.g. QUERY, RFC 10008) go through fetch() with an
-    // explicit method option — APIRequestContext has no helper for them.
+    // Non-standard verbs go through fetch() with an explicit method option;
+    // APIRequestContext has no helper for them.
     const nativeVerb = PLAYWRIGHT_VERBS.includes(method);
     if (!nativeVerb) optionParts.unshift(`      method: '${req.method}'`);
     const optionsStr = optionParts.length ? `, {\n${optionParts.join(',\n')},\n    }` : '';
@@ -299,7 +295,7 @@ ${tests.join('\n\n')}
 `;
 }
 
-// ─── Project scaffolding ──────────────────────────────────────────────────────
+// Project scaffolding
 
 function buildPackageJson(collectionName: string, usesJsonPath: boolean): string {
   const name = collectionName.replaceAll(/\W+/g, '-').toLowerCase();
@@ -342,7 +338,7 @@ npm test
 `;
 }
 
-// ─── Entry point ──────────────────────────────────────────────────────────────
+// Entry point
 
 export function generatePlaywright(
   collection:  Collection,
@@ -358,9 +354,8 @@ export function generatePlaywright(
     for (const sub of folder.folders) processFolder(sub, sub.name);
   }
 
-  // processFolder already guards its own emission and recurses into subfolders,
-  // so walk from the root once (walking the root's subfolders again here would
-  // emit every subfolder's file twice).
+  // processFolder recurses into subfolders itself, so walk from the root once;
+  // walking the root's subfolders again would emit every file twice.
   processFolder(collection.rootFolder, collection.name);
 
   const scaffoldPaths = ['package.json', 'playwright.config.ts', ...files.map(f => f.path)];

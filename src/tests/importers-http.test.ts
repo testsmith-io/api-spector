@@ -65,7 +65,7 @@ describe('parseHttpFile — import', () => {
     const r = reqByName(col, 'Create a pet');
     expect(r.body.mode).toBe('json');
     expect(r.body.json).toContain('"name": "Fluffy"');
-    expect(r.body.json).toContain('{{$uuid}}');   // $guid → $uuid
+    expect(r.body.json).toContain('{{$uuid}}');   // $guid -> $uuid
   });
 
   it('folds wrapped query-string continuation lines into the URL', () => {
@@ -101,7 +101,7 @@ describe('generateHttpFile — export', () => {
   });
 
   it('maps dynamic vars back to REST Client names', () => {
-    expect(file.content).toContain('{{$guid}}');   // $uuid → $guid on the way out
+    expect(file.content).toContain('{{$guid}}');   // $uuid -> $guid on the way out
   });
 
   it('re-emits separators and request names', () => {

@@ -16,21 +16,14 @@ function safeDecode(s: string): string {
   try { return decodeURIComponent(s); } catch { return s; }
 }
 
-/**
- * Split a query string off a URL and merge its parameters into `existing`.
- * Used when a URL is pasted into the address bar so `?a=1&b=2` lands in the
- * Params tab instead of staying in the URL. Values are decoded here; the send
- * path re-encodes them, so the request on the wire is unchanged.
- *
- * Pasted keys win over existing rows with the same key; other existing rows are
- * kept. Blank existing rows (the trailing "add" row) are dropped.
- */
+/** Split a URL's query string into Params rows: values are decoded here and the send
+ *  path re-encodes them (wire request unchanged); pasted keys win, blank rows dropped. */
 export function extractQueryParams(rawUrl: string, existing: KeyValuePair[]): SplitUrlResult {
   const qIdx = rawUrl.indexOf('?');
   if (qIdx === -1) return { url: rawUrl, params: existing, changed: false };
 
   const base = rawUrl.slice(0, qIdx);
-  // A trailing #fragment is not part of the query; keep it out of the last value.
+  // A trailing #fragment is not part of the query.
   let query = rawUrl.slice(qIdx + 1);
   let fragment = '';
   const hashIdx = query.indexOf('#');
@@ -54,21 +47,14 @@ export function extractQueryParams(rawUrl: string, existing: KeyValuePair[]): Sp
   return { url: nextUrl, params: [...kept, ...parsed], changed: true };
 }
 
-// Path-parameter placeholders in a URL: `[name]` (API Spector style),
-// `{name}` (OpenAPI/Swagger style), and `:name` (Postman/Express style, so a
-// `{{baseUrl}}/products/:productId` imported from Postman resolves without
-// hand-editing). Never the `{{var}}` used for variables. The name must start
-// with a letter or underscore, so an IPv6 host literal like `[::1]` never
-// matches; the `:name` branch can't swallow the scheme (`://` is followed by
-// `/`) or the port (`:3900` starts with a digit); the `{name}` branch uses
-// look-around so it never matches inside a `{{variable}}` token. The matched
-// name is capture group 1 (`[name]`), 2 (`{name}`), or 3 (`:name`).
+// Path placeholders `[name]` / `{name}` / `:name`, never the `{{var}}` token: name must
+// start with a letter/underscore (so `[::1]`, `:3900`, `://` never match). Name is group 1/2/3.
 export const PATH_PARAM_PATTERN = String.raw`\[([A-Za-z_]\w*)\]|(?<!\{)\{([A-Za-z_]\w*)\}(?!\})|:([A-Za-z_]\w*)`;
 const PATH_PARAM_RE = new RegExp(PATH_PARAM_PATTERN, 'g');
 
 // Resolve `{{name}}` tokens from a value map, leaving unknown tokens as-is.
-// A display-only interpolation: unlike the send path's interpolate(), it does
-// not evaluate faker()/dayjs() expressions, so it stays pure and renderer-safe.
+// Display-only: unlike the send path's interpolate(), it does not evaluate
+// faker()/dayjs() expressions, so it stays pure and renderer-safe.
 function interpTokens(str: string, vars: Record<string, string>): string {
   return str.replaceAll(/\{\{([^}]+)\}\}/g, (m, key) => {
     const k = String(key).trim();
@@ -76,15 +62,8 @@ function interpTokens(str: string, vars: Record<string, string>): string {
   });
 }
 
-/**
- * Best-effort preview of the final request URL, mirroring the send path's
- * buildUrl (src/main/interpolation.ts): enabled query rows are appended as
- * `?k=v` (URL-encoded), and path rows / `{{name}}` / `[name]` placeholders are
- * substituted from `varValues` (and from the path rows themselves). Unresolved
- * tokens are left visible. Pure and renderer-safe — used for the live "Sends:"
- * line under the URL bar. Query/path routing matches buildUrl exactly; the only
- * difference is that expressions are not evaluated.
- */
+/** Preview the final request URL like the send path's buildUrl (query rows URL-encoded,
+ *  path / `{{name}}` / `[name]` substituted), but pure: expressions are not evaluated. */
 export function buildPreviewUrl(
   baseUrl: string,
   params: KeyValuePair[],
@@ -129,17 +108,8 @@ function referencedNames(url: string): Set<string> {
   return names;
 }
 
-/**
- * Reconcile the Params tab with the URL, Bruno-style:
- *  - a `?a=1&b=2` query string is moved into query-param rows (via
- *    {@link extractQueryParams}); the send path re-appends them, so the wire
- *    request is unchanged;
- *  - each `[name]` in the path gets a path-param row (preserving a value the
- *    user already typed for it);
- *  - auto-added path rows that are now empty and no longer referenced in the URL
- *    are pruned, so editing or removing a `[name]` keeps the table in sync.
- * Query rows and rows the user gave a value are never removed.
- */
+/** Reconcile Params with the URL: extract query rows, add a path row per `[name]`
+ *  (keeping typed values), and prune empty path rows no longer referenced. */
 export function syncParamsFromUrl(rawUrl: string, existing: KeyValuePair[]): SplitUrlResult {
   const q = extractQueryParams(rawUrl, existing);
   const url = q.url;
@@ -148,7 +118,7 @@ export function syncParamsFromUrl(rawUrl: string, existing: KeyValuePair[]): Spl
   const pathNames = extractPathParamNames(url);
   const referenced = referencedNames(url);
 
-  // Prune empty, unreferenced path rows (e.g. after renaming [id] -> [userId]).
+  // Prune empty, unreferenced path rows, e.g. after renaming [id] to [userId].
   let params = q.params.filter(p => {
     if (p.paramType === 'path' && !p.value && p.key && !referenced.has(p.key)) {
       changed = true;
@@ -157,7 +127,7 @@ export function syncParamsFromUrl(rawUrl: string, existing: KeyValuePair[]): Spl
     return true;
   });
 
-  // Add a path row for every :name not already in the table.
+  // Add a path row for every name not already in the table.
   const have = new Set(params.filter(p => p.key).map(p => p.key));
   const additions: KeyValuePair[] = pathNames
     .filter(n => !have.has(n))

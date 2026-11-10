@@ -3,7 +3,7 @@
 
 // Collections and folders open as tabs (like requests), and the legacy panel
 // flags (collectionPanelOpen / folderPanel) track the active tab so the main
-// area shows exactly one thing — no overlap.
+// area shows exactly one thing - no overlap.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '../store';
 

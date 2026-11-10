@@ -143,7 +143,7 @@ describe('can-i-deploy results store', () => {
   });
 });
 
-// ─── Environment / deployment tracking ────────────────────────────────────────
+// Environment / deployment tracking
 
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir as osTmpdir } from 'node:os';
