@@ -3,22 +3,10 @@
 
 import Ajv, { type ValidateFunction } from 'ajv';
 
-// ─── IPC payload validation ──────────────────────────────────────────────────
-//
-// Hardens IPC handlers against malformed payloads from a renderer that's been
-// compromised or simply has stale data. Crashes from undefined fields turn
-// into clean Errors with a useful message; obviously bogus shapes are rejected
-// before they reach domain code.
-//
-// The schemas are intentionally permissive (`additionalProperties: true`,
-// optional fields not in `required`). The goal is to catch *missing* required
-// arrays/objects that today blow up at runtime — not to police every minor
-// shape drift.
-//
-// We avoid the OpenAPI-only `nullable: true` keyword (ajv rejects it in plain
-// Draft-07 strict-types mode). Instead we use `type: ['x', 'null']` unions
-// where actual null is meaningful, and otherwise just leave the field out of
-// `required`.
+// IPC payload validation: hardens handlers against malformed payloads (undefined-field crashes
+// become clean Errors). Schemas are permissive (additionalProperties: true) - the goal is catching
+// MISSING required fields, not shape drift. No `nullable: true` (ajv rejects it in Draft-07 strict);
+// use `type: ['x', 'null']` where null is meaningful, else omit from `required`.
 
 const ajv = new Ajv({
   allErrors: true,
@@ -27,9 +15,7 @@ const ajv = new Ajv({
   allowUnionTypes: true,
 });
 
-/** Build an assertion-style validator. The runtime schema is `unknown` to
- *  ajv (we don't need ajv's type inference — we only use it for runtime
- *  validation), and the assertion type is supplied separately. */
+/** Build an assertion-style validator; the assertion type is supplied separately. */
 function compile<T>(schema: object): (data: unknown) => asserts data is T {
   const fn: ValidateFunction = ajv.compile(schema);
   return function validate(data: unknown): asserts data is T {
@@ -42,7 +28,7 @@ function compile<T>(schema: object): (data: unknown) => asserts data is T {
   };
 }
 
-// ─── Reusable sub-schemas ────────────────────────────────────────────────────
+// Reusable sub-schemas
 
 const apiRequestSchema = {
   type: 'object',
@@ -75,7 +61,7 @@ const stringMap = {
   additionalProperties: { type: 'string' },
 };
 
-// ─── Validators ──────────────────────────────────────────────────────────────
+// Validators
 
 interface ApiRequestShape {
   id: string
@@ -107,8 +93,7 @@ export const validateSendRequestPayload: (data: unknown) => asserts data is Send
     globals:        stringMap,
     dataRow:        stringMap,
     piiMaskPatterns: { type: 'array', items: { type: 'string' } },
-    // `environment`, `proxy`, `tls` are accepted as anything — they're
-    // covered by the IPC handler's own type-narrow + defaults.
+    // environment/proxy/tls accepted as anything; the handler narrows them.
   },
   required: ['request'],
   additionalProperties: true,
@@ -145,7 +130,7 @@ export const validateContractRunPayload: (data: unknown) => asserts data is Cont
 
 export const validateWsdlFetchUrl = (url: unknown): asserts url is string => {
   if (typeof url !== 'string' || !url.trim()) throw new Error('Invalid IPC payload: url must be a non-empty string');
-  // Accept http/https only — no file:// or data: schemes.
+  // Accept http/https only - no file:// or data: schemes.
   if (!/^https?:\/\//i.test(url)) throw new Error('Invalid IPC payload: url must start with http:// or https://');
 };
 

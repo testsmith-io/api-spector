@@ -4,7 +4,7 @@
 import type { ContractReport, ContractResult } from '../../shared/types';
 import { escapeXml } from '../../shared/escape';
 
-// ─── Report formatters ────────────────────────────────────────────────────────
+// Report formatters
 // Machine-readable output so contract runs can gate CI pipelines.
 
 function caseXml(r: ContractResult): string {

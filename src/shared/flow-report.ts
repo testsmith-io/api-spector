@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Standalone HTML report for a flow run — same visual language as the
+// Standalone HTML report for a flow run - same visual language as the
 // collection runner's report (buildHtmlReport), adapted to the flow's typed
 // block records. Self-contained (inline CSS, no assets), dark/light aware.
 

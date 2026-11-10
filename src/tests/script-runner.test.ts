@@ -11,7 +11,7 @@ const baseCtx = {
   localVars: {},
 };
 
-// ─── Basic execution ──────────────────────────────────────────────────────────
+// Basic execution
 
 describe('runScript — basic', () => {
   it('runs without error on an empty script', async () => {
@@ -45,7 +45,7 @@ describe('runScript — basic', () => {
   });
 });
 
-// ─── sp.test ─────────────────────────────────────────────────────────────────
+// sp.test
 
 describe('runScript — sp.test', () => {
   it('records a passing test', async () => {
@@ -75,7 +75,7 @@ describe('runScript — sp.test', () => {
   });
 });
 
-// ─── sp.expect assertions ─────────────────────────────────────────────────────
+// sp.expect assertions
 
 describe('runScript — sp.expect', () => {
   async function passes(assertion: string) {
@@ -99,7 +99,7 @@ describe('runScript — sp.expect', () => {
   it('null — passes for null', async () => expect(await passes(`sp.expect(null).to.be.null`)).toBe(true));
 });
 
-// ─── Variable scopes ─────────────────────────────────────────────────────────
+// Variable scopes
 
 describe('runScript — variable scopes', () => {
   it('can read env vars', async () => {
@@ -143,7 +143,7 @@ describe('runScript — variable scopes', () => {
   });
 });
 
-// ─── Response access ─────────────────────────────────────────────────────────
+// Response access
 
 describe('runScript — sp.response', () => {
   const ctx = {
@@ -201,7 +201,7 @@ describe('runScript — sp.response', () => {
   });
 });
 
-// ─── sp.totp ─────────────────────────────────────────────────────────────────
+// sp.totp
 
 describe('runScript — sp.totp', () => {
   it('generates a 6-digit TOTP code from a base32 secret', async () => {

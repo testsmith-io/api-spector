@@ -68,10 +68,10 @@ type RealtimeTestResult = {
 }
 
 
-// Expose a typed API to the renderer. Note: getSecret is intentionally absent —
-// the renderer never holds raw secret values.
+// Typed API for the renderer. getSecret is intentionally absent - the renderer
+// never holds raw secret values.
 const api = {
-  // ─── Workspace / File ──────────────────────────────────────────────────────
+  // Workspace / File
   openWorkspace: (): Promise<{ workspace: Workspace; workspacePath: string } | null> =>
     ipcRenderer.invoke(IPC.file.openWorkspace),
   getLastWorkspace: (): Promise<{ workspace: Workspace; workspacePath: string } | null> =>
@@ -114,9 +114,8 @@ const api = {
     ipcRenderer.invoke(IPC.file.loadEnvironment, relPath),
   saveEnvironment: (relPath: string, env: Environment): Promise<void> =>
     ipcRenderer.invoke(IPC.file.saveEnvironment, relPath, env),
-  /** Idempotent unlink of a workspace-relative file. Used by collection /
-   *  environment / mock delete flows so the file is removed from disk, not
-   *  just from the workspace manifest. */
+  /** Idempotent unlink of a workspace-relative file, so delete flows remove it
+   *  from disk, not just the manifest. */
   deleteWorkspaceFile: (relPath: string): Promise<void> =>
     ipcRenderer.invoke(IPC.file.deleteWorkspaceFile, relPath),
   loadHistory: (): Promise<HistoryEntry[]> =>
@@ -124,18 +123,18 @@ const api = {
   saveHistory: (entries: HistoryEntry[]): Promise<void> =>
     ipcRenderer.invoke(IPC.file.saveHistory, entries),
 
-  // ─── HTTP execution ────────────────────────────────────────────────────────
+  // HTTP execution
   sendRequest: (payload: SendRequestPayload): Promise<RequestExecutionResult> =>
     ipcRenderer.invoke(IPC.request.send, payload),
 
-  // ─── Secrets (encrypted, master-key-based) ───────────────────────────────
+  // Secrets (encrypted, master-key-based)
   checkMasterKey: (): Promise<{ set: boolean }> =>
     ipcRenderer.invoke(IPC.secret.checkMasterKey),
   setMasterKey: (value: string): Promise<void> =>
     ipcRenderer.invoke(IPC.secret.setMasterKey, value),
 
-  /** Encrypt a secret in the main process with the master key already set there
-   *  (API_SPECTOR_MASTER_KEY) — no password prompt needed. */
+  /** Encrypt a secret in main with the already-set master key
+   *  (API_SPECTOR_MASTER_KEY), no prompt. */
   encryptWithMasterKey: (plaintext: string): Promise<{ secretEncrypted: string; secretSalt: string; secretIv: string; secretHash: string }> =>
     ipcRenderer.invoke(IPC.secret.encryptWithMasterKey, plaintext),
   /** Save a named secret to the OS keychain (safeStorage). */
@@ -151,13 +150,13 @@ const api = {
   generateAiDocs: (input: GenerateDocsInput): Promise<string> =>
     ipcRenderer.invoke(IPC.ai.generateDocs, input),
 
-  // ─── Globals ──────────────────────────────────────────────────────────────
+  // Globals
   getGlobals: (): Promise<Record<string, string>> =>
     ipcRenderer.invoke(IPC.globals.get),
   setGlobals: (globals: Record<string, string>): Promise<void> =>
     ipcRenderer.invoke(IPC.globals.set, globals),
 
-  // ─── Runner ───────────────────────────────────────────────────────────────
+  // Runner
   runCollection: (payload: RunnerPayload): Promise<RunSummary> =>
     ipcRenderer.invoke(IPC.runner.start, payload),
   onRunProgress: (cb: (result: RunRequestResult) => void): void => {
@@ -169,7 +168,7 @@ const api = {
   saveResults: (content: string, defaultName: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC.results.save, content, defaultName),
 
-  // ─── Flow runner ──────────────────────────────────────────────────────────
+  // Flow runner
   runFlow: (payload: RunFlowPayload): Promise<FlowRunSummary> =>
     ipcRenderer.invoke(IPC.flow.run, payload),
   onFlowProgress: (cb: (evt: FlowRunEvent) => void): void => {
@@ -179,7 +178,7 @@ const api = {
     ipcRenderer.removeAllListeners(IPC.flow.progress);
   },
 
-  // ─── Import ────────────────────────────────────────────────────────────────
+  // Import
   importPostman: (): Promise<Collection | null> =>
     ipcRenderer.invoke(IPC.import.postman),
   importPostmanEnvironment: (): Promise<Environment | null> =>
@@ -215,7 +214,7 @@ const api = {
   extractOpenApiSchemasFromUrl: (url: string): Promise<{ method: string; pathTemplate: string; pathRewritten: string; schema: string; operationId?: string; summary?: string }[]> =>
     ipcRenderer.invoke(IPC.import.openapiSchemasUrl, url),
 
-  // ─── Code generation ──────────────────────────────────────────────────────
+  // Code generation
   generateCode: (opts: GenerateOptions): Promise<GeneratedFile[]> =>
     ipcRenderer.invoke(IPC.generate.code, opts),
   pickOutputDir: (): Promise<string | null> =>
@@ -229,15 +228,14 @@ const api = {
   saveGeneratedFilesAsZip: (files: GeneratedFile[], collectionName: string, target: GenerateTarget): Promise<boolean> =>
     ipcRenderer.invoke(IPC.generate.saveZip, files, collectionName, target),
 
-  // ─── HashiCorp Vault (interactive OIDC login) ─────────────────────────────
+  // HashiCorp Vault (interactive OIDC login)
   vaultOidcLogin: (
     opts: { address: string; mount?: string; role?: string; namespace?: string; skipVerify?: boolean },
   ): Promise<{ ok: true; expiresInSeconds: number; entityId?: string }> =>
     ipcRenderer.invoke(IPC.vault.oidcLogin, opts),
 
-  // ─── OAuth 2.0 ────────────────────────────────────────────────────────────
-  // `ctx` is the active scope; main resolves the full {{var}} map from it
-  // (environment incl. secret-manager refs, collection vars, globals).
+  // OAuth 2.0
+  // ctx is the active scope; main resolves the full {{var}} map from it.
   oauth2StartFlow: (
     auth: AuthConfig,
     ctx: VarResolveContext,
@@ -251,7 +249,7 @@ const api = {
   ): Promise<{ accessToken: string; expiresAt: number; refreshToken?: string }> =>
     ipcRenderer.invoke(IPC.oauth2.refreshToken, auth, ctx, refreshToken),
 
-  // ─── Cloud integration ────────────────────────────────────────────────────────
+  // Cloud integration
   cloudConnect: (): Promise<{ token: string; email: string; organization: string | null }> =>
     ipcRenderer.invoke(IPC.cloud.connect),
   cloudTest: (): Promise<{ email: string; organization: string; plan: string }> =>
@@ -312,7 +310,7 @@ const api = {
   cloudWorkspaceRestore: (arg: { id: number; version: number }): Promise<{ version: number; payload: unknown }> =>
     ipcRenderer.invoke(IPC.cloud.workspaceRestore, arg),
 
-  // ─── Mock servers ─────────────────────────────────────────────────────────────
+  // Mock servers
   mockStart:    (server: MockServer): Promise<void> =>
     ipcRenderer.invoke(IPC.mock.start, server),
   mockStop:     (id: string): Promise<void> =>
@@ -338,7 +336,7 @@ const api = {
     ipcRenderer.removeAllListeners(IPC.mock.hit);
   },
 
-  // ─── WebSocket ────────────────────────────────────────────────────────────
+  // WebSocket
   wsConnect: (requestId: string, url: string, headers: Record<string, string>): Promise<void> =>
     ipcRenderer.invoke(IPC.ws.connect, requestId, url, headers),
 
@@ -348,13 +346,8 @@ const api = {
   wsDisconnect: (requestId: string): Promise<void> =>
     ipcRenderer.invoke(IPC.ws.disconnect, requestId),
 
-  // INVARIANT for every on*/off* event pair below: each realtime channel has at
-  // most ONE subscriber at a time (currently always App.tsx). The off* helpers
-  // call removeAllListeners(channel), which tears down every listener on that
-  // channel, so a second concurrent subscriber would unsubscribe the first. If a
-  // channel ever needs multiple subscribers, change on* to return a disposer that
-  // removes only its own listener (and drop the no-arg off*), rather than adding
-  // a second subscriber under this API.
+  // INVARIANT: each realtime channel has at most ONE subscriber (always App.tsx); off* calls
+  // removeAllListeners, so a second concurrent subscriber would unsubscribe the first.
   onWsMessage: (cb: (event: { requestId: string; message: WsMessage }) => void): void => {
     ipcRenderer.on(IPC.ws.message, (_e, payload) => cb(payload));
   },
@@ -374,7 +367,7 @@ const api = {
   }): Promise<RealtimeTestResult> =>
     ipcRenderer.invoke(IPC.ws.test, cfg),
 
-  // ─── Socket.IO ────────────────────────────────────────────────────────────
+  // Socket.IO
   socketIoConnect: (requestId: string, opts: { url: string; namespace?: string; auth?: string; headers?: Record<string, string>; path?: string }): Promise<void> =>
     ipcRenderer.invoke(IPC.socketio.connect, requestId, opts),
 
@@ -404,11 +397,11 @@ const api = {
   }): Promise<RealtimeTestResult> =>
     ipcRenderer.invoke(IPC.socketio.test, cfg),
 
-  // ─── jq (JSON response filtering) ─────────────────────────────────────────
+  // jq (JSON response filtering)
   jqFilter: (json: string, filter: string): Promise<string> =>
     ipcRenderer.invoke(IPC.jq.filter, json, filter),
 
-  // ─── GraphQL subscriptions (graphql-ws) ───────────────────────────────────
+  // GraphQL subscriptions (graphql-ws)
   graphqlWsSubscribe: (requestId: string, opts: { url: string; headers?: Record<string, string>; query: string; variables?: string; operationName?: string; connectionParams?: string }): Promise<void> =>
     ipcRenderer.invoke(IPC.graphqlws.subscribe, requestId, opts),
   graphqlWsStop: (requestId: string): Promise<void> =>
@@ -430,7 +423,7 @@ const api = {
   }): Promise<RealtimeTestResult> =>
     ipcRenderer.invoke(IPC.graphqlws.test, cfg),
 
-  // ─── MQTT ──────────────────────────────────────────────────────────────────
+  // MQTT
   mqttConnect: (requestId: string, opts: { url: string; clientId?: string; username?: string; password?: string; cleanSession?: boolean; subscribeTopic?: string; qos?: 0 | 1 | 2 }): Promise<void> =>
     ipcRenderer.invoke(IPC.mqtt.connect, requestId, opts),
   mqttPublish: (requestId: string, opts: { topic: string; payload: string; qos?: 0 | 1 | 2; retain?: boolean }): Promise<void> =>
@@ -459,7 +452,7 @@ const api = {
     ipcRenderer.removeAllListeners(IPC.mqtt.status);
   },
 
-  // ─── Performance (load) testing ─────────────────────────────────────────────
+  // Performance (load) testing
   perfRun: (payload: {
     plan: PerfPlan
     request?: ApiRequest; vars?: Record<string, string>
@@ -477,7 +470,7 @@ const api = {
     ipcRenderer.removeAllListeners(IPC.perf.progress);
   },
 
-  // ─── gRPC ─────────────────────────────────────────────────────────────────
+  // gRPC
   grpcLoadProto: (src: { protoSource?: string; protoPath?: string; importPaths?: string[] }): Promise<{ services: GrpcServiceInfo[] }> =>
     ipcRenderer.invoke(IPC.grpc.loadProto, src),
 
@@ -503,7 +496,7 @@ const api = {
     ipcRenderer.removeAllListeners(IPC.grpc.status);
   },
 
-  // ─── Streamed responses (SSE / NDJSON / chunked) ──────────────────────────
+  // Streamed responses (SSE / NDJSON / chunked)
   onRequestStreamEvent: (cb: (payload: { streamId: string; events: StreamEvent[] }) => void): void => {
     ipcRenderer.on(IPC.request.streamEvent, (_e, payload) => cb(payload));
   },
@@ -514,7 +507,7 @@ const api = {
   stopStream: (streamId: string): Promise<void> =>
     ipcRenderer.invoke(IPC.request.stopStream, streamId),
 
-  // ─── SOAP / WSDL ──────────────────────────────────────────────────────────
+  // SOAP / WSDL
   wsdlFetch: (url: string, extraHeaders?: Record<string, string>): Promise<{
     operations: Array<{
       name: string
@@ -538,21 +531,20 @@ const api = {
       mock: MockServer
     }>,
 
-  // ─── Docs generation ──────────────────────────────────────────────────────
+  // Docs generation
   generateDocs: (payload: {
     collections: Array<{ collection: Collection; requests: Record<string, ApiRequest> }>
     format: 'html' | 'markdown'
-    /** Captured example exchanges (request body + response body) keyed by
-     *  requestId. The docs handler appends them as "Example Request/Response"
-     *  blocks so docs include real data, not just templates. */
+    /** Captured example exchanges keyed by requestId; docs append them as
+     *  "Example Request/Response" blocks. */
     examples?: Record<string, { sent?: unknown; response?: unknown }>
   }): Promise<string> => ipcRenderer.invoke(IPC.docs.generate, payload),
 
-  // ─── OpenAPI coverage ─────────────────────────────────────────────────────
+  // OpenAPI coverage
   coverageLoadSpec: (source: { path?: string; url?: string; text?: string }): Promise<unknown> =>
     ipcRenderer.invoke(IPC.coverage.loadSpec, source),
 
-  // ─── Contract testing ─────────────────────────────────────────────────────
+  // Contract testing
   runContracts: (payload: ContractRunPayload): Promise<ContractReport> =>
     ipcRenderer.invoke(IPC.contract.run, payload),
   inferContractSchema: (jsonBody: string): Promise<string | null> =>
@@ -592,7 +584,7 @@ const api = {
   }): Promise<FuzzReport> =>
     ipcRenderer.invoke(IPC.contract.fuzz, payload) as Promise<FuzzReport>,
 
-  // ─── Script hooks ─────────────────────────────────────────────────────────
+  // Script hooks
   runScriptHook: (payload: {
     script:         string
     envVars:        Record<string, string>
@@ -606,7 +598,7 @@ const api = {
     error?:                string
   }> => ipcRenderer.invoke(IPC.script.runHook, payload),
 
-  // ─── Git ──────────────────────────────────────────────────────────────────
+  // Git
   gitIsRepo:     (): Promise<boolean> =>
     ipcRenderer.invoke(IPC.git.isRepo),
   gitRepoInfo:   (): Promise<GitRepoInfo> =>
@@ -706,7 +698,7 @@ const api = {
   gitWriteResolved: (filePath: string, content: string): Promise<void> =>
     ipcRenderer.invoke(IPC.git.writeResolved, filePath, content),
 
-  // ─── Recorder ─────────────────────────────────────────────────────────────
+  // Recorder
   recordStart:    (config: RecorderConfig): Promise<void> =>
     ipcRenderer.invoke(IPC.record.start, config),
   recordStop:     (): Promise<RecordingSession> =>
@@ -724,7 +716,7 @@ const api = {
     ipcRenderer.removeAllListeners(IPC.record.hit);
   },
 
-  // ─── Shell ────────────────────────────────────────────────────────────────
+  // Shell
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke(IPC.shell.openExternal, url),
   checkForUpdate: (): Promise<{ current: string; latest: string; updateAvailable: boolean; command: string } | null> =>
     ipcRenderer.invoke(IPC.app.checkUpdate),
@@ -745,10 +737,10 @@ const api = {
     ipcRenderer.on(IPC.app.onUpdateError, (_e, info) => cb(info));
   },
 
-  // ─── Zoom ─────────────────────────────────────────────────────────────────
+  // Zoom
   setZoomFactor: (factor: number): void => webFrame.setZoomFactor(factor),
 
-  // ─── Platform ─────────────────────────────────────────────────────────────
+  // Platform
   platform: process.platform as string,
 };
 

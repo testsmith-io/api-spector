@@ -1,29 +1,23 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// "Ask variables" — values you are prompted for at send time instead of storing
-// them. Written as {{@Message}} anywhere a variable is allowed, or
-// {{@Message[one, two, three]}} to pick from a fixed list (a dropdown). They are
-// never saved, so they suit a one-off value or a secret you do not want on disk.
-//
-// On an interactive send the UI asks for each one; in an automated run (the CLI)
-// they come from --ask "Message=value", and a request whose ask variables are
-// not supplied is skipped. This module is pure (no DOM / Electron) so both the
-// renderer and the main/CLI side share the exact same parsing.
+// "Ask variables" - prompted for at send time, never stored. Written {{@Message}}, or
+// {{@Message[one, two]}} for a fixed-list dropdown. Pure (no DOM/Electron), so the
+// renderer and CLI share the same parsing; the CLI supplies them via --ask "Message=value".
 
 import type { ApiRequest } from './types';
 
 export interface AskVar {
-  /** The exact token inner, including the leading @, used as the interpolation
-   *  key (e.g. "@Region[eu, us]"). */
+  /** Exact token inner incl. the leading @, used as the interpolation key
+   *  (e.g. "@Region[eu, us]"). */
   key: string
   /** The message shown when prompting (e.g. "Region"). */
   message: string
-  /** Fixed choices, when written as {{@Msg[a, b]}} — rendered as a dropdown. */
+  /** Fixed choices, when written as {{@Msg[a, b]}} - rendered as a dropdown. */
   choices?: string[]
 }
 
-// {{@...}} — an ask token. The inner (after @) is captured.
+// {{@...}} - an ask token. The inner (after @) is captured.
 const ASK_RE = /\{\{\s*@([^}]+?)\s*\}\}/g;
 
 function parseInner(inner: string): { message: string; choices?: string[] } {
@@ -35,9 +29,8 @@ function parseInner(inner: string): { message: string; choices?: string[] } {
   return { message: inner.trim() };
 }
 
-/** Extract the unique ask variables found across the given text fields, keyed by
- *  their exact token (so the same message with different choices stays distinct,
- *  and repeats are prompted once). */
+/** Unique ask variables across the given text fields, keyed by exact token so
+ *  repeats are prompted once. */
 export function extractAskVars(texts: (string | undefined)[]): AskVar[] {
   const seen = new Map<string, AskVar>();
   for (const text of texts) {
@@ -72,16 +65,16 @@ export function askVarsInRequest(req: ApiRequest): AskVar[] {
   return extractAskVars(texts);
 }
 
-/** Build the interpolation map ({token → value}) from answers keyed by message.
- *  A missing answer becomes an empty string (matching the blank-input rule). */
+/** Interpolation map ({token -> value}) from answers keyed by message; a missing
+ *  answer becomes an empty string. */
 export function resolveAskValues(asks: AskVar[], answers: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {};
   for (const a of asks) out[a.key] = answers[a.message] ?? '';
   return out;
 }
 
-/** Ask messages that have no answer in the provided map — used by the CLI to
- *  decide whether a request must be skipped in a non-interactive run. */
+/** Ask messages with no answer in the map; the CLI uses these to decide whether
+ *  to skip a request. */
 export function missingAskMessages(asks: AskVar[], answers: Record<string, string>): string[] {
   const missing: string[] = [];
   for (const a of asks) if (!(a.message in answers) && !missing.includes(a.message)) missing.push(a.message);

@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { detectStreamKind, StreamFramer, readStream } from '../main/stream/parse';
 
-// A ReadableStream that emits the given text chunks then closes — lets us drive
+// A ReadableStream that emits the given text chunks then closes - lets us drive
 // readStream with the exact chunk boundaries a real socket might hand us.
 function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
   const enc = new TextEncoder();
@@ -83,7 +83,7 @@ describe('StreamFramer (NDJSON)', () => {
 });
 
 describe('readStream', () => {
-  const now = () => 1000; // constant clock → deterministic tMs of 0
+  const now = () => 1000; // constant clock -> deterministic tMs of 0
 
   it('reads an SSE stream split mid-frame', async () => {
     const seen: number[] = [];

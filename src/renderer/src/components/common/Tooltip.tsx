@@ -3,10 +3,8 @@
 
 import type { ReactNode } from 'react';
 
-// Instant, styled tooltip (matches the activity-bar tooltip). Native `title=`
-// tooltips have a ~1s browser delay; this shows immediately on hover/focus.
-// Wrap a control: <Tooltip label="Save"><button .../></Tooltip>. Keep an
-// aria-label on the control itself for screen readers — this is visual only.
+// Instant styled tooltip, shown on hover/focus (native `title=` has a ~1s delay).
+// Visual only: keep an aria-label on the wrapped control for screen readers.
 export function Tooltip({
   label,
   align = 'center',

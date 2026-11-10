@@ -48,7 +48,7 @@ export function GeneratorPanel() {
     activeCollectionId ?? colList[0]?.data.id ?? ''
   );
 
-  // Clear preview whenever the user changes target/collection — the previously
+  // Clear preview whenever the user changes target/collection - the previously
   // generated files are stale and would mislead if shown alongside a different
   // target's output.
   useEffect(() => {

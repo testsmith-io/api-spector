@@ -6,12 +6,12 @@ import { v4 as uuidv4 } from 'uuid';
 import type { MockServer, MockHit } from '../../../../shared/types';
 import type { FullState } from '../index';
 
-/** Mock files are keyed by id, not display name — renames never move files. */
+/** Mock files are keyed by id, not display name - renames never move files. */
 function mockRelPath(id: string): string {
   return `mocks/${id}.mock.json`;
 }
 
-/** serverId → hits, newest first, capped at this many entries. */
+/** serverId -> hits, newest first, capped at this many entries. */
 const MOCK_LOG_CAP = 100;
 
 export interface MocksSliceState {

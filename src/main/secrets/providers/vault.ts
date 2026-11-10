@@ -8,36 +8,24 @@ import type { Dispatcher } from 'undici';
 import { getSecretsConfig } from '../config';
 import type { SecretProvider, SecretResolveContext } from '../types';
 
-// Substitute `{{name}}` tokens from the active variable scope. A small, local
-// replacer (not the engine's interpolate()) so the provider stays lean and free
-// of import cycles; unknown tokens are left untouched so the failure is visible.
+// Substitute `{{name}}` tokens. A local replacer (not the engine's
+// interpolate()) to avoid an import cycle; unknown tokens are left untouched.
 function applyVars(str: string, vars: Record<string, string> | undefined): string {
   if (!vars || !str.includes('{{')) return str;
   return str.replace(/\{\{\s*([\w.$-]+)\s*\}\}/g, (m, name: string) =>
     (name in vars ? vars[name] : m));
 }
 
-// HashiCorp Vault / OpenBao provider. References look like `vault:<path>#<key>`
-// (or `bao:<path>#<key>` for OpenBao), where <path> is the exact API path
-// (e.g. `secret/data/app` for KV v2, `kv/app` for KV v1) and <key> is the field
-// within that secret. OpenBao is API-compatible with Vault (same /v1 paths and
-// X-Vault-Token header), so the two schemes share this implementation and differ
-// only in which environment variables they read first (BAO_* vs VAULT_*).
+// HashiCorp Vault / OpenBao provider. References are `vault:<path>#<key>` (or `bao:`),
+// <path> being the exact API path (KV v2 `secret/data/app`, KV v1 `kv/app`). Both schemes
+// share this code, differing only in env var prefix (BAO_* vs VAULT_*). A configured path
+// prefix is prepended to every ref; a path starting with `/` is absolute and ignores it.
 //
-// A configured path prefix (settings.secrets.vault.pathPrefix or
-// VAULT_PATH_PREFIX / BAO_PATH_PREFIX) is prepended to every reference path, so
-// `vault:applications/api#email` under prefix `stack/1000120-test-automation/data/`
-// reads `stack/1000120-test-automation/data/applications/api`. A reference whose
-// path starts with `/` is absolute and ignores the prefix.
-//
-// Authentication follows the ambient context (same across UI / CLI / CI, only
-// the source differs):
-//   1. explicit token          — VAULT_TOKEN / BAO_TOKEN
-//   2. login token file        — ~/.vault-token / ~/.bao-token
-//   3. AppRole                 — VAULT_ROLE_ID + VAULT_SECRET_ID (or BAO_*)
-//   4. JWT / OIDC (CI)         — VAULT_JWT | VAULT_JWT_PATH  (+ role)
-// Non-secret bits (address, namespace, role, mount) may also come from the
-// workspace's settings.secrets.vault; environment variables always win.
+// Auth order (env wins over settings.secrets.vault):
+//   1. explicit token    - VAULT_TOKEN / BAO_TOKEN
+//   2. login token file  - ~/.vault-token / ~/.bao-token
+//   3. AppRole           - VAULT_ROLE_ID + VAULT_SECRET_ID (or BAO_*)
+//   4. JWT / OIDC (CI)   - VAULT_JWT | VAULT_JWT_PATH (+ role)
 
 interface VaultConn {
   address: string
@@ -111,11 +99,10 @@ function resolveConn(): VaultConn {
   };
 }
 
-// A short-lived Vault client token (from token auth or a login), cached until
-// shortly before its lease expires, and secret values, cached for their lease.
+// Client token cached until shortly before its lease expires.
 let cachedToken: { value: string; expiresAt: number } | null = null;
-// Cached per secret PATH (not per key), so reading several fields from one
-// secret is a single Vault round-trip.
+// Cached per secret PATH (not per key), so several fields from one secret are a
+// single round-trip.
 const secretCache = new Map<string, { bag: Record<string, unknown>; expiresAt: number }>();
 
 let _dispatcher: Dispatcher | undefined;
@@ -145,7 +132,7 @@ async function vaultFetch(conn: VaultConn, path: string, init: RequestInit & { t
   const res = await fetch(`${conn.address}/v1/${path}`, {
     ...init,
     headers,
-    // undici honours `dispatcher`; the field is not in the DOM RequestInit type.
+    // undici honours `dispatcher`; not in the DOM RequestInit type.
     ...(dispatcher ? { dispatcher } : {}),
   } as RequestInit);
 
@@ -210,11 +197,9 @@ async function readSecret(refBody: string, scheme: string, ctx: SecretResolveCon
   }
 
   const conn = resolveConn();
-  // Interpolate {{var}} in both the prefix and the reference path so teams can
-  // point at a per-environment folder (e.g. prefix `stack/{{stackFolder}}/data/`).
+  // {{var}} in prefix and path lets teams point at a per-environment folder.
   const relResolved = applyVars(relPath, ctx.vars);
-  // Prepend the configured path prefix (e.g. `stack/.../data/`) unless the ref
-  // is absolute. The prefix is trimmed of surrounding slashes so one `/` joins.
+  // Prepend the prefix unless absolute; trim its slashes so one `/` joins.
   const prefix = applyVars(conn.pathPrefix ?? '', ctx.vars).replace(/^\/+|\/+$/g, '');
   const path = (!absolute && prefix) ? `${prefix}/${relResolved}` : relResolved;
   const cacheKey = `${conn.address}|${conn.namespace ?? ''}|${path}`;
@@ -226,8 +211,7 @@ async function readSecret(refBody: string, scheme: string, ctx: SecretResolveCon
     bag = hit.bag;
   } else {
     const json = await vaultFetch(conn, path, { token: await clientToken(conn) });
-    // KV v2 nests the fields under data.data (with data.metadata alongside); KV
-    // v1 puts them directly under data.
+    // KV v2 nests fields under data.data (data.metadata alongside); KV v1 under data.
     const isV2 = conn.kvVersion === '2'
       || (conn.kvVersion === 'auto' && json?.data?.data !== undefined && json?.data?.metadata !== undefined);
     bag = (isV2 ? json?.data?.data : json?.data) as Record<string, unknown> | undefined;
@@ -256,8 +240,7 @@ export const vaultProvider: SecretProvider = {
   resolve: (refBody, ctx) => readSecret(refBody, 'vault', ctx),
 };
 
-// OpenBao is API-compatible with Vault, so `bao:<path>#<key>` references resolve
-// through the exact same client (reading BAO_* env vars first; see resolveConn).
+// OpenBao: `bao:` references resolve through the same client (BAO_* env first).
 export const openBaoProvider: SecretProvider = {
   scheme: 'bao',
   resolve: (refBody, ctx) => readSecret(refBody, 'bao', ctx),

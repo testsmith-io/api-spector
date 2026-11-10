@@ -24,7 +24,7 @@ describe('rebaseUrl', () => {
   });
 });
 
-// ─── Live verification against a real ephemeral provider ──────────────────────
+// Live verification against a real ephemeral provider
 
 let server: http.Server;
 let baseUrl: string;

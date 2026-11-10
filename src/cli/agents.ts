@@ -3,33 +3,21 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * api-spector agents init <name>
- *
- * Scaffolds AI agent instruction files so any LLM-powered coding tool
- * (Claude Code, GitHub Copilot, Cursor, Windsurf, Aider) can generate
- * API Spector test plans and scripts.
- *
- * Usage:
- *   api-spector agents init claude      — .claude/skills/*.md
- *   api-spector agents init copilot     — .github/copilot-instructions.md
- *   api-spector agents init cursor      — .cursor/rules/api-spector.mdc
- *   api-spector agents init windsurf    — .windsurfrules
- *   api-spector agents init aider       — conventions.md
- *   api-spector agents init all         — all of the above
- *   api-spector agents list             — show available agents
+ * api-spector agents init <name>: scaffold AI agent instruction files so an LLM
+ * coding tool can generate API Spector test plans and scripts.
  */
 
 import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
-// This CLI colours unconditionally (not TTY-gated), hence colorAlways.
+// This CLI colours unconditionally, hence colorAlways.
 import { C, colorAlways as color } from './cli-common';
 
-// ─── Agent definitions ───────────────────────────────────────────────────────
+// Agent definitions
 
 interface AgentDef {
   name: string
   description: string
-  /** Files to copy: { sourcePath (relative to templates dir) → destPath (relative to cwd) } */
+  /** Files to copy: { sourcePath (relative to templates dir) -> destPath (relative to cwd) } */
   files: { src: string; dest: string }[]
 }
 
@@ -74,13 +62,10 @@ const AGENTS: Record<string, AgentDef> = {
   },
 };
 
-// ─── Shared docs (copied into a tool-specific location) ──────────────────────
+// Shared docs (copied into a tool-specific location)
 
-/** Build doc destinations based on the agent being initialized. Keeps
- *  everything under the tool's own config directory so we don't pollute
- *  the project root with a `docs/ai/` folder. */
+/** Doc destinations under each tool's own config dir, to keep docs/ai/ out of the project root. */
 function sharedDocsForAgent ( agentName: string ): { src: string; dest: string }[] {
-  // Determine a directory the agent's instruction files can reference
   const destDir: Record<string, string> = {
     claude: '.claude/docs',
     copilot: '.github/docs',
@@ -97,10 +82,9 @@ function sharedDocsForAgent ( agentName: string ): { src: string; dest: string }
   ];
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// Helpers
 
-/** Resolve the package root (where package.json lives). Works from both
- *  `src/cli/agents.ts` (dev) and `out/main/agents.js` (compiled). */
+/** Resolve the package root (package.json), from both dev and compiled layouts. */
 function getPackageRoot (): string {
   let dir = __dirname;
   for ( let i = 0; i < 5; i++ ) {
@@ -140,7 +124,7 @@ async function copyFile ( src: string, dest: string, cwd: string ): Promise<'cre
   return existed ? 'updated' : 'created';
 }
 
-// ─── Commands ────────────────────────────────────────────────────────────────
+// Commands
 
 async function initAgent ( agentName: string, cwd: string ): Promise<void> {
   const names = agentName === 'all' ? Object.keys( AGENTS ) : [agentName];
@@ -222,7 +206,7 @@ function printHelp (): void {
 `);
 }
 
-// ─── Main ────────────────────────────────────────────────────────────────────
+// Main
 
 async function main (): Promise<void> {
   const args = process.argv.slice( 2 );

@@ -1,11 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Setup hooks for renderer-side component tests (run via vitest.renderer.config.ts).
-//
-// Mocks the `window.electron` IPC bridge with a no-op stub so components that
-// call `electron.foo()` during render don't blow up. Individual tests can
-// override specific methods on this object.
+// Renderer component-test setup (vitest.renderer.config.ts). Stubs the window.electron
+// IPC bridge with a no-op so components don't blow up on render; tests override methods.
 
 import '@testing-library/jest-dom';
 

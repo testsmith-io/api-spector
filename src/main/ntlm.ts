@@ -1,16 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// NTLM (NTLMv2) message construction, per [MS-NLMP].
-//
-// We implement this ourselves rather than pull in a dependency because:
-//   - the NT hash needs MD4, which OpenSSL 3 (Node's crypto) no longer exposes,
-//     so we ship a small pure-JS MD4 below; and
-//   - we only need NTLMv2, which is HMAC-MD5 based — no DES, no LM hash.
-//
-// The transport (3-message handshake over one keep-alive socket) lives in
-// auth-builder.ts; this module is pure encoding and is unit-tested against the
-// worked example in [MS-NLMP] §4.2.4.
+// NTLM (NTLMv2) message construction, per [MS-NLMP]. Hand-rolled: the NT hash
+// needs MD4 (not in OpenSSL 3, pure-JS below), HMAC-MD5-based NTLMv2 only, no
+// DES/LM hash. Pure encoding; the 3-message transport lives in auth-builder.ts.
 
 import crypto from 'node:crypto';
 
@@ -27,7 +20,7 @@ const F_EXT_SESSION    = 0x00080000; // NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURI
 const TYPE1_FLAGS = F_UNICODE | F_OEM | F_REQUEST_TARGET | F_NTLM | F_ALWAYS_SIGN | F_EXT_SESSION;
 const TYPE3_FLAGS = F_UNICODE | F_NTLM | F_ALWAYS_SIGN | F_EXT_SESSION;
 
-// ─── MD4 (pure JS — crypto can't provide it under OpenSSL 3) ───────────────────
+// MD4 (pure JS)
 
 function rotl(x: number, n: number): number {
   return ((x << n) | (x >>> (32 - n))) >>> 0;
@@ -98,7 +91,7 @@ export function md4(msg: Buffer): Buffer {
   return out;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// Helpers
 
 const utf16le = (s: string) => Buffer.from(s, 'utf16le');
 const hmacMd5 = (key: Buffer, data: Buffer) => crypto.createHmac('md5', key).update(data).digest();
@@ -117,7 +110,7 @@ function filetime(unixMs: number): Buffer {
   return buf;
 }
 
-// ─── Type 1: NEGOTIATE ──────────────────────────────────────────────────────
+// Type 1: NEGOTIATE
 
 /** Build the Type 1 (negotiate) token, base64-encoded (no "NTLM " prefix). */
 export function createType1Message(): string {
@@ -131,7 +124,7 @@ export function createType1Message(): string {
   return msg.toString('base64');
 }
 
-// ─── Type 2: CHALLENGE (parse) ──────────────────────────────────────────────
+// Type 2: CHALLENGE (parse)
 
 export interface Type2Challenge {
   serverChallenge: Buffer  // 8 bytes
@@ -159,7 +152,7 @@ export function decodeType2Message(token: string | Buffer): Type2Challenge {
   return { serverChallenge, targetInfo, flags };
 }
 
-// ─── NTLMv2 response computation ──────────────────────────────────────────────
+// NTLMv2 response computation
 
 export interface NtlmV2Response {
   ntResponse: Buffer  // NTProofStr (16) + blob
@@ -198,7 +191,7 @@ export function computeNtlmV2Response(opts: {
   return { ntResponse, lmResponse, ntProof };
 }
 
-// ─── Type 3: AUTHENTICATE ──────────────────────────────────────────────────
+// Type 3: AUTHENTICATE
 
 export interface Type3Options {
   user: string
@@ -206,7 +199,7 @@ export interface Type3Options {
   domain?: string
   workstation?: string
   challenge: Type2Challenge
-  /** Test seams — supplied randomly/by clock in production. */
+  /** Test seams - supplied randomly/by clock in production. */
   clientChallenge?: Buffer
   timestamp?: number  // unix ms
 }

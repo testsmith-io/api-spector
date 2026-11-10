@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { maskPii, maskHeaders } from '../main/ipc/request-handler';
 
-// ─── maskPii ─────────────────────────────────────────────────────────────────
+// maskPii
 
 describe('maskPii', () => {
   it('returns data unchanged when no patterns', () => {
@@ -48,7 +48,7 @@ describe('maskPii', () => {
   });
 });
 
-// ─── maskHeaders ─────────────────────────────────────────────────────────────
+// maskHeaders
 
 describe('maskHeaders', () => {
   it('returns headers unchanged when no patterns', () => {

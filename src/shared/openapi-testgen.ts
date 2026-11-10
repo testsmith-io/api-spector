@@ -1,16 +1,10 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// OpenAPI test generation.
-//
-// Turns an OpenAPI 3.x document into real tests: a happy-path call per operation
-// (valid request + response-schema assertion), plus negative tests derived from
-// the request schema (missing required field, wrong type) and boundary tests
-// from numeric/string constraints. Pure and dependency-free so the CLI, the
-// desktop app, and the tests share it; the caller maps GeneratedTest into an
-// ApiRequest (or a collection file).
+// OpenAPI test generation: turns an OpenAPI 3.x doc into happy-path, negative, and
+// boundary tests per operation. Pure and dependency-free; the caller maps GeneratedTest into an ApiRequest.
 
-// ─── Output ─────────────────────────────────────────────────────────────────
+// Output
 
 export type TestCategory = 'happy' | 'negative' | 'boundary';
 
@@ -41,7 +35,7 @@ export interface GenerateOptions {
   maxBoundaryPerOp?: number   // default 4
 }
 
-// ─── Spec walking ─────────────────────────────────────────────────────────────
+// Spec walking
 
  
 
@@ -74,7 +68,7 @@ function jsonSchemaFor(spec: any, responses: any, code: string): any {
   return schema ? deref(spec, schema) : undefined;
 }
 
-// ─── Value sampling ───────────────────────────────────────────────────────────
+// Value sampling
 
 /** A valid sample value that satisfies a (dereferenced) schema's constraints. */
 export function sampleValue(schema: any): any {
@@ -133,7 +127,7 @@ function sampleString(schema: any): string {
   }
 }
 
-// ─── Parameters ───────────────────────────────────────────────────────────────
+// Parameters
 
 interface Param { name: string; in: string; required?: boolean; schema?: any }
 
@@ -145,7 +139,7 @@ function collectParams(spec: any, pathItem: any, op: any): Param[] {
   return [...byKey.values()];
 }
 
-// ─── Generation ─────────────────────────────────────────────────────────────
+// Generation
 
 function successCode(responses: any): number {
   const codes = Object.keys(responses ?? {}).filter(c => /^2\d\d$/.test(c)).map(Number).sort((a, b) => a - b);
@@ -260,7 +254,7 @@ export function generateTests(spec: unknown, options: GenerateOptions = {}): Gen
   return out;
 }
 
-// ─── URL helpers (for building an ApiRequest) ─────────────────────────────────
+// URL helpers (for building an ApiRequest)
 
 /** Fill a path template with sample params and append required query params,
  *  under a {{baseUrl}} prefix so it resolves against the active environment. */
@@ -276,9 +270,9 @@ export function testUrl(test: GeneratedTest, baseVar = '{{baseUrl}}'): string {
 // Request types (type-only, so this module stays value-import free).
 import type { ApiRequest, HttpMethod, KeyValuePair } from './types';
 
-/** Turn a GeneratedTest into a full ApiRequest. The caller supplies the id (a
- *  uuid) so this stays deterministic and dependency-free. The expected status
- *  and response schema become the request's contract, so it is a real test. */
+/** Turn a GeneratedTest into a full ApiRequest. The caller supplies the id so
+ *  this stays deterministic; expected status + response schema become the
+ *  request's contract. */
 export function toApiRequest(test: GeneratedTest, id: string): ApiRequest {
   const headers: KeyValuePair[] = test.headers.map(h => ({ key: h.key, value: h.value, enabled: true }));
   return {

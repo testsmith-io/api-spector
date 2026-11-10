@@ -1,10 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Workspace-agnostic UI chrome: theme, zoom, sidebar, command palette, and the
-// handful of "which pane is showing" flags. Theme/zoom mirror into
-// workspace.settings when a workspace is open (persisted on save) and always
-// into localStorage so the welcome screen remembers them too.
+// Workspace-agnostic UI chrome: theme, zoom, sidebar, command palette, pane
+// flags. Theme/zoom mirror into workspace.settings and always into localStorage
+// (so the welcome screen remembers them without a workspace open).
 
 import type { StateCreator } from 'zustand';
 import type { ResponsePayload } from '../../../../shared/types';
@@ -31,39 +30,30 @@ export interface UiSliceState {
   // Pinned response for diffing
   pinnedResponse: ResponsePayload | null
 
-  /** When set + sidebarTab === 'git', the main pane renders the diff for this
-   *  file instead of the request builder. Lets users see the change at full
-   *  width instead of a cramped sidebar panel. */
+  /** With sidebarTab === 'git', the main pane renders this file's diff at full
+   *  width instead of the request builder. */
   activeGitDiff: { path: string; staged: boolean } | null
 
-  /** Scripts-tab "Quick Inserts" sidebar visibility. Lifted into the store so
-   *  the response-tree assertion flow (handleAssert) can collapse it after
-   *  adding a snippet — otherwise the user lands on the script with the now-
-   *  irrelevant snippet palette still taking up half the editor width. */
+  /** Scripts-tab "Quick Inserts" sidebar visibility; in the store so handleAssert
+   *  can collapse it after adding a snippet. */
   quickInsertsOpen: boolean
 
-  /** When true, the main pane shows the collection/folder data panel even if a
-   *  request tab is open. Cleared as soon as a request tab is (re)activated, so
-   *  it behaves like "bring the collection to front" rather than a mode. */
+  /** Show the collection/folder data panel over an open request tab. Cleared when
+   *  a request tab is (re)activated, so it's "bring to front", not a mode. */
   collectionPanelOpen: boolean
-  /** When set, the main pane shows the folder panel (docs/data/variables) for
-   *  this folder. Mutually exclusive with a request tab / the collection panel. */
+  /** Show the folder panel (docs/data/variables). Exclusive with a request tab / collection panel. */
   folderPanel: { collectionId: string; folderId: string } | null
   coverageOpen: boolean
   compareOpen: boolean
 
-  /** Monotonic counter bumped by requestSend(). The active RequestBuilder
-   *  watches it and fires its normal send pipeline when it changes, so history
-   *  rows (and anything else) can replay the current request without
-   *  duplicating the scripts/hooks/interpolation logic. */
+  /** Counter bumped by requestSend(); the active RequestBuilder watches it and
+   *  replays the request through its normal send pipeline. */
   sendSignal: number
 
-  /** Which editor pane keyboard sub-tab navigation targets. Set by clicking
-   *  into a pane or by the focus-pane shortcuts; drives the focus ring too. */
+  /** Which editor pane sub-tab navigation targets; drives the focus ring too. */
   focusedPane: 'request' | 'response'
-  /** Bumped by cycleSubTab(): the focused pane's RequestBuilder / ResponseViewer
-   *  watches `nonce` and moves to the previous/next of ITS own visible sub-tabs
-   *  (so the dynamic, type-dependent tab list stays authoritative). */
+  /** Bumped by cycleSubTab(): the focused pane watches `nonce` and moves to the
+   *  previous/next of its own visible sub-tabs. */
   subTabCycle: { nonce: number; pane: 'request' | 'response'; dir: -1 | 1 }
 }
 
@@ -124,14 +114,10 @@ export const createUiSlice: StateCreator<
 
   setShowGeneratorPanel: v => set(s => { s.showGeneratorPanel = v; }),
 
-  // ── Theme & zoom ────────────────────────────────────────────────────────────
-  // Persisted in workspace.settings when a workspace is open; otherwise
-  // fall back to localStorage so the welcome screen still remembers the
-  // user's choice across app restarts.
+  // Theme & zoom: persisted in workspace.settings when open, else localStorage.
   setTheme: (t) => set(s => {
     s.theme = t;
-    // Always mirror to localStorage so the welcome screen (no workspace open)
-    // still remembers the most recent choice on next launch.
+    // Mirror to localStorage so the welcome screen remembers the choice.
     localStorage.setItem(STORAGE_KEYS.theme, t);
     if (s.workspace) {
       s.workspace.settings ??= {};
@@ -173,8 +159,8 @@ export const createUiSlice: StateCreator<
   setFocusedPane: pane => set(s => { s.focusedPane = pane; }),
   cycleSubTab: dir => set(s => { s.subTabCycle = { nonce: s.subTabCycle.nonce + 1, pane: s.focusedPane, dir }; }),
 
-  // A collection / folder now opens as a tab. These keep their old names (and
-  // callers) but delegate to the tab openers; the active tab drives the panels.
+  // Collections/folders open as tabs now; these keep their old names but delegate
+  // to the tab openers.
   setCollectionPanelOpen: (open) => {
     if (!open) { set(s => { s.collectionPanelOpen = false; }); return; }
     const collectionId = get().activeCollectionId;
@@ -187,8 +173,7 @@ export const createUiSlice: StateCreator<
 
   setCompareOpen: (open) => set(s => { s.compareOpen = open; }),
 
-  // The OpenAPI spec used for coverage travels with the workspace (persisted on
-  // save), mirroring how theme/zoom are stored.
+  // The coverage OpenAPI spec travels with the workspace, like theme/zoom.
   setCoverageSpec: (spec) => set(s => {
     if (s.workspace) {
       if (!s.workspace.settings) s.workspace.settings = {};

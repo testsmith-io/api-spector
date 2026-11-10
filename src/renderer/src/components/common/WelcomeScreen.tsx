@@ -19,17 +19,16 @@ export function WelcomeScreen() {
   const [gitUrl, setGitUrl] = useState('');
   const [gitBusy, setGitBusy] = useState(false);
   const [gitError, setGitError] = useState<string | null>(null);
-  // Only one workspace action (open/new/clone/recent) may run at a time, so
-  // rapid clicks can't stack multiple native file dialogs / windows. The ref is
-  // the race-free guard (set synchronously); `busy` just drives the disabled UI.
+  // Only one workspace action may run at a time, so rapid clicks can't stack
+  // native dialogs. The ref is the race-free guard (set synchronously); `busy`
+  // just drives the disabled UI.
   const busyRef = useRef(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     electron.getRecentWorkspaces().then(setRecents).catch(() => setRecents([]));
-    // Non-blocking, best-effort: stays null (nothing shown) if offline or current.
-    // Only the npm install surfaces a command here; packaged builds update
-    // in-app (electron-updater) and are handled by UpdateToast instead.
+    // Stays null (nothing shown) if offline or current. Only the npm install
+    // surfaces a command here; packaged builds update in-app via UpdateToast.
     electron.getUpdateMode()
       .then(mode => {
         if (mode !== 'npm') return;
@@ -64,9 +63,8 @@ export function WelcomeScreen() {
     if (busyRef.current) return;
     busyRef.current = true; setBusy(true);
     try {
-      // Pick an existing project folder, then a subfolder for the tests; the
-      // main process scaffolds a workspace there (scoped to that folder when
-      // it is inside a git repo). The git panel's badge then shows the scope.
+      // Pick a project folder, then a subfolder for the tests; the main process
+      // scaffolds a workspace there (scoped when inside a git repo).
       const result = await electron.addToProject();
       if (result) await applyWorkspace(result.workspace, result.workspacePath);
     } finally {

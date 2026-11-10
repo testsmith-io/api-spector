@@ -2,16 +2,14 @@
 // SPDX-License-Identifier: MIT
 
 // Pure helpers for navigating and transforming a Collection's folder tree.
-// No store, DOM, or Electron dependencies — safe to use from both the
-// renderer and the main process.
+// No store/DOM/Electron deps - usable from renderer and main.
 
 import { v4 as uuidv4 } from 'uuid';
 import type { Folder, ChildRef } from './types';
 
-/** Effective, de-duplicated child order for a folder: honour `childOrder` for
- *  items that still exist, then append anything missing (requests first, then
- *  sub-folders). Stale entries in `childOrder` are ignored. This is the single
- *  source of truth for both tree rendering and run order. */
+/** De-duplicated child order: honour `childOrder` for items that still exist,
+ *  then append anything missing (requests, then sub-folders). The single source
+ *  of truth for tree rendering and run order. */
 export function orderedChildren(folder: Folder): ChildRef[] {
   const reqSet    = new Set(folder.requestIds);
   const folderSet = new Set(folder.folders.map(f => f.id));
@@ -30,11 +28,9 @@ export function orderedChildren(folder: Folder): ChildRef[] {
   return out;
 }
 
-/** Child order for a folder sorted alphabetically by display name (case
- *  insensitive), interleaving requests and sub-folders at the same level.
- *  `requestName` resolves a request id to its name (requests live in
- *  Collection.requests, not on the folder). Returns a fresh ChildRef[] to
- *  store as the folder's `childOrder`. */
+/** Child order sorted alphabetically (case-insensitive), interleaving requests
+ *  and sub-folders. `requestName` resolves a request id to its name. Returns a
+ *  fresh ChildRef[] to store as `childOrder`. */
 export function sortChildOrder(folder: Folder, requestName: (id: string) => string): ChildRef[] {
   const nameOf = (ref: ChildRef): string =>
     ref.type === 'folder'
@@ -101,37 +97,26 @@ export function collectRequestIds(f: Folder): string[] {
   return [...f.requestIds, ...f.folders.flatMap(collectRequestIds)];
 }
 
-/**
- * Assign a fresh id to every folder in the tree (in place) and map every
- * requestId through `mapRequestId`. The callback is responsible for cloning /
- * moving the request data itself and returning the id to store in the tree.
- */
+/** Assign a fresh id to every folder in place and map every requestId through
+ *  `mapRequestId` (the callback clones/moves the request data and returns the new id). */
 export function reIdFolderTree(root: Folder, mapRequestId: (oldId: string) => string): void {
   root.id = uuidv4();
   root.requestIds = root.requestIds.map(mapRequestId);
   root.folders.forEach(sub => reIdFolderTree(sub, mapRequestId));
 }
 
-/**
- * Deep-clone a folder tree, then re-ID every folder and remap every requestId
- * through `mapRequestId` (see {@link reIdFolderTree}). Shared by
- * duplicate-folder / merge-collection flows that must avoid id collisions.
- */
+/** Deep-clone a folder tree, then re-ID folders and remap requestIds (see
+ *  {@link reIdFolderTree}). Used by duplicate-folder / merge-collection. */
 export function cloneAndReId(folder: Folder, mapRequestId: (oldId: string) => string): Folder {
   // JSON clone, NOT structuredClone: callers pass an immer draft (a Proxy), and
-  // structuredClone throws DataCloneError on a Proxy — which silently broke
-  // "Duplicate folder". Folder data is plain JSON, so a JSON round-trip is safe
-  // and also reads cleanly through the draft. (Mirrors duplicateRequest.)
+  // structuredClone throws DataCloneError on a Proxy. Folder data is plain JSON.
   const cloned: Folder = JSON.parse(JSON.stringify(folder));
   reIdFolderTree(cloned, mapRequestId);
   return cloned;
 }
 
-/**
- * Merged folder-scope variables on the path from `root` to the folder that
- * contains `reqId`: outer folders first, inner folders override. Returns `{}`
- * when the request isn't found. Mirrors how folder scope resolves at send time.
- */
+/** Merged folder-scope variables from `root` down to the folder containing
+ *  `reqId`: outer first, inner overrides. `{}` when not found. */
 export function collectFolderVars(root: Folder, reqId: string): Record<string, string> {
   const walk = (folder: Folder): Record<string, string> | null => {
     if ((folder.requestIds ?? []).includes(reqId)) return { ...(folder.variables ?? {}) };

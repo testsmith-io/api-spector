@@ -5,17 +5,9 @@ import { useStore } from '../store';
 import { useActiveEnvironment } from './useActiveEnvironment';
 import { collectFolderVars } from '../../../shared/folder-tree';
 
-/**
- * Returns a map of varName → resolved display value for the current scope.
- * Encrypted secrets show ••••••••, env-ref vars show $VARNAME. Assembled in
- * precedence order (higher wins): global < environment < collection < folder <
- * request, matching the runner.
- *
- * Session script values (sp.*.set from earlier sends this session) overlay each
- * scope at that scope's level, so a value a previous request extracted — e.g. a
- * token — shows here even though it was never saved to the environment/collection
- * files. They match what the send resolves.
- */
+/** Map of varName -> resolved display value. Precedence (higher wins):
+ *  global < environment < collection < folder < request, matching the runner.
+ *  Session script values (sp.*.set) overlay each scope; secrets show ••••••••, env-refs show $VARNAME. */
 export function useVarValues(): Record<string, string> {
   const activeCollectionId  = useStore(s => s.activeCollectionId);
   const collections         = useStore(s => s.collections);

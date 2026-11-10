@@ -12,7 +12,7 @@ import { importPostman } from '../main/importers/postman';
 
 const FIXTURES = join(import.meta.dirname, 'fixtures');
 
-// ─── Insomnia importer ────────────────────────────────────────────────────────
+// Insomnia importer
 
 describe('importInsomnia', () => {
   it('returns the workspace name as collection name', async () => {
@@ -91,7 +91,7 @@ describe('importInsomnia', () => {
   });
 });
 
-// ─── parseBruFile ─────────────────────────────────────────────────────────────
+// parseBruFile
 
 describe('parseBruFile', () => {
   const GET_BRU = `
@@ -222,7 +222,7 @@ auth:basic {
   });
 });
 
-// ─── importBruno ─────────────────────────────────────────────────────────────
+// importBruno
 
 describe('importBruno', () => {
   it('returns the collection name from bruno.json', async () => {
@@ -278,7 +278,7 @@ describe('importBruno', () => {
   });
 });
 
-// ─── Variable import alignment (collection / folder / request scopes) ──────────
+// Variable import alignment (collection / folder / request scopes)
 
 describe('importer variable scopes', () => {
   it('Bruno: vars:pre-request on a request → request variables (~ = disabled)', () => {

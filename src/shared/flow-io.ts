@@ -1,11 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Static input/output analysis for flow blocks — which variables a block reads
-// and which it writes. Derived from the block's config (no execution), so the
-// canvas and inspector can surface a block's data contract the way Postman
-// Flows shows input/output ports. Best-effort and display-only: it parses
-// {{templates}}, sp.*.get/set(...) calls and data.<name> references.
+// Static input/output analysis for flow blocks: which variables each reads and writes,
+// derived from config (no execution). Best-effort, display-only; parses {{templates}}, sp.*.get/set and data.<name>.
 
 import type { FlowBlock } from './types/flow';
 
@@ -66,7 +63,7 @@ export function blockIO(block: FlowBlock): BlockIO {
     default: break;
   }
 
-  // A block never both reads and writes the same name for display purposes —
+  // A block never both reads and writes the same name for display purposes -
   // writing wins (it's the block's product).
   for (const w of writes) reads.delete(w);
   return { reads: [...reads], writes: [...writes] };

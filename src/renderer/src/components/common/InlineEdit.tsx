@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-// ─── Inline rename ────────────────────────────────────────────────────────────
+// Inline rename
 
 export function InlineEdit ( {
   value, onCommit, onCancel, className = '', validate,
@@ -37,10 +37,8 @@ export function InlineEdit ( {
           if ( e.key === 'Escape' ) onCancel();
           e.stopPropagation();
         }}
-        // Force the input's own text color so it's consistent regardless of
-        // the parent row's `text-surface-*` (folder rows are dimmer than
-        // request rows; without this, renaming a folder *looks* different
-        // from renaming a request).
+        // Force the input's own text color so renaming a folder looks the same as a
+        // request, regardless of the parent row's dimmer `text-surface-*`.
         className={`bg-surface-700 text-[var(--text-primary)] rounded px-1 focus:outline-none focus:ring-1 w-full ${error ? 'ring-1 ring-red-500 focus:ring-red-500' : 'focus:ring-blue-500'
           } ${className}`}
       />

@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { checkSchemaCompatibility } from '../main/contract/bidirectional';
 import type { ContractViolation } from '../../shared/types';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// Helpers
 
 function compat(
   consumer: Record<string, unknown>,
@@ -19,7 +19,7 @@ function noViolations(consumer: Record<string, unknown>, provider: Record<string
   expect(v, `expected no violations but got: ${JSON.stringify(v)}`).toHaveLength(0);
 }
 
-// ─── Type matching ────────────────────────────────────────────────────────────
+// Type matching
 
 describe('checkSchemaCompatibility — root types', () => {
   it('passes when both schemas have the same type', () => {
@@ -55,7 +55,7 @@ describe('checkSchemaCompatibility — root types', () => {
   });
 });
 
-// ─── Object properties ────────────────────────────────────────────────────────
+// Object properties
 
 describe('checkSchemaCompatibility — object properties', () => {
   it('passes when all consumer required fields exist in provider', () => {
@@ -71,7 +71,7 @@ describe('checkSchemaCompatibility — object properties', () => {
         properties: {
           id:     { type: 'integer' },
           name:   { type: 'string' },
-          status: { type: 'string' },  // extra provider field — fine
+          status: { type: 'string' },  // extra provider field - fine
         },
       },
     );
@@ -123,7 +123,7 @@ describe('checkSchemaCompatibility — object properties', () => {
   });
 });
 
-// ─── Recursive / nested objects ───────────────────────────────────────────────
+// Recursive / nested objects
 
 describe('checkSchemaCompatibility — nested objects', () => {
   it('recursively checks nested required fields', () => {
@@ -183,7 +183,7 @@ describe('checkSchemaCompatibility — nested objects', () => {
   });
 });
 
-// ─── Array schemas ────────────────────────────────────────────────────────────
+// Array schemas
 
 describe('checkSchemaCompatibility — arrays', () => {
   it('passes when array item types match', () => {
@@ -214,7 +214,7 @@ describe('checkSchemaCompatibility — arrays', () => {
   });
 });
 
-// ─── Edge cases ───────────────────────────────────────────────────────────────
+// Edge cases
 
 describe('checkSchemaCompatibility — edge cases', () => {
   it('returns empty array for two empty schemas', () => {
@@ -242,7 +242,7 @@ describe('checkSchemaCompatibility — edge cases', () => {
   });
 
   it('stops recursion once root type mismatch is found', () => {
-    // If root types differ we return immediately — no nested checks
+    // If root types differ we return immediately - no nested checks
     const consumer = {
       type: 'object',
       required: ['id'],
@@ -255,7 +255,7 @@ describe('checkSchemaCompatibility — edge cases', () => {
   });
 });
 
-// ─── Matcher-based consumer schemas (bodyMatcher static compatibility) ───────
+// Matcher-based consumer schemas (bodyMatcher static compatibility)
 
 import { compileMatcherExample } from '../main/contract/matchers';
 

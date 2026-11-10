@@ -5,12 +5,8 @@ import { esc } from './format';
 
 export type JsonPath = (string | number)[]
 
-/**
- * Render a JsonPath as a JavaScript accessor expression rooted at `json`.
- *
- *   ['users', 0, 'name']    → json.users[0].name
- *   ['my key', 'value']     → json["my key"].value
- */
+/** Render a JsonPath as a JS accessor rooted at `json`:
+ *  ['users', 0, 'name'] -> json.users[0].name; ['my key', 'value'] -> json["my key"].value */
 export function jsonAccessor(path: JsonPath): string {
   return path.reduce<string>((acc, key) => {
     if (typeof key === 'number') return `${acc}[${key}]`;
@@ -34,15 +30,10 @@ export function getAtPath(root: unknown, path: JsonPath): unknown {
   return cur;
 }
 
-/**
- * Build a JSONPath filter expression for "the entry in this array whose
- * `filterKey` equals `filterValue`, then drill down to the leaf field of
- * the original `path`."
- *
- * Returns '' if `path` doesn't traverse an array.
- */
+/** JSONPath filter for "the array entry where `filterKey` == `filterValue`, then
+ *  the leaf field of `path`". Returns '' if `path` doesn't traverse an array. */
 export function toJsonPathExpr(path: JsonPath, filterKey: string, filterValue: string): string {
-  // Find last numeric index in path — that's the array boundary
+  // Last numeric index in path is the array boundary.
   let arrayIdx = -1;
   for (let i = path.length - 1; i >= 0; i--) {
     if (typeof path[i] === 'number') { arrayIdx = i; break; }
@@ -61,10 +52,7 @@ export function toJsonPathExpr(path: JsonPath, filterKey: string, filterValue: s
     : `${arrayPart}[?(@.${filterKey}==${filterVal})]`;
 }
 
-/**
- * Pick a sensible variable name from a JsonPath: the last string segment, or
- * 'extracted_value' if every segment is numeric.
- */
+/** Variable name from a JsonPath: the last string segment, else 'extracted_value'. */
 export function varNameFromPath(path: JsonPath): string {
   const stringSegments = path.filter((k): k is string => typeof k === 'string');
   return stringSegments[stringSegments.length - 1] ?? 'extracted_value';

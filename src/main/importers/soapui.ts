@@ -1,19 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── SoapUI / ReadyAPI project importer ───────────────────────────────────────
-//
-// Parses a `*-soapui-project.xml` (or ReadyAPI export) into an API Spector
-// Collection, and runs every Groovy artefact (Script Assertions, Groovy test
-// steps, Setup/TearDown scripts) through the Groovy→sp.* converter. The result
-// carries the best-effort Collection PLUS a list of ConversionCandidate (what
-// was converted, with status/notes/unmapped) and a summary report, so the
-// import UI can show the accept/adjust/reject review step rather than silently
-// applying — or silently dropping — the converted scripts.
-//
-// Parsing is namespace-prefix tolerant (matches on element localName), because
-// SoapUI uses `con:` and ReadyAPI variants use other prefixes. Unknown step
-// types and non-Groovy assertions degrade to a report warning, never a throw.
+// SoapUI / ReadyAPI project importer: parses project XML into a Collection, running every Groovy
+// artefact through the Groovy->sp.* converter and returning review candidates plus a summary report.
+// Namespace-prefix tolerant (matches on localName); unknown steps / non-Groovy assertions warn, never throw.
 
 import { v4 as uuidv4 } from 'uuid';
 import { DOMParser } from '@xmldom/xmldom';
@@ -23,8 +13,8 @@ import { normalizeHttpMethod } from '../../shared/types';
 export type { SoapUiImportReport };
 import { convertGroovyScript, type GroovyConversionStatus, type GroovyUnmapped } from './groovy-script';
 
-// xmldom nodes are structurally typed; treat them loosely (as the JSON
-// importers do with `any`) and read through the small helpers below.
+// xmldom nodes are structurally typed; treat them as `any` and read through the
+// helpers below.
 type El = any // eslint-disable-line @typescript-eslint/no-explicit-any
 
 export interface ConversionCandidate {
@@ -49,7 +39,7 @@ export interface SoapUiImportResult {
   report: SoapUiImportReport
 }
 
-// ─── XML helpers (namespace-prefix tolerant) ──────────────────────────────────
+// XML helpers (namespace-prefix tolerant)
 
 function localName(el: El): string {
   return el.localName ?? String(el.tagName ?? el.nodeName ?? '').replace(/^.*:/, '');
@@ -90,7 +80,7 @@ function attr(el: El, name: string): string {
   return (el?.getAttribute?.(name) ?? '').trim();
 }
 
-// ─── SoapUI property bags → variable records ──────────────────────────────────
+// SoapUI property bags -> variable records
 // <con:properties><con:property><con:name>k</con:name><con:value>v</con:value>…
 function readProperties(container: El | null): Record<string, string> {
   const out: Record<string, string> = {};
@@ -105,7 +95,7 @@ function readProperties(container: El | null): Record<string, string> {
   return out;
 }
 
-// ─── Main entry ───────────────────────────────────────────────────────────────
+// Main entry
 
 export function importSoapUiProject(xml: string, fallbackName = 'SoapUI Import'): SoapUiImportResult {
   const doc = new DOMParser().parseFromString(xml, 'text/xml') as unknown as El;
@@ -135,9 +125,8 @@ export function importSoapUiProject(xml: string, fallbackName = 'SoapUI Import')
     return c.js;
   };
 
-  // Build a placeholder request that carries a standalone script (Groovy step,
-  // setup/teardown) — API Spector attaches scripts to requests, so a script-only
-  // SoapUI step becomes a no-URL carrier whose postRequestScript holds the code.
+  // A no-URL carrier request holding a standalone script in postRequestScript.
+  // API Spector attaches scripts to requests, so script-only steps need a host.
   const scriptCarrier = (name: string, js: string, originKind: string): ApiRequest => ({
     id: uuidv4(),
     name,
@@ -154,12 +143,12 @@ export function importSoapUiProject(xml: string, fallbackName = 'SoapUI Import')
   });
 
   const projectVars = readProperties(project);
-  // REST interfaces declare the HTTP verb + params per operation; a test step
-  // only references them by name. Index them so request steps resolve correctly.
+  // A test step references an interface operation by name only; index the
+  // operations so request steps can resolve their verb + params.
   const methodIndex = indexInterfaceMethods(project);
   const fallbackEndpoint = firstInterfaceEndpoint(project);
 
-  // Project-level setup/teardown → carrier requests at the root.
+  // Project-level setup/teardown -> carrier requests at the root.
   for (const [tag, kind] of [['setupScript', 'setup'], ['tearDownScript', 'teardown']] as const) {
     const el = firstChildByLocal(project, tag);
     const src = textOf(el);
@@ -234,9 +223,8 @@ export function importSoapUiProject(xml: string, fallbackName = 'SoapUI Import')
     }
   }
 
-  // Interface/mock-only projects (no request test steps) still carry useful REST
-  // operations — import them as requests so the project isn't empty. Skipped when
-  // test steps already produced requests, to avoid duplicating the same endpoints.
+  // Interface/mock-only projects: import REST operations as requests so the
+  // project isn't empty. Skipped when test steps already produced requests.
   if (report.requests === 0) {
     importInterfaceDefinitions(project, rootFolder, requests, report, warnings);
   }
@@ -270,7 +258,7 @@ function firstDescAll(root: El, name: string): El[] {
   return out;
 }
 
-// ─── Request step → ApiRequest ────────────────────────────────────────────────
+// Request step -> ApiRequest
 
 interface MethodDef { verb: string; params: KeyValuePair[] }
 
@@ -285,16 +273,14 @@ function buildRequest(
   fallbackEndpoint: string,
 ): ApiRequest {
   const id = uuidv4();
-  // The request config element sits under <con:config>; its localName varies
-  // (restRequest / request / httpRequest) — take the first element that holds an
-  // endpoint/method/assertion.
+  // Config sits under <con:config>; its localName varies (restRequest / request
+  // / httpRequest), so take the first element holding an endpoint/method/assertion.
   const config = firstChildByLocal(step, 'config') ?? step;
   const reqEl = childElements(config).find(c => firstDescByLocal(c, 'endpoint') || firstChildByLocal(c, 'method')) ?? config;
 
   const endpoint = textOf(firstDescByLocal(reqEl, 'endpoint')) || fallbackEndpoint;
-  // resourcePath + the HTTP verb live on the <con:config> (verb indirectly, via
-  // methodName → interface method). Fall back to child elements / attributes for
-  // other SoapUI variants, then to a sensible default.
+  // resourcePath + verb live on <con:config> (verb via methodName -> interface
+  // method). Fall back to child elements/attributes for other variants.
   const resourcePath = attr(config, 'resourcePath')
     || textOf(firstChildByLocal(reqEl, 'resourcePath')) || textOf(firstChildByLocal(reqEl, 'path'));
   const methodDef = methodIndex.get(attr(config, 'methodName'));
@@ -327,15 +313,13 @@ function buildRequest(
     protocol: isSoap ? 'soap' : 'http',
   };
 
-  // SoapUI auth (credentials / OAuth profiles) isn't mapped — flag it so a
-  // request that needs auth doesn't silently import as no-auth.
+  // SoapUI auth isn't mapped; flag it so an auth'd request doesn't import as no-auth.
   const authType = textOf(firstDescByLocal(reqEl, 'authType'));
   if (authType && !/^no authorization$/i.test(authType)) {
     warnings.push(`Request "${name}" uses "${authType}" auth in SoapUI — set up authentication manually.`);
   }
 
-  // Script Assertions → postRequestScript (converted). Non-Groovy assertions
-  // are reported so the user knows to re-create them.
+  // Script Assertions -> converted postRequestScript; non-Groovy ones are reported.
   const scripts: string[] = [];
   for (const a of firstDescAllIn(reqEl, 'assertion')) {
     const aType = attr(a, 'type');
@@ -378,10 +362,10 @@ function looksJson(s: string): boolean {
   return t.startsWith('{') || t.startsWith('[');
 }
 
-// ─── Interface (REST service) definitions ─────────────────────────────────────
+// Interface (REST service) definitions
 
-// Index every interface operation by its SoapUI method name, so a REST request
-// step (which only stores `methodName`) can resolve its HTTP verb and params.
+// Interface operations by SoapUI method name, so a request step (storing only
+// `methodName`) can resolve its verb and params.
 function indexInterfaceMethods(project: El): Map<string, MethodDef> {
   const map = new Map<string, MethodDef>();
   for (const iface of firstDescAll(project, 'interface')) {
@@ -399,8 +383,7 @@ function firstInterfaceEndpoint(project: El): string {
   return iface ? textOf(firstDescByLocal(iface, 'endpoint')) : '';
 }
 
-// Declared parameters of a REST method → request params (names only; TEMPLATE
-// style = path variable, everything else = query).
+// A REST method's declared params -> request params (TEMPLATE style = path, else query).
 function methodParams(method: El): KeyValuePair[] {
   const out: KeyValuePair[] = [];
   const pc = firstChildByLocal(method, 'parameters');
@@ -414,9 +397,8 @@ function methodParams(method: El): KeyValuePair[] {
   return out;
 }
 
-// A request test step can carry its own concrete parameter values
-// (<con:parameters><con:entry key value/>). Returns null when it has none, so
-// the caller falls back to the interface method's declared params.
+// A request step's own concrete param values, or null so the caller falls back
+// to the interface method's declared params.
 function readStepParams(reqEl: El): KeyValuePair[] | null {
   const pc = firstChildByLocal(reqEl, 'parameters');
   if (!pc) return null;
@@ -426,8 +408,7 @@ function readStepParams(reqEl: El): KeyValuePair[] | null {
 }
 
 // Import each REST interface's resources/methods as requests. Used only when the
-// project has no request test steps, so standalone service/mock projects still
-// bring in usable endpoints instead of importing empty.
+// project has no request test steps.
 function importInterfaceDefinitions(
   project: El,
   rootFolder: Folder,

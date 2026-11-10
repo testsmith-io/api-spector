@@ -46,8 +46,8 @@ export function useWorkspaceLoader() {
       useStore.getState().setHistory([]);
     }
 
-    // Guard against a malformed manifest (e.g. a collection opened as a
-    // workspace): these are arrays on a real Workspace, absent on a Collection.
+    // Guard a malformed manifest (a collection opened as a workspace): these are
+    // arrays on a real Workspace, absent on a Collection.
     for (const colPath of ws.collections ?? []) {
       try {
         const col: Collection = await electron.loadCollection(colPath);
@@ -62,9 +62,8 @@ export function useWorkspaceLoader() {
       } catch { /* ignore */ }
     }
 
-    // Activate the workspace's default environment when nothing (valid) is
-    // active. The active id persists in localStorage, so it may point at an
-    // environment from another workspace; treat that the same as none.
+    // Activate the workspace's default environment when nothing valid is active.
+    // The persisted active id may point at another workspace's env; treat as none.
     {
       const state = useStore.getState();
       const activeId = state.activeEnvironmentId;
@@ -92,9 +91,8 @@ export function useWorkspaceLoader() {
       } catch { /* ignore missing / malformed flow files */ }
     }
 
-    // Load contract snapshots referenced by the workspace, plus any orphan
-    // `.contract.json` files present in the contracts/ dir (the main process
-    // handler unions both). Silently skip missing / malformed files.
+    // Load contract snapshots referenced by the workspace, plus orphan
+    // `.contract.json` files in contracts/ (the handler unions both).
     try {
       const snapshots = await electron.listContractSnapshots(ws.contracts ?? []);
       for (const { relPath, snapshot } of snapshots) loadContractSnapshot(relPath, snapshot);

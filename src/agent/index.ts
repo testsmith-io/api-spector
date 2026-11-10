@@ -2,24 +2,13 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * API Spector private runner (agent).
- *
- * Runs monitor checks for internal/local APIs that API Spector Cloud can never
- * reach (localhost, VPN, a service mesh) without any inbound connection. All
- * traffic is outbound: the agent polls the cloud, runs each due check with the
- * real api-spector engine (the same one the desktop app and CLI use), and posts
- * the result back.
+ * API Spector private runner (agent): runs monitor checks for internal/local APIs
+ * the cloud can't reach. All traffic outbound: poll the cloud, run due checks, post back.
  *
  *   APP_URL=https://your-cloud AGENT_TOKEN=<token> npx @testsmith/api-spector-agent
  *
- * Environment:
- *   APP_URL            Base URL of your API Spector Cloud       (required)
- *   AGENT_TOKEN        Org API token with the 'agent' ability   (required)
- *   POLL_INTERVAL_MS   Poll cadence in ms                       (default 5000)
- *   RUNTIME_TOKEN      Shared runtime token (cloud-internal use; AGENT_TOKEN wins)
- *
- * The engine is bundled in; this has no install-time dependencies and needs
- * only Node 18+ (for global fetch).
+ * Env: APP_URL (required), AGENT_TOKEN (required, needs the 'agent' ability),
+ *   POLL_INTERVAL_MS (default 5000), RUNTIME_TOKEN (AGENT_TOKEN wins).
  */
 
 // Replaced at build time by the agent bundler (esbuild `define`).
@@ -33,8 +22,8 @@ const RUNTIME_TOKEN = process.env.RUNTIME_TOKEN || '';
 const POLL_MS = Number(process.env.POLL_INTERVAL_MS || 5000);
 const VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '';
 
-// Private agent: authenticate as the org with a Bearer token. Falls back to the
-// shared X-Runtime-Token only if that is all that is provided.
+// Authenticate as the org with a Bearer token; fall back to the shared
+// X-Runtime-Token only when that is all we have.
 const authHeaders: Record<string, string> = AGENT_TOKEN
   ? { Authorization: `Bearer ${AGENT_TOKEN}` }
   : RUNTIME_TOKEN
@@ -72,9 +61,8 @@ async function runOne(m: DueMonitor): Promise<void> {
   try {
     const dispatcher = await buildDispatcher(undefined, undefined);
 
-    // Setup chain: run each "before" hook (e.g. authenticate) in order, threading
-    // the variables it sets into the next hook and the main check. If a setup
-    // request errors, the check is down with that reason.
+    // Setup chain: run each "before" hook in order, threading the variables it
+    // sets into the next hook and the main check. A setup error means down.
     let envVars: Record<string, unknown> = {}, collectionVars: Record<string, unknown> = {};
     let globals: Record<string, unknown> = {}, localVars: Record<string, unknown> = {};
     for (const setupReq of (m.setup || [])) {

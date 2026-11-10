@@ -39,7 +39,7 @@ const OPTIONS: ImportOption[] = [
   { id: 'curl',     label: 'cURL',     description: 'Paste a curl command' },
 ];
 
-// ── Helpers to walk a parsed collection ─────────────────────────────────────
+// Helpers to walk a parsed collection
 
 interface EndpointEntry {
   request: ApiRequest
@@ -88,13 +88,13 @@ export function ImportModal({ onImport, onClose }: Props) {
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const urlInputRef               = useRef<HTMLInputElement>(null);
 
-  // ── OpenAPI preview state ──────────────────────────────────────────────────
+  // OpenAPI preview state
   const [previewCol, setPreviewCol]     = useState<Collection | null>(null);
   const [chosenIds, setChosenIds]       = useState<Set<string>>(new Set());
   const [target, setTarget]             = useState<string>('__new__');
   const [newColName, setNewColName]     = useState<string>('');
 
-  // ── Base URL → variable state ──────────────────────────────────────────────
+  // Base URL -> variable state
   const [baseUrl, setBaseUrl]           = useState<string>('');
   const [varName, setVarName]           = useState<string>('baseUrl');
   const [envTarget, setEnvTarget]       = useState<string>('__new__');
@@ -137,8 +137,7 @@ export function ImportModal({ onImport, onClose }: Props) {
     setLoading(true);
     setError(null);
     try {
-      // Arazzo builds a collection AND one or more flows; register both, then
-      // show any translation warnings instead of closing silently.
+      // Arazzo builds a collection AND flows; register both, then show translation warnings.
       if (opt.id === 'arazzo') {
         const res = await electron.importArazzo();
         if (!res) return;
@@ -146,8 +145,8 @@ export function ImportModal({ onImport, onClose }: Props) {
         setSummary(buildSummary(res.collection, { warnings: res.warnings, flows: res.flows.length }));
         return;
       }
-      // SoapUI / ReadyAPI returns a collection plus a parse report; surface the
-      // script-conversion tally and any skipped items on the summary screen.
+      // SoapUI/ReadyAPI returns a collection plus a parse report; surface the
+      // script-conversion tally and skipped items on the summary screen.
       if (opt.id === 'soapui') {
         const res = await electron.importSoapUi();
         if (!res) return;
@@ -165,8 +164,8 @@ export function ImportModal({ onImport, onClose }: Props) {
       if (opt.id === 'spector')  col = await electron.importSpectorCollection();
       if (opt.id === 'wsdl')     col = await electron.importWsdl();
       if (!col) { setLoading(false); return; }
-      // OpenAPI, HAR and WSDL can carry many endpoints/operations, so route
-      // them through the picker (choose what to keep, extract a base URL).
+      // OpenAPI, HAR and WSDL can carry many endpoints, so route them through the
+      // picker to choose what to keep and extract a base URL.
       if (opt.id === 'openapi' || opt.id === 'har' || opt.id === 'wsdl') {
         enterPreview(col);
       } else {
@@ -276,8 +275,7 @@ export function ImportModal({ onImport, onClose }: Props) {
           : u;
       };
 
-      // Apply rewrite in-place on the preview collection's requests so both
-      // pruning and merging see the same data.
+      // Apply rewrite in-place so both pruning and merging see the same data.
       for (const ep of picked) {
         ep.request.url = rewriteUrl(ep.request.url);
       }
@@ -288,22 +286,20 @@ export function ImportModal({ onImport, onClose }: Props) {
       }
 
       if (target === '__new__') {
-        // Build a fresh collection containing only the picked endpoints,
-        // preserving their original folder structure.
+        // Fresh collection of only the picked endpoints, keeping folder structure.
         const filtered: Collection = {
           ...previewCol,
           name: newColName.trim() || previewCol.name,
           requests: {},
           rootFolder: pruneFolder(previewCol.rootFolder, previewCol, chosenIds, {} as Record<string, ApiRequest>),
         };
-        // pruneFolder mutates the third object — re-collect requests:
+        // pruneFolder mutates the third object - re-collect requests:
         filtered.requests = collectRequestsByFolder(filtered.rootFolder, previewCol);
         onImport(filtered);
         setPreviewCol(null);
         setSummary(buildSummary(filtered, {}));
       } else {
-        // Merge selected endpoints into the target existing collection,
-        // preserving the folder/tag structure from the spec.
+        // Merge picked endpoints into the target collection, keeping folder/tag structure.
         const targetCol = collections[target]?.data;
         if (!targetCol) throw new Error(t('Target collection not found'));
         const prunedRoot = pruneFolder(previewCol.rootFolder, previewCol, chosenIds, {} as Record<string, ApiRequest>);
@@ -332,11 +328,8 @@ export function ImportModal({ onImport, onClose }: Props) {
     }
   }
 
-  /**
-   * Add (or upsert) the base-URL variable into the chosen environment.
-   * Creates a new environment if `envTarget === '__new__'`. Persists to disk
-   * and registers it in the workspace.
-   */
+  /** Upsert the base-URL variable into the chosen environment, creating one if
+   *  envTarget is '__new__'; persists to disk and registers it in the workspace. */
   async function persistBaseUrlVariable(name: string, value: string) {
     const state = useStore.getState();
     if (envTarget === '__new__') {
@@ -384,7 +377,7 @@ export function ImportModal({ onImport, onClose }: Props) {
     }
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // Render
 
   if (summary) {
     const s = summary.stats;
@@ -483,7 +476,7 @@ export function ImportModal({ onImport, onClose }: Props) {
             )}
           </div>
 
-          {/* Base URL → variable */}
+          {/* Base URL -> variable */}
           <div className="flex flex-col gap-2 border border-surface-800 rounded-lg p-3">
             <p className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">{t('Base URL → variable')}</p>
             <div className="flex gap-2">
@@ -652,7 +645,7 @@ export function ImportModal({ onImport, onClose }: Props) {
           ))}
         </div>
 
-        {/* URL input (shown for formats that support importing from a URL) */}
+        {/* URL input for URL-capable formats */}
         {(selected === 'openapi' || selected === 'wsdl') && (
           <div className="flex flex-col gap-2">
             <p className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">{t('Or import from URL')}</p>
@@ -676,7 +669,7 @@ export function ImportModal({ onImport, onClose }: Props) {
           </div>
         )}
 
-        {/* cURL command input (shown only when cURL selected) */}
+        {/* cURL command input */}
         {selected === 'curl' && (
           <div className="flex flex-col gap-2">
             <p className="text-[10px] text-surface-500 uppercase tracking-wider font-medium">{t('Paste a curl command')}</p>
@@ -726,7 +719,7 @@ export function ImportModal({ onImport, onClose }: Props) {
   );
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// Helpers
 
 /** Count every folder in a tree (excluding the implicit root). */
 function countFolders(root: Folder): number {
@@ -735,8 +728,8 @@ function countFolders(root: Folder): number {
   return n;
 }
 
-/** Turn a SoapUI import report into summary warnings: a script-conversion
- *  tally (only when something needs a review) followed by any skipped items. */
+/** SoapUI import report -> summary warnings: a script-conversion tally (when review
+ *  needed) plus skipped items. */
 function soapUiWarnings(report: SoapUiImportReport): string[] {
   const out: string[] = [];
   const s = report.scripts;
@@ -765,11 +758,8 @@ function buildSummary(col: Collection, opts: { warnings?: string[]; flows?: numb
   };
 }
 
-/**
- * Find the longest common URL prefix across `urls`, trimmed back to the last
- * `/` so we don't split a path segment in half. Returns '' if no useful
- * prefix is shared.
- */
+/** Longest common URL prefix across `urls`, trimmed to the last `/` so a path
+ *  segment isn't split; '' if nothing useful is shared. */
 function detectBaseUrl(urls: string[]): string {
   if (!urls.length) return '';
   let prefix = urls[0];
@@ -779,7 +769,7 @@ function detectBaseUrl(urls: string[]): string {
     prefix = prefix.slice(0, i);
     if (!prefix) break;
   }
-  // Don't return a partial path segment — back off to last '/'
+  // Don't return a partial path segment - back off to last '/'
   if (!prefix.includes('://')) return '';
   const protoEnd = prefix.indexOf('://') + 3;
   const lastSlash = prefix.lastIndexOf('/');
@@ -806,11 +796,8 @@ function methodColor(method: string): string {
   }
 }
 
-/**
- * Walk the source folder tree, returning a clone that contains only requests
- * whose IDs are in `keep`. Empty folders (no requests in their subtree) are
- * dropped. Request IDs are preserved (caller will pull them from src.requests).
- */
+/** Clone of the source folder tree keeping only requests whose IDs are in `keep`;
+ *  empty folders are dropped. Request IDs preserved for the caller. */
 function pruneFolder(
   src: Folder,
   _col: Collection,

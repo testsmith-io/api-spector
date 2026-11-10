@@ -8,7 +8,7 @@ import { Toast, useToast } from '../common/Toast';
 import { useT } from '../../i18n';
 import { labelCls } from '../../lib/ui-classes';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// Helpers
 
 function statusColor(code: number): string {
   return getStatusColor(code);
@@ -22,7 +22,7 @@ const ORACLE_META: Record<FuzzOracle, { label: string; badge: string; border: st
   'response-schema':     { label: 'Response schema',     badge: 'bg-orange-900/50 text-orange-400', border: 'border-orange-500' },
 };
 
-// ─── Finding row ──────────────────────────────────────────────────────────────
+// Finding row
 
 function FindingRow({ finding, onCopy }: { readonly finding: FuzzFinding; readonly onCopy: (text: string) => void }) {
   const t = useT();
@@ -100,7 +100,7 @@ function FindingRow({ finding, onCopy }: { readonly finding: FuzzFinding; readon
   );
 }
 
-// ─── Operation card ───────────────────────────────────────────────────────────
+// Operation card
 
 function OperationCard({ result, onCopy }: { readonly result: FuzzTargetResult; readonly onCopy: (text: string) => void }) {
   const t = useT();
@@ -135,7 +135,7 @@ function OperationCard({ result, onCopy }: { readonly result: FuzzTargetResult; 
   );
 }
 
-// ─── Trace: every case sent (trace mode) ──────────────────────────────────────
+// Trace: every case sent (trace mode)
 
 function statusTone(status: number, finding: boolean): string {
   if (finding) return 'text-red-400';
@@ -216,7 +216,7 @@ function TraceCard({ result, onCopy }: { readonly result: FuzzTargetResult; read
   );
 }
 
-// ─── Main panel ───────────────────────────────────────────────────────────────
+// Main panel
 
 export function FuzzResultsPanel({ report, onClear }: { readonly report: FuzzReport; readonly onClear: () => void }) {
   const { toast, show: showToast } = useToast();
@@ -237,7 +237,7 @@ export function FuzzResultsPanel({ report, onClear }: { readonly report: FuzzRep
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* ── Summary bar ── */}
+      {/* Summary bar */}
       <div className={`flex items-center gap-4 px-6 py-3 border-b flex-shrink-0 ${
         clean5xx ? 'bg-emerald-950/30 border-emerald-800/50' : 'bg-red-950/30 border-red-800/50'
       }`}>
@@ -265,7 +265,7 @@ export function FuzzResultsPanel({ report, onClear }: { readonly report: FuzzRep
         </button>
       </div>
 
-      {/* ── Skipped notes ── */}
+      {/* Skipped notes */}
       {(report.skippedWrites > 0 || report.skippedNoBody > 0) && (
         <div className="flex flex-col gap-1 px-6 py-2 border-b border-surface-800 bg-surface-900/60 flex-shrink-0">
           {report.skippedWrites > 0 && (
@@ -282,7 +282,7 @@ export function FuzzResultsPanel({ report, onClear }: { readonly report: FuzzRep
       )}
       <Toast toast={toast} />
 
-      {/* ── Results list ── */}
+      {/* Results list */}
       <div className="flex-1 overflow-y-auto min-h-0 p-6">
         <div className="flex flex-col gap-3 max-w-4xl mx-auto">
           {withFindings.map(r => <OperationCard key={r.requestId} result={r} onCopy={copy} />)}

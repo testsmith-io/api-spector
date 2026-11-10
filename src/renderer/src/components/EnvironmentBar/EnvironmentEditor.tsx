@@ -1,9 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useStore } from '../../store';
-import type { EnvVariable } from '../../../../shared/types';
+import type { EnvVariable, Environment } from '../../../../shared/types';
 import { MasterKeyModal } from './MasterKeyModal';
 import { Modal } from '../common/Modal';
 import { MoveVariableMenu } from '../common/MoveVariableMenu';
@@ -14,9 +14,9 @@ import { useT } from '../../i18n';
 
 const { electron } = window;
 
-// ─── Crypto helpers (Web Crypto API) ─────────────────────────────────────────
+// Crypto helpers (Web Crypto API)
 
-/** First 8 hex chars of SHA-256(value) — fingerprint only, not reversible. */
+/** First 8 hex chars of SHA-256(value) - fingerprint only, not reversible. */
 async function shortHash(value: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 8);
@@ -34,10 +34,8 @@ function envVarDisplay(v: EnvVariable): string {
   return v.value ?? '';
 }
 
-/**
- * Encrypt plaintext with AES-256-GCM using PBKDF2-derived key.
- * Returns base64 fields suitable for storing in the env file.
- */
+/** Encrypt plaintext with AES-256-GCM (PBKDF2-derived key), returning base64
+ *  fields for the env file. */
 async function encryptSecret(plaintext: string, password: string): Promise<{
   secretEncrypted: string
   secretSalt: string
@@ -66,7 +64,7 @@ async function encryptSecret(plaintext: string, password: string): Promise<{
   };
 }
 
-// ─── Source mode ──────────────────────────────────────────────────────────────
+// Source mode
 
 type SourceMode = 'plain' | 'encrypted' | 'env'
 
@@ -76,7 +74,7 @@ function getSourceMode(v: EnvVariable): SourceMode {
   return 'plain';
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// Component
 
 export function EnvironmentEditor({ onClose }: { readonly onClose: () => void }) {
   const t = useT();
@@ -95,6 +93,10 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
   // Show master key setup modal for a pending row
   const [pendingEncryptIdx, setPendingEncryptIdx] = useState<number | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
+  // Environments touched this modal session. Save persists all of them, not just
+  // the selected one; untouched environments are left alone so we never rewrite
+  // (or rename) a file the user didn't change.
+  const editedIds = useRef<Set<string>>(new Set());
 
   const deleteEnvironment    = useStore(s => s.deleteEnvironment);
   const duplicateEnvironment = useStore(s => s.duplicateEnvironment);
@@ -126,10 +128,9 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
     }
   }
 
-  // Variables inherited from the extends chain (not defined on this env), each
-  // tagged with the nearest parent that provides it. `ancestorSource` maps every
-  // inherited key to that parent, so an own variable with the same key can be
-  // badged as an override.
+  // Variables inherited from the extends chain, each tagged with the nearest
+  // parent providing it. `ancestorSource` maps every inherited key to its parent
+  // so an own variable with the same key can be badged as an override.
   const ancestorSource = new Map<string, string>();
   const inheritedVars: { v: EnvVariable; from: string }[] = [];
   if (env) {
@@ -167,9 +168,9 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
 
   function handleDuplicate(id: string) {
     duplicateEnvironment(id);
-    // Select the duplicate — it's the most recently added environment.
+    // Select the duplicate - it's the most recently added environment.
     const next = Object.keys(useStore.getState().environments).at(-1);
-    if (next) setSelectedId(next);
+    if (next) { editedIds.current.add(next); setSelectedId(next); }
   }
 
   // Import a Postman environment export (.json) as a new environment: unique its
@@ -194,21 +195,28 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
     setSelectedId(finalEnv.id);
   }
 
+  // Every mutation goes through here so the environment is updated in the store
+  // and flagged for the next Save.
+  function applyEnv(id: string, data: Environment) {
+    editedIds.current.add(id);
+    updateEnvironment(id, data);
+  }
+
   function updateVar(idx: number, patch: Partial<EnvVariable>) {
     if (!env) return;
     const vars = env.variables.map((v, i) => i === idx ? { ...v, ...patch } : v);
-    updateEnvironment(env.id, { ...env, variables: vars });
+    applyEnv(env.id, { ...env, variables: vars });
   }
 
   function addVar() {
     if (!env) return;
     const newVar: EnvVariable = { key: '', value: '', enabled: true };
-    updateEnvironment(env.id, { ...env, variables: [...env.variables, newVar] });
+    applyEnv(env.id, { ...env, variables: [...env.variables, newVar] });
   }
 
   function removeVar(idx: number) {
     if (!env) return;
-    updateEnvironment(env.id, { ...env, variables: env.variables.filter((_, i) => i !== idx) });
+    applyEnv(env.id, { ...env, variables: env.variables.filter((_, i) => i !== idx) });
   }
 
   function cycleSource(idx: number) {
@@ -251,12 +259,11 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
 
     const { set } = await electron.checkMasterKey();
     if (set) {
-      // The master key is already in the main process (shell env var or entered
-      // earlier this session). Encrypt there with that key so we don't prompt.
+      // Master key already in the main process: encrypt there, no prompt.
       applyEncrypted(idx, await electron.encryptWithMasterKey(plaintext));
       return;
     }
-    // No master key set — ask for a password, then encrypt in the renderer.
+    // No master key set - ask for a password, then encrypt in the renderer.
     setPendingEncryptIdx(idx);
   }
 
@@ -267,25 +274,21 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
     setNameError(null);
   }
 
-  async function saveEnv() {
-    if (!env) return;
-    const duplicate = Object.values(environments).some(
-      e => e.data.id !== env.id && e.data.name.toLowerCase() === env.name.trim().toLowerCase()
-    );
-    if (duplicate) {
-      setNameError(t('":name" already exists', { name: env.name.trim() }));
-      return;
-    }
-    setNameError(null);
-    const currentRelPath = environments[env.id]?.relPath ?? `environments/${env.id}.env.json`;
-    const newRelPath = envRelPath(env.name, env.id);
+  // Persist one environment to disk. A rename moves the file (name derives the
+  // filename) and updates the workspace manifest. Reads latest data from store.
+  async function persistEnv(envId: string): Promise<void> {
+    const entry = useStore.getState().environments[envId];
+    if (!entry) return;
+    const data = entry.data;
+    const currentRelPath = entry.relPath ?? `environments/${data.id}.env.json`;
+    const newRelPath = envRelPath(data.name, data.id);
 
-    // Update store and workspace if the path changed (name was renamed)
+    // Update store and workspace if the path changed (name was renamed).
     if (newRelPath !== currentRelPath) {
       useStore.setState(state => ({
         environments: {
           ...state.environments,
-          [env.id]: { ...state.environments[env.id], relPath: newRelPath },
+          [data.id]: { ...state.environments[data.id], relPath: newRelPath },
         },
         workspace: state.workspace ? {
           ...state.workspace,
@@ -296,7 +299,34 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
       if (ws) await electron.saveWorkspace(ws);
     }
 
-    await electron.saveEnvironment(newRelPath, env);
+    await electron.saveEnvironment(newRelPath, data);
+  }
+
+  // Save every environment touched this session. Returns false if a name
+  // collision blocks the save, so the caller keeps the modal open.
+  async function saveAll(): Promise<boolean> {
+    const all = Object.values(useStore.getState().environments).map(x => x.data);
+
+    // Environment names must be unique (the file name and `extends` references
+    // key off the name). Block the save and point at the first clash.
+    const byName = new Map<string, number>();
+    for (const e of all) {
+      const key = e.name.trim().toLowerCase();
+      byName.set(key, (byName.get(key) ?? 0) + 1);
+    }
+    const clash = all.find(e => (byName.get(e.name.trim().toLowerCase()) ?? 0) > 1);
+    if (clash) {
+      setSelectedId(clash.id);
+      setNameError(t('":name" already exists', { name: clash.name.trim() }));
+      return false;
+    }
+    setNameError(null);
+
+    const live = useStore.getState().environments;
+    const ids = [...editedIds.current].filter(id => live[id]);
+    for (const id of ids) await persistEnv(id);
+    editedIds.current.clear();
+    return true;
   }
 
   return (
@@ -356,6 +386,7 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
               onClick={() => {
                 useStore.getState().addEnvironment();
                 const newId = Object.keys(useStore.getState().environments).at(-1) ?? '';
+                if (newId) editedIds.current.add(newId);
                 selectEnv(newId);
               }}
               className="px-3 py-2 text-xs text-surface-400 hover:text-white border-t border-surface-800 transition-colors text-left"
@@ -378,7 +409,7 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
                 <div className="flex items-center gap-3">
                   <input
                     value={env.name}
-                    onChange={e => { updateEnvironment(env.id, { ...env, name: e.target.value }); setNameError(null); }}
+                    onChange={e => { applyEnv(env.id, { ...env, name: e.target.value }); setNameError(null); }}
                     className={`flex-1 bg-surface-800 rounded px-2 py-1 text-sm font-semibold focus:outline-none focus:ring-1 ${
                       nameError ? 'ring-1 ring-red-500 focus:ring-red-500' : 'focus:ring-blue-500'
                     }`}
@@ -395,7 +426,7 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
                   </label>
                   <select
                     value={env.extends ?? ''}
-                    onChange={e => updateEnvironment(env.id, { ...env, extends: e.target.value || undefined })}
+                    onChange={e => applyEnv(env.id, { ...env, extends: e.target.value || undefined })}
                     className="bg-surface-800 border border-surface-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
                   >
                     <option value="">{t('(none)')}</option>
@@ -417,8 +448,7 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
                   <thead>
                     <tr className="text-surface-400 text-left border-b border-surface-800">
                       <th className="px-3 py-2 w-8">{t('On')}</th>
-                      {/* Variable name column — was 144px which truncated typical names
-                          like OAUTH2_CLIENT_SECRET. 224px fits ~25 chars comfortably. */}
+                      {/* 224px fits ~25 chars; 144px truncated names like OAUTH2_CLIENT_SECRET. */}
                       <th className="px-2 py-2 w-56">{t('Variable')}</th>
                       <th className="px-2 py-2">{t('Value / Encrypted / Env var')}</th>
                       <th className="px-2 py-2 w-6"></th>
@@ -426,9 +456,8 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
                   </thead>
                   {env.variables.map((v, idx) => {
                     const mode = getSourceMode(v);
-                    // Each variable gets its own <tbody> so the two rows
-                    // (main fields + description/source) hover and group
-                    // together visually.
+                    // Each variable gets its own <tbody> so its two rows hover
+                    // and group together.
                     return (
                       <tbody key={idx} className="group border-b border-surface-800/50 hover:bg-surface-800/30">
                         <tr>
@@ -539,10 +568,8 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
                           </td>
                         </tr>
 
-                        {/* Row 2 — description + source mode toggle. Sits
-                            underneath the main row, aligned under the Value
-                            cell so the secondary fields don't crowd horizontal
-                            space. */}
+                        {/* Row 2: description + source-mode toggle, under the
+                            Value cell. */}
                         <tr>
                           <td></td>
                           <td colSpan={2} className="px-2 pb-2">
@@ -582,9 +609,8 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
                   {t('+ Add variable')}
                 </button>
 
-                {/* Inherited variables — read-only, from the extends chain. Each
-                    row shows the nearest parent it comes from; add a variable
-                    with the same name above to override it. */}
+                {/* Inherited variables, read-only, from the extends chain. Add a
+                    variable with the same name above to override one. */}
                 {inheritedVars.length > 0 && (
                   <div className="px-3 pb-3">
                     <div className="text-[10px] uppercase tracking-wider text-surface-500 font-medium mt-1 mb-1.5 flex items-center gap-1.5">
@@ -637,7 +663,7 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
                   {t('Cancel')}
                 </button>
                 <button
-                  onClick={() => { saveEnv(); onClose(); }}
+                  onClick={async () => { if (await saveAll()) onClose(); }}
                   className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 rounded transition-colors"
                 >
                   {t('Save')}
@@ -648,7 +674,7 @@ export function EnvironmentEditor({ onClose }: { readonly onClose: () => void })
             <div className="flex-1 flex flex-col items-center justify-center gap-3 text-surface-400 text-xs">
               <p>{t('No environment selected.')}</p>
               <button
-                onClick={() => { useStore.getState().addEnvironment(); const id = Object.keys(useStore.getState().environments).at(-1) ?? ''; selectEnv(id); }}
+                onClick={() => { useStore.getState().addEnvironment(); const id = Object.keys(useStore.getState().environments).at(-1) ?? ''; if (id) editedIds.current.add(id); selectEnv(id); }}
                 className="text-blue-400 hover:text-blue-300"
               >
                 {t('+ Create environment')}

@@ -7,17 +7,17 @@
 
 import { sep, isAbsolute, join } from 'node:path';
 
-/** OS path → posix (forward-slash) path. */
+/** OS path -> posix (forward-slash) path. */
 export function toPosix(p: string): string {
   return p.split(sep).join('/');
 }
 
-/** Workspace-relative path → repo-root-relative pathspec. */
+/** Workspace-relative path -> repo-root-relative pathspec. */
 export function toRepoPath(scope: string, wsRelPath: string): string {
   return scope ? `${scope}/${wsRelPath}` : wsRelPath;
 }
 
-/** Repo-root-relative path → workspace-relative path. */
+/** Repo-root-relative path -> workspace-relative path. */
 export function fromRepoPath(scope: string, repoRelPath: string): string {
   if (!scope) return repoRelPath;
   const prefix = `${scope}/`;

@@ -9,7 +9,7 @@ import { DOMParser } from '@xmldom/xmldom';
 import type { MockServer, MockRoute, MockHit } from '../shared/types';
 import type { faker as FakerType } from '@faker-js/faker';
 
-// ─── Faker (lazy-loaded) ──────────────────────────────────────────────────────
+// Faker (lazy-loaded)
 
 let _fakerCache: { faker: typeof FakerType } | null = null;
 async function getFaker(): Promise<typeof FakerType> {
@@ -17,10 +17,10 @@ async function getFaker(): Promise<typeof FakerType> {
   return _fakerCache.faker;
 }
 
-// ─── Global server state ──────────────────────────────────────────────────────
+// Global server state
 
 const running     = new Map<string, Server>();
-const liveRoutes  = new Map<string, MockRoute[]>();  // mutable — survives route edits
+const liveRoutes  = new Map<string, MockRoute[]>();  // mutable - survives route edits
 
 let hitCallback: ((hit: MockHit) => void) | null = null;
 
@@ -33,7 +33,7 @@ export function updateMockRoutes(id: string, routes: MockRoute[]): void {
   liveRoutes.set(id, routes);
 }
 
-// ─── Path matching ────────────────────────────────────────────────────────────
+// Path matching
 
 function matchPath(pattern: string, urlPath: string): boolean {
   const regexStr = pattern
@@ -56,7 +56,7 @@ export function findRoute(routes: MockRoute[], method: string, urlPath: string):
   );
 }
 
-// ─── Request utilities ────────────────────────────────────────────────────────
+// Request utilities
 
 /** Extract :param values from a route pattern against an actual URL path. */
 function extractPathParams(pattern: string, urlPath: string): Record<string, string> {
@@ -89,7 +89,7 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
-// ─── XML body parsing ───────────────────────────────────────────────────────
+// XML body parsing
 
 /** Minimal subset of the @xmldom/xmldom node shape we walk. */
 interface XmlNode {
@@ -103,15 +103,13 @@ interface XmlNode {
 const ELEMENT_NODE = 1, TEXT_NODE = 3, CDATA_NODE = 4;
 
 /**
- * Convert an XML element into a plain JS value so `request.body.x` works the
- * same as it does for JSON. Rules:
- *   - leaf element (text only)        → its trimmed text string
- *   - element with children/attrs     → object keyed by child tag name
- *   - repeated child tags             → array
- *   - attributes                      → `@name` keys
- *   - mixed text + children           → text stored under `#text`
- * Namespaced tags keep their prefix (e.g. `soap:Body`); access via bracket
- * notation in templates: `request.body['soap:Envelope']`.
+ * XML element -> plain JS value so `request.body.x` works like JSON:
+ *   - leaf (text only)        -> trimmed text string
+ *   - children/attrs          -> object keyed by child tag name
+ *   - repeated child tags     -> array
+ *   - attributes              -> `@name` keys
+ *   - mixed text + children   -> text under `#text`
+ * Namespaced tags keep their prefix; access via bracket notation in templates.
  */
 function elementToValue(el: XmlNode): unknown {
   const obj: Record<string, unknown> = {};
@@ -139,7 +137,7 @@ function elementToValue(el: XmlNode): unknown {
   }
 
   const trimmed = text.trim();
-  // Pure leaf: no children and no attributes → just the text.
+  // Pure leaf: no children and no attributes -> just the text.
   if (childEls.length === 0 && Object.keys(obj).length === 0) return trimmed;
   if (trimmed) obj['#text'] = trimmed;
   return obj;
@@ -159,14 +157,12 @@ function parseXmlToObject(xml: string): Record<string, unknown> | null {
   }
 }
 
-/**
- * Parse a request body into a value for `request.body`. Tries JSON first, then
- * XML (by content-type or a leading `<`); falls back to `{}` for anything else.
- */
+/** Parse a request body for `request.body`: JSON first, then XML (by content-type or
+ *  leading `<`), else `{}`. */
 function parseRequestBody(bodyRaw: string, contentType: string): unknown {
   try {
     return JSON.parse(bodyRaw);
-  } catch { /* not JSON — fall through */ }
+  } catch { /* not JSON - fall through */ }
 
   const ct = contentType.toLowerCase();
   if (ct.includes('xml') || bodyRaw.trimStart().startsWith('<')) {
@@ -177,12 +173,9 @@ function parseRequestBody(bodyRaw: string, contentType: string): unknown {
   return {};
 }
 
-// ─── Body interpolation ───────────────────────────────────────────────────────
+// Body interpolation
 
-/**
- * Expand {{expression}} tokens in a string using a vm context.
- * Supports faker expressions, dayjs expressions, and request.xxx access.
- */
+/** Expand {{expression}} tokens via a vm context (faker, dayjs, request.xxx). */
 function interpolateMockBody(body: string, context: Record<string, unknown>): string {
   return body.replaceAll(/\{\{([^}]+)\}\}/g, (match, key) => {
     const expr = key.trim();
@@ -191,14 +184,14 @@ function interpolateMockBody(body: string, context: Record<string, unknown>): st
         const result = vm.runInNewContext(expr, context);
         if (result !== undefined && result !== null) return String(result);
       } catch {
-        // Not a valid expression — leave token as-is
+        // Not a valid expression - leave token as-is
       }
     }
     return match;
   });
 }
 
-// ─── Response draft type ──────────────────────────────────────────────────────
+// Response draft type
 
 interface ResponseDraft {
   statusCode: number
@@ -206,7 +199,7 @@ interface ResponseDraft {
   headers:    Record<string, string>
 }
 
-// ─── Per-request handler ──────────────────────────────────────────────────────
+// Per-request handler
 
 export async function handleRequest(
   serverId: string,
@@ -261,7 +254,7 @@ export async function handleRequest(
     headers: reqHeaders,
   };
 
-  // Mutable response draft — scripts can modify it before send
+  // Mutable response draft - scripts can modify it before send
   const responseDraft: ResponseDraft = {
     statusCode: route.statusCode,
     body:       route.body,
@@ -275,8 +268,7 @@ export async function handleRequest(
       vm.runInNewContext(route.script, {
         request:  requestCtx,
         response: responseDraft,
-        // Free-form per-route data the importer/user can stash (e.g. SOAP
-        // envelopes by operation, lookup tables, fixtures). Frozen so a script
+        // Free-form per-route data the importer/user can stash. Frozen so a script
         // can't mutate it across calls.
         metadata: route.metadata ? Object.freeze({ ...route.metadata }) : {},
         faker,
@@ -309,7 +301,7 @@ export async function handleRequest(
   else respond();
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// Public API
 
 export async function startMock(server: MockServer): Promise<void> {
   if (running.has(server.id)) await stopMock(server.id);

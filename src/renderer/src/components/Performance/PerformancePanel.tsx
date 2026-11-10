@@ -1,13 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Performance (load) testing view. Plans live inline in the workspace (see
-// PerfPlansPanel). A plan targets a single request OR a Flow (so authenticated,
-// multi-step scenarios load test too), and shapes load with one of four
-// patterns (basic / stepping / arrivals / custom) over a unified schedule shown
-// as a live profile preview. Results report whole-iteration throughput and
-// latency, a per-step breakdown, status codes and errors. The run happens in
-// the main process (perf-runner.ts).
+// Performance (load) testing view. Plans target a request, sequence or Flow and shape
+// load with one of four patterns; the run happens in the main process (perf-runner.ts).
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../../store';
@@ -154,8 +149,7 @@ function SeriesChart({ series }: { readonly series: PerfResult['series'] }) {
   );
 }
 
-// Realtime results: a live line of instantaneous iterations/sec (amber) and p95
-// (fuchsia), updated from the progress stream while the run is in flight.
+// Realtime results: live lines of instantaneous iter/s and p95 from the progress stream.
 function LiveChart({ samples }: { readonly samples: PerfProgress[] }) {
   const t = useT();
   if (samples.length < 2) return null;

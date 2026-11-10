@@ -3,16 +3,9 @@
 
 import type { IpcMain, IpcMainInvokeEvent } from 'electron';
 
-/**
- * Registers an ipcMain.handle handler with consistent error logging.
- *
- * Any error thrown (or rejection) from `fn` is logged to the main-process
- * console as `[<channel>] <error>` and then RETHROWN, so the renderer-side
- * `invoke` still rejects exactly as it did before — the error shape reaching
- * the renderer is unchanged. Handlers that catch their own errors and return
- * custom `{ ok: false, ... }` shapes are unaffected: those returns are not
- * errors, so they pass straight through.
- */
+/** Register an ipcMain.handle handler that logs any thrown error as
+ *  `[<channel>] <error>` and rethrows, so the renderer's `invoke` rejects
+ *  unchanged. Handlers returning their own `{ ok: false }` are unaffected. */
 export function handleIpc<Args extends unknown[]>(
   ipc: IpcMain,
   channel: string,

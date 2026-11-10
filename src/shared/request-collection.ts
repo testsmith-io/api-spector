@@ -7,17 +7,13 @@ import { findFolder, orderedChildren } from './folder-tree';
 export type CollectedRequest = {
   request: ApiRequest
   collectionVars: Record<string, string>
-  /** Folder names from (just below) the root to the folder that owns this
-   *  request. Used for grouped rendering in the CLI output and reports. */
+  /** Folder names from below the root to the folder owning this request; for grouped CLI/report rendering. */
   scopePath?: string[]
 }
 
-// ─── Internal helpers ─────────────────────────────────────────────────────────
+// Internal helpers
 
-/**
- * Return the chain of folders from `root` down to (and including) the folder
- * with id `targetId`. Returns [] if not found.
- */
+/** Folder chain from `root` down to the folder with id `targetId`; [] if not found. */
 function folderChainTo(root: Folder, targetId: string): Folder[] {
   if (root.id === targetId) return [root];
   for (const sub of root.folders) {
@@ -37,9 +33,8 @@ type ScopeWrapper = {
   folderId: string
 }
 
-/** All non-disabled requests in a folder subtree, in visible (childOrder)
- *  order. Used to run an entire folder as a single hook body. Request-level
- *  hook tags inside the folder are ignored — the folder's own hookType governs. */
+/** Non-disabled requests in a folder subtree, in childOrder, for running a folder
+ *  as one hook body. Inner request hookTags ignored; the folder's hookType governs. */
 function flattenFolderRequests(folder: Folder, requests: Collection['requests']): ApiRequest[] {
   const out: ApiRequest[] = [];
   for (const child of orderedChildren(folder)) {
@@ -69,15 +64,12 @@ function makeHook(
 }
 
 /**
- * Recursively build a flat run plan for a folder, interleaving hook requests.
- *
- * Hooks are identified by request.hookType within each folder:
- *   beforeAll — runs once before any regular request in this folder/sub-folders
- *   before    — runs before every regular request in this folder/sub-folders
- *   after     — runs after every regular request (always)
- *   afterAll  — runs once after all regular requests complete (always)
- *
- * wrappers: accumulated before/after hooks from outer scopes (outermost first)
+ * Flat run plan for a folder, hooks interleaved. request.hookType per folder:
+ *   beforeAll - once before any regular request here/below
+ *   before    - before every regular request here/below
+ *   after     - after every regular request
+ *   afterAll  - once after all regular requests
+ * wrappers: before/after hooks from outer scopes (outermost first).
  */
 function buildFolderPlan(
   folder: Folder,
@@ -89,20 +81,17 @@ function buildFolderPlan(
   /** Folder names from root (excluding the synthetic root) down to this folder's parent. */
   parentPath: string[],
   wrappers: ScopeWrapper[],
-  /** True if this is the collection's top-level root scope — root name is omitted. */
+  /** True if this is the collection's top-level root scope - root name is omitted. */
   isRoot: boolean,
-  /** Folder variables inherited from ancestor folders (root→leaf). */
+  /** Folder variables inherited from ancestor folders (root->leaf). */
   inheritedFolderVars: Record<string, string> = {},
 ): RunnerItem[] {
   const result: RunnerItem[] = [];
-  // Folder vars visible to requests owned by this folder: the inherited chain
-  // plus this folder's own `variables` (inner wins). Attached to each item so
-  // a script reads them as `sp.folder` and writes land on this folder.
+  // Folder vars for requests here: inherited chain plus this folder's own (inner wins).
+  // Attached per item so scripts read `sp.folder` and writes land on this folder.
   const myFolderVars = { ...inheritedFolderVars, ...(folder.variables ?? {}) };
   const myFolderId = folder.id;
-  // scopePath is the path *for requests owned by this folder*. For the root
-  // scope, that's [] (direct collection children have no folder). For any
-  // other scope, it's the parent path + this folder's name.
+  // scopePath for requests owned by this folder: [] at root, else parentPath + folder name.
   const scopePath = isRoot ? [] : [...parentPath, folder.name];
 
   // This folder's direct, non-disabled requests (for regular-request lookup).
@@ -111,11 +100,9 @@ function buildFolderPlan(
     .map(c => requests[c.id])
     .filter(r => r && !r.disabled) as ApiRequest[];
 
-  // Collect hook bodies in the folder's visible (drag) order so a series of
-  // same-type hooks runs top-to-bottom as shown. A hook is either a single
-  // request (request.hookType) or an entire sub-folder (folder.hookType) whose
-  // requests run as a group; folder-hooks are attributed to THIS parent scope
-  // and are not run inline. Disabled items are excluded from all runs.
+  // Collect hook bodies in drag order so same-type hooks run top-to-bottom.
+  // A hook is one request (request.hookType) or a whole sub-folder (folder.hookType)
+  // run as a group, attributed to THIS scope not run inline. Disabled items excluded.
   const beforeAllHooks: ApiRequest[] = [];
   const beforeHooks:    ApiRequest[] = [];
   const afterHooks:     ApiRequest[] = [];
@@ -150,9 +137,8 @@ function buildFolderPlan(
     result.push(makeHook(req, collectionVars, 'beforeAll', scopeId, ancestorIds, scopePath, undefined, myFolderVars, myFolderId));
   }
 
-  // 2 + 3. Regular requests and sub-folders, interleaved in the folder's own
-  // order (childOrder). Hook requests are excluded here — they are emitted as
-  // beforeAll/afterAll or as before/after wrappers around each regular request.
+  // 2 + 3. Regular requests and sub-folders interleaved in childOrder. Hooks excluded
+  // here; emitted as beforeAll/afterAll or before/after wrappers per regular request.
   const regularById = new Map(regularReqs.map(r => [r.id, r] as const));
   const subById     = new Map(folder.folders.map(f => [f.id, f] as const));
   for (const child of orderedChildren(folder)) {
@@ -162,7 +148,7 @@ function buildFolderPlan(
       const tags = req.meta?.tags ?? [];
       if (filterTags.length > 0 && !filterTags.some(t => tags.includes(t))) continue;
 
-      // before hooks: outer → inner
+      // before hooks: outer -> inner
       for (const w of allWrappers) {
         for (const hookReq of w.before) {
           result.push(makeHook(hookReq, collectionVars, 'before', w.scopeId, w.ancestors, w.scopePath, req.id, w.folderVars, w.folderId));
@@ -170,7 +156,7 @@ function buildFolderPlan(
       }
       // main request
       result.push({ request: req, collectionVars, scopeId, scopeAncestors: ancestorIds, scopePath, folderVars: myFolderVars, folderId: myFolderId });
-      // after hooks: inner → outer
+      // after hooks: inner -> outer
       for (const w of [...allWrappers].reverse()) {
         for (const hookReq of w.after) {
           result.push(makeHook(hookReq, collectionVars, 'after', w.scopeId, w.ancestors, w.scopePath, req.id, w.folderVars, w.folderId));
@@ -199,25 +185,17 @@ function buildFolderPlan(
   return result;
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// Public API
 
-/**
- * Recursively collect requests from a folder tree, optionally filtered by tags.
- * Hook requests (request.hookType set) are excluded — use buildRunPlan for runner use.
- *
- * Each returned item carries a `scopePath` — folder names from (just below)
- * the synthetic root to the folder that owns the request. The root's own name
- * is suppressed unless the caller explicitly starts the walk inside a named
- * subfolder (in which case that folder's name becomes the first path entry).
- */
+/** Collect requests from a folder tree, optionally tag-filtered; hooks excluded
+ *  (use buildRunPlan for the runner). scopePath is folder names below the root. */
 export function collectTagged(
   folder: Folder,
   requests: Collection['requests'],
   collectionVars: Record<string, string>,
   filterTags: string[],
   parentPath: string[] = [],
-  /** True on the very first call if `folder` is the collection's synthetic
-   *  root; its "root" name should not appear in scopePath. */
+  /** True on the first call when `folder` is the synthetic root; its name is kept out of scopePath. */
   isRoot = true,
 ): CollectedRequest[] {
   const results: CollectedRequest[] = [];
@@ -244,9 +222,7 @@ export function collectTagged(
   return results;
 }
 
-/**
- * Collect all unique tags used across a folder tree (folders + requests).
- */
+/** All unique tags across a folder tree (folders + requests). */
 export function collectAllTags(folder: Folder, requests: Collection['requests']): string[] {
   const tags = new Set<string>();
 
@@ -262,10 +238,7 @@ export function collectAllTags(folder: Folder, requests: Collection['requests'])
   return Array.from(tags).sort((a, b) => a.localeCompare(b));
 }
 
-/**
- * Find the path of folders from the root to (and including) the folder that
- * directly contains requestId. Returns [] if not found.
- */
+/** Folder path from root to the folder directly containing requestId; [] if not found. */
 function folderPathTo(root: Folder, requestId: string): Folder[] {
   if (root.requestIds.includes(requestId)) return [root];
   for (const sub of root.folders) {
@@ -275,22 +248,8 @@ function folderPathTo(root: Folder, requestId: string): Folder[] {
   return [];
 }
 
-/**
- * Return the hooks that should wrap a single request execution.
- * before: [outermost scope → innermost scope], beforeAll then before within each scope.
- * after:  [innermost scope → outermost scope], after then afterAll within each scope.
- */
-/**
- * Collect all hook requests applicable to a given folder, by walking from
- * the collection root down to (and including) that folder. Hooks defined at
- * any ancestor scope wrap requests in this folder.
- *
- * Returned in correct execution order:
- *   - beforeAll: outer → inner
- *   - before:    outer → inner
- *   - after:     inner → outer
- *   - afterAll:  inner → outer
- */
+/** Hook requests applicable to a folder (walk root down to it; ancestors wrap).
+ *  Order: beforeAll/before outer->inner, after/afterAll inner->outer. */
 export function getAllApplicableHooks(
   folderId: string,
   collection: Collection,
@@ -316,7 +275,7 @@ export function getAllApplicableHooks(
     beforeAll.push(...reqs.filter(r => r.hookType === 'beforeAll'));
     before   .push(...reqs.filter(r => r.hookType === 'before'));
   }
-  // after hooks fire inner → outer
+  // after hooks fire inner -> outer
   for (const folder of [...chain].reverse()) {
     const reqs = folder.requestIds.map(id => collection.requests[id]).filter(r => r && !r.disabled) as ApiRequest[];
     after   .push(...reqs.filter(r => r.hookType === 'after'));
@@ -348,21 +307,32 @@ export function getHooksForRequest(
   return { before, after: afterReversed };
 }
 
-/**
- * Resolve inherited auth and headers for a request by walking the collection →
- * root folder → … → immediate parent folder chain. Each level can override
- * auth (if non-'none') and append headers.
- *
- * This is the shared/main-process equivalent of the renderer's
- * `getInheritedAuthAndHeaders` store action.
- */
-/**
- * Whether an auth config carries a usable credential. A request whose own auth
- * is `none`, or a credential type left blank (e.g. the empty bearer stub that
- * OpenAPI import stamps on every request from the spec's security scheme), does
- * NOT override folder/collection auth: it should inherit instead. This is the
- * decision point for "does the request's own auth win over the inherited one?".
- */
+/** Inherited auth and headers for a request: walk collection -> root -> parent folder;
+ *  each level can override auth (if non-'none') and append headers. */
+/** Whether an auth config has a usable credential. `none`, or a blank credential like
+ *  OpenAPI's empty bearer stub, does NOT override inherited auth; it inherits instead. */
+/** Strip the session-only OAuth2 token cache (oauth2CachedToken/oauth2TokenExpiry)
+ *  from an auth config in place; it must never reach the .spector file on disk. */
+function stripEphemeralAuthFields(auth?: AuthConfig): void {
+  if (auth?.type !== 'oauth2') return;
+  delete auth.oauth2CachedToken;
+  delete auth.oauth2TokenExpiry;
+}
+
+/** Remove session-only auth state (cached OAuth2 tokens at any level) before persisting.
+ *  Mutates `col` in place, so callers pass a clone. */
+export function stripEphemeralAuth(col: Collection): void {
+  stripEphemeralAuthFields(col.auth);
+  const walk = (f: Folder): void => {
+    stripEphemeralAuthFields(f.auth);
+    f.folders.forEach(walk);
+  };
+  walk(col.rootFolder);
+  for (const req of Object.values(col.requests)) {
+    stripEphemeralAuthFields(req.auth);
+  }
+}
+
 export function authIsConfigured(auth?: AuthConfig): boolean {
   if (!auth || auth.type === 'none') return false;
   const set = (s?: string): boolean => !!(s?.trim());
@@ -387,7 +357,7 @@ export function resolveInheritedAuthAndHeaders(
   let inheritedHeaders: KeyValuePair[] =
     collection.headers?.filter(h => h.enabled && h.key) ?? [];
 
-  // Walk folder path (root → immediate folder); each level can override
+  // Walk folder path (root -> immediate folder); each level can override
   const path = folderPathTo(collection.rootFolder, requestId);
   for (const folder of path) {
     if (folder.auth && folder.auth.type !== 'none') inheritedAuth = folder.auth;
@@ -406,12 +376,8 @@ export interface InheritedHeader {
   source: string
 }
 
-/**
- * The enabled headers a request inherits from its collection and the folders on
- * its path, each tagged with its source level. Ordered the same way they are
- * applied at send time (collection first, then root → leaf folders), so the
- * Headers tab can show exactly what gets sent and where each one is defined.
- */
+/** Enabled headers a request inherits from collection + path folders, each tagged with
+ *  its source, in send order (collection, then root->leaf) so the Headers tab mirrors it. */
 export function inheritedHeadersWithSource(requestId: string, collection: Collection): InheritedHeader[] {
   const out: InheritedHeader[] = [];
   for (const h of collection.headers ?? []) {
@@ -425,10 +391,7 @@ export function inheritedHeadersWithSource(requestId: string, collection: Collec
   return out;
 }
 
-/**
- * Build a flat RunnerItem list with hooks interleaved in the correct order.
- * Hooks are requests that have request.hookType set, scoped to their folder.
- */
+/** Flat RunnerItem list with hooks (request.hookType, scoped to their folder) interleaved. */
 export function buildRunPlan(
   collection: Collection,
   folderId: string | null,
@@ -438,7 +401,7 @@ export function buildRunPlan(
 
   const tag = (items: RunnerItem[]) => items.map(i => ({ ...i, collection: collection.name }));
 
-  // ── Whole-collection run ──────────────────────────────────────────────────
+  // Whole-collection run
   if (!folderId) {
     return tag(buildFolderPlan(
       collection.rootFolder, collection.requests, collectionVars, filterTags,
@@ -446,12 +409,8 @@ export function buildRunPlan(
     ));
   }
 
-  // ── Folder-scoped run ─────────────────────────────────────────────────────
-  // Walk down from the collection root to the target folder. Hooks defined on
-  // any ancestor (including root/"collection level") still need to fire — a
-  // collection-level `beforeAll` should run once before the target's content,
-  // collection-level `before`/`after` should wrap each request inside the
-  // target, and collection-level `afterAll` should run once at the end.
+  // Folder-scoped run. Ancestor hooks still fire: a collection-level beforeAll once
+  // before the target, before/after wrap each request inside it, afterAll once at the end.
   const chain = folderChainTo(collection.rootFolder, folderId);
   if (chain.length === 0) return [];
 
@@ -461,13 +420,11 @@ export function buildRunPlan(
   const result: RunnerItem[] = [];
   const ancestorWrappers: ScopeWrapper[] = [];
   const ancestorIds: string[] = [];
-  // Folder variables accumulate down the ancestor chain (outer → inner), the same
-  // way buildFolderPlan merges `{ ...inherited, ...folder.variables }`. Each
-  // wrapper gets its own snapshot so an ancestor's before/after hooks resolve with
-  // that ancestor's folder vars (previously omitted, which dropped them silently).
+  // Folder vars accumulate down the ancestor chain (outer -> inner), like buildFolderPlan.
+  // Each wrapper snapshots its own so an ancestor's hooks resolve with that ancestor's vars.
   let ancestorFolderVars: Record<string, string> = {};
 
-  // Walk root → target's parent: emit each ancestor's beforeAll once, and
+  // Walk root -> target's parent: emit each ancestor's beforeAll once, and
   // build a wrapper carrying its before/after hooks for nested requests.
   for (const f of ancestors) {
     ancestorFolderVars = { ...ancestorFolderVars, ...(f.variables ?? {}) };
@@ -491,8 +448,7 @@ export function buildRunPlan(
     ancestorIds.push(f.id);
   }
 
-  // Run the target folder as the new root for scopePath purposes, but with
-  // the ancestor chain and wrappers we just built.
+  // Run the target folder as the new scopePath root, with the ancestor chain/wrappers.
   result.push(...buildFolderPlan(
     targetFolder, collection.requests, collectionVars, filterTags,
     targetFolder.id, ancestorIds, [], ancestorWrappers, true,
@@ -512,19 +468,13 @@ export function buildRunPlan(
   return tag(result);
 }
 
-/**
- * Data-driven expansion: repeat a run plan once per DataSet row, tagging each
- * copy with the row's values (`dataRow`, injected as local vars at send-time)
- * and a `1/N` iteration label. Used for both collection- and folder-scoped runs
- * — pass the folder's DataSet for a folder run, the collection's otherwise.
- * With no rows the plan is returned unchanged (a single pass).
- */
+/** Repeat a run plan once per DataSet row, tagging each copy with the row's values
+ *  (dataRow) and a `1/N` label. No rows = plan returned unchanged. */
 export function expandRunPlanWithData(items: RunnerItem[], ds: DataSet | undefined): RunnerItem[] {
   if (!ds || ds.rows.length === 0) return items;
   return ds.rows.flatMap((row, ri) => {
     const parsed = parseDataRow(ds.columns, row);
-    // Merge onto any existing dataRow (e.g. from folder-level expansion) so both
-    // sets of variables are available; this row's values win on key conflicts.
+    // Merge onto any existing dataRow; this row's values win on key conflicts.
     return items.map(item => ({
       ...item,
       dataRow: { ...item.dataRow, ...parsed.dataRow },
@@ -535,11 +485,9 @@ export function expandRunPlanWithData(items: RunnerItem[], ds: DataSet | undefin
   });
 }
 
-// ─── Data-table row parsing ────────────────────────────────────────────────────
-// Most columns become variables. A few reserved column names turn a data table
-// into an access-control / OWASP matrix: `expectStatus` (or expect_status /
-// expectedStatus) makes the run assert the response code (a single 403 or a list
-// "403,404"), and `owasp` tags that assertion (e.g. BOLA) so it flows into SARIF.
+// Data-table row parsing. Most columns become variables; reserved names build an
+// OWASP matrix: expectStatus asserts the response code (403 or "403,404"), owasp
+// tags the assertion so it flows into SARIF.
 const RESERVED_STATUS = new Set(['expectstatus', 'expect_status', 'expectedstatus', 'expected_status']);
 const RESERVED_OWASP  = new Set(['owasp', 'owasp_tag', 'category']);
 
@@ -569,9 +517,8 @@ export function parseDataRow(columns: string[], row: string[]): ParsedDataRow {
   return { dataRow, expectStatus, owaspTag };
 }
 
-/** The nearest data table for a run item: walk from its own folder outward and
- *  return the first ancestor folder that has rows. Collection-level data is not
- *  considered here (it is applied separately by expandRunPlanWithData). */
+/** Nearest folder data table for a run item: own folder outward, first with rows.
+ *  Collection-level data is applied separately by expandRunPlanWithData. */
 function nearestFolderDataSet(item: RunnerItem, collection: Collection): DataSet | undefined {
   const chain = [item.scopeId, ...(item.scopeAncestors ?? [])].filter(Boolean) as string[];
   for (const id of chain) {
@@ -581,10 +528,8 @@ function nearestFolderDataSet(item: RunnerItem, collection: Collection): DataSet
   return undefined;
 }
 
-/** Collection-run expansion: each non-hook request is repeated once per row of
- *  its nearest folder-level data table (requests inherit an ancestor folder's
- *  table). Hooks and requests not under any folder table pass through unchanged.
- *  Collection-level data is layered on afterwards via expandRunPlanWithData. */
+/** Each non-hook request repeated once per row of its nearest folder data table
+ *  (inherited from ancestors). Hooks and tableless requests pass through unchanged. */
 export function expandFolderDataSets(items: RunnerItem[], collection: Collection): RunnerItem[] {
   const out: RunnerItem[] = [];
   for (const item of items) {

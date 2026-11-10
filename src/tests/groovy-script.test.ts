@@ -186,7 +186,7 @@ describe('convertGroovyScript — end to end', () => {
     expect(r.js).toContain('sp.expect(json.status == "ok").to.be.ok;');
     expect(r.js).toContain('json.items.forEach((item) => {');
     expect(parses(r.js)).toBe(true);
-    // No hard blockers in this script → fully or mostly mapped.
+    // No hard blockers in this script -> fully or mostly mapped.
     expect(r.status === 'clean' || r.status === 'partial').toBe(true);
     expect(r.unmapped).toHaveLength(0);
   });

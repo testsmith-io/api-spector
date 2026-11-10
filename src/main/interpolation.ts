@@ -21,10 +21,7 @@ async function getFaker(): Promise<typeof FakerType> {
 /** Populated after first buildDynamicVars() call; used by interpolate() for inline expressions. */
 let _exprContext: Record<string, unknown> | null = null;
 
-/**
- * Built-in dynamic variables resolved fresh on every request send.
- * Available as {{$uuid}}, {{$isoTimestamp}}, {{$randomEmail}}, etc.
- */
+/** Built-in dynamic variables ({{$uuid}}, {{$isoTimestamp}}, {{$randomEmail}}, …), fresh per send. */
 export async function buildDynamicVars(): Promise<Record<string, string>> {
   const faker = await getFaker();
   const now   = dayjs();
@@ -50,33 +47,28 @@ export async function buildDynamicVars(): Promise<Record<string, string>> {
   };
 }
 
-/** Replace {{var}} placeholders with values from the merged vars map.
- *  Tokens that don't match a variable and look like expressions (contain `.` or `(`)
- *  are evaluated with faker and dayjs in scope when available. */
+/** Replace {{var}} placeholders from the merged vars map. Unmatched tokens that
+ *  look like expressions (contain `.` or `(`) are evaluated with faker and dayjs in scope. */
 export function interpolate(str: string, vars: Record<string, string>): string {
-  // Allow a single level of `{...}` inside the token so expressions with object
-  // args resolve, e.g. {{faker.date.between({ from: '…', to: '…' })}}.
+  // One level of `{...}` is allowed inside the token so object-arg expressions
+  // resolve, e.g. {{faker.date.between({ from: '…', to: '…' })}}.
   return str.replaceAll(/\{\{\s*((?:[^{}]|\{[^{}]*\})+?)\s*\}\}/g, (match, key) => {
     const trimmed = key.trim();
     if (trimmed in vars) return vars[trimmed];
-    // Try evaluating as an expression (e.g. faker.internet.email(), dayjs().format(...))
     if (_exprContext && (trimmed.includes('.') || trimmed.includes('('))) {
       try {
         const result = vm.runInNewContext(trimmed, _exprContext);
         if (result !== undefined && result !== null) return String(result);
       } catch {
-        // Not a valid expression — fall through to unresolved
+        // Not a valid expression: leave unresolved.
       }
     }
     return match;
   });
 }
 
-/** Resolve {{...}} references and faker/dynamic expressions inside data-row
- *  (DataSet) cell values, so a collection- or folder-level data table can use
- *  {{baseUrl}}, {{$randomEmail}}, {{faker.person.firstName()}}, etc. Each value
- *  is interpolated against `scope` (the surrounding variable scopes plus the
- *  freshly-generated dynamic vars, so faker yields a new value per row). */
+/** Interpolate each DataSet cell value against `scope`, so a data table can use
+ *  {{baseUrl}}, {{$randomEmail}}, {{faker.person.firstName()}}, etc. */
 export function resolveDataRow(row: Record<string, string>, scope: Record<string, string>): Record<string, string> {
   return Object.fromEntries(
     Object.entries(row).map(([k, v]) => [k, typeof v === 'string' ? interpolate(v, scope) : v]),
@@ -89,12 +81,9 @@ export function buildUrl(
   params: KeyValuePair[],
   vars: Record<string, string>
 ): string {
-  // Detect which keys appear as `{{name}}` tokens in the URL template, so we
-  // can route param rows correctly without depending on the user remembering
-  // to flip a dropdown. A row is treated as a path substitution iff:
-  //   - it's enabled and has a key
-  //   - AND either paramType === 'path' OR its key appears in the URL template
-  // Everything else gets appended as a query string parameter.
+  // A row routes to the path when it's enabled, has a key, and either
+  // paramType === 'path' or its key appears as a `{{name}}` token in the URL.
+  // Everything else is appended as a query parameter.
   const templateTokens = new Set<string>();
   baseUrl.replaceAll(/\{\{\s*((?:[^{}]|\{[^{}]*\})+?)\s*\}\}/g, (_m, name) => {
     templateTokens.add(String(name).trim());
@@ -115,9 +104,8 @@ export function buildUrl(
     else queryRows.push(p);
   }
 
-  // Merge path rows into the var scope (per-request priority) before
-  // interpolating the URL, so `/pets/{{id}}` resolves from a row in the
-  // request's params table.
+  // Merge path rows into the var scope before interpolating, so `/pets/{{id}}`
+  // resolves from a row in the request's params table.
   const mergedVars = pathRows.length
     ? {
       ...vars,
@@ -125,8 +113,8 @@ export function buildUrl(
     }
     : vars;
 
-  // Substitute `{{name}}` (via interpolate) then `[name]` / `{name}` / `:name` path
-  // placeholders. A placeholder with no resolvable value is left as-is.
+  // Substitute `{{name}}` then `[name]` / `{name}` / `:name`; an unresolvable
+  // placeholder is left as-is.
   let url = interpolate(baseUrl, mergedVars);
   url = url.replaceAll(PATH_PARAM_RE, (m, g1, g2, g3) => {
     const name = g1 ?? g2 ?? g3;
@@ -141,11 +129,9 @@ export function buildUrl(
   return url + sep + qs;
 }
 
-/** Swap the origin (and optional base path) of a request URL for `baseUrl`,
- *  keeping the request's own path and query string. Used to rebase a contract's
- *  path (which may be host-less, e.g. `/brands`) onto a provider you point at,
- *  so the same contracts run against localhost, staging, or production without
- *  editing every request. Returns the original URL when no base is given. */
+/** Swap a request URL's origin (and optional base path) for `baseUrl`, keeping its
+ *  path and query. Lets the same contracts run against localhost/staging/prod.
+ *  Returns the original URL when no base is given. */
 export function rebaseUrl(fullUrl: string, baseUrl?: string): string {
   if (!baseUrl) return fullUrl;
   try {
@@ -165,16 +151,15 @@ export async function buildEnvVars(environment: Environment | null): Promise<Rec
   const vars: Record<string, string> = {};
   if (!environment) return vars;
   const masterKey = process.env['API_SPECTOR_MASTER_KEY'];
-  // External secrets resolve in a second pass, after all plain/env/encrypted
-  // vars, so a secret ref (or a provider's path prefix) can interpolate a
-  // {{var}} that is defined anywhere in this environment, not only above it.
+  // External secrets resolve in a second pass so a secret ref can interpolate a
+  // {{var}} defined anywhere in this environment, not only above it.
   const deferredSecretRefs: { key: string; ref: string }[] = [];
   for (const v of environment.variables) {
     if (!v.enabled) continue;
     if (v.secretRef && hasSecretScheme(v.secretRef)) {
       deferredSecretRefs.push({ key: v.key, ref: v.secretRef });
     } else if (v.envRef) {
-      // OS environment variable — read from process.env at send-time
+      // OS environment variable, read at send-time.
       const envValue = process.env[v.envRef];
       if (envValue !== undefined) vars[v.key] = envValue;
     } else if (v.secret && v.secretEncrypted && v.secretSalt && v.secretIv) {
@@ -183,15 +168,15 @@ export async function buildEnvVars(environment: Environment | null): Promise<Rec
         try {
           vars[v.key] = decryptSecret(v.secretEncrypted, v.secretSalt, v.secretIv, masterKey);
         } catch {
-          // Wrong password or corrupted — fall through to env fallback
+          // Wrong password or corrupted: fall through to env fallback.
         }
       }
-      // CLI / CI context: secret injected as environment variable (e.g. from GitHub Secrets)
+      // CLI / CI: secret injected as an environment variable.
       if (vars[v.key] === undefined && process.env[v.key] !== undefined) {
         vars[v.key] = process.env[v.key]!;
       }
     } else if (v.secret) {
-      // Secret with no stored ciphertext — check process.env (CI / CLI context)
+      // Secret with no stored ciphertext: check process.env (CI / CLI).
       if (process.env[v.key] !== undefined) {
         vars[v.key] = process.env[v.key]!;
       }
@@ -199,9 +184,8 @@ export async function buildEnvVars(environment: Environment | null): Promise<Rec
       vars[v.key] = v.value;
     }
   }
-  // Second pass: external secrets, with the plain vars available as the scope a
-  // provider interpolates against. A resolution failure leaves the var unset (so
-  // only the requests that use it fail) with a warning, rather than aborting.
+  // Second pass: external secrets, with the plain vars as the scope a provider
+  // interpolates against. A failure warns and leaves the var unset rather than aborting.
   for (const { key, ref } of deferredSecretRefs) {
     try {
       const resolved = await resolveExternalSecret(ref, { vars });
@@ -213,15 +197,9 @@ export async function buildEnvVars(environment: Environment | null): Promise<Rec
   return vars;
 }
 
-/** Merge all variable scopes. Local vars win everything; dynamic vars are the base layer. */
-/**
- * Scan arbitrary text for inline secret-manager tokens (`{{vault:path#key}}`,
- * `{{op://...}}`, `{{azure:...}}`, etc.) and resolve each once. The result is
- * keyed by the full reference so a later {{...}} substitution picks it up
- * (e.g. out['vault:secret/data/app#k'] = 'v'). interpolate() is synchronous, so
- * these async lookups must run up-front. Throws if a referenced secret cannot
- * be resolved.
- */
+/** Resolve inline secret-manager tokens ({{vault:path#key}}, {{op://...}}, …) once,
+ *  keyed by the full reference so a later {{...}} substitution picks it up. Runs
+ *  up-front because interpolate() is synchronous. Throws if a secret can't be resolved. */
 export async function resolveInlineSecretRefs(
   text: string,
   vars?: Record<string, string>,
@@ -235,8 +213,7 @@ export async function resolveInlineSecretRefs(
 
   const out: Record<string, string> = {};
   await Promise.all([...refs].map(async (ref) => {
-    // Pass the variable scope so a provider can interpolate {{var}} inside a
-    // reference path or its configured path prefix.
+    // Pass the var scope so a provider can interpolate {{var}} inside the reference path.
     const value = await resolveExternalSecret(ref, { vars });
     if (value !== null) out[ref] = value;
   }));
@@ -251,18 +228,9 @@ export function mergeVars(
   dynamicVars: Record<string, string> = {},
   folderVars: Record<string, string> = {}
 ): Record<string, string> {
-  // Precedence low→high: dynamic < globals < env < collection < folder < local.
-  // The collection/folder/request structure is one chain, "the closer to the
-  // request, the stronger": collection < folder, both overridden by the local
-  // bucket (request, CLI --var, data-row and runtime script-set). The environment
-  // is a shared default BELOW the collection (above globals): a collection, folder
-  // or request value — set closer to the request — overrides it. A null/undefined
-  // value is treated as UNSET: it must not shadow a real value from a
-  // lower-precedence scope, and must never render as the literal string
-  // "null"/"undefined" in a template (e.g. a stale env placeholder `token:null`
-  // shadowing a token a flow just set globally -> "Authorization: Bearer null").
-  // Values arrive typed as string, but baked/serialized definitions can carry
-  // real nulls, so guard at runtime.
+  // Precedence low->high: dynamic < globals < env < collection < folder < local.
+  // null/undefined = unset: skip it, so it can't shadow a lower scope or render
+  // as the literal "null" (serialized defs can carry real nulls).
   const out: Record<string, string> = {};
   for (const src of [dynamicVars, globals, envVars, collectionVars, folderVars, localVars]) {
     for (const [k, v] of Object.entries(src ?? {})) {

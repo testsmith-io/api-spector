@@ -4,7 +4,7 @@
 import { Modal } from './Modal';
 import { useT } from '../../i18n';
 
-// ─── Confirm dialog ───────────────────────────────────────────────────────────
+// Confirm dialog
 
 export function ConfirmDialog ( { message, onConfirm, onCancel, confirmLabel }: {
   readonly message: string

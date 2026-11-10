@@ -9,7 +9,7 @@ import { getSecret } from './ipc/secret-handler';
 import { interpolate } from './interpolation';
 import { createType1Message, decodeType2Message, createType3Message } from './ntlm';
 
-// ─── Auth header builder ──────────────────────────────────────────────────────
+// Auth header builder
 
 export async function buildAuthHeaders(
   auth: AuthConfig,
@@ -32,8 +32,7 @@ export async function buildAuthHeaders(
     headers['Authorization'] = `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`;
   }
 
-  // apiKeyIn defaults to 'header' when unset, matching the editor's default and
-  // the code generators (which treat only 'query' specially).
+  // apiKeyIn defaults to 'header' when unset, matching the editor and generators.
   if (auth.type === 'apikey' && (auth.apiKeyIn ?? 'header') === 'header') {
     let value = auth.apiKeyValue ?? '';
     if (!value && auth.apiKeySecretRef) value = (await getSecret(auth.apiKeySecretRef)) ?? '';
@@ -41,9 +40,9 @@ export async function buildAuthHeaders(
     headers[auth.apiKeyName ?? 'X-API-Key'] = value;
   }
 
-  // digest: handled separately via performDigestAuth — no headers set here
-  // ntlm:   handled separately via performNtlmRequest  — no headers set here
-  // oauth2: handled separately via fetchOAuth2Token    — injected as Bearer below
+  // digest: handled separately via performDigestAuth - no headers set here
+  // ntlm:   handled separately via performNtlmRequest  - no headers set here
+  // oauth2: handled separately via fetchOAuth2Token    - injected as Bearer below
 
   if (auth.type === 'oauth2') {
     // Use cached token if still valid
@@ -54,12 +53,12 @@ export async function buildAuthHeaders(
     // Otherwise caller must invoke fetchOAuth2Token first, then retry
   }
 
-  // apikey in query is handled at URL build time — nothing to add to headers
+  // apikey in query is handled at URL build time - nothing to add to headers
 
   return headers;
 }
 
-// ─── Query-param apikey helper ────────────────────────────────────────────────
+// Query-param apikey helper
 
 export async function buildApiKeyParam(
   auth: AuthConfig,
@@ -72,7 +71,7 @@ export async function buildApiKeyParam(
   return { key: auth.apiKeyName ?? 'apikey', value };
 }
 
-// ─── Digest auth helpers ──────────────────────────────────────────────────────
+// Digest auth helpers
 
 export interface DigestChallenge {
   realm: string
@@ -104,10 +103,7 @@ function md5(s: string): string {
   return crypto.createHash('md5').update(s).digest('hex');
 }
 
-/**
- * Build the Authorization: Digest header value given a parsed challenge,
- * credentials, HTTP method and URI.
- */
+/** Build the `Authorization: Digest` header value from a parsed challenge. */
 export function buildDigestAuthHeader(
   challenge: DigestChallenge,
   username: string,
@@ -146,12 +142,8 @@ export function buildDigestAuthHeader(
   return header;
 }
 
-/**
- * Perform the two-round-trip Digest authentication flow.
- * Returns the Authorization header value (without key name) or null on failure.
- * The caller passes a `fetchFn` to avoid coupling to a specific undici instance
- * and to allow proxy/TLS dispatcher injection.
- */
+/** Two-round-trip Digest auth. Returns the Authorization header value or null on
+ *  failure. `fetchFn` is injected to allow proxy/TLS dispatcher wiring. */
 export async function performDigestAuth(
   url: string,
   method: string,
@@ -180,14 +172,10 @@ export async function performDigestAuth(
   return buildDigestAuthHeader(challenge, username, password, method, uri);
 }
 
-// ─── NTLM ───────────────────────────────────────────────────────────────────
+// NTLM
 
-/**
- * Minimal response shape the request handler consumes — deliberately matches
- * the slice of the undici `fetch` response it reads (status, statusText,
- * iterable headers, and a `text()` resolver), so the NTLM branch slots in
- * alongside the normal/digest branches without special-casing downstream.
- */
+/** Minimal response shape the request handler consumes, matching the slice of
+ *  undici's `fetch` response it reads, so the NTLM branch needs no special-casing. */
 export interface NtlmResponseAdapter {
   status: number
   statusText: string
@@ -231,18 +219,9 @@ async function buildNtlmConnectOpts(tls?: TlsSettings): Promise<Record<string, u
   return Object.keys(connect).length ? connect : undefined;
 }
 
-/**
- * Perform an NTLM (NTLMv2) authenticated request.
- *
- * NTLM authenticates the *connection*, not the request, so the three messages
- * (negotiate → challenge → authenticate) must travel over one keep-alive
- * socket. We use a dedicated single-connection undici `Client` to guarantee
- * that — the global fetch pool gives no such guarantee.
- *
- *   1. send Type 1 (negotiate), expect 401 + `WWW-Authenticate: NTLM <type2>`
- *   2. parse the Type 2 challenge
- *   3. resend on the SAME connection with Type 3 (authenticate) + the real body
- */
+/** Perform an NTLM (NTLMv2) authenticated request. NTLM authenticates the
+ *  connection, not the request, so all three messages must share one keep-alive
+ *  socket - hence a dedicated single-connection undici `Client`. */
 export async function performNtlmRequest(opts: NtlmRequestOptions): Promise<NtlmResponseAdapter> {
   if (opts.proxy?.url) {
     throw new Error('NTLM authentication through a proxy is not supported. Disable the proxy for this request, or target the server directly.');
@@ -280,7 +259,7 @@ export async function performNtlmRequest(opts: NtlmRequestOptions): Promise<Ntlm
   };
 
   try {
-    // ── Message 1: negotiate ────────────────────────────────────────────────
+    // Message 1: negotiate
     const negotiate = await client.request({
       path,
       method: opts.method,
@@ -291,14 +270,14 @@ export async function performNtlmRequest(opts: NtlmRequestOptions): Promise<Ntlm
 
     const challengeToken = extractNtlmChallenge(negotiate.headers['www-authenticate']);
 
-    // Server didn't offer an NTLM challenge — surface whatever it returned.
+    // Server didn't offer an NTLM challenge - surface whatever it returned.
     if (negotiate.statusCode !== 401 || !challengeToken) {
       const second = await client.request({ path, method: opts.method, headers: opts.baseHeaders, body: opts.body });
       const bodyText = await second.body.text();
       return toAdapter(second.statusCode, second.headers, bodyText);
     }
 
-    // ── Message 3: authenticate (same connection) ────────────────────────────
+    // Message 3: authenticate (same connection)
     const challenge = decodeType2Message(challengeToken);
     const type3 = createType3Message({ user: username, password, domain, workstation, challenge });
 
@@ -311,11 +290,11 @@ export async function performNtlmRequest(opts: NtlmRequestOptions): Promise<Ntlm
     const bodyText = await authed.body.text();
     return toAdapter(authed.statusCode, authed.headers, bodyText);
   } finally {
-    await client.close().catch(() => { /* best effort */ });
+    await client.close().catch(() => { /* ignore */ });
   }
 }
 
-// ─── OAuth 2.0 token fetch ────────────────────────────────────────────────────
+// OAuth 2.0 token fetch
 
 export interface OAuth2TokenResult {
   accessToken: string
@@ -323,10 +302,8 @@ export interface OAuth2TokenResult {
   refreshToken?: string
 }
 
-/**
- * Fetch an OAuth 2.0 token for client_credentials or password flows.
- * The token is NOT cached here — callers should store it in auth.oauth2CachedToken.
- */
+/** Fetch an OAuth 2.0 token for client_credentials or password flows. Not cached
+ *  here; callers store it in auth.oauth2CachedToken. */
 export async function fetchOAuth2Token(
   auth: Oauth2Auth,
   vars: Record<string, string>,

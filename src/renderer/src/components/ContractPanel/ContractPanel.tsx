@@ -10,13 +10,11 @@ import type { ContractMode } from '../../../../shared/types';
 
 const { electron } = window;
 
-// Tabs shown in the panel. "Live" (provider-live) is no longer a peer tab; it
-// is folded into Consumer as a toggle (verify against a running provider and
-// seed provider states). Fuzzing is no longer a contract mode — it lives on the
-// per-request fuzz button (and the CLI) instead.
+// Panel tabs. "Live" (provider-live) is folded into Consumer as a toggle, not a
+// peer tab. Fuzzing lives on the per-request fuzz button, not here.
 type PanelTab = 'consumer' | 'provider' | 'bidirectional';
 
-// ─── Main panel ───────────────────────────────────────────────────────────────
+// Main panel
 
 export function ContractPanel() {
   const collections          = useStore(s => s.collections);
@@ -36,8 +34,7 @@ export function ContractPanel() {
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [tab, setTab]                   = useState<PanelTab>('consumer');
-  // Consumer sub-option: replay against a running provider and seed provider
-  // states (the old "Live" / provider-live mode).
+  // Consumer sub-option: replay against a running provider (old "Live" mode).
   const [liveVerify, setLiveVerify]     = useState(false);
   const cloudConnected = useStore(s => Boolean(s.workspace?.settings?.cloud?.enabled));
   const [providerName, setProviderName] = useState('');

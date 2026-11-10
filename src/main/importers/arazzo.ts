@@ -1,17 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Import an Arazzo workflow document (the OpenAPI Initiative's spec for
-// sequences of API calls) as API Spector Flows. Each Arazzo `workflow` becomes
-// one Flow; its `sourceDescriptions` (OpenAPI specs) are imported into a
-// collection so the steps have requests to reference. A step maps to a
-// request block, its successCriteria to a validate block, and its outputs to an
-// evaluate block, chained by onSuccess / onFailure routing.
-//
-// Arazzo runtime expressions ($response.body#/id, $inputs.x, $statusCode, ...)
-// are translated to the sp.* sandbox used elsewhere. The translation covers the
-// common forms; anything it cannot map is recorded as a warning and left as a
-// clearly-marked placeholder, so the imported flow is never silently wrong.
+// Import an Arazzo workflow document as API Spector Flows: each workflow becomes a
+// Flow, its sourceDescriptions import into a collection, and runtime expressions
+// translate to the sp.* sandbox (unmappable forms are warned and left as placeholders).
 
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve as resolvePath, basename } from 'node:path';
@@ -26,10 +18,9 @@ export interface ArazzoImportResult {
   warnings: string[]
 }
 
-// ─── Runtime-expression translation ───────────────────────────────────────────
+// Runtime-expression translation
 
-/** Convert a JSON Pointer fragment (e.g. `/items/0/id`) into a JS accessor tail
- *  (e.g. `.items[0].id`). */
+/** JSON Pointer fragment (`/items/0/id`) into a JS accessor tail (`.items[0].id`). */
 function jsonPointerToAccessor(pointer: string): string {
   const parts = pointer.split('/').filter(p => p !== '');
   let out = '';
@@ -42,17 +33,15 @@ function jsonPointerToAccessor(pointer: string): string {
   return out;
 }
 
-/**
- * Translate a single Arazzo runtime expression (starting with `$`) into a JS
- * expression over the sp.* sandbox. `warn` is called for forms we cannot map.
- */
+/** Translate one Arazzo runtime expression (`$...`) to a JS expression over the
+ *  sp.* sandbox. `warn` is called for unmappable forms. */
 export function translateRuntimeExpr(expr: string, warn?: (msg: string) => void): string {
   const e = expr.trim();
 
   if (e === '$statusCode') return 'sp.response.code';
   if (e === '$response.body') return 'sp.response.json()';
 
-  // $response.body#/pointer  → sp.response.json()<accessor>
+  // $response.body#/pointer  -> sp.response.json()<accessor>
   let m = /^\$response\.body#(\/.*)$/.exec(e);
   if (m) return `sp.response.json()${jsonPointerToAccessor(m[1])}`;
 
@@ -60,16 +49,16 @@ export function translateRuntimeExpr(expr: string, warn?: (msg: string) => void)
   m = /^\$response\.header[s]?\.(.+)$/.exec(e);
   if (m) return `sp.response.headers.get(${JSON.stringify(m[1])})`;
 
-  // $inputs.name → a flow variable (inputs are seeded into the local scope)
+  // $inputs.name -> a flow variable (inputs are seeded into the local scope)
   m = /^\$inputs\.(.+)$/.exec(e);
   if (m) return `sp.variables.get(${JSON.stringify(m[1])})`;
 
-  // $steps.<id>.outputs.<name> / $workflows.<id>.outputs.<name> → a variable
+  // $steps.<id>.outputs.<name> / $workflows.<id>.outputs.<name> -> a variable
   // (step outputs are stored as flow variables by the generated evaluate block)
   m = /^\$(?:steps|workflows)\.[^.]+\.outputs\.(.+)$/.exec(e);
   if (m) return `sp.variables.get(${JSON.stringify(m[1])})`;
 
-  // $outputs.name → a variable
+  // $outputs.name -> a variable
   m = /^\$outputs\.(.+)$/.exec(e);
   if (m) return `sp.variables.get(${JSON.stringify(m[1])})`;
 
@@ -77,9 +66,8 @@ export function translateRuntimeExpr(expr: string, warn?: (msg: string) => void)
   return `/* TODO: ${e} */ undefined`;
 }
 
-/** Translate a parameter/template value, which may be a literal or contain
- *  embedded `{$expr}` references, into a value suitable for a request field
- *  (using {{var}} where the reference is a flow variable). */
+/** Translate a parameter/template value (literal or with embedded `{$expr}`)
+ *  into a request field value, using {{var}} for flow-variable references. */
 export function translateTemplateValue(value: unknown, warn?: (msg: string) => void): string {
   if (typeof value !== 'string') return value == null ? '' : JSON.stringify(value);
   // Whole-string runtime expression.
@@ -101,12 +89,11 @@ export function translateTemplateValue(value: unknown, warn?: (msg: string) => v
   });
 }
 
-// ─── successCriteria → validate script ─────────────────────────────────────────
+// successCriteria -> validate script
 
 function translateCondition(cond: string, warn?: (msg: string) => void): string {
-  // Replace each runtime expression token with its JS translation, then relax
-  // == / != into JS strict equality. This is best-effort for the "simple"
-  // condition grammar.
+  // Replace each runtime-expression token with its JS translation, then relax
+  // == / != to strict equality. Covers the "simple" condition grammar.
   const translated = cond.replace(/\$[A-Za-z][\w.#/~[\]]*/g, (tok) => `(${translateRuntimeExpr(tok, warn)})`);
   return translated.replace(/([^=!<>])={2}([^=])/g, '$1===$2').replace(/!={1}([^=])/g, '!==$1');
 }
@@ -137,7 +124,7 @@ function toRegexLiteral(pattern: string): string {
   return `/${String(pattern).replace(/\//g, '\\/')}/`;
 }
 
-// ─── outputs → evaluate script ─────────────────────────────────────────────────
+// outputs -> evaluate script
 
 export function buildOutputsScript(outputs: Record<string, unknown>, warn?: (msg: string) => void): string {
   return Object.entries(outputs)
@@ -145,20 +132,19 @@ export function buildOutputsScript(outputs: Record<string, unknown>, warn?: (msg
     .join('\n');
 }
 
-// ─── Flow construction ─────────────────────────────────────────────────────────
+// Flow construction
 
 interface BuildCtx {
   collectionId: string
-  /** operationId → request id, for the single-source common case. */
+  /** operationId -> request id, for the single-source common case. */
   opToRequest: Map<string, string>
   requests: Record<string, ApiRequest>
   warnings: string[]
 }
 
-/** Find the imported request a step points at. Arazzo can reference an operation
- *  as a bare operationId, as a source-qualified `sourceName.operationId`, or via
- *  operationPath/operationRef, so try the value as written and its last segment
- *  (the part after the final `.`, `/` or `#`). */
+/** Find the imported request a step points at. A step may reference an operation
+ *  as a bare operationId, `sourceName.operationId`, or operationPath/operationRef,
+ *  so try the value as written and its last segment. */
 function resolveStepOperation(step: any, ctx: BuildCtx): string | undefined {
   const candidates: string[] = [];
   const add = (v: unknown): void => {
@@ -288,7 +274,7 @@ export function buildWorkflowFlow(workflow: any, ctx: BuildCtx): Flow {
     }
   });
 
-  // Chain steps: success exit → next step (or onSuccess goto / end).
+  // Chain steps: success exit -> next step (or onSuccess goto / end).
   const steps = workflow.steps ?? [];
   steps.forEach((step: any, i: number) => {
     const exit = stepExit[i];
@@ -326,12 +312,11 @@ export function buildWorkflowFlow(workflow: any, ctx: BuildCtx): Flow {
   };
 }
 
-// ─── Collection assembly (import the source OpenAPI specs) ─────────────────────
+// Collection assembly (import the source OpenAPI specs)
 
-// Resolve a source description's OpenAPI spec, trying in order: its URL as
-// written (http, or relative to the Arazzo file), then a user-selected file
-// matching the URL's filename, then — when the workflow has a single source and
-// the user supplied a single spec — that file. Returns null if none load.
+// Resolve a source's OpenAPI spec, in order: its URL (http, or relative to the
+// Arazzo file), a selected file matching the URL's filename, then the single
+// supplied spec when there's one source. Returns null if none load.
 async function importSource(
   source: any,
   baseDir: string,
@@ -378,7 +363,7 @@ function mergeSourceIntoCollection(col: Collection, source: Collection, folderNa
   });
 }
 
-// ─── Public API ────────────────────────────────────────────────────────────────
+// Public API
 
 export async function importArazzoDoc(doc: any, baseDir: string, sourcePaths: string[] = []): Promise<ArazzoImportResult> {
   const warnings: string[] = [];

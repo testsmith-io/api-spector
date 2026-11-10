@@ -120,10 +120,10 @@ describe('evaluateThresholds', () => {
 
   it('passes and fails each gate against the actual value', () => {
     const r = evaluateThresholds(result, [
-      { metric: 'iteration_p95', op: 'lt', value: 500 },   // 420 < 500 → pass
-      { metric: 'iteration_p99', op: 'lt', value: 500 },   // 800 < 500 → fail
-      { metric: 'error_rate', op: 'lte', value: 2 },        // 3% <= 2 → fail
-      { metric: 'throughput', op: 'gte', value: 40 },       // 45 >= 40 → pass
+      { metric: 'iteration_p95', op: 'lt', value: 500 },   // 420 < 500 -> pass
+      { metric: 'iteration_p99', op: 'lt', value: 500 },   // 800 < 500 -> fail
+      { metric: 'error_rate', op: 'lte', value: 2 },        // 3% <= 2 -> fail
+      { metric: 'throughput', op: 'gte', value: 40 },       // 45 >= 40 -> pass
     ]);
     expect(r.map(x => x.passed)).toEqual([true, false, false, true]);
     expect(r[2].actual).toBeCloseTo(3, 5);

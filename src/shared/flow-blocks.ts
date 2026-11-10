@@ -1,10 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Static registry describing every flow block type: its category, label, the
-// input/output ports it exposes, and its default config. Both the canvas UI
-// (Add-block menu, node handles, inspector fields) and the execution engine
-// read from here, so ports never drift between what you can draw and what runs.
+// Static registry of every flow block type: category, label, ports, default
+// config. The canvas UI and the execution engine both read it, so ports never
+// drift between what you can draw and what runs.
 
 import type {
   Flow,
@@ -45,7 +44,7 @@ export const BLOCK_SPECS: Record<FlowBlockType, BlockSpec> = {
     inputs: IN, outputs: () => [],
   },
 
-  // ── Action ──────────────────────────────────────────────────────────────
+  // Action
   request: {
     type: 'request', category: 'action', label: 'Send Request',
     description: 'Send a saved request; routes success or fail on its response.',
@@ -58,7 +57,7 @@ export const BLOCK_SPECS: Record<FlowBlockType, BlockSpec> = {
     inputs: IN, outputs: OUT,
   },
 
-  // ── Logic ───────────────────────────────────────────────────────────────
+  // Logic
   if: {
     type: 'if', category: 'logic', label: 'If',
     description: 'Route to true or false based on a JS condition.',
@@ -120,7 +119,7 @@ export const BLOCK_SPECS: Record<FlowBlockType, BlockSpec> = {
     defaultConfig: { copies: 1 },
   },
 
-  // ── Looping ─────────────────────────────────────────────────────────────
+  // Looping
   forEach: {
     type: 'forEach', category: 'looping', label: 'For Each',
     description: 'Run the body once per item of a list; then continue on done.',
@@ -142,7 +141,7 @@ export const BLOCK_SPECS: Record<FlowBlockType, BlockSpec> = {
     defaultConfig: { intoVar: 'results' },
   },
 
-  // ── Visualize ───────────────────────────────────────────────────────────
+  // Visualize
   display: {
     type: 'display', category: 'visualize', label: 'Display',
     description: 'Show a value in the run results (text, JSON or table).',
@@ -178,7 +177,7 @@ export function inputsFor(block: Pick<FlowBlock, 'type'>): PortSpec[] {
   return BLOCK_SPECS[block.type].inputs;
 }
 
-/** Blocks grouped by category, in menu order — used by the Add-block menu. */
+/** Blocks grouped by category, in menu order - used by the Add-block menu. */
 export const BLOCKS_BY_CATEGORY: { category: FlowBlockCategory; blocks: BlockSpec[] }[] = [
   { category: 'action', blocks: [BLOCK_SPECS.request, BLOCK_SPECS.subflow] },
   { category: 'logic', blocks: [BLOCK_SPECS.if, BLOCK_SPECS.condition, BLOCK_SPECS.validate, BLOCK_SPECS.evaluate, BLOCK_SPECS.setVar, BLOCK_SPECS.delay, BLOCK_SPECS.merge, BLOCK_SPECS.parallel] },
@@ -186,12 +185,8 @@ export const BLOCKS_BY_CATEGORY: { category: FlowBlockCategory; blocks: BlockSpe
   { category: 'visualize', blocks: [BLOCK_SPECS.display, BLOCK_SPECS.log] },
 ];
 
-/**
- * Normalize / migrate a flow loaded from disk. v0 flows (pre-blocks) used
- * `kind: 'start'|'end'|'request'` with a top-level `ref`; lift those into the
- * typed-block shape. Also fills missing arrays so the engine/UI never crash on
- * a hand-edited file.
- */
+/** Normalize/migrate a flow loaded from disk: lift legacy v0 `kind`+`ref` into
+ *  the typed-block shape, and fill missing arrays so a hand-edited file can't crash. */
 export function normalizeFlow(raw: Flow): Flow {
   const nodes = (raw.nodes ?? []).map(n => {
     const legacy = n as FlowBlock & { kind?: FlowBlockType; ref?: FlowBlockConfig['ref'] };

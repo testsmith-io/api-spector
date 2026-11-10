@@ -18,8 +18,8 @@ interface Props {
   readonly headerMode?: boolean
   /** When true, each row shows a "query/path" type selector. */
   readonly paramMode?: boolean
-  /** When these rows are scope variables, the source location for each key — a
-   *  per-row "move ▸" control relocates it to another scope. */
+  /** For scope-variable rows, the source location of each key; a per-row "move"
+   *  control relocates it to another scope. */
   readonly moveFrom?: (key: string) => VarLoc | null
   readonly onMoved?: () => void
 }
@@ -28,12 +28,11 @@ export function KVTable({ rows, onChange, keyPlaceholder, valuePlaceholder, head
   const t = useT();
   const keyPh = keyPlaceholder ?? t('Key');
   const valuePh = valuePlaceholder ?? t('Value');
-  // Track which rows have their description input visible.
-  // Initialise with indices of rows that already have a description.
+  // Rows whose description input is visible; seeded with rows already having one.
   const [descVisible, setDescVisible] = useState<Set<number>>(
     () => new Set(rows.map((r, i) => (r.description ? i : -1)).filter(i => i >= 0)),
   );
-  // Track which rows have their allowed-values (choices) editor visible.
+  // Rows whose allowed-values (choices) editor is visible.
   const [choicesVisible, setChoicesVisible] = useState<Set<number>>(
     () => new Set(rows.map((r, i) => (r.enum && r.enum.length ? i : -1)).filter(i => i >= 0)),
   );
@@ -62,7 +61,7 @@ export function KVTable({ rows, onChange, keyPlaceholder, valuePlaceholder, head
       const next = new Set(prev);
       if (next.has(idx)) {
         next.delete(idx);
-        // Clear the stored description when hiding
+        // Clear the stored description when hiding.
         update(idx, { description: '' });
       } else {
         next.add(idx);
@@ -76,7 +75,7 @@ export function KVTable({ rows, onChange, keyPlaceholder, valuePlaceholder, head
       const next = new Set(prev);
       if (next.has(idx)) {
         next.delete(idx);
-        // Clear the allowed values when hiding, so the cell reverts to free text.
+        // Clear allowed values when hiding so the cell reverts to free text.
         update(idx, { enum: undefined });
       } else {
         next.add(idx);
@@ -85,7 +84,7 @@ export function KVTable({ rows, onChange, keyPlaceholder, valuePlaceholder, head
     });
   }
 
-  // Parse a comma-separated list into trimmed, non-empty choices.
+  // Comma-separated list into trimmed, non-empty choices.
   function parseChoices(text: string): string[] {
     return text.split(',').map(s => s.trim()).filter(Boolean);
   }

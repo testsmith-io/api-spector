@@ -1,10 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Run a GraphQL subscription over WebSocket (graphql-ws) and stream the results.
-// Shown inside the GraphQL editor when the query is a subscription. The live
-// connection lives in the main process (graphqlws-handler.ts); this panel emits
-// subscribe/stop and renders the streamed payloads from the store.
+// GraphQL subscription panel (graphql-ws), shown when the query is a subscription.
+// The live connection is in main (graphqlws-handler.ts); this emits subscribe/stop
+// and renders the streamed payloads from the store.
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../../store';

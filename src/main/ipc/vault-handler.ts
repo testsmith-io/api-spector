@@ -6,15 +6,10 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { IPC } from '../../shared/ipc-channels';
 import { handleIpc } from './handle';
 
-// Interactive Vault OIDC login. Opens the system browser to Vault's OIDC auth
-// URL, captures the callback on a localhost loopback, and exchanges it for a
-// short-lived Vault token. The token is placed in process.env.VAULT_TOKEN for
-// this session so the Vault secret provider uses it — it is never written to the
-// workspace or exposed to the renderer.
-//
-// Modelled on the loopback pattern in oauth2-handler.ts. The redirect URI is
-// Vault's CLI default (http://localhost:8250/oidc/callback), which OIDC roles
-// typically already allow in allowed_redirect_uris.
+// Interactive Vault OIDC login: opens the system browser, captures the callback
+// on a localhost loopback, and exchanges it for a token in process.env.VAULT_TOKEN
+// for this session only (never written to the workspace or exposed to the renderer).
+// Redirect URI is Vault's CLI default (http://localhost:8250/oidc/callback).
 
 export interface VaultOidcOptions {
   address: string;

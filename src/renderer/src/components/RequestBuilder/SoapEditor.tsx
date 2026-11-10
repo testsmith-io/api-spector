@@ -18,7 +18,7 @@ interface Props {
   readonly onChange: (p: Partial<ApiRequest>) => void
 }
 
-// ─── Param tree (read-only) ──────────────────────────────────────────────────
+// Param tree (read-only)
 
 function ParamTree({ params, depth = 0 }: { readonly params: WsdlParam[]; readonly depth?: number }) {
   const t = useT();
@@ -39,7 +39,7 @@ function ParamTree({ params, depth = 0 }: { readonly params: WsdlParam[]; readon
   );
 }
 
-// ─── Main editor ─────────────────────────────────────────────────────────────
+// Main editor
 
 export function SoapEditor({ request, onChange }: Props) {
   const t = useT();
@@ -50,15 +50,12 @@ export function SoapEditor({ request, onChange }: Props) {
   const [targetNs, setTargetNs]     = useState<string>('');
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [fetching, setFetching]     = useState(false);
-  // Show the XML envelope by default — for SOAP, the wire body IS the
-  // important detail. Users still get the toggle to collapse it if they want
-  // to focus on the operation list.
+  // XML envelope shown by default: for SOAP the wire body is the point.
   const [showXml, setShowXml]       = useState(true);
 
-  // After a panel/tab switch the component remounts and `operations` is empty
-  // again, even though the request still has a saved WSDL URL + envelope.
-  // Re-fetch silently so the operations sidebar reappears, but don't touch the
-  // envelope — the user's edits are sacred.
+  // On remount (panel/tab switch) `operations` is empty though the request still
+  // has a saved WSDL URL. Re-fetch silently to restore the sidebar; never touch
+  // the envelope.
   useEffect(() => {
     const url = soap.wsdlUrl?.trim();
     if (!url) return;
@@ -71,13 +68,11 @@ export function SoapEditor({ request, onChange }: Props) {
         setEndpoints(result.endpoints);
         setTargetNs(result.targetNamespace);
       } catch {
-        // Best-effort. If the WSDL is offline we keep showing the saved
-        // envelope below so the user can still edit/send.
+        // WSDL offline: the saved envelope below stays editable/sendable.
       }
     })();
     return () => { cancelled = true; };
-    // Re-run when the user opens a different SOAP request, not on every
-    // keystroke in the URL field — they click Fetch for that.
+    // Re-run on a different SOAP request, not on every URL keystroke (Fetch does that).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request.id]);
 
@@ -85,10 +80,9 @@ export function SoapEditor({ request, onChange }: Props) {
     onChange({ body: { ...request.body, soap: { ...soap, ...patch } } });
   }
 
-  /** Apply an operation to the whole request. The endpoint is the WSDL's
-   *  `<soap:address>` — always authoritative for SOAP, so we overwrite the
-   *  request URL. Method, Content-Type, SOAPAction header, and envelope are
-   *  all wired in one shot so Send works without manual setup. */
+  /** Wire an operation into the request in one shot (URL, method, Content-Type,
+   *  SOAPAction, envelope) so Send works without manual setup. The WSDL's
+   *  `<soap:address>` is authoritative, so it overwrites the request URL. */
   function applyOperation(op: WsdlOperation) {
     const headers = withContentType(request.headers ?? [], contentTypeForSoap(op.soapVersion));
     onChange({
@@ -132,9 +126,8 @@ export function SoapEditor({ request, onChange }: Props) {
     applyOperation(op);
   }
 
-  // Match the stored operation exactly (name + version + binding when present),
-  // so same-named 1.1 / 1.2 operations don't collide. Fall back to name-only for
-  // requests saved before the version was recorded.
+  // Match the stored operation on name + version + binding so same-named 1.1 / 1.2
+  // operations don't collide; fall back to name-only for pre-version requests.
   const selected =
     operations.find(o =>
       o.name === soap.operationName
@@ -153,7 +146,7 @@ export function SoapEditor({ request, onChange }: Props) {
 
   return (
     <div className="flex flex-col gap-3 h-full min-h-0">
-      {/* ── WSDL URL row ──────────────────────────────────────────────────── */}
+      {/* WSDL URL row */}
       <div className="flex gap-2 items-center">
         <label className="text-[10px] uppercase tracking-wider text-surface-500 font-medium whitespace-nowrap">
           {t('WSDL')}
@@ -180,7 +173,7 @@ export function SoapEditor({ request, onChange }: Props) {
         </p>
       )}
 
-      {/* ── Service summary card ──────────────────────────────────────────── */}
+      {/* Service summary card */}
       {operations.length > 0 && (
         <div className="bg-surface-900/40 border border-surface-800 rounded-md px-3 py-2 text-[11px] flex flex-col gap-1">
           <div className="flex items-center gap-2 text-surface-500">
@@ -203,7 +196,7 @@ export function SoapEditor({ request, onChange }: Props) {
         </div>
       )}
 
-      {/* ── Operations + detail panel (only after a successful fetch) ─────── */}
+      {/* Operations + detail panel (only after a successful fetch) */}
       {showFullUi && (
         <div className="flex gap-3 min-h-0 flex-1">
           {/* Operations list */}
@@ -223,8 +216,7 @@ export function SoapEditor({ request, onChange }: Props) {
                     }`}
                   >
                     <span className="font-mono truncate flex-1 min-w-0">{op.name}</span>
-                    {/* Version chip — shown when the WSDL exposes both bindings,
-                        so a same-named 1.1 / 1.2 operation is distinguishable. */}
+                    {/* Version chip: shown when the WSDL exposes both bindings. */}
                     {versions.length > 1 && (
                       <span
                         className={`shrink-0 text-[8px] font-bold px-1 py-px rounded tracking-wide ${
@@ -301,9 +293,7 @@ export function SoapEditor({ request, onChange }: Props) {
         </div>
       )}
 
-      {/* ── Fallback: WSDL not loaded (yet), but request already has data.
-            Show the saved envelope so a tab switch or offline WSDL doesn't
-            wipe the user's work. */}
+      {/* Fallback: WSDL not loaded but the request has saved data; show its envelope. */}
       {showFallback && (
         <div className="flex flex-col gap-2 flex-1 min-h-0">
           <div className="bg-surface-900/40 border border-surface-800 rounded-md px-3 py-2 text-[11px] flex items-center gap-3">
@@ -345,7 +335,7 @@ export function SoapEditor({ request, onChange }: Props) {
         </div>
       )}
 
-      {/* ── True empty state: nothing fetched, nothing saved. */}
+      {/* True empty state: nothing fetched, nothing saved. */}
       {showEmpty && (
         <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 border border-dashed border-surface-800 rounded-md py-8 px-4">
           <p className="text-xs text-surface-400">{t('Paste a WSDL URL above and click')} <em>{t('Fetch WSDL')}</em>.</p>

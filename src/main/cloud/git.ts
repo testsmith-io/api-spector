@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Resolve the contract "version" — the git SHA — automatically, so publishing
+// Resolve the contract "version" - the git SHA - automatically, so publishing
 // and gating key off the exact commit without anyone typing it. Prefers the CI
 // provider's env var, then falls back to the local git checkout.
 

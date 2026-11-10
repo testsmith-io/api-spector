@@ -3,7 +3,7 @@
 
 import type { IntrospectionQuery } from 'graphql';
 
-// ─── Introspection types ──────────────────────────────────────────────────────
+// Introspection types
 
 export interface GqlTypeRef {
   kind: string
@@ -41,7 +41,7 @@ export interface ParsedSchema {
   typeMap: Map<string, GqlType>
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// Helpers
 
 export function displayType(ref: GqlTypeRef | null): string {
   if (!ref) return '';
@@ -70,25 +70,21 @@ export function isRequired(ref: GqlTypeRef | null): boolean {
   return !!ref && ref.kind === 'NON_NULL';
 }
 
-/** Whether an argument must actually be supplied: non-null type AND no default
- *  value. `first: Int! = 10` is non-null but optional (the default applies), so
- *  it is NOT required. */
+/** Must be supplied: non-null AND no default. `first: Int! = 10` is non-null but
+ *  optional, so not required. */
 export function argRequired(arg: GqlArg): boolean {
   return isRequired(arg.type) && arg.defaultValue == null;
 }
 
-/** Default literal value for an argument based on its type. Picks something
- *  the user can immediately edit in place, instead of a `$var` reference
- *  that forces a side-trip to the variables JSON. Common pagination names
- *  get pragmatic integers (`first: 5`, `skip: 0`). */
+/** Default literal value for an arg, editable in place rather than a `$var`.
+ *  Common pagination names get pragmatic integers (`first: 5`, `skip: 0`). */
 export function defaultArgValue(arg: GqlArg): string {
   const baseTypeName = getBaseTypeName(arg.type);
   const baseKind     = getBaseKind(arg.type);
   const isList       = arg.type.kind === 'LIST'
     || (arg.type.kind === 'NON_NULL' && arg.type.ofType?.kind === 'LIST');
 
-  // Pagination heuristic — well-known arg names get useful defaults so the
-  // user lands on a runnable query for the most common case.
+  // Pagination heuristic: well-known arg names get useful defaults.
   const name = arg.name.toLowerCase();
   if (baseTypeName === 'Int' || baseTypeName === 'Long') {
     if (['first', 'last', 'limit', 'take', 'top', 'count', 'size'].includes(name)) return '5';
@@ -108,27 +104,19 @@ export function defaultArgValue(arg: GqlArg): string {
     case 'Date':     return '""';
   }
 
-  // Enum — we don't have the enum's values cached here, so leave a hint the
-  // user can replace. Same for input objects (complex shapes need a JSON
-  // variable anyway).
+  // Enum values aren't cached here, so leave a hint to replace. Same for input objects.
   if (baseKind === 'ENUM') return `# ${baseTypeName}`;
   return `$${arg.name}`;
 }
 
-/** Build a smart field snippet:
- *  - scalars  → `name`
- *  - objects  → `name { <first scalars> }`
- *  - args     → required args + well-known pagination args, with literal
- *               defaults inlined so the snippet is runnable without first
- *               populating the variables JSON. */
+/** Build a runnable field snippet: scalars -> `name`, objects -> `name { <first
+ *  scalars> }`, args -> required + pagination args with literal defaults inlined. */
 export function buildSnippet(field: GqlField, typeMap: Map<string, GqlType>): string {
   const baseTypeName = getBaseTypeName(field.type);
   const baseKind     = getBaseKind(field.type);
   const type         = typeMap.get(baseTypeName);
 
-  // Include required args (NON_NULL) and recognizable pagination args. Other
-  // optional args are dropped — the user can add them back via the schema
-  // explorer or autocomplete if they need them.
+  // Required args (NON_NULL) + pagination args; other optionals dropped.
   const PAGINATION_NAMES = new Set([
     'first', 'last', 'limit', 'take', 'top', 'count', 'size',
     'skip', 'offset', 'page',
@@ -152,30 +140,20 @@ export function buildSnippet(field: GqlField, typeMap: Map<string, GqlType>): st
   return `  ${field.name}${args}`;
 }
 
-/**
- * Insert a snippet into a query string.
- *
- * When `parentField` is given (e.g. "category"), the function first tries to
- * find an existing `category {` block in the query and inserts inside it. If
- * no such block exists, it creates `category {\n  <snippet>\n}` and inserts
- * that at the deepest level.
- *
- * When no `parentField` is given, inserts at the deepest `{ }` block (for
- * root-level fields).
- *
- * If the query is empty, wraps in `query { … }`.
- */
+/** Insert a snippet into a query string. With `parentField`, insert inside its
+ *  existing `{ }` block, else wrap it and insert at the deepest block. Without,
+ *  insert at the deepest block. Empty query wraps in `query { … }`. */
 export function insertSnippet(query: string, snippet: string, parentField?: string): string {
   const trimmed = query.trim();
   if (!trimmed) return `query {\n${snippet}\n}`;
 
   // If we have a parentField, try to find its existing `{ }` block
   if (parentField) {
-    // Match `parentField {` or `parentField(args) {` — find the opening brace
+    // Match `parentField {` or `parentField(args) {` - find the opening brace
     const regex = new RegExp(`\\b${parentField}\\b(?:\\s*\\([^)]*\\))?\\s*\\{`);
     const match = regex.exec(trimmed);
     if (match) {
-      // Found existing block — find its closing brace by counting braces
+      // Found existing block - find its closing brace by counting braces
       const openPos = match.index + match[0].length;
       let depth = 1;
       let closePos = -1;
@@ -204,7 +182,7 @@ export function insertSnippet(query: string, snippet: string, parentField?: stri
       }
     }
 
-    // No existing block found — wrap the snippet and fall through to
+    // No existing block found - wrap the snippet and fall through to
     // insert the wrapped block at the deepest level
     snippet = `  ${parentField} {\n  ${snippet}\n  }`;
   }
@@ -242,7 +220,7 @@ export function insertSnippet(query: string, snippet: string, parentField?: stri
   return trimmed.slice(0, insertPos).trimEnd() + '\n' + reindented + '\n' + '  '.repeat(depthAtInsert - 1) + trimmed.slice(insertPos);
 }
 
-// ─── Introspection ────────────────────────────────────────────────────────────
+// Introspection
 
 // 7 levels of ofType unwrapping covers types like [[String!]!]! which needs 5,
 // plus some margin. buildClientSchema throws if the chain is truncated.

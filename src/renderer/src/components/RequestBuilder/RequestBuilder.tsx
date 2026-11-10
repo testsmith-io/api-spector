@@ -49,10 +49,7 @@ interface Props {
   readonly request: ApiRequest
 }
 
-/**
- * Mirror of the runner-handler / request-handler status logic, applied to a
- * single hook execution. Kept in sync with src/main/ipc/runner-handler.ts.
- */
+/** Hook-execution status, kept in sync with src/main/ipc/runner-handler.ts. */
 function deriveHookStatus(r: {
   response: { status: number }
   scriptResult: { postScriptError?: string; testResults: { passed: boolean }[] }
@@ -98,9 +95,8 @@ export function RequestBuilder({ request }: Props) {
   const isSending    = activeAppTab?.isSending ?? false;
   const activeTab    = activeAppTab?.requestTab ?? 'params';
 
-  // Live preview of the final URL that will actually be sent: enabled query
-  // params appended, path params / {{vars}} / [name] substituted. Shown under
-  // the URL bar so the composed request is visible at a glance before sending.
+  // Live preview of the URL that will be sent: enabled query params appended,
+  // path params / {{vars}} / [name] substituted. Shown under the URL bar.
   const varValues = useVarValues();
   const previewUrl = useMemo(
     () => buildPreviewUrl(request.url, request.params ?? [], varValues),
@@ -113,13 +109,12 @@ export function RequestBuilder({ request }: Props) {
 
   const [editingName, setEditingName] = useState(false);
   const [showFuzz, setShowFuzz] = useState(false);
-  // Realtime panels (WS/IO/MQTT/gRPC) have no tab bar of their own, so they get
-  // a tiny Protocol | Docs switch here so their requests can be documented too.
+  // Realtime panels (WS/IO/MQTT/gRPC) have no tab bar, so a Protocol | Docs
+  // switch here lets their requests be documented.
   const [rtTab, setRtTab] = useState<'panel' | 'docs'>('panel');
   const [askPrompt, setAskPrompt] = useState<{ asks: AskVar[]; resolve: (answers: Record<string, string> | null) => void } | null>(null);
 
-  // Open the ask-variable modal and resolve with the entered answers, or null if
-  // the user cancels (which aborts the send).
+  // Open the ask-variable modal; resolves with the answers, or null on cancel.
   function promptAskVars(asks: AskVar[]): Promise<Record<string, string> | null> {
     return new Promise(resolve => setAskPrompt({ asks, resolve }));
   }
@@ -134,8 +129,7 @@ export function RequestBuilder({ request }: Props) {
     });
   }
 
-  // Data table applicable to this request (its folder's wins, else the
-  // collection's) so a single send can be run against one specific row.
+  // Data table for this request: its folder's wins, else the collection's.
   const applicableDataSet = useMemo(() => {
     const col = activeCollectionId ? collections[activeCollectionId]?.data : null;
     if (!col) return null;
@@ -156,17 +150,15 @@ export function RequestBuilder({ request }: Props) {
     return dr;
   }
 
-  // When the tab is on an example, edits update the example's overrides rather
-  // than the base request (the example "overrides the request").
+  // On an example tab, edits update the example's overrides, not the base request.
   function update(patch: Partial<ApiRequest>) {
     if (activeAppTab?.exampleId) updateExampleRequest(request.id, activeAppTab.exampleId, patch);
     else updateRequest(request.id, patch);
   }
 
-  // Pasting a URL syncs its params into the Params tab: a `?a=1` query string is
-  // moved out of the address bar (the send path re-appends it, so the wire
-  // request is unchanged), and each `[name]` path placeholder gets a path-param
-  // row. The `[name]` text stays in the URL.
+  // Pasting a URL syncs its params into the Params tab: a `?a=1` query string
+  // moves out of the address bar (re-appended on send, so the wire request is
+  // unchanged) and each `[name]` placeholder gets a row, staying in the URL.
   function handleUrlPaste(e: React.ClipboardEvent<HTMLInputElement>) {
     const pasted = e.clipboardData.getData('text');
     const input = e.currentTarget;
@@ -180,32 +172,30 @@ export function RequestBuilder({ request }: Props) {
     }
   }
 
-  // On blur, reconcile the Params tab with whatever the user typed: new `[name]`
-  // path params and any `?query` get rows; empty, now-unreferenced path rows are
-  // pruned. Done on blur (not per keystroke) so half-typed tokens are ignored.
+  // On blur (not per keystroke, so half-typed tokens are ignored), reconcile the
+  // Params tab: new `[name]` and `?query` get rows; empty unreferenced rows prune.
   function handleUrlBlur() {
     const synced = syncParamsFromUrl(request.url, request.params ?? []);
     if (synced.changed) update({ url: synced.url, params: synced.params });
   }
 
-  // Replay support: history rows (and anywhere else) call requestSend() to
-  // bump this counter; when it changes we fire the same send pipeline as the
+  // Replay: history rows bump this counter to fire the same send pipeline as the
   // Send button. The ref skips the initial mount so we never auto-send.
   const sendSignal = useStore(s => s.sendSignal);
   const lastSendSignal = useRef(sendSignal);
   useEffect(() => {
     if (sendSignal !== lastSendSignal.current) {
       lastSendSignal.current = sendSignal;
-      // WebSocket / Socket.IO / gRPC drive their own panels; the HTTP send
-      // pipeline does not apply, so the Cmd/Ctrl+Enter shortcut is a no-op there.
+      // Realtime protocols drive their own panels, so the Cmd/Ctrl+Enter
+      // shortcut is a no-op there.
       if (request.protocol !== 'websocket' && request.protocol !== 'grpc' && request.protocol !== 'socketio' && request.protocol !== 'mqtt') void sendRequest();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sendSignal]);
 
-  // Keyboard sub-tab navigation (Cmd/Ctrl+Alt+Up/Down). App bumps subTabCycle;
-  // when it targets the request pane we step through THIS tab's own visible tab
-  // list (kept in a ref, since the list depends on the request type).
+  // Keyboard sub-tab navigation (Cmd/Ctrl+Alt+Up/Down). When subTabCycle targets
+  // the request pane, step through this tab's visible list (in a ref, since the
+  // list depends on the request type).
   const subTabCycle = useStore(s => s.subTabCycle);
   const lastSubTabCycle = useRef(subTabCycle.nonce);
   const subTabIdsRef = useRef<string[]>([]);
@@ -225,9 +215,8 @@ export function RequestBuilder({ request }: Props) {
   async function sendRequest() {
     if (!activeTabId) return;
 
-    // A GraphQL subscription is not an HTTP exchange: start the graphql-ws
-    // stream (the Response pane shows the live messages + tests) instead of
-    // POSTing. The stream and its Stop control live in the Response pane.
+    // A GraphQL subscription isn't an HTTP exchange: start the graphql-ws stream
+    // instead of POSTing. Live messages and the Stop control are in the Response pane.
     if (request.body.mode === 'graphql' && request.body.graphql && isSubscriptionQuery(request.body.graphql.query)) {
       const gql = request.body.graphql;
       const interp = (s: string) => (s ?? '').replace(/\{\{([^}]+)\}\}/g, (_m, k) => subVars[String(k).trim()] ?? '');
@@ -265,36 +254,30 @@ export function RequestBuilder({ request }: Props) {
         piiMaskPatterns: workspaceSettings?.piiMaskPatterns,
       };
 
-      // Session script values (sp.*.set from earlier sends this session) seed the
-      // scopes so an extracted value — e.g. a token set by a previous manual send
-      // — is visible to this request. They are held in memory only (never written
-      // to disk / the Variables screens) and clear on workspace close / restart.
+      // Session script values (sp.*.set from earlier sends) seed the scopes so an
+      // extracted value is visible to this request. In memory only; cleared on
+      // workspace close / restart.
       const session = useStore.getState().sessionScriptVars;
 
       let collectionVars: Record<string, string> = {
         ...(activeCollectionId ? (collections[activeCollectionId]?.data.collectionVariables ?? {}) : {}),
         ...session.collection,
       };
-      // Folder-chain variables are their own scope (folder precedence: above the
-      // environment, below request/local) — passed to the send separately rather
-      // than flattened into collectionVars, which would drop them to collection
-      // precedence (below the environment).
+      // Folder-chain variables are their own scope (above the environment, below
+      // request/local). Passed separately rather than flattened into
+      // collectionVars, which would drop them below the environment.
       const folderVars = {
         ...useStore.getState().getInheritedVariables(request.id),
         ...session.folder,
       };
       let liveGlobals = { ...globals, ...session.globals };
-      // Script-write accumulators threaded WITHIN this send: a before-hook's
-      // sp.*.set flows into the next hook and the main request through these
-      // locals. Env writes seed from the session and are overlaid onto the
-      // environment via withEnvOverrides; local (sp.variables) is in-send only
-      // (request-scoped) and starts empty.
+      // Script-write accumulators threaded across hooks and the main request this
+      // send. Env writes seed from the session; local (sp.variables) starts empty.
       let liveLocalVars: Record<string, string> = {};
       let liveEnvOverrides: Record<string, string> = { ...session.env };
 
-      // Merge folder/collection-level auth and headers for the main request.
-      // The request's own auth wins only when it actually carries a credential;
-      // an empty stub (e.g. from OpenAPI import) falls back to inherited auth.
+      // Merge inherited auth and headers. The request's own auth wins only when
+      // it carries a credential; an empty stub falls back to inherited auth.
       const inherited = useStore.getState().getInheritedAuthAndHeaders(request.id);
       const mergedAuth: typeof request.auth =
         authIsConfigured(request.auth) ? request.auth : (inherited.auth ?? request.auth);
@@ -304,7 +287,7 @@ export function RequestBuilder({ request }: Props) {
       ];
       const mergedRequest = { ...request, auth: mergedAuth, headers: mergedHeaders };
 
-      // ── Ask variables ({{@Message}}) — prompt before anything is sent ───────
+      // Ask variables ({{@Message}}): prompt before anything is sent
       const asks = askVarsInRequest(mergedRequest);
       if (asks.length > 0) {
         const answers = await promptAskVars(asks);
@@ -313,18 +296,18 @@ export function RequestBuilder({ request }: Props) {
         collectionVars = { ...collectionVars, ...askValues };
       }
 
-      // ── Resolve applicable hooks ────────────────────────────────────────────
+      // Resolve applicable hooks
       const collection = activeCollectionId ? collections[activeCollectionId]?.data : null;
       const hooks = (runHooks && collection)
         ? getHooksForRequest(request.id, collection)
         : { before: [], after: [] };
 
-      // ── Run before hooks ────────────────────────────────────────────────────
+      // Run before hooks
       for (const hook of hooks.before) {
         const start = Date.now();
         try {
-          // Thread any run-only env writes from prior hooks onto the environment
-          // (sp.environment.set / sp.variables.set), without re-reading the store.
+          // Thread run-only env writes from prior hooks onto the environment,
+          // without re-reading the store.
           const hookEnv = withEnvOverrides(activeEnv, liveEnvOverrides);
           const r = await electron.sendRequest({
             ...basePayload,
@@ -338,8 +321,8 @@ export function RequestBuilder({ request }: Props) {
           liveGlobals      = { ...liveGlobals,      ...r.scriptResult.updatedGlobals };
           liveLocalVars    = { ...liveLocalVars,    ...r.scriptResult.updatedLocalVars };
           liveEnvOverrides = { ...liveEnvOverrides, ...r.scriptResult.updatedEnvVars };
-          // Persist the named-scope writes into the session so the next manual
-          // send can read them (in memory only; local vars stay request-scoped).
+          // Persist named-scope writes into the session for the next manual
+          // send (in memory only; local vars stay request-scoped).
           recordScriptSession({
             env:        r.scriptResult.updatedEnvVars,
             collection: r.scriptResult.updatedCollectionVars,
@@ -370,13 +353,11 @@ export function RequestBuilder({ request }: Props) {
         }
       }
 
-      // ── Run main request ────────────────────────────────────────────────────
-      // Before hooks may have set env/local vars via scripts (e.g. extracting a
-      // token); thread those run-only writes onto the environment and into the
-      // collection-var bag for this send. Nothing was written to the store.
+      // Run main request. Before hooks may have set env/local vars; thread those
+      // run-only writes onto the environment. Nothing was written to the store.
       const freshEnv = withEnvOverrides(activeEnv, liveEnvOverrides);
-      // A streamId lets the main process push live frames back for this send;
-      // the viewer renders them as they arrive. Only the main request streams.
+      // A streamId lets the main process push live frames back as they arrive.
+      // Only the main request streams.
       const streamId = crypto.randomUUID();
       startLiveStream(activeTabId, streamId);
       let result;
@@ -400,8 +381,8 @@ export function RequestBuilder({ request }: Props) {
       liveGlobals      = { ...liveGlobals,      ...result.scriptResult.updatedGlobals };
       liveLocalVars    = { ...liveLocalVars,    ...result.scriptResult.updatedLocalVars };
       liveEnvOverrides = { ...liveEnvOverrides, ...result.scriptResult.updatedEnvVars };
-      // Persist the main request's named-scope writes into the session so the
-      // next manual send can read them (in memory only; local stays request-scoped).
+      // Persist the main request's named-scope writes into the session for the
+      // next manual send (in memory only; local stays request-scoped).
       recordScriptSession({
         env:        result.scriptResult.updatedEnvVars,
         collection: result.scriptResult.updatedCollectionVars,
@@ -419,7 +400,7 @@ export function RequestBuilder({ request }: Props) {
         scriptResult: result.scriptResult,
       });
 
-      // ── Run after hooks ─────────────────────────────────────────────────────
+      // Run after hooks
       for (const hook of hooks.after) {
         const start = Date.now();
         try {
@@ -436,8 +417,8 @@ export function RequestBuilder({ request }: Props) {
           liveGlobals      = { ...liveGlobals,      ...r.scriptResult.updatedGlobals };
           liveLocalVars    = { ...liveLocalVars,    ...r.scriptResult.updatedLocalVars };
           liveEnvOverrides = { ...liveEnvOverrides, ...r.scriptResult.updatedEnvVars };
-          // Persist the named-scope writes into the session so the next manual
-          // send can read them (in memory only; local vars stay request-scoped).
+          // Persist named-scope writes into the session for the next manual
+          // send (in memory only; local vars stay request-scoped).
           recordScriptSession({
             env:        r.scriptResult.updatedEnvVars,
             collection: r.scriptResult.updatedCollectionVars,
@@ -484,12 +465,11 @@ export function RequestBuilder({ request }: Props) {
   const isSocketIo = request.protocol === 'socketio';
   const isMqtt = request.protocol === 'mqtt';
 
-  // An example is a request specimen (a saved payload), not a test — so it has
-  // no Scripts / Schema / Contract, only what it sends.
+  // An example is a saved payload, not a test: no Scripts / Schema / Contract.
   const isExample = !!activeAppTab?.exampleId;
   const tabs = [
-    // SOAP collapses Params + Body into a single "SOAP" tab — the WSDL drives both.
-    // Docs leads so documentation is the first thing a reader sees.
+    // SOAP collapses Params + Body into one "SOAP" tab (WSDL drives both).
+    // Docs leads so it's the first thing a reader sees.
     ...(!isExample ? [{ id: 'docs', label: 'Docs', count: request.description?.trim() ? 1 : 0 }] : []),
     ...(!isSoap ? [{ id: 'params', label: 'Params', count: request.params.filter(p => p.enabled && p.key).length }] : []),
     { id: 'headers', label: 'Headers', count: request.headers.filter(h => h.enabled && h.key).length },
@@ -566,9 +546,8 @@ export function RequestBuilder({ request }: Props) {
                 method: 'POST',
                 body: request.body.mode === 'soap' ? request.body : { ...request.body, mode: 'soap', soap: request.body.soap ?? { wsdlUrl: '', envelope: '' } },
               });
-              // SOAP's primary surface is the WSDL fetcher inside the Body
-              // tab — jump there so the user sees it immediately instead of
-              // landing on the (now-hidden) Params tab.
+              // Jump to the Body tab (the WSDL fetcher) instead of the
+              // now-hidden Params tab.
               if (activeTabId) setTabRequestTab(activeTabId, 'body');
             }}
             className={`px-2 py-1.5 transition-colors ${isSoap ? 'bg-amber-700 text-amber-100' : 'text-surface-500 hover:text-white'}`}
@@ -602,8 +581,7 @@ export function RequestBuilder({ request }: Props) {
           </button>
         </div>
 
-        {/* Method selector — only meaningful for HTTP. SOAP is always POST,
-            shown as a static badge so the user sees what's on the wire. */}
+        {/* Method selector (HTTP only). SOAP is always POST, shown as a badge. */}
         {!isWs && !isSoap && !isGrpc && !isSocketIo && !isMqtt && (customVerb ? (
           <input
             autoFocus
@@ -652,8 +630,8 @@ export function RequestBuilder({ request }: Props) {
         )}
         </div>
 
-        {/* Row 2: endpoint + hooks + Send (HTTP/SOAP only; WS/IO/MQTT/gRPC put
-            the endpoint + Connect in their own panel header below). */}
+        {/* Row 2: endpoint + hooks + Send (HTTP/SOAP only; realtime protocols
+            put endpoint + Connect in their own panel header below). */}
         {!isWs && !isGrpc && !isSocketIo && !isMqtt && (
         <div className="flex items-center gap-2">
         <VarInput
@@ -681,7 +659,7 @@ export function RequestBuilder({ request }: Props) {
           }`}
         />
 
-        {/* Data-row picker — run this request against one specific data table row */}
+        {/* Data-row picker: run this request against one data table row */}
         {!isWs && !isGrpc && !isMqtt && applicableDataSet && (
           <select
             value={dataRowIdx}
@@ -726,9 +704,8 @@ export function RequestBuilder({ request }: Props) {
         </div>
         )}
 
-        {/* Live preview of the composed request (HTTP/SOAP): the final URL with
-            enabled query params appended and path params/variables resolved, so
-            it's clear what gets sent before clicking Send. */}
+        {/* Live preview of the composed request (HTTP/SOAP): final URL with
+            query params appended and path params/variables resolved. */}
         {!isWs && !isGrpc && !isSocketIo && !isMqtt && previewUrl && previewUrl !== request.url && (
           <div
             className="flex items-start gap-2 text-[11px] font-mono -mt-0.5 px-0.5"
@@ -753,8 +730,8 @@ export function RequestBuilder({ request }: Props) {
         />
       )}
 
-      {/* WS / Socket.IO / MQTT / gRPC panels take over the full remaining area,
-          with a small Protocol | Docs switch so their requests can be documented. */}
+      {/* Realtime panels take over the remaining area, with a Protocol | Docs
+          switch so their requests can be documented. */}
       {(isWs || isSocketIo || isMqtt || isGrpc) ? (
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex border-b border-surface-800 px-4 gap-0 flex-shrink-0">
@@ -798,8 +775,7 @@ export function RequestBuilder({ request }: Props) {
                 className={`px-3 py-1.5 text-xs transition-colors border-b-2 -mb-px ${
                   activeTab === tab.id
                     ? 'border-blue-500 text-white'
-                    // An inactive tab that HAS content reads brighter than an empty
-                    // one, so populated sections stand out at a glance.
+                    // Inactive tab with content reads brighter than an empty one.
                     : tab.count > 0
                       ? 'border-transparent text-surface-200 hover:text-white'
                       : 'border-transparent text-surface-400 hover:text-white'
@@ -807,8 +783,7 @@ export function RequestBuilder({ request }: Props) {
               >
                 {t(tab.label)}
                 {tab.count > 0 && (
-                  // Brand-blue count pill (white text stays AA on blue in both
-                  // themes via the light-mode remap) so a populated tab is obvious.
+                  // Brand-blue count pill; white text stays AA on blue in both themes.
                   <span className="ml-1 text-[10px] bg-blue-600 text-white rounded px-1 font-medium">{tab.count}</span>
                 )}
               </button>
@@ -826,11 +801,11 @@ export function RequestBuilder({ request }: Props) {
           {/* Tab content */}
           <div className="px-4 py-3 flex-1 overflow-y-auto min-h-0">
             {(() => {
-              // The Contract tab was removed; a persisted 'contract' sub-tab
-              // falls back to Schema (its successor for response validation).
+              // Contract tab was removed; a persisted 'contract' falls back to
+              // Schema, its successor for response validation.
               const raw = activeTab === 'contract' ? 'schema' : activeTab;
-              // On an example, Scripts/Schema are hidden; if the stored tab was
-              // one of them, fall back to Body so nothing renders blank.
+              // On an example, Scripts/Schema are hidden; fall back to Body so
+              // nothing renders blank.
               const shown = isExample && (raw === 'scripts' || raw === 'schema' || raw === 'docs' || raw === 'stream')
                 ? 'body' : raw;
               return <>

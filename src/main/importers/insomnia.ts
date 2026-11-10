@@ -7,7 +7,7 @@ import type { Collection, ApiRequest, AuthConfig, RequestBody, KeyValuePair, Fol
 import { normalizeHttpMethod } from '../../shared/types';
 import { translateScript } from './script-translator';
 
-// ─── Insomnia v4 export importer ──────────────────────────────────────────────
+// Insomnia v4 export importer
 
  
 
@@ -51,8 +51,7 @@ function parseBody(body: any): RequestBody {
     };
   }
   if (mime === 'multipart/form-data') {
-    // Insomnia multipart: a param with `type: 'file'` carries `fileName` (the
-    // path on the exporting machine); everything else is a text field.
+    // Insomnia multipart: a param with type 'file' carries fileName; others are text fields.
     return {
       mode: 'multipart',
       multipart: (body.params ?? []).map((p: any) => {
@@ -91,12 +90,8 @@ function parseAuth(auth: any): AuthConfig {
   return { type: 'none' };
 }
 
-/**
- * Insomnia environment `data` is an arbitrary key-value object; coerce it to a
- * flat string map for our variable scopes. Primitives stringify directly;
- * nested objects/arrays are JSON-encoded so they survive as a value rather than
- * rendering as `[object Object]`.
- */
+/** Coerce Insomnia's arbitrary `data` object to a flat string map; nested
+ *  objects/arrays are JSON-encoded, not stringified to [object Object]. */
 function toVarMap(data: unknown): Record<string, string> {
   const out: Record<string, string> = {};
   if (!data || typeof data !== 'object') return out;
@@ -122,7 +117,7 @@ export async function importInsomnia(filePath: string): Promise<Collection> {
   const rootFolder: Folder = { id: uuidv4(), name: 'root', description: '', folders: [], requestIds: [] };
 
   // First pass: build all folders. A request_group carries its own variables in
-  // an `environment` object → map to our folder scope.
+  // an `environment` object -> map to our folder scope.
   for (const r of resources) {
     if (r._type !== 'request_group') continue;
     const variables = toVarMap(r.environment);
@@ -174,10 +169,8 @@ export async function importInsomnia(filePath: string): Promise<Collection> {
     }
   }
 
-  // The base environment (a top-level `environment` resource parented to the
-  // workspace) holds collection-wide defaults → map to our collection scope.
-  // Sub-environments (parented to the base environment) are separate Environment
-  // entities and are not imported through the single-Collection contract here.
+  // The base environment (parented to the workspace) holds collection-wide
+  // defaults -> our collection scope. Sub-environments aren't imported here.
   const baseEnv = resources.find(r => r._type === 'environment' && r.parentId === workspaceId)
     ?? resources.find(r => r._type === 'environment');
   const collectionVariables = toVarMap(baseEnv?.data);

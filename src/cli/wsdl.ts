@@ -3,17 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * API Spector WSDL CLI
- *
- * Usage:
- *   api-spector wsdl describe        --url <wsdlUrl>
- *   api-spector wsdl import-collection --workspace <path> --url <wsdlUrl> [--name <label>]
- *   api-spector wsdl import-mock       --workspace <path> --url <wsdlUrl> [--name <label>] [--start]
- *
- * `describe` prints operations + endpoints. `import-collection` writes a new
- * Collection JSON with one POST request per WSDL operation. `import-mock`
- * writes a MockServer JSON with one dispatch route per endpoint that picks
- * the matching response envelope by SOAPAction / operation element.
+ * API Spector WSDL CLI. `describe` prints operations + endpoints;
+ * `import-collection` writes a Collection JSON; `import-mock` writes a MockServer JSON.
  */
 
 import { writeFile, mkdir } from 'node:fs/promises';
@@ -25,7 +16,7 @@ import { parseWsdl } from '../main/ipc/soap-handler';
 import { importWsdl, defaultCollectionRelPath, defaultMockRelPath } from '../main/wsdl/import';
 import { parseArgs, loadWorkspace, loadMocks } from './cli-common';
 
-// ─── HTTP fetch (no electron dep — works in plain node) ──────────────────────
+// HTTP fetch (no electron dep)
 
 function fetchUrl(url: string): Promise<string> {
   return new Promise((resolveP, rejectP) => {
@@ -45,7 +36,7 @@ async function ensureDir(dir: string): Promise<void> {
   await mkdir(dir, { recursive: true });
 }
 
-// ─── Commands ────────────────────────────────────────────────────────────────
+// Commands
 
 async function cmdDescribe(args: Record<string, string | boolean>): Promise<void> {
   const url = typeof args['url'] === 'string' ? args['url'] : undefined;
@@ -134,7 +125,7 @@ async function cmdImportMock(args: Record<string, string | boolean>): Promise<vo
   }
 }
 
-// ─── Entry ───────────────────────────────────────────────────────────────────
+// Entry
 
 async function main(): Promise<void> {
   const [, , sub, ...rest] = process.argv;

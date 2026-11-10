@@ -1,19 +1,15 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Compile a design-first ConsumerContract into the artifacts the rest of the
-// system already understands:
-//   • a Pact v3 document  → publish to API Spector Cloud, verify on the provider
-//   • a MockServer        → the consumer develops against the designed responses
-//
-// Response bodies are matched by TYPE, not value, by default (the CDCT best
-// practice) so a timestamp or generated id doesn't make the contract brittle.
+// Compile a design-first ConsumerContract into a Pact v3 document and a
+// MockServer. Response bodies are matched by type, not value, by default, so a
+// timestamp or generated id doesn't make the contract brittle.
 
 import type { ConsumerContract, DesignInteraction, KeyValuePair } from '../../shared/types';
 import { V4_SYNC_HTTP, interactionKey } from './pact-format';
 
-// `designContractToMock` is pure and shared with the renderer's "Create mock"
-// action; re-exported here so existing import sites (and tests) keep working.
+// `designContractToMock` is shared with the renderer; re-exported here so
+// existing import sites keep working.
 export { designContractToMock } from '../../shared/design-mock';
 
 type Rule = { match: string; min?: number }
@@ -43,9 +39,8 @@ function parseJson(s?: string): unknown {
   try { return JSON.parse(s); } catch { return undefined; }
 }
 
-/** Walk an example body and emit a Pact matchingRules.body map that matches
- *  every leaf by type, arrays by type + min length. Objects need no rule of
- *  their own — matching their members is enough. */
+/** Pact matchingRules.body map matching every leaf by type, arrays by type +
+ *  min length. Objects need no rule of their own. */
 export function typeMatchingRules(body: unknown): BodyRules {
   const rules: BodyRules = {};
   const walk = (node: unknown, path: string) => {
@@ -62,18 +57,9 @@ export function typeMatchingRules(body: unknown): BodyRules {
   return rules;
 }
 
-// ─── Type-shape shorthand ─────────────────────────────────────────────────────
-//
-// A design-first response body may be written as a *type shape* rather than a
-// concrete JSON example - the way you'd sketch a response before the API exists:
-//
-//   [{ id: string, name: string, slug: string }]
-//   { count: integer, price: number, active: boolean, tags: [ string ] }
-//   [{ id, name }]                    // bare fields default to string
-//
-// It compiles to a representative example body plus Pact matchingRules that match
-// each leaf by type - so the *format* becomes part of the pact and is verified,
-// without inventing example values.
+// Type-shape shorthand: a response body written as a type shape rather than concrete JSON, e.g.
+// `{ count: integer, tags: [ string ] }` (bare fields default to string). Compiles to an example
+// body + type-matching rules, so the format is verified without inventing example values.
 
 type Shape =
   | { kind: 'scalar'; type: 'string' | 'number' | 'integer' | 'boolean' | 'null' }
@@ -86,13 +72,13 @@ function scalarFromName(name: string): Shape {
     case 'number': case 'float': case 'double': case 'decimal': return { kind: 'scalar', type: 'number' };
     case 'boolean': case 'bool': return { kind: 'scalar', type: 'boolean' };
     case 'null': return { kind: 'scalar', type: 'null' };
-    // string / str / text / any unknown type name → string
+    // string / str / text / any unknown type name -> string
     default: return { kind: 'scalar', type: 'string' };
   }
 }
 
-/** Tokenize a shape string into structural symbols and identifiers, or return
- *  undefined on an unexpected character (so the caller can reject it). */
+/** Tokenize a shape string into structural symbols and identifiers; undefined
+ *  on an unexpected character. */
 function tokenizeShape(src: string): string[] | undefined {
   const tokens: string[] = [];
   const re = /\s*([{}[\]:,]|[A-Za-z0-9_$-]+|"[^"]*")\s*/y;
@@ -197,12 +183,9 @@ function compileShape(shape: Shape): { body: unknown; rules: BodyRules } {
   return { body, rules };
 }
 
-/**
- * Compile a design-first response body into a pact body + matchingRules.
- * Valid JSON is treated as a concrete example (matched by type when loose);
- * otherwise it is parsed as a type-shape shorthand. Returns undefined only when
- * the text is neither valid JSON nor a parseable shape.
- */
+/** Compile a design-first response body into a pact body + matchingRules. Valid
+ *  JSON is a concrete example (matched by type when loose), otherwise parsed as
+ *  type-shape shorthand. Undefined when neither. */
 export function compileResponseBody(text?: string, loose = true): { body: unknown; rules?: BodyRules } | undefined {
   if (!text?.trim()) return undefined;
 
@@ -211,7 +194,7 @@ export function compileResponseBody(text?: string, loose = true): { body: unknow
     const rules = loose ? typeMatchingRules(json) : {};
     return { body: json, rules: Object.keys(rules).length ? rules : undefined };
   } catch {
-    // not JSON — fall through to the type-shape shorthand
+    // not JSON - fall through to the type-shape shorthand
   }
 
   const shape = parseShape(text);

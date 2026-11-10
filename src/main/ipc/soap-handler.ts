@@ -8,18 +8,10 @@ import https from 'node:https';
 import http from 'node:http';
 import { DOMParser } from '@xmldom/xmldom';
 
-// ─── WSDL fetch & parse ───────────────────────────────────────────────────────
-//
-// Goal: from a WSDL URL the user pastes (e.g. dneonline calculator.asmx?WSDL)
-// produce enough metadata to drive the request builder end-to-end:
-//   • the service endpoint URL (so the user doesn't need to copy it manually)
-//   • each operation's SOAPAction + soap version
-//   • a schema-aware envelope template with the actual input parameter names
-//     instead of a generic "Add parameters here" comment.
-//
-// We use @xmldom/xmldom so we can walk schema imports/refs reliably; the old
-// regex parser couldn't follow `<wsdl:part element="tns:Add"/>` to the matching
-// `<xs:element name="Add">` definition in `<wsdl:types>`.
+// WSDL fetch & parse: from a WSDL URL, produce metadata for the request builder -
+// endpoint URL, each operation's SOAPAction + soap version, and a schema-aware
+// envelope template with real input parameter names. Uses @xmldom/xmldom to walk
+// schema imports/refs (the old regex parser couldn't follow part element refs).
 
 export function fetchUrl(url: string, headers: Record<string, string> = {}): Promise<string> {
   return new Promise((resolveP, rejectP) => {
@@ -35,22 +27,18 @@ export function fetchUrl(url: string, headers: Record<string, string> = {}): Pro
   });
 }
 
-// ─── Public types ────────────────────────────────────────────────────────────
-//
-// The WSDL metadata shapes are shared with the renderer (SoapEditor) and live
-// in src/shared/types/soap-wsdl.ts. Re-exported here so existing importers of
-// this module (e.g. main/wsdl/import.ts) keep working.
+// WSDL metadata shapes live in src/shared/types/soap-wsdl.ts (shared with the
+// renderer). Re-exported here so existing importers of this module keep working.
 
 import type { WsdlParam, WsdlOperation, WsdlEndpoint, WsdlResult } from '../../shared/types';
 export type { WsdlParam, WsdlOperation, WsdlEndpoint, WsdlResult };
 
-// ─── DOM helpers ─────────────────────────────────────────────────────────────
+// DOM helpers
 
 const NS_SOAP  = 'http://schemas.xmlsoap.org/wsdl/soap/';
 const NS_SOAP12 = 'http://schemas.xmlsoap.org/wsdl/soap12/';
 
-// `@xmldom/xmldom` returns array-like NodeLists (length + indexed access) that
-// are NOT iterable, so we have to walk by index — `for...of` throws on them.
+// @xmldom/xmldom NodeLists are array-like but NOT iterable; `for...of` throws.
 interface XmlNodeList {
   length: number
   [index: number]: XmlNode
@@ -79,8 +67,7 @@ function children(node: XmlNode): XmlNode[] {
   return nodeListToArray(node.childNodes).filter(isElement);
 }
 
-/** Find direct children of `node` whose local name matches. Namespace-agnostic
- *  (we accept both `<wsdl:operation>` and `<operation>`). */
+/** Direct children with a matching local name; namespace-agnostic. */
 function childrenByLocalName(node: XmlNode, localName: string): XmlNode[] {
   return children(node).filter(c => (c.localName ?? c.tagName) === localName);
 }
@@ -105,28 +92,25 @@ function attr(node: XmlNode, name: string): string | undefined {
   return v == null || v === '' ? undefined : v;
 }
 
-/** Strip the prefix from a QName like `tns:Add` → `Add`. */
+/** Strip the prefix from a QName: `tns:Add` to `Add`. */
 function localOfQName(q: string): string {
   const i = q.indexOf(':');
   return i === -1 ? q : q.slice(i + 1);
 }
 
-// ─── Schema indexing ─────────────────────────────────────────────────────────
-//
-// Build a map from element name → its XSD definition node so we can resolve
+// Map element name to its XSD definition node, to resolve
 // `<wsdl:part element="tns:Add"/>` to the matching `<xs:element name="Add">`.
 
 function indexSchema(definitions: XmlNode): Map<string, XmlNode> {
   const idx = new Map<string, XmlNode>();
-  // Find <wsdl:types><xs:schema>* — there can be multiple schemas.
+  // There can be multiple <xs:schema> under <wsdl:types>.
   for (const types of childrenByLocalName(definitions, 'types')) {
     for (const schema of childrenByLocalName(types, 'schema')) {
-      // Top-level <xs:element name="..."> entries
       for (const el of childrenByLocalName(schema, 'element')) {
         const n = attr(el, 'name');
         if (n) idx.set(n, el);
       }
-      // Top-level named complexTypes — referenced by element type=
+      // Named complexTypes, referenced by element type=
       for (const ct of childrenByLocalName(schema, 'complexType')) {
         const n = attr(ct, 'name');
         if (n) idx.set('__type__:' + n, ct);
@@ -136,10 +120,8 @@ function indexSchema(definitions: XmlNode): Map<string, XmlNode> {
   return idx;
 }
 
-/** Resolve an `<xs:element ref|type|name>` to the inner `<xs:complexType>`
- *  (or null if it's a primitive / nothing to expand). */
+/** Resolve an `<xs:element>` to its `<xs:complexType>`, or null for a primitive. */
 function resolveComplexType(el: XmlNode, schemaIdx: Map<string, XmlNode>): XmlNode | null {
-  // Inline complexType inside the element
   const inlineCt = childrenByLocalName(el, 'complexType')[0];
   if (inlineCt) return inlineCt;
 
@@ -148,7 +130,7 @@ function resolveComplexType(el: XmlNode, schemaIdx: Map<string, XmlNode>): XmlNo
     const local = localOfQName(typeAttr);
     const named = schemaIdx.get('__type__:' + local);
     if (named) return named;
-    return null; // primitive (xs:string, xs:int, …)
+    return null; // primitive
   }
   return null;
 }
@@ -156,7 +138,7 @@ function resolveComplexType(el: XmlNode, schemaIdx: Map<string, XmlNode>): XmlNo
 type Param = WsdlParam
 
 function buildParams(complexType: XmlNode, schemaIdx: Map<string, XmlNode>, depth = 0): Param[] {
-  if (depth > 5) return []; // guard against pathological recursion via type cycles
+  if (depth > 5) return []; // guard against type cycles
   const params: Param[] = [];
   // Look inside <xs:sequence>, <xs:all>, <xs:choice>
   const containers = ['sequence', 'all', 'choice'].flatMap(n => childrenByLocalName(complexType, n));
@@ -179,7 +161,7 @@ function buildParams(complexType: XmlNode, schemaIdx: Map<string, XmlNode>, dept
   return params;
 }
 
-// ─── Envelope template builder ───────────────────────────────────────────────
+// Envelope template builder
 
 function indent(level: number): string {
   return '  '.repeat(level);
@@ -219,7 +201,7 @@ export function buildEnvelopeTemplate(
 </soap:Envelope>`;
 }
 
-// ─── Main parser ─────────────────────────────────────────────────────────────
+// Main parser
 
 export function parseWsdl(wsdlText: string): WsdlResult {
   let doc: XmlNode;
@@ -229,7 +211,6 @@ export function parseWsdl(wsdlText: string): WsdlResult {
     throw new Error(`WSDL parse failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  // The <definitions> root may be `<wsdl:definitions>` or `<definitions>`.
   const definitions = childrenByLocalName(doc, 'definitions')[0]
     ?? descendantsByLocalName(doc, 'definitions')[0];
   if (!definitions) {
@@ -238,10 +219,9 @@ export function parseWsdl(wsdlText: string): WsdlResult {
 
   const targetNamespace = attr(definitions, 'targetNamespace') ?? '';
 
-  // ── Index schema elements + named complexTypes ──────────────────────────────
   const schemaIdx = indexSchema(definitions);
 
-  // ── portType operations: name → input message qname ────────────────────────
+  // portType operations: name to input message qname
   const portTypeInputs: Record<string, string | undefined> = {};
   for (const pt of childrenByLocalName(definitions, 'portType')) {
     for (const op of childrenByLocalName(pt, 'operation')) {
@@ -252,7 +232,7 @@ export function parseWsdl(wsdlText: string): WsdlResult {
     }
   }
 
-  // ── messages: qname → element ref (e.g. "tns:Add") ──────────────────────────
+  // messages: qname to element ref
   const messageElements: Record<string, string | undefined> = {};
   for (const msg of childrenByLocalName(definitions, 'message')) {
     const name = attr(msg, 'name');
@@ -262,7 +242,7 @@ export function parseWsdl(wsdlText: string): WsdlResult {
     messageElements[name] = attr(part, 'element');
   }
 
-  // ── bindings: list operations + their SOAPAction + version ─────────────────
+  // bindings: list operations + their SOAPAction + version
   interface BindingInfo {
     name: string
     soapVersion: '1.1' | '1.2'
@@ -272,7 +252,7 @@ export function parseWsdl(wsdlText: string): WsdlResult {
 
   for (const binding of childrenByLocalName(definitions, 'binding')) {
     const bindingName = attr(binding, 'name') ?? '';
-    // Detect SOAP version by the inner <soap:binding> / <soap12:binding>
+    // SOAP version from the inner <soap:binding> / <soap12:binding>
     let soapVersion: '1.1' | '1.2' = '1.1';
     for (const c of children(binding)) {
       if ((c.localName ?? c.tagName) === 'binding') {
@@ -285,7 +265,6 @@ export function parseWsdl(wsdlText: string): WsdlResult {
     for (const op of childrenByLocalName(binding, 'operation')) {
       const opName = attr(op, 'name');
       if (!opName) continue;
-      // Find <soap:operation soapAction="..."/> or <soap12:operation soapAction="..."/>
       let soapAction: string | undefined;
       for (const c of children(op)) {
         if ((c.localName ?? c.tagName) === 'operation' &&
@@ -298,13 +277,12 @@ export function parseWsdl(wsdlText: string): WsdlResult {
     bindings.push({ name: bindingName, soapVersion, operations: ops });
   }
 
-  // ── services: binding name → endpoint address ───────────────────────────────
+  // services: binding name to endpoint address
   const endpoints: WsdlEndpoint[] = [];
   for (const svc of childrenByLocalName(definitions, 'service')) {
     for (const port of childrenByLocalName(svc, 'port')) {
       const bindingRef = attr(port, 'binding');
       if (!bindingRef) continue;
-      // Find the address element (soap:address or soap12:address)
       let address: string | undefined;
       let addrVersion: '1.1' | '1.2' = '1.1';
       for (const c of children(port)) {
@@ -319,7 +297,7 @@ export function parseWsdl(wsdlText: string): WsdlResult {
     }
   }
 
-  // ── Compose operations: combine portType (input message) + binding (SOAPAction) + service (endpoint) ──
+  // Compose: portType (input message) + binding (SOAPAction) + service (endpoint)
   const operations: WsdlOperation[] = [];
   const seenOpNames = new Set<string>();
   for (const binding of bindings) {
@@ -333,7 +311,7 @@ export function parseWsdl(wsdlText: string): WsdlResult {
       const elementQName = messageLocal ? messageElements[messageLocal] : undefined;
       const elementLocal = elementQName ? localOfQName(elementQName) : op.name;
 
-      // Resolve the schema element → its complexType → params
+      // Resolve the schema element to its complexType to params
       const schemaEl = schemaIdx.get(elementLocal);
       let params: Param[] = [];
       if (schemaEl) {
@@ -353,8 +331,7 @@ export function parseWsdl(wsdlText: string): WsdlResult {
     }
   }
 
-  // Fallback: WSDLs without proper bindings (the old test fixtures) — keep
-  // the regex-style name extraction so existing simple cases still work.
+  // Fallback for WSDLs without proper bindings: regex-style name extraction.
   if (operations.length === 0) {
     const regex = /<(?:wsdl:)?operation\s+name\s*=\s*["']([^"']+)["']/g;
     const seen = new Set<string>();
@@ -381,11 +358,9 @@ export function parseWsdl(wsdlText: string): WsdlResult {
   return { targetNamespace, endpoints, operations };
 }
 
-// ─── Response envelope template (used for mocking) ──────────────────────────
-//
-// SOAP response shape mirrors the request: `<tns:{Op}Response><tns:{Op}Result>...`.
-// Real schemas vary, but this template is a sensible default for stubbing —
-// users can edit per-operation in the Mock detail panel after import.
+// Response envelope template (for mocking). Shape mirrors the request:
+// `<tns:{Op}Response><tns:{Op}Result>...`. A default for stubbing; users edit
+// per-operation in the Mock detail panel after import.
 
 export function buildResponseEnvelope(
   operationName: string,
@@ -407,13 +382,9 @@ export function buildResponseEnvelope(
 </soap:Envelope>`;
 }
 
-/** JS source for a mock route's `script` field. Branches on the incoming
- *  SOAPAction (or fallback: operation element in the body) and writes the
- *  matching response envelope.
- *
- *  Envelopes themselves are NOT embedded in the script — they live on the
- *  route's `metadata.soapEnvelopes` map so the workspace JSON stays compact
- *  (otherwise a 25-operation WSDL bakes ~30KB into each route). */
+/** JS source for a mock route's `script`: branches on the incoming SOAPAction (or
+ *  body operation element) and writes the matching response envelope from the
+ *  route's `metadata.soapEnvelopes` map. */
 export function buildMockDispatchScript(_opMap: Record<string, string>): string {
   return `// Auto-generated by Import WSDL - dispatches per SOAP operation.
 // Envelopes come from route metadata.soapEnvelopes (set by the WSDL importer).
@@ -446,20 +417,19 @@ if (opName) {
 `;
 }
 
-// ─── IPC handler ─────────────────────────────────────────────────────────────
+// IPC handler
 
 export function registerSoapHandlers(ipc: IpcMain): void {
   handleIpc(ipc, IPC.wsdl.fetch, async (_event, url: string, extraHeaders: Record<string, string> = {}): Promise<WsdlResult> => {
-    // Lazy import so the test runner doesn't need electron + ajv on disk for
-    // the soap-handler unit tests.
+    // Lazy import so the unit tests don't need electron + ajv on disk.
     const { validateWsdlFetchUrl } = await import('./ipc-validate');
     validateWsdlFetchUrl(url);
     const wsdlText = await fetchUrl(url, extraHeaders);
     return parseWsdl(wsdlText);
   });
 
-  // Import a WSDL — returns a ready-to-register Collection + MockServer.
-  // Renderer is responsible for persisting them via the existing save flows.
+  // Import a WSDL into a ready-to-register Collection + MockServer; the renderer
+  // persists them via the existing save flows.
   handleIpc(ipc, IPC.wsdl.import, async (_event, opts: { url?: string; xml?: string; name?: string; existingMockPorts?: number[] }) => {
     const { validateWsdlImport } = await import('./ipc-validate');
     validateWsdlImport(opts);

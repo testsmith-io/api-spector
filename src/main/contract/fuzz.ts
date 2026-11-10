@@ -1,16 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── Spec-driven fuzzing orchestrator ─────────────────────────────────────────
-//
-// Generates malformed variants of each request's JSON body (from the OpenAPI
-// spec's requestBody schema, or from the request's own body when no spec is
-// given), sends them to the provider, and judges the responses. Single-fault:
-// each case mutates exactly one field, so a finding names one cause.
-//
-// Reuses the shared request-execution core (auth, proxy, TLS, interpolation)
-// and the provider-verifier's spec loading + operation matching, so a fuzz run
-// behaves like the rest of the contract stack.
+// Spec-driven fuzzing orchestrator: generates malformed variants of each request's JSON
+// body (from the OpenAPI schema or the request's own body), sends them, and judges the
+// responses. Single-fault: each case mutates one field, so a finding names one cause.
 
 import Ajv from 'ajv';
 import type { Dispatcher } from 'undici';
@@ -54,9 +47,8 @@ export interface FuzzOptions {
   requestBaseUrl?: string
   casesPerOperation?: number
   seed?: number
-  /** Fuzzing intensity: 'basic' (structural), 'standard' (+ boundary/naughty/
-   *  duplicate-key), 'aggressive' (+ injection probes + header tampering).
-   *  Default 'standard'. */
+  /** 'basic' (structural), 'standard' (+ boundary/naughty/duplicate-key),
+   *  'aggressive' (+ injection + header tampering). Default 'standard'. */
   level?: FuzzLevel
   /** Fuzz POST/PUT/PATCH/DELETE. Off by default: those send malformed writes. */
   includeWrites?: boolean
@@ -124,15 +116,13 @@ function specContextFor(
 
 function statusDocumented(status: number, documented: number[]): boolean {
   if (documented.includes(status)) return true;
-  // OpenAPI range codes like "2XX" are stored as NaN-filtered out; also accept
-  // the common "default" catch-all by treating an empty list as "documented".
+  // Empty list (range codes filtered out, or a "default" catch-all) counts as documented.
   if (documented.length === 0) return true;
   return false;
 }
 
-/** Judge one fuzzed response. Returns a finding, or null when it behaved.
- *  `bodyIsSchemaInvalid` is whether the mutated body actually violates the
- *  request schema (checked with ajv) — only then is a 2xx a validation gap. */
+/** Judge one fuzzed response; returns a finding, or null when it behaved.
+ *  `bodyIsSchemaInvalid` (from ajv) gates the 2xx-validation-gap finding. */
 function judge(
   status: number,
   responseBody: string,
@@ -140,13 +130,12 @@ function judge(
   spec: SpecContext | null,
   opts: FuzzOptions,
 ): { oracle: FuzzOracle; message: string } | null {
-  // 1. Server error on malformed input — the gold-standard finding. Always on.
+  // 1. Server error on malformed input. Always on.
   if (status >= 500) {
     return { oracle: 'never-5xx', message: `Server returned ${status} on a malformed request (should reject with 4xx, not crash)` };
   }
-  // 2. Server accepted input that provably violates the schema. Only fires when
-  //    ajv confirms the body is invalid, so valid-but-unusual inputs (empty or
-  //    unicode strings with no minLength/pattern) are not false positives.
+  // 2. Server accepted provably-invalid input. Gated on ajv so valid-but-unusual
+  //    inputs aren't false positives.
   if (spec && bodyIsSchemaInvalid && status >= 200 && status < 300) {
     return { oracle: 'accepted-invalid', message: `Server accepted a schema-invalid request with ${status} (missing input validation)` };
   }
@@ -163,7 +152,7 @@ function judge(
         if (!validate(JSON.parse(responseBody))) {
           return { oracle: 'response-schema', message: `2xx response body does not match the documented schema: ${ajv.errorsText(validate.errors)}` };
         }
-      } catch { /* non-JSON 2xx against a JSON schema — ignore, not our finding */ }
+      } catch { /* non-JSON 2xx against a JSON schema: ignore */ }
     }
   }
   return null;
@@ -201,7 +190,7 @@ export async function runFuzz(opts: FuzzOptions): Promise<FuzzRunResult> {
     }
 
     // Baseline body + schema: spec first, else the request's own JSON body.
-    // Absent for GET-style requests, which are still fuzzed on their query params.
+    // Absent for GET-style requests, still fuzzed on their query params.
     const specCtx = specContextFor(spec, req, vars, opts.requestBaseUrl);
     let baselineBody: unknown;
     let bodySchema: JsonSchema | undefined;
@@ -218,9 +207,8 @@ export async function runFuzz(opts: FuzzOptions): Promise<FuzzRunResult> {
     const hasBody = bodySchema !== undefined;
     const baselineBodyJson = hasBody ? JSON.stringify(baselineBody) : undefined;
 
-    // Baseline query params: the request's enabled params, plus any required
-    // spec query params that are missing (generated valid), so the "omit
-    // required" mutation has something to omit.
+    // Baseline query params: enabled request params, plus any missing required
+    // spec params (generated valid), so "omit required" has something to omit.
     const baselineParams: KeyValuePair[] = req.params.filter(p => p.enabled && p.key).map(p => ({ ...p }));
     for (const qp of specCtx?.queryParams ?? []) {
       if (qp.required && !baselineParams.some(p => p.key === qp.name)) {
@@ -242,9 +230,8 @@ export async function runFuzz(opts: FuzzOptions): Promise<FuzzRunResult> {
       for (const c of mutate(baselineBody, bodySchema, 'body', level)) {
         applied.push({ mutation: c.mutation, bodyJson: JSON.stringify(c.value), bodyValue: c.value, params: baselineParams, isBody: true });
       }
-      // Duplicate a top-level JSON key (raw body — JSON.stringify can't express
-      // it). Body stays otherwise valid, so only crashing behaviour is a finding.
-      // Standard and up.
+      // Duplicate a top-level JSON key (raw body; JSON.stringify can't express it).
+      // Body stays otherwise valid, so only a crash is a finding. Standard and up.
       if (level !== 'basic') {
         const dupRaw = duplicateKeyBody(baselineBody);
         if (dupRaw) {
@@ -312,9 +299,8 @@ export async function runFuzz(opts: FuzzOptions): Promise<FuzzRunResult> {
           responseSample: ex.responseBody.slice(0, 2000),
         });
       } catch (err) {
-        // Transport errors (connection refused, timeout) are not API bugs; the
-        // provider might simply be down. Report as a finding only when it looks
-        // like the server crashed the connection mid-response.
+        // Transport errors (refused, timeout) aren't API bugs. Report only when
+        // it looks like the server crashed the connection mid-response.
         const msg = err instanceof Error ? err.message : String(err);
         const dropped = /socket hang up|ECONNRESET|other side closed/i.test(msg);
         if (dropped) {

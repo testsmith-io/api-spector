@@ -6,12 +6,8 @@ import type {
 } from '../../shared/types';
 import { SPECTOR_TO_HTTP } from '../importers/http-file';
 
-// ─── .http / .rest file exporter ──────────────────────────────────────────────
-//
-// Serialises a collection to a single `.http` file compatible with the VSCode
-// REST Client and IntelliJ HTTP Client. Collection + (non-secret) environment
-// variables are emitted as `@name = value` declarations so the file is
-// self-contained and round-trips back through the importer.
+// .http / .rest file exporter: serialises a collection to one `.http` file (VSCode REST Client, IntelliJ).
+// Collection + non-secret env vars become `@name = value` declarations so the file round-trips through the importer.
 
 /** Basename of a path, tolerant of both / and \ separators (no node:path dep). */
 function basenameOf(p: string): string {
@@ -95,7 +91,7 @@ function bodyLines(req: ApiRequest): { contentType?: string; text?: string } {
 export function generateHttpFile(collection: Collection, environment: Environment | null): GeneratedFile[] {
   const lines: string[] = [];
 
-  // ── File variables: environment first, collection variables override ──
+  // File variables: environment first, collection variables override
   const vars: Record<string, string> = {};
   for (const v of environment?.variables ?? []) {
     if (v.enabled && !v.secret) vars[v.key] = v.value;
@@ -107,7 +103,7 @@ export function generateHttpFile(collection: Collection, environment: Environmen
     lines.push('');
   }
 
-  // ── Requests ──
+  // Requests
   orderedRequests(collection).forEach((req, idx) => {
     if (idx > 0) lines.push('');
     lines.push(`### ${req.name}`);
@@ -126,8 +122,8 @@ export function generateHttpFile(collection: Collection, environment: Environmen
       && (req.body.multipart ?? []).some(p => p.enabled && p.key);
 
     if (isMultipart) {
-      // REST Client .http multipart: explicit boundary, with `< path` including
-      // a file's contents. We always set the Content-Type so the boundary matches.
+      // REST Client multipart: explicit boundary, `< path` embeds a file. Always
+      // set Content-Type so the boundary matches.
       const boundary = '----WebKitFormBoundaryApiSpector';
       const ctIdx = headers.findIndex(h => h.key.toLowerCase() === 'content-type');
       const ctHeader = { key: 'Content-Type', value: `multipart/form-data; boundary=${boundary}`, enabled: true };

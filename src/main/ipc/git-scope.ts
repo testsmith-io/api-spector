@@ -10,21 +10,11 @@ import { toPosix } from './git-scope-paths';
 // Re-export the pure pathspec helpers so handlers import everything from here.
 export { toRepoPath, fromRepoPath, scopePathspec, isWithinScope, resolveFromRoot } from './git-scope-paths';
 
-// ─── Scoped git resolution ──────────────────────────────────────────────────
-//
-// Historically the git client assumed the workspace dir WAS the repo root. That
-// breaks when a `.spector` workspace lives in a subfolder of a larger project
-// repo. This module resolves, for the current workspace, which repository to
-// operate on and which subtree to scope file operations to:
-//
-//   mode 'own'    — the workspace dir is itself the repo root (scope '').
-//   mode 'scoped' — the workspace is a subfolder of an enclosing repo AND the
-//                   user opted in (settings.git.useEnclosingRepo). `scope` is
-//                   the workspace's path relative to the repo root (posix).
-//
-// Scoped mode is OPT-IN: detection may walk up (`rev-parse --show-toplevel`),
-// but we never operate in scoped mode unless the persisted preference is on, so
-// a workspace under an unrelated ancestor repo is never silently touched.
+// Scoped git resolution: picks which repo to operate on and which subtree to scope
+// file operations to. mode 'own' = workspace dir is the repo root (scope ''); mode
+// 'scoped' = workspace is a subfolder of an enclosing repo and the user opted in
+// (scope = path relative to root). Scoped mode is OPT-IN, so a workspace under an
+// unrelated ancestor repo is never silently touched.
 
 export interface GitScope {
   /** simple-git bound to the repository root (NOT the workspace dir). */
@@ -36,10 +26,9 @@ export interface GitScope {
   mode: 'own' | 'scoped'
 }
 
-// Cache the (expensive-ish) toplevel lookup per workspace dir. The preference
-// is read live, so toggling scoped mode does not need a cache bust; only a
-// change to whether the dir is inside a repo at all (e.g. after `git init`)
-// does — callers that change that invalidate explicitly.
+// Cache the toplevel lookup per workspace dir. The preference is read live, so
+// toggling scoped mode needs no bust; only a change to whether the dir is in a
+// repo (e.g. after `git init`) does, and callers invalidate explicitly.
 const toplevelCache = new Map<string, string | null>();
 
 async function repoToplevel(wsDir: string): Promise<string | null> {
@@ -60,12 +49,8 @@ export function clearGitScopeCache(): void {
   toplevelCache.clear();
 }
 
-/**
- * Resolve the active git scope for the current workspace. Throws when there is
- * no workspace, no repository, or the workspace is inside an enclosing repo but
- * scoped mode is not enabled — i.e. whenever the panel should not be running
- * git operations. Callers only invoke this once the panel is in 'own'/'scoped'.
- */
+/** Resolve the active git scope. Throws when there's no workspace, no repo, or
+ *  the workspace is inside an enclosing repo with scoped mode off. */
 export async function resolveGitScope(): Promise<GitScope> {
   const wsDir = getWorkspaceDir();
   if (!wsDir) throw new Error('No workspace open');
@@ -81,10 +66,8 @@ export async function resolveGitScope(): Promise<GitScope> {
   throw new Error('Workspace is inside a repository but scoped git mode is not enabled');
 }
 
-/**
- * Describe the repo situation for the UI WITHOUT running any working-tree
- * command (so it cannot wedge on a huge ancestor tree). Never throws.
- */
+/** Describe the repo situation for the UI without any working-tree command (so
+ *  it can't wedge on a huge ancestor tree). Never throws. */
 export async function detectRepoInfo(): Promise<GitRepoInfo> {
   const wsDir = getWorkspaceDir();
   if (!wsDir) return { state: 'none' };

@@ -1,10 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Optional AI documentation generation. The API key is NEVER stored in the
-// workspace/collection files — it lives only in the OS keychain (safeStorage),
-// referenced by AI_OPENAI_TOKEN_REF. Model choice lives in renderer localStorage,
-// per-machine, so nothing AI-related is committed to version control.
+// Optional AI doc generation. The API key is never stored in workspace/collection
+// files; it lives only in the OS keychain (safeStorage), referenced by AI_OPENAI_TOKEN_REF.
 
 /** Keychain ref the OpenAI API key is stored under. */
 export const AI_OPENAI_TOKEN_REF = 'ai:openai:token';
@@ -13,7 +11,7 @@ export const AI_OPENAI_TOKEN_REF = 'ai:openai:token';
 export const DEFAULT_AI_MODEL = 'gpt-4o-mini';
 
 export interface GenerateDocsInput {
-  /** Which tree level the docs are for — steers the prompt. */
+  /** Which tree level the docs are for; steers the prompt. */
   level: 'request' | 'folder' | 'collection'
   /** The item's name, shown to the model. */
   name: string

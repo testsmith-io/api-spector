@@ -18,12 +18,10 @@ interface Props {
 }
 
 /** Markdown documentation editor shared by request / folder / collection docs.
- *  A Write/Preview toggle, a lightweight formatting toolbar, and an optional
- *  "Generate with AI" action. Docs are stored as plain markdown. */
+ *  Write/Preview toggle, a formatting toolbar, and an optional "Generate with AI". */
 export function DocsEditor({ value, onChange, placeholder, onGenerate, aiAvailable }: Props) {
   const t = useT();
-  // Open in Preview when there's already documentation to read; fall back to
-  // Write only when the doc is empty (nothing to preview yet).
+  // Open in Preview when there's documentation to read, else Write.
   const [mode, setMode] = useState<'write' | 'preview'>(value.trim() ? 'preview' : 'write');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,8 +63,7 @@ export function DocsEditor({ value, onChange, placeholder, onGenerate, aiAvailab
     requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(start + snippet.length - 1, start + snippet.length - 1); });
   }
 
-  // Drop a starter flowchart block at the cursor (and make sure we're in Write
-  // so the user can edit it). Rendered as a diagram in Preview.
+  // Drop a starter flowchart block at the cursor and switch to Write.
   function insertDiagram() {
     const ta = taRef.current;
     setMode('write');

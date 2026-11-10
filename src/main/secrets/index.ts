@@ -1,13 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// External secret managers. Importing this module registers the built-in
-// providers; add a new backend by implementing SecretProvider and registering it
-// here (one line), with no changes to the run/interpolation pipeline.
-//
-//   import { registerSecretProvider } from './registry'
-//   import { awsSecretsProvider } from './providers/aws'
-//   registerSecretProvider(awsSecretsProvider)   // enables `aws:...` references
+// External secret managers. Importing this module registers the built-in providers;
+// add a backend by implementing SecretProvider and registering it here (one line).
 
 import { registerSecretProvider } from './registry';
 import { vaultProvider, openBaoProvider } from './providers/vault';

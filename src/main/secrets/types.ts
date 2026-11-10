@@ -1,25 +1,20 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Pluggable external-secret backends. A provider resolves a scheme-prefixed
-// reference (e.g. `vault:secret/data/app#token`) to a secret value at run time.
-// HashiCorp Vault is the first provider; adding another backend (AWS Secrets
-// Manager, Azure Key Vault, GCP Secret Manager, ...) is just implementing this
-// interface and registering it — nothing in the run/interpolation pipeline
-// changes. Providers must stay free of Electron imports so the engine build
-// (out/main/lib.js, used by the cloud runtime) can use them.
+// Pluggable external-secret backends: a provider resolves a scheme-prefixed
+// reference (e.g. `vault:secret/data/app#token`) to a value at run time. Keep them
+// free of Electron imports so the engine build (cloud runtime) can use them.
 
 export interface SecretResolveContext {
   /** Reserved for future per-request scoping (profile selection, etc.). */
   readonly profile?: string
-  /** The active variable scope (environment + collection + …), so a provider
-   *  can interpolate `{{var}}` tokens inside a reference path or a configured
-   *  path prefix — e.g. the Vault prefix `stack/{{stackFolder}}/data/`. */
+  /** The active variable scope, so a provider can interpolate `{{var}}` tokens
+   *  inside a reference path or configured prefix. */
   readonly vars?: Record<string, string>
 }
 
 export interface SecretProvider {
-  /** The reference scheme this provider handles, e.g. `vault` — the part
+  /** The reference scheme this provider handles, e.g. `vault` - the part
    *  before the first `:` in a reference. Lower-case. */
   readonly scheme: string
 

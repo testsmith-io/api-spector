@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── Scripting & request execution (IPC payloads) ───────────────────────────
+// Scripting & request execution (IPC payloads)
 
 import type { ApiRequest, Environment, TlsSettings } from './collection';
 
@@ -25,20 +25,18 @@ export interface ScriptExecutionMeta {
   postScriptError?: string
 }
 
-// ─── IPC payloads ─────────────────────────────────────────────────────────────
+// IPC payloads
 
 export interface SendRequestPayload {
   request: ApiRequest
   environment: Environment | null
   collectionVars: Record<string, string>
-  /** Folder-chain variables for this request (inner folder wins). A distinct
-   *  scope so they resolve at folder precedence — above the environment, below
-   *  request/local — instead of being folded into collectionVars. */
+  /** Folder-chain variables for this request (inner folder wins); a distinct
+   *  scope resolving above the environment, below request/local. */
   folderVars?: Record<string, string>
   globals: Record<string, string>
-  /** A single data-table row to inject as local variables for this send, so an
-   *  individual request can be run against one specific row. Values may contain
-   *  {{vars}} / faker expressions; they are resolved at send-time. */
+  /** One data-table row injected as local variables for this send. Values may
+   *  contain {{vars}} / faker expressions, resolved at send time. */
   dataRow?: Record<string, string>
   proxy?: {
     url: string
@@ -46,17 +44,16 @@ export interface SendRequestPayload {
   }
   tls?: TlsSettings
   piiMaskPatterns?: string[]
-  /** When set, the main process streams frames back on IPC.request.streamEvent
-   *  tagged with this id, and IPC.request.stopStream can abort the read. Only
-   *  the main (visible) request sets this; hooks are always buffered. */
+  /** When set, main streams frames on IPC.request.streamEvent tagged with this id
+   *  (stoppable via IPC.request.stopStream). Only the visible request sets it;
+   *  hooks are always buffered. */
   streamId?: string
   /** Force streaming regardless of Content-Type (the "Stream response" toggle). */
   forceStream?: boolean
 }
 
-/** One frame from a streamed response (SSE / NDJSON / json-seq / raw chunk).
- *  Emitted live over IPC as it arrives and also collected on the final
- *  ResponsePayload so the viewer can re-render a completed stream. */
+/** One frame from a streamed response (SSE / NDJSON / raw chunk). Emitted live
+ *  over IPC and collected on the final ResponsePayload for re-render. */
 export interface StreamEvent {
   /** 0-based receive order. */
   seq: number

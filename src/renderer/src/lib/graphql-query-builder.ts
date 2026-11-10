@@ -1,12 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// AST-based GraphQL query building. Inserting a field from the schema explorer
-// works on the parsed document (not string splicing), so the result is ALWAYS
-// syntactically valid: fields land in the right operation/selection set,
-// required arguments become typed variables (added to the operation signature
-// and seeded into the variables JSON), and object/interface/union fields get a
-// non-empty, valid selection set. Printing the AST guarantees valid syntax.
+// AST-based GraphQL query building: a field is inserted into the parsed document, not by
+// string splicing, so the result stays valid (right selection set, required args become typed variables).
 
 import {
   parse, print, validate, Kind,
@@ -24,7 +20,7 @@ export type OperationType = 'query' | 'mutation' | 'subscription';
 const LEAF_LIMIT = 6;
 const name = (value: string) => ({ kind: Kind.NAME as const, value });
 
-// ─── GqlTypeRef -> AST TypeNode + JSON seed ───────────────────────────────────
+// GqlTypeRef -> AST TypeNode + JSON seed
 
 function toTypeNode(ref: GqlTypeRef): TypeNode {
   if (ref.kind === 'NON_NULL') return { kind: Kind.NON_NULL_TYPE, type: toTypeNode(ref.ofType!) as TypeNode & { kind: Kind.NAMED_TYPE | Kind.LIST_TYPE } };
@@ -36,8 +32,7 @@ function isListRef(ref: GqlTypeRef): boolean {
   return ref.kind === 'LIST' || (ref.kind === 'NON_NULL' && ref.ofType?.kind === 'LIST');
 }
 
-/** A placeholder value for a freshly-added variable, typed roughly right so the
- *  variables JSON is usable immediately (the user fills in real values). */
+/** A roughly-typed placeholder for a new variable, for the user to fill in. */
 function seedFor(ref: GqlTypeRef): unknown {
   if (isListRef(ref)) return [];
   switch (getBaseTypeName(ref)) {
@@ -47,15 +42,15 @@ function seedFor(ref: GqlTypeRef): unknown {
   }
 }
 
-// ─── Argument / variable construction ─────────────────────────────────────────
+// Argument / variable construction
 
 interface VarRegistry {
   defs: Map<string, VariableDefinitionNode>   // var name -> definition
   seeds: Record<string, unknown>
 }
 
-// A unique variable name for (arg, field): prefer the bare arg name, but if it
-// is already taken by a different type, qualify it with the field name.
+// A unique variable name for (arg, field): the bare arg name, qualified with
+// the field name if already taken by a different type.
 function variableFor(field: GqlField, arg: GqlField['args'][number], reg: VarRegistry): string {
   const typeStr = print(toTypeNode(arg.type));
   const existing = reg.defs.get(arg.name);
@@ -64,16 +59,13 @@ function variableFor(field: GqlField, arg: GqlField['args'][number], reg: VarReg
   return `${field.name}_${arg.name}`;
 }
 
-// Well-known pagination arg names: when required (e.g. Lighthouse's
-// `first: Int!`), we inline a sensible number so the query runs immediately
-// instead of forcing the user to fill a variable.
+// Pagination arg names: when required, inline a number so the query runs without
+// the user filling a variable.
 const PAGE_SIZE = new Set(['first', 'last', 'limit', 'take', 'top', 'count', 'size', 'perpage', 'per_page']);
 const PAGE_ZERO = new Set(['skip', 'offset']);
 
-// Only REQUIRED (non-null) arguments are added. Optional args (including
-// optional pagination) are left out so a plain field inserts clean. A required
-// pagination Int gets an inline literal; every other required arg becomes a
-// typed variable (added to the signature + seeded into the variables JSON).
+// Only required (non-null) args are added. A required pagination Int gets an
+// inline literal; every other required arg becomes a typed variable.
 function buildArguments(field: GqlField, reg: VarRegistry): ArgumentNode[] {
   const out: ArgumentNode[] = [];
   for (const arg of field.args.filter(argRequired)) {
@@ -93,11 +85,11 @@ function buildArguments(field: GqlField, reg: VarRegistry): ArgumentNode[] {
   return out;
 }
 
-// ─── Selection sets ───────────────────────────────────────────────────────────
+// Selection sets
 
-/** A valid, non-empty selection set for a composite type: its leaf (scalar/enum)
- *  fields, always at least __typename so unions (and fieldless types) stay valid.
- *  `all` selects every leaf field; otherwise the first LEAF_LIMIT. */
+/** A non-empty selection set of a composite type's leaf fields, falling back to
+ *  __typename so unions/fieldless types stay valid. `all` picks every leaf,
+ *  else the first LEAF_LIMIT. */
 function leafSelectionSet(baseTypeName: string, typeMap: Map<string, GqlType>, all: boolean): SelectionSetNode | undefined {
   const type = typeMap.get(baseTypeName);
   const selections: SelectionNode[] = [];
@@ -113,10 +105,8 @@ function leafSelectionSet(baseTypeName: string, typeMap: Map<string, GqlType>, a
   return { kind: Kind.SELECTION_SET, selections };
 }
 
-/** Build a FieldNode for a field. `withSelection` adds a leaf selection set when
- *  the field's type is composite (only the deepest inserted field needs one;
- *  intermediate ancestors get their selection set from navigation). `all` picks
- *  every leaf field instead of the first few. */
+/** `withSelection` adds a leaf selection set when the field's type is composite;
+ *  only the deepest inserted field needs one. `all` picks every leaf field. */
 function buildFieldNode(field: GqlField, typeMap: Map<string, GqlType>, reg: VarRegistry, withSelection: boolean, all = false): FieldNode {
   const args = buildArguments(field, reg);
   const baseKind = getBaseKind(field.type);
@@ -129,7 +119,7 @@ function buildFieldNode(field: GqlField, typeMap: Map<string, GqlType>, reg: Var
   };
 }
 
-// ─── Document navigation ──────────────────────────────────────────────────────
+// Document navigation
 
 function findOrCreateOperation(doc: DocumentNode, opType: OperationType, opName?: string): { doc: DocumentNode; op: OperationDefinitionNode } {
   const ops = doc.definitions.filter((d): d is OperationDefinitionNode => d.kind === Kind.OPERATION_DEFINITION);
@@ -144,8 +134,8 @@ function findOrCreateOperation(doc: DocumentNode, opType: OperationType, opName?
   return { doc: { ...doc, definitions: [...doc.definitions, op] }, op };
 }
 
-// Resolve the chain of GqlFields for a path of field names, starting from the
-// root type. Lets intermediate ancestors be created with their required args.
+// The chain of GqlFields for a path of field names from the root type, so
+// intermediate ancestors can be created with their required args.
 function resolveChain(rootTypeName: string, path: string[], typeMap: Map<string, GqlType>): GqlField[] {
   const chain: GqlField[] = [];
   let currentType = rootTypeName;
@@ -158,8 +148,8 @@ function resolveChain(rootTypeName: string, path: string[], typeMap: Map<string,
   return chain;
 }
 
-/** Add `sel` to a selection set if a field with the same name is not already
- *  present (mutating a copy). Returns the field node that now lives there. */
+/** Add the field unless one of the same name is present; returns the node that
+ *  now lives there. */
 function upsertField(set: { selections: SelectionNode[] }, fieldNode: FieldNode): FieldNode {
   const existing = set.selections.find((s): s is FieldNode => s.kind === Kind.FIELD && s.name.value === fieldNode.name.value);
   if (existing) return existing;
@@ -167,12 +157,12 @@ function upsertField(set: { selections: SelectionNode[] }, fieldNode: FieldNode)
   return fieldNode;
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// Public API
 
 export interface InsertResult { query: string; variables: string }
 
-/** Insert `field` (found under `path` in the root `operationType` type) into the
- *  query, returning a printed, valid query and the merged variables JSON. */
+/** Insert `field` (found under `path`) into the query, returning the printed
+ *  query and merged variables JSON. */
 export function insertField(
   currentQuery: string,
   currentVariables: string,
@@ -188,8 +178,7 @@ export function insertField(
     : operationType === 'mutation' ? schema.mutationType
     : schema.subscriptionType;
 
-  // Parse the current query; on any problem start from a clean document so we
-  // never build on top of invalid syntax.
+  // On any parse problem start clean rather than build on invalid syntax.
   let doc: DocumentNode;
   try { doc = currentQuery.trim() ? parse(currentQuery) : { kind: Kind.DOCUMENT, definitions: [] }; }
   catch { doc = { kind: Kind.DOCUMENT, definitions: [] }; }
@@ -197,7 +186,7 @@ export function insertField(
   const created = findOrCreateOperation(doc, operationType, operationName);
   doc = created.doc;
 
-  // Work on a deep-cloned operation so we can mutate selection sets freely.
+  // Deep clone so selection sets can be mutated freely.
   const op = JSON.parse(JSON.stringify(created.op)) as OperationDefinitionNode;
   const reg: VarRegistry = { defs: new Map((op.variableDefinitions ?? []).map(v => [v.variable.name.value, v])), seeds: {} };
 
@@ -218,8 +207,7 @@ export function insertField(
   (op as { variableDefinitions?: VariableDefinitionNode[] }).variableDefinitions = [...reg.defs.values()];
   if (operationName && !op.name) (op as { name?: ReturnType<typeof name> }).name = name(operationName);
 
-  // `doc` already contains created.op (findOrCreateOperation appends it); swap
-  // in the mutated clone.
+  // Swap the mutated clone in for created.op.
   const definitions = doc.definitions.map(d => (d === created.op ? op : d));
   return {
     query: print({ kind: Kind.DOCUMENT, definitions }),
@@ -227,8 +215,7 @@ export function insertField(
   };
 }
 
-/** Merge new variable seeds into the variables JSON without clobbering values
- *  the user already set. */
+/** Merge new seeds into the variables JSON without clobbering the user's values. */
 export function mergeVariables(currentJson: string, seeds: Record<string, unknown>): string {
   if (Object.keys(seeds).length === 0) return currentJson;
   let obj: Record<string, unknown> = {};
@@ -237,12 +224,12 @@ export function mergeVariables(currentJson: string, seeds: Record<string, unknow
   return JSON.stringify(merged, null, 2);
 }
 
-// ─── Validation ───────────────────────────────────────────────────────────────
+// Validation
 
 export interface QueryProblem { message: string; severity: 'error' | 'warning' }
 
-/** Validate the query against the schema, plus a check that every used variable
- *  is present in the variables JSON. Empty array means all good. */
+/** Validate the query against the schema, and check every used variable is in
+ *  the variables JSON. Empty array means no problems. */
 export function validateQuery(schema: GraphQLSchema | null, query: string, variablesJson: string): QueryProblem[] {
   if (!query.trim()) return [];
   let doc: DocumentNode;
@@ -254,8 +241,8 @@ export function validateQuery(schema: GraphQLSchema | null, query: string, varia
     for (const err of validate(schema, doc)) problems.push({ message: err.message, severity: 'error' });
   }
 
-  // Variables referenced but not provided (warning, since some may be intended
-  // to come from {{env}} substitution at send-time).
+  // Referenced but not provided: only a warning, since some come from {{env}}
+  // substitution at send-time.
   let provided: Record<string, unknown> = {};
   try { provided = variablesJson.trim() ? JSON.parse(variablesJson) : {}; } catch { /* invalid JSON handled elsewhere */ }
   const used = new Set<string>();

@@ -17,7 +17,7 @@ const { electron } = window;
 
 type Tab = 'changes' | 'log' | 'branches' | 'ci';
 
-// ─── File status badge ────────────────────────────────────────────────────────
+// File status badge
 
 function StatusBadge({ status }: { readonly status: GitFile['status'] }) {
   const map: Record<GitFile['status'], { label: string; color: string }> = {
@@ -31,7 +31,7 @@ function StatusBadge({ status }: { readonly status: GitFile['status'] }) {
   return <span className={`font-mono text-[11px] font-bold w-4 shrink-0 ${color}`}>{label}</span>;
 }
 
-// ─── Diff viewer ─────────────────────────────────────────────────────────────
+// Diff viewer
 
 export function DiffViewer({ diff }: { readonly diff: string }) {
   const t = useT();
@@ -53,7 +53,7 @@ export function DiffViewer({ diff }: { readonly diff: string }) {
   );
 }
 
-// ─── Changes tab ─────────────────────────────────────────────────────────────
+// Changes tab
 
 function ChangesTab({ status, onRefresh, reloadWorkspace, scoped }: { readonly status: GitStatus; readonly onRefresh: () => void; readonly reloadWorkspace: () => Promise<void>; readonly scoped: boolean }) {
   const t = useT();
@@ -67,8 +67,7 @@ function ChangesTab({ status, onRefresh, reloadWorkspace, scoped }: { readonly s
   const [fetching,   setFetching]   = useState(false);
   const [amend,      setAmend]      = useState(false);
   const [pushRejected, setPushRejected] = useState(false);
-  // Non-null while the git author identity is missing: shows an inline form so
-  // the commit can proceed without dropping to a terminal.
+  // Non-null while the git author identity is missing: shows an inline form to set it.
   const [identity,   setIdentity]   = useState<{ name: string; email: string } | null>(null);
   const [conflictFile, setConflictFile] = useState<string | null>(null);
   const [pullRebase, setPullRebase] = useState(() => {
@@ -111,10 +110,8 @@ function ChangesTab({ status, onRefresh, reloadWorkspace, scoped }: { readonly s
     try { await electron.gitStageAll(); onRefresh(); } catch (e) { setError(String(e)); }
   }
 
-  // Throw away working-tree changes for the given files. Irreversible, so it
-  // always runs behind a confirmation. Tracked files revert to HEAD; untracked
-  // files are deleted. After discarding we reload the workspace from disk so
-  // the rest of the UI does not keep showing the now-reverted in-memory data.
+  // Discard working-tree changes (irreversible, always confirmed): tracked files
+  // revert to HEAD, untracked are deleted. Reload the workspace so the UI isn't stale.
   function discard(files: GitFile[]) {
     if (files.length === 0) return;
     const message = files.length === 1
@@ -147,8 +144,7 @@ function ChangesTab({ status, onRefresh, reloadWorkspace, scoped }: { readonly s
       onRefresh();
     } catch (e) {
       const msg = String(e);
-      // git refuses to commit without an author identity — surface an inline
-      // form to set it rather than a cryptic error, then let the user retry.
+      // git refuses to commit without an author identity - show an inline form to set it.
       if (/please tell me who you are|user\.name|user\.email|empty ident|auto-detect/i.test(msg)) {
         const cur = await electron.gitGetIdentity().catch(() => ({ name: '', email: '' }));
         setIdentity(cur);
@@ -593,7 +589,7 @@ function ChangesTab({ status, onRefresh, reloadWorkspace, scoped }: { readonly s
   );
 }
 
-// ─── Log tab ──────────────────────────────────────────────────────────────────
+// Log tab
 
 function LogTab({ onRefresh, scoped }: { readonly onRefresh: () => void; readonly scoped: boolean }) {
   const t = useT();
@@ -680,7 +676,7 @@ function LogTab({ onRefresh, scoped }: { readonly onRefresh: () => void; readonl
   );
 }
 
-// ─── Branches tab ─────────────────────────────────────────────────────────────
+// Branches tab
 
 function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () => void; readonly reloadWorkspace: () => Promise<void> }) {
   const t = useT();
@@ -721,10 +717,8 @@ function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () =>
 
   useEffect(() => { load(); }, [load]);
 
-  // git aborts a checkout when the switch would clobber uncommitted work; the
-  // exact wording varies ("overwritten by checkout/merge", "commit your changes
-  // or stash them"). On that specific failure, offer to stash and retry so the
-  // user isn't stuck. Any other error propagates to the caller untouched.
+  // git aborts a checkout that would clobber uncommitted work (wording varies).
+  // On that failure, offer to stash and retry; any other error propagates.
   function isDirtyTreeError(msg: string): boolean {
     return /overwritten by (checkout|merge)|commit your changes or stash/i.test(msg);
   }
@@ -750,9 +744,8 @@ function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () =>
     try {
       setError(null); setInfo(null);
       const localName = remote ? name.replace(/^origin\//, '') : name;
-      // A checkout swaps the working-tree files to the other branch, so the
-      // in-memory workspace (collections, environments, flows, open tabs) is now
-      // stale — reload it from disk before refreshing the git views.
+      // A checkout swaps the working-tree files, so the in-memory workspace is
+      // stale - reload it from disk before refreshing the git views.
       if (await checkoutOrStash(localName, false)) { await reloadWorkspace(); load(); onRefresh(); }
     } catch (e) { setError(String(e)); }
   }
@@ -770,9 +763,8 @@ function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () =>
     } catch (e) { setError(String(e)); }
   }
 
-  // Rebase the current branch onto `onto`. A rebase rewrites the working tree,
-  // so reload the workspace afterwards (same as checkout). When it stops on
-  // conflicts, leave the user in the Changes tab to resolve and continue.
+  // Rebase the current branch onto `onto`. Rewrites the working tree, so reload
+  // the workspace after; on conflicts, leave the user in the Changes tab.
   async function rebaseOnto(onto: string) {
     if (!confirm(t('Rebase the current branch onto ":name"? Your commits are replayed on top of it.', { name: onto }))) return;
     try {
@@ -790,8 +782,7 @@ function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () =>
     try {
       setError(null); setInfo(null);
       await electron.gitStashPop(ref);
-      // Popping a stash writes the parked changes back into the working tree,
-      // so the workspace on disk changed — reload it into the store.
+      // Popping writes the parked changes back to the working tree - reload the store.
       await reloadWorkspace(); load(); onRefresh();
     } catch (e) { setError(String(e)); }
   }
@@ -864,8 +855,8 @@ function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () =>
     } catch (e) { setError(String(e)); }
   }
 
-  // Merge another branch into the current one. Repo-wide (the whole working tree
-  // changes), so reload the workspace afterwards; a conflict routes to Changes.
+  // Merge another branch into the current one. Rewrites the working tree, so
+  // reload the workspace after; a conflict routes to Changes.
   async function mergeBranch(name: string) {
     if (!confirm(t('Merge ":name" into the current branch?', { name }))) return;
     try {
@@ -1028,8 +1019,7 @@ function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () =>
                   {t('rename')}
                 </button>
               )}
-              {/* Sync indicators — colored chips for ahead/behind so the user
-                  sees at a glance which branches need pushing/pulling. */}
+              {/* Sync chips: ahead/behind at a glance. */}
               {b.behind ? (
                 <span className="text-[10px] px-1 rounded bg-amber-900/40 text-amber-300" title={t(':count commit behind :upstream|:count commits behind :upstream', { count: b.behind, upstream: b.upstream })}>
                   ↓{b.behind}
@@ -1113,9 +1103,8 @@ function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () =>
         <p className="px-3 py-3 text-[11px] text-surface-500">{t('No branches match ":filter".', { filter })}</p>
       )}
 
-      {/* Stashes — parked working-tree snapshots (e.g. an auto-stash from
-          switching branches with uncommitted changes). Pop restores them onto
-          the current branch; drop discards them permanently. */}
+      {/* Stashes - parked working-tree snapshots. Pop restores onto the current
+          branch; drop discards permanently. */}
       {stashes.length > 0 && (
         <section className="border-t border-surface-800 mt-1">
           <p className="px-3 py-1.5 text-[10px] uppercase tracking-widest text-surface-500 font-semibold">{t('Stashes')}</p>
@@ -1303,7 +1292,7 @@ function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () =>
   );
 }
 
-// ─── CI tab ───────────────────────────────────────────────────────────────────
+// CI tab
 
 function CiTab() {
   const t = useT();
@@ -1326,26 +1315,23 @@ function CiTab() {
       const detected = detectPlatform(r);
       setPlatform(detected);
     }).catch(err => {
-      // Not having a git remote is the common case for fresh workspaces — log
-      // for diagnostics but don't surface a UI error here, the platform picker
-      // will simply default to 'unknown'.
+      // No git remote is normal for fresh workspaces - log but don't surface a
+      // UI error; the platform picker defaults to 'unknown'.
       console.warn('GitPanel: failed to read git remotes', err);
     });
   }, []);
 
   // Build the pipeline from the current platform/env/tags + detected secrets.
-  // Kept as a callable (not an effect side effect) so we can regenerate on a
-  // deliberate settings change or an explicit "Regenerate", without clobbering
-  // the user's manual edits whenever an unrelated store update re-renders.
+  // A callable (not an effect) so a deliberate change or "Regenerate" rebuilds
+  // it without clobbering manual edits on unrelated re-renders.
   const buildGenerated = useCallback(() => {
     const env = Object.values(environments).find(e => e.data.id === envId);
     const secretVars = env
       ? env.data.variables.filter(v => v.secret && v.enabled).map(v => v.key)
       : [];
     // Detect which external secret managers this run references, so the pipeline
-    // can wire up their credentials (VAULT_ADDR + OIDC step, etc.). Two sources:
-    // env-var secretRefs, and inline {{vault:...}} used anywhere in a request
-    // (URL, headers, body, auth, pre/post scripts).
+    // wires up their credentials. Two sources: env-var secretRefs, and inline
+    // {{vault:...}} anywhere in a request.
     const envRefManagers = env
       ? env.data.variables
           .filter(v => v.enabled && v.secretRef)
@@ -1359,10 +1345,8 @@ function CiTab() {
     return generateCiContent(platform, envName, tags, secretVars, secretManagers);
   }, [platform, envId, tags, environments, collections]);
 
-  // Regenerate only when a SETTING changes (platform/env/tags) — a deliberate
-  // "give me a fresh pipeline for these options" — which discards manual edits.
-  // Incidental store updates (a background autosave touching collections) no
-  // longer overwrite what the user has typed.
+  // Regenerate only when a setting changes (platform/env/tags), which discards
+  // manual edits. Incidental store updates don't overwrite what the user typed.
   useEffect(() => {
     setPreview(buildGenerated());
     setEdited(false);
@@ -1370,9 +1354,8 @@ function CiTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platform, envId, tags]);
 
-  // Keep the pipeline in sync with background changes (e.g. adding a secret
-  // variable, which changes buildGenerated) ONLY while the user hasn't edited
-  // it by hand — manual edits are never silently overwritten.
+  // Sync the pipeline with background changes only while the user hasn't edited
+  // it by hand - manual edits are never silently overwritten.
   useEffect(() => {
     if (!edited) { setPreview(buildGenerated()); setWritten(false); }
   }, [buildGenerated, edited]);
@@ -1504,7 +1487,7 @@ function CiTab() {
   );
 }
 
-// ─── Root ─────────────────────────────────────────────────────────────────────
+// Root
 
 export function GitPanel() {
   const t = useT();
@@ -1519,9 +1502,8 @@ export function GitPanel() {
     try {
       const repoInfo = await electron.gitRepoInfo();
       setInfo(repoInfo);
-      // Only run a working-tree command once there is a repo we operate on;
-      // in 'enclosing-available'/'none' we show an offer instead (and never
-      // risk a status walk over an ancestor's whole tree).
+      // Only run a working-tree command once there's a repo we operate on;
+      // otherwise show an offer instead.
       setStatus(repoInfo.state === 'own' || repoInfo.state === 'scoped'
         ? await electron.gitStatus()
         : null);

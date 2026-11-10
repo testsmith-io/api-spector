@@ -10,7 +10,7 @@ import { KVTable } from '../RequestBuilder/KVTable';
 import { useAiAvailable, generateDocs, collectionDocsContext } from '../../lib/ai';
 import { useT } from '../../i18n';
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// Component
 
 export function CollectionPanel() {
   const t = useT();
@@ -26,10 +26,8 @@ export function CollectionPanel() {
 
   const [activeTab, setActiveTab] = useState<'documentation' | 'data' | 'variables'>('documentation');
 
-  // Local draft rows for the variables editor. Kept in component state (not
-  // derived each render) so a freshly-added blank row survives until it gets a
-  // key — a Record<string,string> can't hold an empty key, so storing filters
-  // blanks out. Reseeded when the active collection changes.
+  // Draft rows kept in state (not derived) so a blank row survives until it gets a
+  // key - a Record<string,string> can't hold an empty key. Reseeded on collection switch.
   const [varRows, setVarRows] = useState<KeyValuePair[]>([]);
   useEffect(() => {
     const data = activeCollectionId ? collections[activeCollectionId]?.data : undefined;

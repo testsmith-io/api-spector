@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { entriesToMockServer } from '../main/recorder';
 import type { RecordedEntry } from '../shared/types';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// Helpers
 
 function makeEntry(
   method: string,
@@ -24,7 +24,7 @@ function makeEntry(
   };
 }
 
-// ─── entriesToMockServer ──────────────────────────────────────────────────────
+// entriesToMockServer
 
 describe('entriesToMockServer', () => {
   it('returns empty routes for empty input', () => {
@@ -52,7 +52,7 @@ describe('entriesToMockServer', () => {
     expect(server.routes).toHaveLength(1);
   });
 
-  // ── Deduplication preference ──────────────────────────────────────────────
+  // Deduplication preference
 
   it('keeps the first 2xx response and discards subsequent non-2xx', () => {
     const entries = [
@@ -93,7 +93,7 @@ describe('entriesToMockServer', () => {
     expect(server.routes[0].body).toBe('original-200');
   });
 
-  // ── Binary content ────────────────────────────────────────────────────────
+  // Binary content
 
   it('replaces binary body with a human-readable placeholder', () => {
     const entries = [makeEntry('GET', '/logo.png', 200, 'base64:abc==', {}, true)];
@@ -109,7 +109,7 @@ describe('entriesToMockServer', () => {
     expect(server.routes[0].body).toContain('/img.png');
   });
 
-  // ── Header filtering ──────────────────────────────────────────────────────
+  // Header filtering
 
   it('strips connection, content-length, and transfer-encoding headers', () => {
     const entries = [makeEntry('GET', '/api', 200, '{}', {
@@ -153,7 +153,7 @@ describe('entriesToMockServer', () => {
     expect(server.routes[0].headers['x-custom']).toBe('keep-me');
   });
 
-  // ── Server metadata ───────────────────────────────────────────────────────
+  // Server metadata
 
   it('sets name and port from arguments', () => {
     const server = entriesToMockServer([], 'https://api.example.com', 'My Server', 8080);

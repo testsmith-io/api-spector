@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import { DotsHorizontalIcon } from './icons';
 import { useT } from '../../i18n';
 
-// ─── Context menu ─────────────────────────────────────────────────────────────
+// Context menu
 
 export type MenuItem =
   | { type: 'item'; label: string; icon?: React.ReactNode; danger?: boolean; onClick: () => void }
@@ -29,12 +29,8 @@ export function ContextMenu ( { items, x, y, onClose }: {
     return () => document.removeEventListener( 'mousedown', handle, true );
   }, [onClose] );
 
-  // Keep the menu fully inside the window even when it is small or the menu is
-  // opened near an edge: flip past the anchor on right/bottom overflow, then
-  // clamp both axes into the viewport with a margin. Measured before paint so
-  // the menu never flashes partly off-screen. `pos` is null until measured, and
-  // the first (hidden) render is placed at the raw coords only so it can be
-  // measured.
+  // Keep the menu inside the window: flip past the anchor on overflow, then clamp
+  // both axes with a margin. Measured before paint (`pos` null until measured) so it never flashes.
   const MARGIN = 8;
   const [pos, setPos] = useState<{ top: number; left: number } | null>( null );
   useLayoutEffect( () => {
@@ -94,13 +90,9 @@ export function ContextMenu ( { items, x, y, onClose }: {
   );
 }
 
-/**
- * The "⋯" options button. In addition to opening on click, it binds a
- * right-click (contextmenu) handler to its enclosing row — the nearest ancestor
- * matching `rowSelector` (default `[data-row]`) — so right-clicking anywhere on
- * that row opens the same menu at the cursor. Mark each row's root element with
- * `data-row` to enable it.
- */
+/** The options button. Also binds a contextmenu handler to its enclosing row
+ *  (nearest `rowSelector` ancestor, default `[data-row]`) so right-clicking the
+ *  row opens the same menu at the cursor. */
 export function DotsBtn ( { items, rowSelector = '[data-row]' }: {
   readonly items: MenuItem[]
   readonly rowSelector?: string

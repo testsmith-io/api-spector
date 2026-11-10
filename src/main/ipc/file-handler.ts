@@ -12,6 +12,7 @@ import JSZip from 'jszip';
 import { simpleGit } from 'simple-git';
 import type { Collection, Environment, Workspace, Flow } from '../../shared/types';
 import { externalizeDataSets, inlineDataSets } from '../data-files';
+import { stripEphemeralAuth } from '../../shared/request-collection';
 import { loadGlobals, getGlobals, setGlobals, persistGlobals } from '../globals-store';
 import { setSecretsConfig } from '../secrets';
 import { clearGitScopeCache } from './git-scope';
@@ -60,46 +61,35 @@ async function readLastWorkspacePath(): Promise<string | null> {
 let workspaceDir: string | null = null;
 let workspaceFile: string | null = null;
 
-// Whether the built-in git client should operate on an enclosing repository and
-// scope to this workspace's subtree (see settings.git.useEnclosingRepo and
-// git-scope.ts). Mirrored from the active workspace's settings at open/save so
-// the git handlers can read it synchronously without the manifest in hand.
+// Mirror of settings.git.useEnclosingRepo (see git-scope.ts), so git handlers
+// can read it synchronously without the manifest in hand.
 let gitScopePref = false;
 export function getGitScopePref(): boolean { return gitScopePref; }
 
-/** Apply a freshly opened/created/saved workspace's git preference and drop any
- *  cached repo-root lookup (the workspace dir, and so its repo situation, may
- *  have changed). */
+/** Apply a workspace's git preference and drop the cached repo-root lookup. */
 function applyGitPref(ws: Workspace | null | undefined): void {
   gitScopePref = ws?.settings?.git?.useEnclosingRepo === true;
   clearGitScopeCache();
 }
 
 async function atomicWrite(path: string, data: string): Promise<void> {
-  // Skip the write when nothing actually changed, so re-serializing an unchanged
-  // file (e.g. the workspace manifest the moment it is opened) does not rewrite
-  // it on disk and show up as a phantom git modification.
+  // Skip the write when unchanged, so re-serializing doesn't show up as a
+  // phantom git modification.
   try {
     if (await readFile(path, 'utf8') === data) return;
   } catch { /* file does not exist yet */ }
   await writeFile(path, data, 'utf8');
 }
 
-/** Serialize a workspace / collection / environment / flow to pretty JSON with a
- *  trailing newline, the convention editors and git expect, so a save never
- *  fights an editor's "insert final newline" and churn the file. */
+/** Pretty JSON with a trailing newline, so a save never fights an editor's
+ *  "insert final newline". */
 function writeJson(path: string, value: unknown): Promise<void> {
   return atomicWrite(path, JSON.stringify(value, null, 2) + '\n');
 }
 
-/** Default `.gitignore` for an API Spector workspace. Excludes:
- *  - secrets / env files (we never want these committed)
- *  - dependency installs if the user runs `npm i` inside the workspace
- *  - generated artifacts: docs from `electron.generateDocs`, run reports
- *    written by `api-spector run --output`, coverage from CI
- *  - OS / editor noise (.DS_Store, .idea — we keep `.vscode/` because
- *    `settings.json` is part of the workspace contract)
- */
+/** Default `.gitignore` for a workspace: excludes secrets, dependencies,
+ *  generated docs/reports, and OS/editor noise. `.vscode/` is kept (its
+ *  settings.json is part of the workspace contract). */
 export const SPECTOR_GITIGNORE = [
   '# API Spector - never commit secrets',
   '*.secrets',
@@ -135,11 +125,8 @@ export const SPECTOR_GITIGNORE = [
   '',
 ].join('\n');
 
-/** Default README for a fresh workspace. Tells anyone who clones the repo
- *  what the folder is, where things live, and how to run the tests — both
- *  in the GUI and from CI. The workspace filename is interpolated so
- *  `cd my-tests && api-spector ui` produces a README that already references
- *  `my-tests.spector` correctly. */
+/** Default README for a fresh workspace. The workspace filename is interpolated
+ *  so the README references the right `.spector` file. */
 function readmeContents(workspaceFileName: string): string {
   return [
     `# API tests`,
@@ -194,7 +181,7 @@ function readmeContents(workspaceFileName: string): string {
   ].join('\n');
 }
 
-/** Write `README.md` only when absent — never overwrite an existing one. */
+/** Write `README.md` only when absent - never overwrite an existing one. */
 export async function ensureReadme(workspaceDir: string, workspaceFileName: string): Promise<void> {
   const path = join(workspaceDir, 'README.md');
   try {
@@ -209,7 +196,7 @@ export async function ensureReadme(workspaceDir: string, workspaceFileName: stri
   }
 }
 
-/** Write `.gitignore` only when absent — never overwrite a hand-tuned one. */
+/** Write `.gitignore` only when absent - never overwrite a hand-tuned one. */
 export async function ensureGitignore(workspaceDir: string): Promise<void> {
   const path = join(workspaceDir, '.gitignore');
   try {
@@ -224,13 +211,9 @@ export async function ensureGitignore(workspaceDir: string): Promise<void> {
   }
 }
 
-/** Ensure the workspace's `.vscode/settings.json` maps `*.spector` to the JSON
- *  language so VS Code (and editors that read this file) syntax-highlight the
- *  workspace manifest without the user wiring it up manually each clone.
- *
- *  Idempotent and non-destructive: if the file already exists with other keys
- *  we merge our entry in; if it has invalid JSON we leave it alone rather than
- *  trash the user's config; if it already maps `*.spector`, no-op. */
+/** Map `*.spector` to JSON in the workspace's `.vscode/settings.json` so editors
+ *  highlight the manifest. Idempotent and non-destructive: merges into existing
+ *  keys, leaves invalid JSON alone. */
 async function ensureVscodeFileAssociation(workspaceDir: string): Promise<void> {
   const dir  = join(workspaceDir, '.vscode');
   const file = join(dir, 'settings.json');
@@ -241,9 +224,8 @@ async function ensureVscodeFileAssociation(workspaceDir: string): Promise<void> 
     try {
       parsed = JSON.parse(raw) as Record<string, unknown>;
     } catch {
-      // Hand-edited / commented JSON we can't safely round-trip. Bail rather
-      // than overwrite — the user's existing config is more important than
-      // our convenience write.
+      // Can't safely round-trip hand-edited/commented JSON; bail rather than
+      // overwrite the user's config.
       return;
     }
     const associations = (parsed['files.associations'] as Record<string, string> | undefined) ?? {};
@@ -251,7 +233,7 @@ async function ensureVscodeFileAssociation(workspaceDir: string): Promise<void> 
     parsed['files.associations'] = { ...associations, '*.spector': 'json' };
     await atomicWrite(file, JSON.stringify(parsed, null, 2) + '\n');
   } catch (err) {
-    // ENOENT is the common path — file/dir doesn't exist yet, create both.
+    // ENOENT: file/dir doesn't exist yet, create both.
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
       console.warn('file-handler: could not read existing .vscode/settings.json', err);
       return;
@@ -262,15 +244,12 @@ async function ensureVscodeFileAssociation(workspaceDir: string): Promise<void> 
   }
 }
 
-/** Pick a sensible starting directory for the file dialogs. When launched from
- *  the CLI we have the user's actual cwd; that beats whatever the OS would
- *  default to. */
+/** Starting directory for file dialogs: the CLI launch cwd when present. */
 function dialogStartDir(): string | undefined {
   return process.env.API_SPECTOR_LAUNCH_CWD || workspaceDir || undefined;
 }
 
-/** Derive a default workspace filename from the cwd: `/tmp/my-tests` → `my-tests.spector`.
- *  Falls back to a generic name if the cwd basename isn't usable. */
+/** Default workspace filename from the cwd basename, or a generic name. */
 function defaultWorkspaceName(): string {
   const cwd = process.env.API_SPECTOR_LAUNCH_CWD;
   if (cwd) {
@@ -280,15 +259,14 @@ function defaultWorkspaceName(): string {
   return 'my-workspace.spector';
 }
 
-// ─── Cloud workspace sync: serialize / apply helpers ─────────────────────────
+// Cloud workspace sync: serialize / apply helpers
 
 const SYNC_SKIP_DIRS = new Set(['.git', 'node_modules']);
 const SYNC_SKIP_FILES = new Set(['history.json']);
 
-/** Drop resolved secret material from an environment before it leaves the
- *  machine: remove the encrypted blob + salt/iv/hash and blank the value of any
- *  secret variable. Plain values (baseUrl, …) and references (envRef/secretRef)
- *  are kept so the workspace still works for teammates. */
+/** Strip resolved secret material before an environment leaves the machine:
+ *  drop the encrypted blob/salt/iv/hash and blank secret values. Plain values
+ *  and references are kept. */
 function stripEnvSecrets(text: string): string {
   try {
     const env = JSON.parse(text) as { variables?: Record<string, unknown>[] };
@@ -309,9 +287,8 @@ function stripEnvSecrets(text: string): string {
   }
 }
 
-/** When applying a pulled environment, keep THIS machine's secret values for
- *  variables that still exist (matched by key), so a pull never wipes local
- *  secrets. Structure/order come from the remote. */
+/** Merge local secret values (matched by key) into a pulled environment so a
+ *  pull never wipes them. Structure/order come from the remote. */
 function mergeEnvSecrets(remoteText: string, localText: string | null): string {
   if (!localText) return remoteText;
   try {
@@ -364,8 +341,8 @@ export function registerFileHandlers(ipc: IpcMain): void {
     const raw = await readFile(wsPath, 'utf8');
     const parsed = JSON.parse(raw) as unknown;
 
-    // A collection saved with a .spector extension is not a workspace. Offer to
-    // wrap it in one rather than failing to open.
+    // A collection saved with a .spector extension: offer to wrap it in a
+    // workspace rather than failing to open.
     if (looksLikeCollection(parsed)) {
       const { response } = await dialog.showMessageBox({
         type: 'question',
@@ -389,11 +366,8 @@ export function registerFileHandlers(ipc: IpcMain): void {
   });
 
   handleIpc(ipc, IPC.file.newWorkspace, async () => {
-    // When launched from the CLI in a specific folder, default the save
-    // dialog to that folder with a workspace name derived from the folder
-    // basename (e.g. /tmp/my-tests → my-tests.spector). The user can still
-    // navigate elsewhere or rename — this just removes the friction of
-    // every fresh workspace landing in ~/Documents.
+    // Default the save dialog to the CLI launch folder with a name from its
+    // basename, so a fresh workspace doesn't land in ~/Documents.
     const startDir = dialogStartDir();
     const defaultPath = startDir
       ? join(startDir, defaultWorkspaceName())
@@ -404,10 +378,9 @@ export function registerFileHandlers(ipc: IpcMain): void {
       filters: [{ name: 'API Spector Workspace', extensions: ['spector', 'json'] }]
     });
     if (result.canceled || !result.filePath) return null;
-    // If the chosen location sits inside an existing repository, auto-enable
-    // scoped git mode so the panel versions only this folder, not the whole
-    // project (see git-scope.ts). A location that IS a repo root, or no repo
-    // at all, scaffolds a plain standalone workspace.
+    // Inside an existing repo: auto-enable scoped git mode so the panel versions
+    // only this folder (see git-scope.ts). A repo root or no repo scaffolds a
+    // standalone workspace.
     const dir = dirname(result.filePath);
     const enclosing = await detectEnclosingRepo(dir);
     return scaffoldWorkspace(dir, basename(result.filePath), enclosing ?? undefined);
@@ -418,8 +391,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     setSecretsConfig(ws.settings?.secrets); // apply edited connection config at once
     applyGitPref(ws); // pick up a scoped-mode toggle saved from the panel
     await writeJson(workspaceFile, ws);
-    // Backfill the editor file-association for workspaces created before this
-    // helper existed. Idempotent — no-op if the file already maps *.spector.
+    // Backfill the file-association for pre-existing workspaces. Idempotent.
     if (workspaceDir) await ensureVscodeFileAssociation(workspaceDir);
   });
 
@@ -435,8 +407,11 @@ export function registerFileHandlers(ipc: IpcMain): void {
     if (!workspaceDir) throw new Error('No workspace open');
     const fullPath = resolve(workspaceDir, relPath);
     await mkdir(dirname(fullPath), { recursive: true });
-    // Data tables are written to separate CSVs under data/, not inline.
+    // Data tables go to separate CSVs under data/. externalizeDataSets returns a
+    // deep clone, so stripping its OAuth token cache keeps tokens out of the
+    // .spector file without clearing the live session cache.
     const toWrite = await externalizeDataSets(col, dirname(fullPath));
+    stripEphemeralAuth(toWrite);
     await writeJson(fullPath, toWrite);
   });
 
@@ -467,29 +442,25 @@ export function registerFileHandlers(ipc: IpcMain): void {
     await writeJson(fullPath, flow);
   });
 
-  /** Delete a workspace-relative file (collection, environment, mock, …).
-   *  Constrained to the workspace dir so a malicious renderer can't trick us
-   *  into wiping files elsewhere. Idempotent — missing files are not an error. */
+  /** Delete a workspace-relative file, constrained to the workspace dir.
+   *  Idempotent (missing files are not an error). */
   handleIpc(ipc, IPC.file.deleteWorkspaceFile, async (_e, relPath: string) => {
     if (!workspaceDir) throw new Error('No workspace open');
     const fullPath = resolve(workspaceDir, relPath);
-    // Reject any path that escapes the workspace dir (`..`, absolute paths
-    // resolved into another tree, etc.).
+    // Reject any path that escapes the workspace dir.
     if (!fullPath.startsWith(resolve(workspaceDir) + (process.platform === 'win32' ? '\\' : '/'))) {
       throw new Error(`Refusing to delete file outside the workspace: ${relPath}`);
     }
     try {
       await unlink(fullPath);
     } catch (err) {
-      // ENOENT is the common case (file already gone) — treat as success so
-      // callers can fire-and-forget without worrying about double-deletes.
+      // ENOENT (already gone): treat as success so callers can fire-and-forget.
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     }
   });
 
-  // Serialize the open workspace into a secret-free snapshot for cloud sync:
-  // the manifest's structural data (minus machine-local cloud/sync settings) and
-  // every workspace file, with environment secrets stripped.
+  // Secret-free snapshot for cloud sync: the manifest (minus machine-local
+  // cloud/sync settings) and every workspace file, env secrets stripped.
   handleIpc(ipc, IPC.file.serializeWorkspace, async () => {
     if (!workspaceDir || !workspaceFile) throw new Error('No workspace open');
     const manifest = JSON.parse(await readFile(workspaceFile, 'utf8')) as Workspace;
@@ -506,13 +477,12 @@ export function registerFileHandlers(ipc: IpcMain): void {
     return { manifest: { ...manifest, settings: sharedSettings }, manifestName, files };
   });
 
-  // Apply a pulled snapshot: back up the current workspace, write files (merging
-  // local env secrets so a pull never wipes them), then merge the manifest while
-  // keeping local cloud/sync settings. The renderer reloads from disk after.
+  // Apply a pulled snapshot: back up, write files (merging local env secrets),
+  // then merge the manifest keeping local cloud/sync settings.
   handleIpc(ipc, IPC.file.applyWorkspaceSnapshot, async (_e, snap: { manifest: Workspace; files: Record<string, string> }) => {
     if (!workspaceDir || !workspaceFile) throw new Error('No workspace open');
 
-    // Best-effort restore point (excludes .git / node_modules).
+    // Restore point (excludes .git / node_modules).
     try {
       const backupDir = join(app.getPath('userData'), 'sync-backups', basename(workspaceDir) + '-' + Date.now());
       await cp(workspaceDir, backupDir, {
@@ -612,7 +582,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     return true;
   });
 
-  // ── Globals ──────────────────────────────────────────────────────────────
+  // Globals
   handleIpc(ipc, IPC.globals.get, () => getGlobals());
 
   handleIpc(ipc, IPC.globals.set, async (_e, patch: Record<string, string>) => {
@@ -624,30 +594,21 @@ export function registerFileHandlers(ipc: IpcMain): void {
     workspaceDir  = null;
     workspaceFile = null;
     applyGitPref(null);
-    // Clear so the app shows the welcome screen on next launch. If the user-data
-    // directory is read-only the next launch will simply auto-load the previous
-    // workspace again — non-fatal but log so it shows up in diagnostics.
+    // Clear so the next launch shows the welcome screen. If user-data is
+    // read-only this logs and the previous workspace reloads instead.
     await writeFile(LAST_WS_FILE, JSON.stringify({ path: null }), 'utf8').catch(err => {
       console.warn('file-handler: could not clear last-workspace pointer', err);
     });
   });
 
   handleIpc(ipc, IPC.file.getLastWorkspace, async () => {
-    // Launch order of preference:
-    //   1. The CLI's launch cwd (set by bin/cli.js as API_SPECTOR_LAUNCH_CWD).
-    //      If that folder contains a `.spector` file, open it. If the folder
-    //      exists but has no workspace, return null so the welcome screen
-    //      shows — *do not* fall back to the previous workspace, since the
-    //      user explicitly chose this directory.
-    //   2. The remembered last-workspace path (regular dock/menu launch).
-    //
-    // This makes `cd /tmp/empty && api-spector ui` show the welcome screen
-    // instead of silently re-opening whatever was last open elsewhere.
+    // Launch order: 1) CLI launch cwd (API_SPECTOR_LAUNCH_CWD) opens its .spector, else null for
+    //    the welcome screen (no fallback to the previous workspace - the user chose this dir);
+    //    2) otherwise the remembered last-workspace path (dock/menu launch).
     const cwd = process.env.API_SPECTOR_LAUNCH_CWD;
     if (cwd) {
       const fromCwd = await tryOpenWorkspaceInDir(cwd);
-      // Either we found a workspace and opened it, or the user is in a folder
-      // they meant to be empty — either way, this is the answer.
+      // Whether or not a workspace was found, this is the answer.
       return fromCwd;
     }
 
@@ -656,9 +617,8 @@ export function registerFileHandlers(ipc: IpcMain): void {
     try {
       const raw = await readFile(wsPath, 'utf8');
       const workspace = JSON.parse(raw) as Workspace;
-      // Only set the module-level globals once the load *actually* succeeds —
-      // otherwise a stale path would leave the main process pretending a
-      // workspace is open.
+      // Set the module globals only after the load succeeds, so a stale path
+      // doesn't leave the main process pretending a workspace is open.
       workspaceDir = dirname(wsPath);
       workspaceFile = wsPath;
       await loadGlobals(workspaceDir);
@@ -670,8 +630,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     }
   });
 
-  // Recent-workspaces list for the welcome screen. Prune entries whose file no
-  // longer exists so the list never offers a dead link.
+  // Recent-workspaces list, pruned of entries whose file no longer exists.
   handleIpc(ipc, IPC.file.getRecentWorkspaces, async () => {
     const list = await readRecentWorkspaces();
     const alive = await Promise.all(list.map(async r => {
@@ -680,7 +639,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     return alive.filter((r): r is RecentWorkspace => r !== null);
   });
 
-  // Open a workspace by path (no dialog) — used by the recent-workspaces list.
+  // Open a workspace by path (no dialog) - used by the recent-workspaces list.
   handleIpc(ipc, IPC.file.openWorkspacePath, async (_e, wsPath: string) => {
     let raw: string;
     try {
@@ -699,10 +658,9 @@ export function registerFileHandlers(ipc: IpcMain): void {
     return { workspace: parsed as Workspace, workspacePath: wsPath };
   });
 
-  // Open a public Git repository directly: pick a destination folder, download
-  // the repo as a zip, extract it, and open the workspace it contains. No git
-  // binary and no auth — public repos only. Returns null if the user cancels
-  // the folder picker; throws (surfaced to the renderer) on any other failure.
+  // Open a Git repository: pick a destination folder, clone it (zip download
+  // fallback for public repos when git is absent), and open the workspace it
+  // contains. Returns null if the user cancels; throws on other failures.
   handleIpc(ipc, IPC.file.openFromGit, async (_e, repoUrl: string) => {
     const url = repoUrl.trim();
     if (!url) throw new Error('Enter a repository URL');
@@ -715,8 +673,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     if (pick.canceled || pick.filePaths.length === 0) return null;
     const parent = pick.filePaths[0];
 
-    // Derive a folder name from the repo (works for https and git@host:owner/repo.git),
-    // and refuse to overwrite existing content so a clone never clobbers a folder.
+    // Folder name from the repo URL; refuse to overwrite existing content.
     const repoName =
       ((/[/:]([^/:]+?)(?:\.git)?\/?$/.exec(url))?.[1] ?? 'repository')
         .replaceAll(/[^a-zA-Z0-9._-]+/g, '-') || 'repository';
@@ -731,10 +688,9 @@ export function registerFileHandlers(ipc: IpcMain): void {
       if (err instanceof Error && err.message.includes('already exists')) throw err;
     }
 
-    // Prefer a real `git clone`: supports private repos (the user's SSH keys /
-    // git credentials), keeps history, and wires up `origin` so the Git panel's
-    // commit/pull/push work immediately. Fall back to a zip download for public
-    // http(s) repos only when the git binary isn't available.
+    // Prefer `git clone`: supports private repos, keeps history, and wires up
+    // `origin` for the Git panel. Fall back to a zip download for public repos
+    // when the git binary isn't available.
     try {
       await simpleGit(parent).clone(url, destDir);
     } catch (err) {
@@ -752,8 +708,8 @@ export function registerFileHandlers(ipc: IpcMain): void {
 
     const found = await findWorkspaceSpectors(destDir);
     if (found.length === 0) {
-      // A regular project with no API Spector workspace yet: let the user pick
-      // or create a subfolder and scaffold one there (scoped to that folder).
+      // No workspace yet: let the user pick or create a subfolder and scaffold
+      // one there.
       return addWorkspaceIntoProject(destDir);
     }
     if (found.length > 1) throw new Error('multiple workspace files found — open the folder and pick one');
@@ -768,9 +724,9 @@ export function registerFileHandlers(ipc: IpcMain): void {
     return { workspace: parsed, workspacePath: wsPath };
   });
 
-  // Add API Spector tests to an existing LOCAL project: pick the project folder,
-  // then pick or create a subfolder for the tests, and scaffold a workspace
-  // there. Scoped git mode is auto-enabled when the folder is inside a repo.
+  // Add tests to an existing local project: pick the project folder, then a
+  // subfolder for the tests, and scaffold a workspace there (scoped git mode
+  // when inside a repo).
   handleIpc(ipc, IPC.file.addToProject, async () => {
     const projPick = await dialog.showOpenDialog({
       title: 'Select the project to add API Spector tests to',
@@ -782,11 +738,8 @@ export function registerFileHandlers(ipc: IpcMain): void {
   });
 }
 
-/** Look for a `*.spector` file in `dir`. If exactly one is present (or the
- *  directory is the workspace dir of one), open it and return the loaded
- *  workspace. Otherwise return null — including when the directory is empty,
- *  unreadable, or contains multiple workspace files (ambiguous, defer to
- *  welcome screen so the user picks). */
+/** Open the single `*.spector` in `dir` and return it. Null when the dir is
+ *  empty, unreadable, or holds multiple workspaces (ambiguous). */
 async function tryOpenWorkspaceInDir(dir: string): Promise<{ workspace: Workspace; workspacePath: string } | null> {
   let entries: string[];
   try {
@@ -815,24 +768,22 @@ export function getWorkspaceDir(): string | null {
   return workspaceDir;
 }
 
-/** A `.spector` file whose JSON is a Collection, not a Workspace manifest
- *  (has rootFolder/requests but no `collections` list). Happens when a
- *  collection is saved or shared with the workspace extension. */
+/** True when the JSON is a Collection, not a Workspace manifest (rootFolder/
+ *  requests but no `collections` list). */
 function looksLikeCollection(obj: unknown): boolean {
   if (!obj || typeof obj !== 'object') return false;
   const o = obj as Record<string, unknown>;
   return !Array.isArray(o['collections']) && (!!o['rootFolder'] || !!o['requests']);
 }
 
-// ─── Open from Git (public repos, download + extract, no git binary) ─────────
+// Open from Git (public repos, download + extract, no git binary)
 
 /** Cap the download so a hostile or mistyped URL can't fill the disk. */
 const MAX_ARCHIVE_BYTES = 100 * 1024 * 1024; // 100 MB
 
-/** Turn a public repo URL into a downloadable .zip archive URL.
- *  Supports GitHub repo URLs (with optional `/tree/<branch>`) and any direct
- *  link ending in `.zip`. For GitHub, resolves the default branch via the API
- *  when no branch is given. Returns null for anything we can't map. */
+/** Map a public repo URL to a downloadable .zip URL: GitHub repo URLs (optional
+ *  `/tree/<branch>`, default branch resolved via the API) or any `.zip` link.
+ *  Null for anything else. */
 async function resolveArchiveUrl(input: string): Promise<string | null> {
   let url: URL;
   try {
@@ -842,7 +793,7 @@ async function resolveArchiveUrl(input: string): Promise<string | null> {
   }
   if (url.protocol !== 'https:') return null;
 
-  // Already a zip archive — download it directly.
+  // Already a zip archive - download it directly.
   if (url.pathname.toLowerCase().endsWith('.zip')) return url.toString();
 
   // GitHub repository URL: https://github.com/<owner>/<repo>[/tree/<branch>]
@@ -888,7 +839,7 @@ async function extractZip(buf: Buffer, destDir: string): Promise<void> {
   const zip = await JSZip.loadAsync(buf);
   const paths = Object.keys(zip.files);
 
-  // Detect a common single root folder (e.g. "repo-main/") to strip.
+  // Detect a common single root folder to strip.
   let root: string | null = null;
   for (const p of paths) {
     const top = p.split('/')[0];
@@ -914,12 +865,8 @@ async function extractZip(buf: Buffer, destDir: string): Promise<void> {
   }
 }
 
-/** Recursively find the single workspace `.spector` file under `dir`.
- *  Skips collection `.spector` files. Returns the path, or throws when zero
- *  or more than one workspace is present (ambiguous — the user should pick). */
 /** Find every workspace (`*.spector`, not a bare collection) under `dir`,
- *  skipping node_modules and .git. Returns all matches so the caller can decide
- *  how to treat zero (scaffold a new one) vs one (open) vs many (ambiguous). */
+ *  skipping node_modules and .git. */
 async function findWorkspaceSpectors(dir: string): Promise<string[]> {
   const found: string[] = [];
   async function walk(d: string): Promise<void> {
@@ -946,10 +893,8 @@ async function findWorkspaceSpectors(dir: string): Promise<string[]> {
   return found;
 }
 
-/** If `dir` sits inside a git repository whose root is an ANCESTOR of it (i.e.
- *  `dir` is a subfolder, not the repo root itself), describe that enclosing
- *  repo. Returns null when `dir` is the repo root or not in a repo at all — in
- *  both cases there is no "scope to a subtree" to opt into. */
+/** Describe the enclosing repo when `dir` is a subfolder of a repo (not the
+ *  root). Null when `dir` is the repo root or not in a repo. */
 async function detectEnclosingRepo(
   dir: string,
 ): Promise<{ name: string; scope: string } | null> {
@@ -964,11 +909,9 @@ async function detectEnclosingRepo(
   }
 }
 
-/** Create the on-disk skeleton of a new workspace in `dir` (collections/,
- *  environments/, flows/, .gitignore, .vscode, README) plus a `<name>` manifest,
- *  make it the active workspace, and return it. When `enclosing` is given the
- *  manifest opts into scoped git mode and the result carries the repo/scope so
- *  the renderer can confirm what will be versioned. */
+/** Scaffold a new workspace in `dir` (folders, .gitignore, .vscode, README,
+ *  manifest), make it active, and return it. `enclosing` opts the manifest into
+ *  scoped git mode and is echoed back for renderer confirmation. */
 async function scaffoldWorkspace(
   dir: string,
   wsFileName: string,
@@ -1042,8 +985,8 @@ async function wrapCollectionAsWorkspace(
   await ensureGitignore(dir);
   await ensureVscodeFileAssociation(dir);
   await ensureReadme(dir, basename(collFilePath));
-  // Replace the picked collection file with the manifest (content is safe in
-  // collections/ already). The file the user opened becomes the workspace.
+  // Replace the picked file with the manifest; its content now lives in
+  // collections/.
   await writeJson(collFilePath, ws);
 
   workspaceDir = dir;

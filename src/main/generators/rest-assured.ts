@@ -23,7 +23,7 @@ function restAssuredJsonPath(q: JsonPathQuery): string {
   return `jsonPath(hookResponse.asString(), "${javaStr(q.query)}", ${index}, "${javaStr(fallback)}")`;
 }
 
-// ─── REST Assured (Java + JUnit 5 + Maven) generator ─────────────────────────
+// REST Assured (Java + JUnit 5 + Maven) generator
 
 function javaMethod(name: string): string {
   const parts = name.replaceAll(/[^\w\s]/g, ' ').split(/\s+/).filter(Boolean);
@@ -39,12 +39,8 @@ function javaTypeFor(expected?: string): string {
   }
 }
 
-/** Replace {{var}} with System.getenv("VAR") ?? "" Java expression. */
-/**
- * Render a string with `{{var}}` tokens as a Java string concatenation.
- * Variables in `sharedVars` (extracted by hooks) reference the local field;
- * everything else falls back to `System.getenv("VAR")`.
- */
+/** Render `{{var}}` tokens as Java string concatenation: `sharedVars` (hook-extracted)
+ *  reference the local field, everything else falls back to System.getenv("VAR"). */
 function interpolateJava(value: string, sharedVars: Set<string> = new Set()): string {
   return '"' + value.replaceAll(/\{\{([^}]+)\}\}/g, (_, key) => {
     const envKey = toEnvConst(key.trim());
@@ -55,7 +51,7 @@ function interpolateJava(value: string, sharedVars: Set<string> = new Set()): st
   }) + '"';
 }
 
-// ─── pom.xml ──────────────────────────────────────────────────────────────────
+// pom.xml
 
 function buildPom(collectionName: string, usesJsonPath: boolean): string {
   const artifact = collectionName.replaceAll(/\W+/g, '-').toLowerCase();
@@ -134,7 +130,7 @@ ${jsonPathDep}  </dependencies>
 `;
 }
 
-// ─── BaseTest.java ────────────────────────────────────────────────────────────
+// BaseTest.java
 
 function buildBaseTest(environment: Environment | null, usesJsonPath: boolean): string {
   const baseUrl = getEnvBaseUrl(environment, 'http://localhost:8080');
@@ -144,8 +140,8 @@ function buildBaseTest(environment: Environment | null, usesJsonPath: boolean): 
     `     * - ${toEnvConst(v.key)}=<value from keychain>`
   ).join('\n');
 
-  // Jayway JSONPath helper for sp.jsonPath(...) extractions. Suppresses missing-path
-  // exceptions so an absent match yields the fallback instead of failing the run.
+  // Jayway JSONPath helper for sp.jsonPath(...) extractions; a missing path yields
+  // the fallback rather than failing the run.
   const jsonPathHelper = usesJsonPath ? `
     private static final com.jayway.jsonpath.Configuration JSONPATH_CFG =
         com.jayway.jsonpath.Configuration.defaultConfiguration()
@@ -200,14 +196,14 @@ ${jsonPathHelper}
 `;
 }
 
-// ─── Per-folder test class ────────────────────────────────────────────────────
+// Per-folder test class
 
 function buildTestClass(folderName: string, folder: Folder, collection: Collection): string {
   const requests = collection.requests;
   const className = javaClass(folderName) + 'Test';
   const methods: string[] = [];
 
-  // Hook methods (collected from this folder + all ancestors) with variable extraction
+  // Hook methods from this folder + ancestors, with variable extraction.
   const hooks = getAllApplicableHooks(folder.id, collection);
   const beforeAllH = hooks.beforeAll;
   const afterAllH  = hooks.afterAll;
@@ -287,7 +283,7 @@ function buildTestClass(folderName: string, folder: Folder, collection: Collecti
     const lines: string[] = [];
     lines.push(`    @Test`, `    public void ${methodName}() {`, `        given()`, `            .spec(requestSpec)`);
 
-    // Auth header — use shared variable if extracted by a hook
+    // Auth header - use shared variable if extracted by a hook
     if (effectiveAuth.type === 'bearer') {
       const token = effectiveAuth.token ?? '';
       if (token.includes('{{')) {
@@ -314,8 +310,7 @@ function buildTestClass(folderName: string, folder: Folder, collection: Collecti
 
     if (hasBody(req)) {
       if (req.body.mode === 'json' && req.body.json) {
-        // Inline the JSON body as a Java string. Escape quotes/newlines and
-        // interpolate {{var}} tokens into shared-var references or getenv calls.
+        // Inline the JSON body as an escaped, interpolated Java string.
         const escaped = req.body.json.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('\n', '\\n');
         lines.push(`            .body(${interpolateJava(escaped, sharedVars)})`);
       }
@@ -376,7 +371,7 @@ ${methods.join('\n\n')}
 `;
 }
 
-// ─── README ───────────────────────────────────────────────────────────────────
+// README
 
 function buildReadme(collectionName: string, filePaths: string[]): string {
   const tree = renderTree(filePaths);
@@ -402,7 +397,7 @@ BASE_URL=https://api.example.com mvn test
 `;
 }
 
-// ─── Main entry ───────────────────────────────────────────────────────────────
+// Main entry
 
 export function generateRestAssured(
   collection: Collection,

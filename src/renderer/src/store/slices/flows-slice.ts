@@ -1,10 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Flows: visual dataflow graphs of typed blocks, stored one-file-per-flow under
-// flows/. Mirrors the collections slice — `{ relPath, data, dirty }` entries
-// driven by the same debounced autosave loop, registered in the workspace
-// manifest. The canvas edits the graph; running happens in the main process.
+// Flows: visual dataflow graphs of typed blocks, one file per flow under flows/.
+// Mirrors the collections slice ({ relPath, data, dirty }) with the same autosave.
 
 import type { StateCreator } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';

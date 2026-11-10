@@ -1,13 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// MQTT connections, managed in the main process and keyed by requestId — the
-// same model as the WebSocket, Socket.IO and graphql-ws handlers. We use the
-// official MQTT.js client, which speaks MQTT over TCP (mqtt://, mqtts://) and
-// over WebSocket (ws://, wss://), so the renderer only publishes/subscribes and
-// renders the streamed session log. Auto-reconnect is disabled so connect and
-// disconnect stay under explicit user control, matching the other realtime
-// handlers.
+// MQTT connections, managed in main and keyed by requestId (like the WS/Socket.IO handlers).
+// MQTT.js speaks MQTT over TCP (mqtt://, mqtts://) and WebSocket (ws://, wss://).
 
 import { type IpcMain, type IpcMainInvokeEvent } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
@@ -17,7 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { MqttMessage } from '../../shared/types';
 import { runMqttTest, type MqttTestConfig, type MqttTestResult } from '../mqtt-test';
 
-// ─── Connection registry ──────────────────────────────────────────────────────
+// Connection registry
 
 const connections = new Map<string, MqttClient>();
 
@@ -57,10 +52,10 @@ function normalizeQos(q: unknown): Qos {
   return q === 1 || q === 2 ? q : 0;
 }
 
-// ─── IPC handlers ─────────────────────────────────────────────────────────────
+// IPC handlers
 
 export function registerMqttHandlers(ipc: IpcMain): void {
-  // mqtt:connect — open (or re-open) a connection for this request.
+  // mqtt:connect - open (or re-open) a connection for this request.
   handleIpc(ipc, IPC.mqtt.connect, async (event: IpcMainInvokeEvent, requestId: string, opts: ConnectOpts) => {
     const existing = connections.get(requestId);
     if (existing) {
@@ -68,8 +63,8 @@ export function registerMqttHandlers(ipc: IpcMain): void {
       connections.delete(requestId);
     }
 
-    // Guard sends: the renderer may be destroyed (tab/window closed or reloaded)
-    // while the connection is still open, and WebContents.send then throws.
+    // Guard sends: the renderer may be destroyed while the connection is open,
+    // and WebContents.send then throws.
     const alive = () => !event.sender.isDestroyed();
     const send = (message: MqttMessage) => { if (alive()) event.sender.send(IPC.mqtt.message, { requestId, message }); };
     const status = (s: string, error?: string) => { if (alive()) event.sender.send(IPC.mqtt.status, { requestId, status: s, error }); };
@@ -87,8 +82,7 @@ export function registerMqttHandlers(ipc: IpcMain): void {
         username: opts.username?.trim() || undefined,
         password: opts.password ? opts.password : undefined,
         clean: opts.cleanSession !== false,
-        // Recover from a transient drop on its own and re-apply subscriptions,
-        // so a brief hiccup doesn't force the user to reconnect by hand.
+        // Recover from a transient drop and re-apply subscriptions automatically.
         reconnectPeriod: 2000,
         resubscribe: true,
         connectTimeout: 30_000,
@@ -100,8 +94,8 @@ export function registerMqttHandlers(ipc: IpcMain): void {
 
     connections.set(requestId, client);
 
-    // If the renderer goes away (tab/window closed or reloaded), end the client
-    // so it doesn't stream into a destroyed sender indefinitely.
+    // If the renderer goes away, end the client so it doesn't stream into a
+    // destroyed sender.
     event.sender.once('destroyed', () => { try { client.end(true); } catch { /* ignore */ } connections.delete(requestId); });
 
     client.on('connect', () => {
@@ -129,7 +123,7 @@ export function registerMqttHandlers(ipc: IpcMain): void {
     });
 
     // A non-fatal error (mqtt.js keeps the connection on many of these) is shown
-    // as a note, NOT a disconnect — only an actual close changes the status.
+    // as a note, NOT a disconnect - only an actual close changes the status.
     client.on('error', (err: Error) => {
       note('', `Error: ${err.message}`);
     });
@@ -141,14 +135,13 @@ export function registerMqttHandlers(ipc: IpcMain): void {
       note('', 'Connection lost, reconnecting…');
     });
     client.on('close', () => {
-      // Only a close we did NOT initiate (the client is still the registered
-      // one) means a drop we are auto-recovering from; an explicit disconnect
-      // removes it from the map first and reports 'disconnected' itself.
+      // Only a close we did NOT initiate (client still registered) is a drop
+      // we auto-recover from; an explicit disconnect de-registers it first.
       if (connections.get(requestId) === client) status('connecting');
     });
   });
 
-  // mqtt:publish — publish a message on an existing connection.
+  // mqtt:publish - publish a message on an existing connection.
   handleIpc(ipc, IPC.mqtt.publish, async (_event: IpcMainInvokeEvent, requestId: string, opts: PublishOpts) => {
     const client = connections.get(requestId);
     if (!client || !client.connected) throw new Error('MQTT is not connected');
@@ -161,7 +154,7 @@ export function registerMqttHandlers(ipc: IpcMain): void {
     });
   });
 
-  // mqtt:subscribe — subscribe to a topic (or topic filter) on an existing connection.
+  // mqtt:subscribe - subscribe to a topic (or topic filter) on an existing connection.
   handleIpc(ipc, IPC.mqtt.subscribe, async (event: IpcMainInvokeEvent, requestId: string, opts: SubscribeOpts) => {
     const client = connections.get(requestId);
     if (!client || !client.connected) throw new Error('MQTT is not connected');
@@ -176,7 +169,7 @@ export function registerMqttHandlers(ipc: IpcMain): void {
     });
   });
 
-  // mqtt:unsubscribe — stop receiving from a topic.
+  // mqtt:unsubscribe - stop receiving from a topic.
   handleIpc(ipc, IPC.mqtt.unsubscribe, async (event: IpcMainInvokeEvent, requestId: string, opts: SubscribeOpts) => {
     const client = connections.get(requestId);
     if (!client || !client.connected) return;
@@ -188,17 +181,16 @@ export function registerMqttHandlers(ipc: IpcMain): void {
     });
   });
 
-  // mqtt:test — run a one-shot MQTT test (its own connection) and assert.
+  // mqtt:test - run a one-shot MQTT test (its own connection) and assert.
   handleIpc(ipc, IPC.mqtt.test, async (_event: IpcMainInvokeEvent, cfg: MqttTestConfig): Promise<MqttTestResult> => {
     const t0 = Date.now();
     const res = await runMqttTest(cfg);
-    // Diagnostic (main-process console): shows the window asked for vs actual
-    // run time and what was collected, so an early finish is easy to spot.
+    // Diagnostic: asked-for vs actual run time and what was collected.
     console.log(`[mqtt:test] url=${cfg.url} sub=${cfg.subscribeTopic ?? '(none)'} clientId=${res.clientId} collectMs=${cfg.collectMs} ran=${Date.now() - t0}ms messages=${res.messages.length}${res.error ? ` error=${res.error}` : ''}`);
     return res;
   });
 
-  // mqtt:disconnect — close a connection.
+  // mqtt:disconnect - close a connection.
   handleIpc(ipc, IPC.mqtt.disconnect, async (event: IpcMainInvokeEvent, requestId: string) => {
     const client = connections.get(requestId);
     if (client) {

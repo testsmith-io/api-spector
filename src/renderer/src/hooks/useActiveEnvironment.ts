@@ -8,18 +8,8 @@ import type { Environment } from '../../../shared/types';
 
 type EnvironmentsMap = Record<string, { relPath: string; data: Environment }>
 
-/**
- * Overlay session / in-run script env writes (`sp.environment.set`) onto a
- * resolved environment for the next send, without touching the store or the
- * `.env.json` file. Existing non-secret vars are updated in place; new keys are
- * appended as enabled plain values; secret vars are left untouched (their
- * ciphertext is never overwritten with a plaintext).
- *
- * When there is NO active environment, a synthetic one is created to carry the
- * overrides — otherwise a value a script set (e.g. a token) would have nowhere
- * to live and would silently vanish on the next send. Returns the input
- * unchanged when there are no overrides.
- */
+/** Overlay in-run script env writes (`sp.environment.set`) onto a resolved environment:
+ *  non-secret vars update in place, new keys append, secrets untouched, input returned unchanged if no overrides. */
 export function withEnvOverrides(
   env: Environment | null,
   overrides: Record<string, string>,
@@ -44,11 +34,8 @@ export function withEnvOverrides(
   return { ...env, variables };
 }
 
-/**
- * Resolve an environment (by store id) through its `extends` inheritance
- * chain. Non-hook helper so send-time code paths that re-read the store via
- * `useStore.getState()` can resolve fresh snapshots the same way.
- */
+/** Resolve an environment (by store id) through its `extends` chain. Non-hook so
+ *  send-time code reading the store via `useStore.getState()` resolves the same way. */
 export function resolveEnvironmentById(
   environments: EnvironmentsMap,
   id: string | null,
@@ -60,11 +47,8 @@ export function resolveEnvironmentById(
   return resolveEnvironmentChain(env, all);
 }
 
-/**
- * The ACTIVE environment with its `extends` inheritance chain resolved
- * (parent variables merged in, child wins per key). Null when no environment
- * is active.
- */
+/** The active environment with its `extends` chain resolved (child wins per key).
+ *  Null when no environment is active. */
 export function useActiveEnvironment(): Environment | null {
   const activeEnvironmentId = useStore(s => s.activeEnvironmentId);
   const environments        = useStore(s => s.environments);

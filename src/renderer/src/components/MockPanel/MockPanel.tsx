@@ -135,7 +135,7 @@ export function MockPanel() {
       {confirmDialog}
       {pushTarget && <PushToCloudModal mock={pushTarget} onClose={() => setPushTarget(null)} />}
 
-      {/* ── Recorder section ── */}
+      {/* Recorder section */}
       <div className="border-b border-surface-800 flex-shrink-0">
         <button
           onClick={() => setRecorderOpen(!recorderOpen)}
@@ -191,7 +191,7 @@ export function MockPanel() {
         )}
       </div>
 
-      {/* ── Mock servers section ── */}
+      {/* Mock servers section */}
       <div className="px-3 py-2 flex items-center justify-between border-b border-surface-800 flex-shrink-0">
         <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-600">
           {t('Mock Servers')}

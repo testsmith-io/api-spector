@@ -6,25 +6,14 @@ import { resolveInheritedAuthAndHeaders, getAllApplicableHooks } from '../../sha
 import { parsePostScript, accessorToJsonPath } from './script-parser';
 import { javaClass, resolveEffectiveAuth, mergeHeaders, hasBody, getEnvBaseUrl, renderTree, karateJsonPathExpr } from './generator-utils';
 
-// ─── Karate (Java + JUnit 5 + Maven) generator ───────────────────────────────
-//
-// Emits a runnable Maven project: pom.xml, karate-config.js, a JUnit 5 runner,
-// and one .feature file per folder. Variables flow through karate-config.js
-// (baseUrl + secrets) and are referenced in feature files as plain JS idents.
-// Hooks are translated to Background sections; pre/post-script extractions
-// become `* def` lines so subsequent scenarios can reference the captured
-// values.
-//
-// References:
-//   https://docs.karatelabs.io/getting-started/why-karate
-//   https://github.com/karatelabs/karate
+// Karate (Java + JUnit 5 + Maven) generator: one .feature file per folder. Vars
+// flow through karate-config.js; hooks become Background sections, script
+// extractions become `* def` lines. https://github.com/karatelabs/karate
 
-// ─── Identifier helpers ──────────────────────────────────────────────────────
+// Identifier helpers
 
-/** Karate-friendly variable name: lowerCamelCase, JS-safe identifier.
- *  Splits on any non-alphanumeric run (including `_` and `-`) and lowercases
- *  every part so SCREAMING_SNAKE acronyms collapse to `baseUrl`/`authToken`/
- *  `userId` rather than `baseURL`/`authTOKEN`/`userID`. */
+/** Karate-friendly variable name: lowerCamelCase, JS-safe. SCREAMING_SNAKE
+ *  collapses to baseUrl/authToken, not baseURL/authTOKEN. */
 function jsVar(name: string): string {
   const parts = name.replaceAll(/[^a-zA-Z0-9]+/g, ' ').split(/\s+/).filter(Boolean).map(p => p.toLowerCase());
   if (parts.length === 0) return '_';
@@ -47,11 +36,8 @@ function escSingle(s: string): string {
   return s.replaceAll('\\', '\\\\').replaceAll("'", "\\'");
 }
 
-/**
- * Render a `{{var}}`-laced string as a Karate expression in single-quoted
- * concat form: `'foo ' + token + ' bar'`. Pure-literal strings come back
- * fully quoted so they can drop straight into a Karate step.
- */
+/** `{{var}}`-laced string as a single-quoted Karate concat: `'foo ' + token`.
+ *  Pure literals come back fully quoted. */
 function interpolateKarate(value: string): string {
   if (!value.includes('{{')) return `'${escSingle(value)}'`;
   const parts: string[] = [];
@@ -68,20 +54,9 @@ function interpolateKarate(value: string): string {
 }
 
 /**
- * Decide how to render a request URL as Karate steps. Three cases:
- *
- *   1. `{{BASE_URL}}/foo/bar` → `Given url baseUrl` + `And path 'foo/bar'`
- *      (any `{{var}}` prefix becomes a config-driven base, with the
- *      remainder split out so query/path interpolation stays clean).
- *   2. `https://api.example.com/foo` → `Given url 'https://api.example.com/foo'`
- *      (literal host means the request is self-sufficient — don't force a
- *      baseUrl the user didn't ask for).
- *   3. `/foo` or `foo` → `Given url baseUrl` + `And path 'foo'`
- *      (relative path: fall back to whatever baseUrl resolves to in
- *      karate-config.js).
- *
- * The returned blocks plug directly into the Scenario builder's `setup`
- * array, so the first one becomes `Given …` and the rest `And …`.
+ * Render a request URL as Karate steps: a leading `{{var}}` or a bare/relative
+ * path becomes `url baseUrl` + `path`; a full `https://` URL becomes a literal
+ * `url`. First block becomes `Given`, the rest `And`.
  */
 function urlSteps(url: string): string[][] {
   const leadingVar = /^\{\{([^}]+)\}\}(.*)$/.exec(url);
@@ -101,7 +76,7 @@ function urlSteps(url: string): string[][] {
   return steps;
 }
 
-// ─── pom.xml ─────────────────────────────────────────────────────────────────
+// pom.xml
 
 function buildPom(collectionName: string): string {
   const artifact = collectionName.replaceAll(/\W+/g, '-').toLowerCase();
@@ -154,14 +129,13 @@ function buildPom(collectionName: string): string {
 `;
 }
 
-// ─── karate-config.js ────────────────────────────────────────────────────────
+// karate-config.js
 
 function buildKarateConfig(environment: Environment | null): string {
   const baseUrl = getEnvBaseUrl(environment, 'http://localhost:8080');
 
-  // Every non-baseUrl env variable becomes a top-level config field. Plain
-  // values keep their default; secrets/sensitive values come from
-  // System.getenv at runtime so the generated project never embeds them.
+  // Each non-baseUrl env var becomes a config field; secrets come from
+  // System.getenv at runtime, never embedded.
   const lines: string[] = [];
   lines.push(`function fn() {`, `  var env = karate.env || 'dev';`, `  karate.log('karate env:', env);`, ``, `  var config = {`, `    baseUrl: '${escSingle(baseUrl)}'`);
 
@@ -182,7 +156,7 @@ function buildKarateConfig(environment: Environment | null): string {
   return lines.join('\n') + '\n';
 }
 
-// ─── TestRunner.java ─────────────────────────────────────────────────────────
+// TestRunner.java
 
 function buildRunner(collectionName: string): string {
   const className = javaClass(collectionName) + 'Runner';
@@ -206,12 +180,11 @@ public class ${className} {
 `;
 }
 
-// ─── Per-folder feature file ─────────────────────────────────────────────────
+// Per-folder feature file
 
 interface BackgroundBlock {
   lines: string[]
-  /** Variables defined by hook extractions (so we know not to fall back to
-   *  config keys when a Scenario references them). */
+  /** Variables defined by hook extractions. */
   defined: Set<string>
 }
 
@@ -220,10 +193,8 @@ function buildBackground(folderId: string, collection: Collection): BackgroundBl
   const lines: string[] = [];
   const defined = new Set<string>();
 
-  // Karate's Background runs once per Scenario. That's not a perfect mapping
-  // for `beforeAll`, but it's safe — re-running a token fetch per scenario is
-  // wasteful but correct. `callonce` could optimise this; we keep things flat
-  // for readability.
+  // Karate's Background runs once per Scenario, so beforeAll re-runs per
+  // scenario: wasteful but correct. callonce could optimise; kept flat.
   for (const h of [...hooks.beforeAll, ...hooks.before]) {
     const method = h.method.toLowerCase();
     const declared = new Set((h.headers ?? []).filter(x => x.enabled && x.key).map(x => x.key.toLowerCase()));
@@ -258,26 +229,15 @@ function buildBackground(folderId: string, collection: Collection): BackgroundBl
   return { lines, defined };
 }
 
-/**
- * Render a JSON body as a Karate docstring block. `{{var}}` tokens become
- * Karate's `#(var)` placeholder so values still substitute when the JSON is
- * evaluated. Output is pretty-printed and indented under `request`:
- *
- *     """
- *     {
- *       "name": "Karate Demo Post"
- *     }
- *     """
- */
+/** JSON body as a Karate docstring; `{{var}}` becomes Karate's `#(var)`
+ *  placeholder. Pretty-printed and indented under `request`. */
 function bodyDocstring(json: string): string[] {
   const expanded = json.replaceAll(/\{\{([^}]+)\}\}/g, (_, k) => `#(${configKey(k.trim())})`);
   let pretty = expanded.trim();
   try {
     pretty = JSON.stringify(JSON.parse(expanded), null, 2);
   } catch {
-    // Not strictly-valid JSON (e.g. trailing commas or an unquoted
-    // placeholder). Emit the user's text verbatim so Karate can still
-    // evaluate it; alignment may be slightly less crisp.
+    // Not strictly-valid JSON; emit verbatim so Karate can still evaluate it.
   }
   const out: string[] = ['    """'];
   for (const l of pretty.split('\n')) out.push(`    ${l}`);
@@ -285,11 +245,8 @@ function bodyDocstring(json: string): string[] {
   return out;
 }
 
-/**
- * Render a raw text/XML/SOAP body as a Karate docstring. No re-formatting —
- * just split on newlines and indent so the original structure (XML
- * namespaces, whitespace-sensitive payloads) survives.
- */
+/** Raw text/XML/SOAP body as a Karate docstring: split on newlines and indent,
+ *  no re-formatting, so whitespace-sensitive payloads survive. */
 function rawDocstring(text: string): string[] {
   const expanded = text.replaceAll(/\{\{([^}]+)\}\}/g, (_, k) => `#(${configKey(k.trim())})`);
   const out: string[] = ['    """'];
@@ -298,13 +255,9 @@ function rawDocstring(text: string): string[] {
   return out;
 }
 
-/**
- * Steps required to send an arbitrary request body. Returns one or more
- * "step blocks" (first line + continuation lines) so a multi-line `request`
- * docstring can be rendered with the right Gherkin keyword applied to its
- * first line. Headers added here only fire when the user hasn't already
- * declared them — preserves an explicit override.
- */
+/** Steps to send a request body, as "step blocks" (first line + continuations)
+ *  so a multi-line `request` docstring keeps the right Gherkin keyword. Headers
+ *  added here defer to any the user already declared. */
 function bodySteps(
   body: RequestBody,
   alreadyHasHeader: (name: string) => boolean,
@@ -315,8 +268,7 @@ function bodySteps(
   if (body.mode === 'soap' && body.soap?.envelope) {
     const out: string[][] = [];
     if (body.soap.soapAction && !alreadyHasHeader('soapaction')) {
-      // SOAP 1.1 wants the action quoted; double-quote it so Karate emits
-      // SOAPAction: "https://…"
+      // SOAP 1.1 wants the action quoted: Karate emits SOAPAction: "https://…"
       out.push([`header SOAPAction = '"${escSingle(body.soap.soapAction)}"'`]);
     }
     if (!alreadyHasHeader('content-type')) {
@@ -334,8 +286,7 @@ function bodySteps(
     return out;
   }
   if (body.mode === 'graphql' && body.graphql) {
-    // GraphQL request shape: { query, variables?, operationName? }. Build
-    // the JSON envelope here so consumers don't have to special-case it.
+    // GraphQL envelope: { query, variables?, operationName? }.
     const env: Record<string, unknown> = { query: body.graphql.query };
     if (body.graphql.variables?.trim()) {
       try { env.variables = JSON.parse(body.graphql.variables); } catch { /* leave undefined */ }
@@ -357,9 +308,8 @@ function buildFeature(folderName: string, folder: Folder, collection: Collection
     const req = requests[reqId];
     if (!req || req.disabled || req.hookType) continue;
 
-    // Karate scenario tags must be unique-ish to be useful for `--tags`
-    // filters; collisions are harmless (multiple scenarios share a tag) but
-    // we still try for distinct slugs.
+    // Distinct-ish scenario tags so `--tags` filtering is useful; collisions
+    // are harmless.
     let tag = featureFileName(req.name);
     if (usedTags.has(tag)) {
       let i = 2;
@@ -377,9 +327,8 @@ function buildFeature(folderName: string, folder: Folder, collection: Collection
     const lines: string[] = [];
     lines.push(`@${tag}`, `Scenario: ${req.name}`);
 
-    // Setup steps: first one is `Given`, the rest `And`. We collect them as
-    // (firstLine, ...continuationLines) tuples so a multi-line `request`
-    // docstring can carry its `"""` block under the same logical step.
+    // Setup steps: first `Given`, rest `And`. Collected as (firstLine,
+    // ...continuations) so a multi-line `request` docstring stays one step.
     const setup: string[][] = [...urlSteps(req.url)];
 
     if (effectiveAuth.type === 'bearer') {
@@ -422,9 +371,8 @@ function buildFeature(folderName: string, folder: Folder, collection: Collection
 
     lines.push(`  When method ${method}`);
 
-    // Assertions: first one is `Then`, the rest `And`. We always emit a
-    // status assertion (defaulting to 200) so the scenario is meaningfully
-    // testing something even when the post-script had no parsed checks.
+    // Assertions: first `Then`, rest `And`. Always emit a status assertion
+    // (default 200) so the scenario tests something.
     const asserts: string[] = [];
     const parsed = parsePostScript(req.postRequestScript);
     let statusEmitted = false;
@@ -480,7 +428,7 @@ ${scenarios.join('\n\n')}
 `;
 }
 
-// ─── README ──────────────────────────────────────────────────────────────────
+// README
 
 function buildReadme(collectionName: string, filePaths: string[]): string {
   const tree = renderTree(filePaths);
@@ -515,19 +463,15 @@ mvn test "-Dkarate.options=--tags @get-users"
 `;
 }
 
-// ─── Main entry ──────────────────────────────────────────────────────────────
+// Main entry
 
 export function generateKarate(
   collection: Collection,
   environment: Environment | null
 ): GeneratedFile[] {
-  // Standard Maven layout — Java sources under src/test/java, every other
-  // resource (karate-config.js, *.feature) under src/test/resources. With
-  // `relativeTo(getClass())` the runner resolves features by package, so as
-  // long as the runner sits at `karate/` and the features at the matching
-  // resources path, Maven copies them onto the test classpath at the same
-  // location and Karate finds them automatically. This layout keeps every
-  // IDE happy without needing a custom <testResources> override in pom.xml.
+  // Standard Maven layout: Java under src/test/java, resources (karate-config.js,
+  // *.feature) under src/test/resources. relativeTo(getClass()) resolves features
+  // by package, so the runner at karate/ finds the matching resources path.
   const files: GeneratedFile[] = [
     { path: 'pom.xml',                                  content: buildPom(collection.name) },
     { path: 'src/test/resources/karate-config.js',      content: buildKarateConfig(environment) },
@@ -548,7 +492,7 @@ export function generateKarate(
     for (const sub of folder.folders) processFolder(sub, sub.name);
   }
 
-  // Walk from the root once (processFolder guards emission and recurses).
+  // Walk from the root once; processFolder guards emission and recurses.
   processFolder(collection.rootFolder, collection.name);
 
   files.unshift({ path: 'README.md', content: buildReadme(collection.name, files.map(f => f.path)) });

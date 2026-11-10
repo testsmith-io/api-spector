@@ -28,7 +28,7 @@ describe('typeMatchingRules', () => {
     expect(rules['$.tags']).toEqual({ matchers: [{ match: 'type', min: 1 }] });
     expect(rules['$.tags[*]']).toEqual({ matchers: [{ match: 'type' }] });
     expect(rules['$.nested.k']).toEqual({ matchers: [{ match: 'type' }] });
-    // objects themselves get no rule — matching their members is enough
+    // objects themselves get no rule - matching their members is enough
     expect(rules['$.nested']).toBeUndefined();
   });
   it('marks an empty array with min 0', () => {
@@ -52,7 +52,7 @@ describe('designContractToPact', () => {
     const it0 = pact.interactions[0] as { type: string; key: string };
     expect(it0.type).toBe('Synchronous/HTTP');
     expect(it0.key).toMatch(/^[0-9a-f]{8}$/);
-    // key is deterministic — same contract compiles to the same key
+    // key is deterministic - same contract compiles to the same key
     const again = (designContractToPact(contract) as { interactions: { key: string }[] }).interactions[0].key;
     expect(again).toBe(it0.key);
   });

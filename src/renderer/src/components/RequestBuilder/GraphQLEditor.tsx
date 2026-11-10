@@ -31,7 +31,7 @@ function opTypeForLabel(label: string): OperationType {
   return label === 'Mutation' ? 'mutation' : label === 'Subscription' ? 'subscription' : 'query';
 }
 
-// ─── Schema explorer components ──────────────────────────────────────────────
+// Schema explorer components
 
 function FieldNode({
   field,
@@ -79,8 +79,7 @@ function FieldNode({
 
         {field.args.length > 0 && (() => {
           const hasRequired = field.args.some(argRequired);
-          // Required args get a trailing ! so it's clear the field needs input
-          // (e.g. brand(id!) vs brands()).
+          // Required args get a trailing ! so it's clear the field needs input.
           const label = field.args.map(a => a.name + (argRequired(a) ? "!" : "")).join(', ');
           const full = field.args.map(a => `${a.name}: ${displayType(a.type)}`).join(', ');
           return (
@@ -129,8 +128,7 @@ function RootTypeSection({
   readonly label: string
   readonly typeName: string
   readonly typeMap: Map<string, GqlType>
-  /** Hide root fields that require an argument (the by-id lookups), leaving the
-   *  list/collection fields. */
+  /** Hide root fields that require an argument (the by-id lookups). */
   readonly listOnly: boolean
   readonly onInsert: InsertHandler
 }) {
@@ -229,7 +227,7 @@ function SchemaExplorer({
   );
 }
 
-// ─── GraphQL Editor ───────────────────────────────────────────────────────────
+// GraphQL Editor
 
 interface Props {
   readonly request: ApiRequest
@@ -245,12 +243,10 @@ export function GraphQLEditor({ request, onChange }: Props) {
     [request.body.graphql],
   );
 
-  // For introspection hook: build plain env/collection/globals maps.
-  // Read reactively from the store so edits to variables are picked up
-  // without needing to switch environments.
+  // Plain env/collection/globals maps for the introspection hook. Read reactively
+  // so variable edits are picked up without switching environments.
   const activeCollectionId  = useStore(s => s.activeCollectionId);
-  // Resolved through the extends inheritance chain so inherited variables
-  // participate in introspection just like at send time.
+  // Resolved through the extends chain so inherited variables participate too.
   const envData        = useActiveEnvironment();
   const colVarsData    = useStore(s => activeCollectionId ? s.collections[activeCollectionId]?.data.collectionVariables : null);
   const globals        = useStore(s => s.globals);
@@ -271,8 +267,7 @@ export function GraphQLEditor({ request, onChange }: Props) {
   const [showVars,    setShowVars]    = useState(false);
   const [showExplorer, setShowExplorer] = useState(true);
 
-  // Build a full GraphQLSchema for CM6 autocomplete from the cached or
-  // freshly-fetched introspection result.
+  // Full GraphQLSchema for CM6 autocomplete, from the cached introspection result.
   const gqlSchema = useMemo(() => {
     const raw = request.graphqlIntrospectionCache;
     if (!raw) return null;
@@ -283,9 +278,8 @@ export function GraphQLEditor({ request, onChange }: Props) {
     }
   }, [request.graphqlIntrospectionCache]);
 
-  // CM6 extension for GraphQL syntax highlighting + autocomplete.
-  // Memoised with a stable reference so CodeMirror doesn't reconfigure
-  // on every render.
+  // CM6 GraphQL highlighting + autocomplete; memoised so CodeMirror doesn't
+  // reconfigure every render.
   const gqlExtension = useMemo(() => {
     if (!gqlSchema) return [];
     try {
@@ -295,8 +289,7 @@ export function GraphQLEditor({ request, onChange }: Props) {
     }
   }, [gqlSchema]);
 
-  // Restore the schema explorer from cache when the request changes (tab
-  // switch) or when the cache is first populated after a fetch.
+  // Restore the explorer from cache on request change or after a fetch populates it.
   useEffect(() => {
     if (request.graphqlIntrospectionCache) {
       try {
@@ -314,10 +307,8 @@ export function GraphQLEditor({ request, onChange }: Props) {
     onChange({ body: { ...request.body, graphql: { ...gql, ...patch } } });
   }
 
-  // Insert a field from the explorer by editing the query AST and printing it,
-  // so the result is always valid: the field lands in the right operation, its
-  // required args become typed variables (added to the signature + seeded into
-  // the variables JSON), and object/union fields get a valid selection set.
+  // Insert a field by editing the query AST and printing it, so the result stays
+  // valid: required args become typed variables, object/union fields get a selection set.
   const handleInsert = useCallback<InsertHandler>((field, path, opType, allFields) => {
     if (!schema) return;
     const { query, variables } = insertField(gql.query, gql.variables, schema, opType, path, field, gql.operationName || undefined, { allFields });
@@ -335,7 +326,7 @@ export function GraphQLEditor({ request, onChange }: Props) {
     setSchemaState('loading');
     setSchemaError(null);
     try {
-      // Run introspection hook if defined — can inject auth headers via sp.environment.set()
+      // Introspection hook (if defined) can inject auth headers via sp.environment.set()
       let resolvedVars = { ...hookVars.envVars, ...hookVars.collectionVars, ...hookVars.globals };
       if (request.graphqlIntrospectionScript?.trim()) {
         try {
@@ -351,7 +342,7 @@ export function GraphQLEditor({ request, onChange }: Props) {
             ...hookResult.updatedGlobals,
           };
         } catch {
-          // Hook errors are non-fatal — introspection continues with original vars
+          // Hook errors are non-fatal: introspection continues with original vars
         }
       }
 
@@ -366,8 +357,7 @@ export function GraphQLEditor({ request, onChange }: Props) {
       }
       const { parsed, rawIntrospection } = await fetchSchemaFromUrl(url, extraHeaders);
       setSchema(parsed);
-      // Cache the raw introspection on the request so it persists across tab
-      // switches and app restarts, and feeds CM6 autocomplete.
+      // Cache raw introspection on the request: persists across restarts, feeds CM6.
       onChange({ graphqlIntrospectionCache: JSON.stringify(rawIntrospection) });
       setSchemaState('idle');
       setShowExplorer(true);
@@ -509,8 +499,7 @@ export function GraphQLEditor({ request, onChange }: Props) {
             )}
           </div>
 
-          {/* Subscription (graphql-ws) — the live stream + tests now render in
-              the Response pane (like a query's response). Just a hint here. */}
+          {/* Subscription (graphql-ws): stream + tests render in the Response pane; just a hint here. */}
           {isSubscriptionQuery(gql.query) && (
             <div className="flex-shrink-0 border-t border-surface-800 pt-2 mt-1">
               <p className="text-[10px] text-surface-600">

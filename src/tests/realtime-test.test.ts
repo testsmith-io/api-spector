@@ -14,7 +14,7 @@ import { runWsTest, runSocketIoTest, runGraphqlWsTest } from '../main/realtime-t
 const cleanups: (() => void)[] = [];
 afterEach(() => { while (cleanups.length) cleanups.pop()!(); });
 
-// ─── WebSocket ────────────────────────────────────────────────────────────
+// WebSocket
 
 describe('runWsTest', () => {
   function startWsServer(): Promise<string> {
@@ -63,7 +63,7 @@ describe('runWsTest', () => {
   });
 });
 
-// ─── Socket.IO ──────────────────────────────────────────────────────────────
+// Socket.IO
 
 describe('runSocketIoTest', () => {
   function startIoServer(): Promise<string> {
@@ -109,7 +109,7 @@ describe('runSocketIoTest', () => {
   });
 });
 
-// ─── GraphQL subscriptions (graphql-ws protocol) ──────────────────────────────
+// GraphQL subscriptions (graphql-ws protocol)
 
 describe('runGraphqlWsTest', () => {
   // Minimal graphql-transport-ws server over `ws`: ack, then stream `next`.

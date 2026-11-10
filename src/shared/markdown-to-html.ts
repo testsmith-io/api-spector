@@ -1,10 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 //
-// A compact Markdown -> HTML string renderer for the documentation export (main
-// process, where the React preview renderer can't run). All text is escaped, so
-// it is safe for untrusted description content. A `flow` / `flowchart` fenced
-// block is handed to the optional `flowchart` hook (which draws an <svg>).
+// Compact Markdown to HTML renderer for the documentation export (main process,
+// no React preview). All text is escaped, so it's safe for untrusted content; a
+// `flow`/`flowchart` fenced block goes to the optional `flowchart` hook.
 
 import { escapeHtml } from './escape';
 

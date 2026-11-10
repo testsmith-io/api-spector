@@ -4,13 +4,9 @@
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell } from 'electron';
 import { IPC } from '../shared/ipc-channels';
 
-// Managed / locked-down machines (corporate Windows with EDR software, or
-// Linux with user-namespaces disabled) can hit "permission denied" with
-// Electron 33+ due to tightened Chromium sandbox defaults:
-//   - Windows: RendererCodeIntegrity blocks unsigned EDR DLL injection;
-//              GPU-process job-object changes conflict with some EDR products.
-//   - Linux:   user-namespace restrictions break the sandbox from Electron 36+.
-// Setting ELECTRON_NO_SANDBOX=1 opts out of the sandbox for these environments.
+// Locked-down machines (corporate Windows with EDR, or Linux with user
+// namespaces disabled) can hit "permission denied" on Electron 33+ from
+// tightened Chromium sandbox defaults. ELECTRON_NO_SANDBOX=1 opts out.
 if (process.env.ELECTRON_NO_SANDBOX === '1') {
   app.commandLine.appendSwitch('no-sandbox');
   app.commandLine.appendSwitch('disable-features', 'RendererCodeIntegrity');
@@ -28,12 +24,8 @@ import { checkForUpdate }          from './update-check';
 import { initAutoUpdater, installUpdate, updateMode } from './auto-updater';
 import { stopAll } from './mock-server';
 
-// ─── Deep links (spector://) ─────────────────────────────────────────────────
-//
-// The web courses embed an "Open in API Spector" button that links to
-//   spector://open-from-git?url=<public repo url>
-// Clicking it launches (or focuses) the app and opens that repo via the same
-// Open-from-Git flow as the welcome-screen button. Public repos only.
+// Deep links (spector://). An "Open in API Spector" button links to
+// spector://open-from-git?url=<public repo url>, which opens that repo. Public repos only.
 
 const PROTOCOL = 'spector';
 
@@ -42,8 +34,8 @@ const PROTOCOL = 'spector';
 let pendingRepoUrl: string | null = null;
 let pendingImportToken: string | null = null;
 
-/** Pull the first `spector://` argument out of a process argv list (Windows/
- *  Linux deliver deep links this way, both on cold start and second-instance). */
+/** First `spector://` argument in an argv list (how Windows/Linux deliver deep
+ *  links, on cold start and second-instance). */
 function deepLinkFromArgv(argv: string[]): string | null {
   return argv.find(a => a.startsWith(`${PROTOCOL}://`)) ?? null;
 }
@@ -58,8 +50,8 @@ function parseOpenFromGit(deepLink: string): string | null {
     return null;
   }
   if (u.protocol !== `${PROTOCOL}:`) return null;
-  // The action is the host or the first path segment, tolerating both
-  // spector://open-from-git?… and spector:open-from-git?… shapes.
+  // Action is the host or first path segment, tolerating both
+  // spector://open-from-git and spector:open-from-git shapes.
   const action = u.hostname || u.pathname.replace(/^\/+/, '').split('/')[0];
   if (action !== 'open-from-git') return null;
   const repo = u.searchParams.get('url');
@@ -167,9 +159,8 @@ function loadAppIcon(): Electron.NativeImage | undefined {
 }
 
 
-// Keep the splash on screen at least this long so it reads as intentional, but
-// never add a fixed delay on top of load time (it used to always wait 1.2s
-// AFTER the window finished loading).
+// Minimum splash time so it reads as intentional, with no fixed delay on top of
+// load time.
 const MIN_SPLASH_MS = 350;
 
 function createWindow(): void {
@@ -217,7 +208,7 @@ function createWindow(): void {
     }, remaining);
   });
 
-  // On Windows the native title bar is shown — include the version in the title
+  // On Windows the native title bar is shown - include the version in the title
   if (process.platform === 'win32') {
     const version = app.getVersion();
     win.setTitle(`API Spector${version ? ` v${version}` : ''}`);

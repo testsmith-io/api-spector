@@ -1,12 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Component test for the collection-tree RequestRow + its grouped examples.
-// Covers the UX contract: examples live in an expandable "Saved examples"
-// group (not as ordinary tree nodes), carry a file-code icon and no HTTP
-// method badge, the request shows a live example count whether or not the
-// group is expanded, and clicking an example opens that specific example.
-//
+// Component test for RequestRow's grouped examples: expandable group, no method
+// badge, live count whether expanded or not, click opens that example.
 // Run with: npx vitest --project renderer
 
 import * as React from 'react';
@@ -77,7 +73,7 @@ function props(overrides: Partial<RequestRowProps> = {}): RequestRowProps {
   };
 }
 
-/** The example group is collapsed by default — click the request chevron. */
+/** The example group is collapsed by default - click the request chevron. */
 function expandExamples() {
   fireEvent.click(screen.getByTitle(/Show \d+ example/));
 }

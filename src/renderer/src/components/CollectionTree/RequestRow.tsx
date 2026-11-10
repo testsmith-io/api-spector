@@ -17,9 +17,8 @@ import { ShareModal } from '../common/ShareModal';
 import { pushRequestAsMonitor, shareRequestToCloud, cloudEnabled } from '../../lib/cloud-push';
 import { useT } from '../../i18n';
 
-/** The path portion of a request URL, for showing under the name in the tree.
- *  Strips a leading {{baseUrl}} token and the scheme+host so an imported
- *  request reads as "/pets/{id}" rather than its vendor description. */
+/** Path portion of a request URL, shown under the name. Strips a leading
+ *  {{baseUrl}} token and scheme+host so it reads as "/pets/{id}". */
 function requestPath(url: string): string {
   const trimmed = url.trim()
     .replace(/^\{\{[^}]+\}\}/, '')     // leading {{baseUrl}} variable
@@ -27,7 +26,7 @@ function requestPath(url: string): string {
   return trimmed || url.trim();
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// Constants
 
 export const HOOK_LABELS: Record<NonNullable<ApiRequest['hookType']>, string> = {
   beforeAll: 'Before All',
@@ -52,7 +51,7 @@ const AUTH_BADGE_LABELS: Record<string, string> = {
   oauth2:  'OAuth2',
 };
 
-// ─── RequestRow ──────────────────────────────────────────────────────────────
+// RequestRow
 
 export interface RequestRowProps {
   readonly reqId: string
@@ -94,29 +93,24 @@ export function RequestRow({
   onAddExample, onOpenExample, onRenameExample, onDeleteExample, onDuplicateExample,
   onReorderExample, onSortExamples,
 }: RequestRowProps) {
-  // Which example is being dragged (for reorder) — tracked here so every
-  // ExampleRow shares one drag source.
+  // Which example is being dragged, so every ExampleRow shares one drag source.
   const [dragExampleId, setDragExampleId] = useState<string | null>(null);
   const t = useT();
-  // An example is a saved request + single response snapshot, which only fits
-  // request/response protocols. Realtime ones (WebSocket, Socket.IO, MQTT) have
-  // no single response, so they do not offer "Add Example".
+  // An example is a saved request + single response, so realtime protocols
+  // (WebSocket, Socket.IO, MQTT) do not offer "Add Example".
   const canAddExample = !protocol || protocol === 'http' || protocol === 'soap' || protocol === 'grpc';
   const [renaming, setRenaming] = useState(autoRename);
-  // Examples start collapsed: the count on the request row already signals they
-  // exist, and expanding reveals the grouped "Saved examples" panel.
+  // Examples start collapsed; the count on the row signals they exist.
   const [examplesOpen, setExamplesOpen] = useState(false);
   const [addingTag, setAddingTag] = useState(false);
   const [showSchemaSync, setShowSchemaSync] = useState(false);
   const dragCtx = useContext(DragCtx);
   const sel = useContext(SelectionCtx);
   const selected = sel.isSelected(collectionId, reqId);
-  // When an example of this request is the open tab, the example row owns the
-  // selection highlight — the parent request must not also look selected, but
-  // it keeps a subtle cue (the connector line tints blue).
+  // When an example is the open tab, its row owns the selection highlight; the
+  // parent request keeps only a subtle cue (connector line tints blue).
   const exampleActive = activeExampleId != null && examples.some(e => e.id === activeExampleId);
-  // The "Saved examples" group is nudged in from the request's left edge so it
-  // reads as belonging to the request without consuming a full indent level.
+  // Nudge the group in from the request's left edge, less than a full indent.
   const groupIndent = indent + 14;
   const { toast, show } = useToast();
   const addSecurityTests = useStore(s => s.addSecurityTests);
@@ -124,8 +118,8 @@ export function RequestRow({
   const [showCloudRequired, setShowCloudRequired] = useState(false);
   const [showShare, setShowShare] = useState(false);
 
-  // Cmd/Ctrl+click toggles this request into the multi-selection instead of
-  // opening it; a plain click clears any selection and opens as before.
+  // Cmd/Ctrl+click toggles into the multi-selection; a plain click clears it
+  // and opens the request.
   function handleRowClick(e: React.MouseEvent) {
     if (e.metaKey || e.ctrlKey) { e.preventDefault(); sel.toggle(collectionId, reqId); return; }
     if (sel.active) sel.clear();
@@ -143,8 +137,7 @@ export function RequestRow({
     }
   }
 
-  // Open the share dialog (create / view / restrict / revoke the public link).
-  // Sharing needs the cloud; without it we invite the user to connect instead.
+  // Open the share dialog; sharing needs the cloud, else prompt to connect.
   function openShare() {
     if (!cloudEnabled()) { setShowCloudRequired(true); return; }
     setShowShare(true);
@@ -162,12 +155,8 @@ export function RequestRow({
         data-row
         draggable
         tabIndex={0}
-        // Accessible name so a screen reader announces "GET Pets" rather than the
-        // raw concatenation of badges/name, and the open request is marked current.
-        // NOTE: a full role="treeitem" is deliberately NOT set here — the row has
-        // independently tabbable children (select checkbox, chevron, dots menu), so
-        // a widget role would create a nested-interactive violation without a
-        // roving-tabindex keyboard model. That is tracked as a separate task.
+        // Accessible name announces method + name; the open row gets aria-current.
+        // No role="treeitem": tabbable children would be a nested-interactive violation.
         aria-label={`${protocol && protocol !== 'http' ? protocol.toUpperCase() : method} ${name}`}
         aria-current={isActive && !exampleActive ? 'true' : undefined}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRowClick(e as unknown as React.MouseEvent); } }}
@@ -181,9 +170,11 @@ export function RequestRow({
         onClick={handleRowClick}
         onDoubleClick={() => setRenaming(true)}
         onDragStart={e => {
-          e.dataTransfer.effectAllowed = 'move';
+          // copyMove so Ctrl/Cmd can switch the drop to a copy; the drop target
+          // decides move vs copy.
+          e.dataTransfer.effectAllowed = 'copyMove';
           dragCtx.setDragging({ type: 'request', requestId: reqId, collectionId });
-          // When this request is part of a multi-selection, show how many move.
+          // In a multi-selection, show how many move.
           if (selected && sel.count > 1) {
             const ghost = document.createElement('div');
             ghost.textContent = t(':count request|:count requests', { count: sel.count });
@@ -195,10 +186,8 @@ export function RequestRow({
         }}
         onDragEnd={() => { dragCtx.setDragging(null); }}
       >
-        {/* Multi-select checkbox — overlaid in the left indentation gutter (just
-            left of the chevron) so it reserves no column and causes no layout
-            shift. Hidden + non-interactive until the row is hovered; stays
-            visible once a selection is in progress. */}
+        {/* Multi-select checkbox overlaid in the left gutter so it reserves no
+            column. Hidden until hover; stays visible once a selection starts. */}
         <input
           type="checkbox"
           checked={selected}
@@ -209,8 +198,8 @@ export function RequestRow({
           className={`absolute top-1.5 accent-blue-500 cursor-pointer ${sel.active || selected ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto'}`}
         />
 
-        {/* Col 1 — compact, fixed-width chevron slot. Empty (but same width)
-            when the request has no examples, so method and name never shift. */}
+        {/* Col 1 - fixed-width chevron slot, kept even with no examples so
+            method and name never shift. */}
         <span className="shrink-0 w-4 flex items-center justify-center mt-0.5">
           {examples.length > 0 && (
             <button
@@ -223,8 +212,8 @@ export function RequestRow({
           )}
         </span>
 
-        {/* Col 2 — HTTP method / protocol, in a fixed-width column so request
-            names always begin at the same x regardless of the method. */}
+        {/* Col 2 - HTTP method / protocol, fixed-width so names start at the
+            same x regardless of method. */}
         <span className="shrink-0 w-10 flex items-center mt-0.5">
           {protocol === 'soap' ? (
             <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-amber-700/80 text-amber-50" title={t('SOAP request')}>SOAP</span>
@@ -239,7 +228,7 @@ export function RequestRow({
           )}
         </span>
 
-        {/* Col 3 — request name (priority) + muted URL + tags. */}
+        {/* Col 3 - request name (priority) + muted URL + tags. */}
         <div className="flex-1 min-w-0">
           {renaming ? (
             <InlineEdit
@@ -251,8 +240,8 @@ export function RequestRow({
           ) : (
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="text-xs truncate" title={name}>{name}</span>
-              {/* Col 4 — secondary metadata, compact icons pinned right so the
-                  name keeps the width. Each carries a descriptive tooltip. */}
+              {/* Col 4 - secondary metadata icons pinned right so the name
+                  keeps the width. */}
               <span className="shrink-0 ml-auto flex items-center gap-1.5">
                 {hookType && (
                   <span className={`shrink-0 text-[9px] font-bold px-1 py-px rounded ${HOOK_COLORS[hookType]}`}>
@@ -267,9 +256,8 @@ export function RequestRow({
                     <KeyIcon className="w-3.5 h-3.5" />
                   </span>
                 )}
-                {/* Example count — small and secondary; shown only while the
-                    group is collapsed (expanded, the EXAMPLES header carries it).
-                    Derived from props, so it stays correct on add/move/delete. */}
+                {/* Example count, shown only while the group is collapsed
+                    (expanded, the EXAMPLES header carries it). */}
                 {examples.length > 0 && !examplesOpen && (
                   <span
                     className={`inline-flex items-center gap-0.5 text-[10px] tabular-nums ${exampleActive ? 'text-blue-400' : 'text-surface-500'}`}
@@ -352,10 +340,8 @@ export function RequestRow({
           />
         )}
       </div>
-      {/* Examples under the request: a plain, compact indented list (no card,
-          no header, no connector line). Marked with a neutral icon and their
-          own selection state. Hidden when collapsed (the count then shows on
-          the request row). */}
+      {/* Examples under the request: a compact indented list with a neutral
+          icon and its own selection state. Hidden when collapsed. */}
       {examplesOpen && examples.length > 0 && (
         <div className="mb-0.5" style={{ paddingLeft: groupIndent }}>
           {examples.map(ex => (
@@ -389,14 +375,13 @@ export function RequestRow({
   );
 }
 
-// ─── ExampleRow ──────────────────────────────────────────────────────────────
-// One saved request/response snapshot, rendered as a compact member of its
-// request's "Saved examples" group (no collection-level indentation, no method
-// badge, a neutral icon, and its own selection/hover styling).
+// ExampleRow
+// One saved request/response snapshot in its request's "Saved examples" group:
+// no method badge, a neutral icon, its own selection/hover styling.
 
 function ExampleRow({ name, indent, isActive, reorderable, dragging, dragActive, onDragStart, onDragEnd, onDropOn, onOpen, onRename, onDelete, onDuplicate }: {
   readonly name: string
-  /** Left padding (px) so the example sits nested under its request. */
+  /** Left padding (px) nesting the example under its request. */
   readonly indent: number
   readonly isActive: boolean
   readonly reorderable: boolean

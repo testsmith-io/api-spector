@@ -3,10 +3,8 @@
 
 import type { SecretsSettings } from '../../shared/types';
 
-// Non-secret connection config for external secret managers, taken from the
-// workspace (settings.secrets). Set once at run start; providers read it and let
-// environment variables override, so the same workspace runs unchanged on a
-// laptop (VAULT_ADDR + ~/.vault-token) and in CI (VAULT_ADDR + OIDC/AppRole).
+// Non-secret connection config for external secret managers, from the workspace
+// (settings.secrets). Env vars override, so the same workspace runs on a laptop or CI.
 let current: SecretsSettings | undefined;
 
 export function setSecretsConfig(settings: SecretsSettings | undefined): void {

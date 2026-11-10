@@ -1,15 +1,11 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Load-generation worker. Runs in an Electron utilityProcess (a dedicated Node
-// process) so the main process event loop stays responsive while a heavy run is
-// in flight. The engine is pure Node (undici, vm, the flow engine), so it runs
-// here unchanged. The main process resolves env vars (OS keychain) and passes
-// them in via `resolvedEnvVars`, so this process never touches the keychain;
-// inline {{vault:…}} references use the HTTP-based secret providers, configured
-// here from the passed secretsConfig.
+// Load-generation worker in an Electron utilityProcess (keeps the main loop
+// responsive). The worker never touches the keychain; the main process passes
+// resolved env vars in, and inline {{vault:...}} refs use secretsConfig providers.
 //
-// Protocol (over process.parentPort):
+// Protocol (process.parentPort):
 //   in : { type: 'run', payload } | { type: 'stop' }
 //   out: { type: 'progress', p } | { type: 'result', result } | { type: 'error', message }
 

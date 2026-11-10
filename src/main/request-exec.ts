@@ -1,16 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-/**
- * Shared request-execution core.
- *
- * The single-send IPC handler (`request-handler.ts`), the GUI batch runner
- * (`runner-handler.ts`) and the CLI runner (`cli/runner.ts`) all execute the
- * same request lifecycle: auth → body build → fetch (with NTLM/digest
- * handshakes) → tests → post-script → status. This module is the one
- * implementation they share, so the three entry points cannot drift apart
- * (the CLI used to support only bearer auth because its copy fell behind).
- */
+/** Shared request-execution core: the one request lifecycle (auth -> body -> fetch ->
+ *  tests -> post-script -> status) shared by the single-send handler, GUI and CLI runners,
+ *  so they can't drift apart. */
 
 import { fetch, Headers, ProxyAgent, Agent, Pool, type Dispatcher } from 'undici';
 import { readFile } from 'fs/promises';
@@ -55,11 +48,8 @@ type SystemCertificateTlsApi = {
 
 let systemCertificateStoreApplied = false;
 
-/**
- * Node does not use the Windows root store by default. Local TLS-intercepting
- * proxies usually install their CA there, so merge it into this process while
- * keeping normal certificate verification enabled.
- */
+/** Node ignores the Windows root store; merge it in so a local TLS-intercepting proxy's
+ *  CA is trusted, keeping normal verification on. */
 export function trustSystemCertificateStore(options: {
   platform?: NodeJS.Platform | string
   tlsApi?: SystemCertificateTlsApi
@@ -95,13 +85,10 @@ export function trustSystemCertificateStore(options: {
   }
 }
 
-// ─── PII masking ──────────────────────────────────────────────────────────────
+// PII masking
 
-/**
- * Replace values of matching JSON fields and matching header names with
- * `[REDACTED]`.  `patterns` is a list of field/header name substrings to
- * match (case-insensitive).
- */
+/** Replace values of JSON fields whose name matches a pattern (case-insensitive
+ *  substring) with `[REDACTED]`. */
 export function maskPii(data: string, patterns: string[]): string {
   if (!patterns.length) return data;
   try {
@@ -109,7 +96,7 @@ export function maskPii(data: string, patterns: string[]): string {
     const masked = maskObject(obj, patterns);
     return JSON.stringify(masked);
   } catch {
-    // Not JSON — return as-is (raw masking of non-JSON is out of scope)
+    // Not JSON - return as-is
     return data;
   }
 }
@@ -146,18 +133,12 @@ export function maskHeaders(headers: Record<string, string>, patterns: string[])
   return result;
 }
 
-// ─── Schema → TestResult adapter ──────────────────────────────────────────────
+// Schema -> TestResult adapter
 
 const schemaAjv = new Ajv({ allErrors: true, strict: false });
 
-/**
- * Validate the response body against the request's standalone JSON Schema
- * (if any) and convert the result into TestResults so it shows up next to
- * post-script tests in the runner output.
- *
- * Independent of `request.contract` — this is the field edited in the
- * Schema tab.
- */
+/** Validate the response body against the request's standalone JSON Schema
+ *  (Schema tab, independent of `request.contract`) as TestResults. */
 export function buildSchemaTestResults(
   schemaText: string | undefined,
   body: string,
@@ -208,19 +189,13 @@ export function buildSchemaTestResults(
   }));
 }
 
-// ─── Protocol-level "did the call succeed" tests ─────────────────────────────
+// Protocol-level "did the call succeed" tests
 //
-// REST requests with no user-defined assertions stay 'skipped' — the runner
-// nudges the user to write an explicit check. SOAP and GraphQL are different:
-// HTTP 200 alone doesn't mean success (a SOAP service can return a Fault,
-// GraphQL can return a populated `errors` array), so we add a synthetic
-// pass/fail check based on the response shape. That promotes those requests
-// from 'skipped' to 'passed'/'failed' automatically.
+// REST with no assertions stays 'skipped'. SOAP/GraphQL can fail at HTTP 200 (a Fault
+// or populated `errors`), so a synthetic pass/fail promotes them out of 'skipped'.
 
-/** Returns synthetic test results for SOAP / GraphQL requests so the runner
- *  can mark them passed (no fault / no errors) or failed (fault / errors)
- *  without requiring a hand-written post-script. Returns `[]` for other body
- *  modes — REST keeps the existing "no tests = skipped" semantics. */
+/** Synthetic pass/fail for SOAP (fault) / GraphQL (errors) requests; `[]` for
+ *  other modes, where "no tests = skipped" stands. */
 export function buildProtocolFaultTests(
   bodyMode: string | undefined,
   body: string,
@@ -228,12 +203,10 @@ export function buildProtocolFaultTests(
   if (!body) return [];
 
   if (bodyMode === 'soap') {
-    // SOAP 1.1 fault element name: `Fault`. SOAP 1.2 same (different ns).
-    // Match `<…:Fault` or `<Fault` (some servers omit the ns prefix on the
-    // root response). Case-insensitive to cover non-standard servers.
+    // Match `<ns:Fault` or `<Fault` (prefix sometimes omitted), case-insensitive.
     const isFault = /<(?:[\w-]+:)?Fault(?:\s|>)/i.test(body);
     if (isFault) {
-      // Best-effort: extract the faultstring / Reason text for the error msg.
+      // Extract the faultstring / Reason text for the error msg.
       const reason = /<(?:[\w-]+:)?(?:faultstring|Text)[^>]*>([\s\S]*?)<\/(?:[\w-]+:)?(?:faultstring|Text)>/i.exec(body);
       return [{
         name:   '[soap] response is not a Fault',
@@ -262,9 +235,9 @@ export function buildProtocolFaultTests(
   return [];
 }
 
-// ─── Defensive defaults ───────────────────────────────────────────────────────
+// Defensive defaults
 
-/** AI-generated collections may omit empty arrays — normalize in place. */
+/** AI-generated collections may omit empty arrays - normalize in place. */
 export function applyRequestDefaults(req: ApiRequest): void {
   if (!req.headers) req.headers = [];
   if (!req.params) req.params = [];
@@ -272,25 +245,20 @@ export function applyRequestDefaults(req: ApiRequest): void {
   if (!req.auth) req.auth = { type: 'none' };
 }
 
-// ─── Build undici dispatcher (proxy + TLS) ────────────────────────────────────
+// Build undici dispatcher (proxy + TLS)
 
-// A shared HTTP/2-capable dispatcher for plain requests, so we don't build an
-// Agent per send. `allowH2` negotiates h2 via ALPN and transparently falls back
-// to HTTP/1.1 for servers that don't offer it — matching what a browser does.
-// This matters for streaming: some servers (and CDNs) only flush a response
-// body incrementally over HTTP/2; over HTTP/1.1 Node's TLS stack coalesces the
-// frames and an SSE/NDJSON stream arrives all at once at the end.
+// Shared HTTP/2-capable dispatcher for plain requests (one per process). allowH2
+// negotiates h2 via ALPN, falling back to HTTP/1.1; matters for streaming, since some
+// servers only flush an SSE/NDJSON stream incrementally over h2 (HTTP/1.1 coalesces it).
 let _defaultAgent: Agent | undefined;
 function defaultAgent(): Agent {
   _defaultAgent ??= new Agent({ allowH2: true } as ConstructorParameters<typeof Agent>[0]);
   return _defaultAgent;
 }
 
-// Loopback / local hosts a proxy must never be used for: a configured HTTP
-// proxy almost never has a route back to the user's own machine, so sending
-// localhost traffic through it fails even though the URL is reachable directly
-// (the exact "works in the browser, fails here with a proxy on" report). This
-// mirrors what curl and browsers do automatically.
+// Loopback / local hosts the proxy must bypass: a configured proxy rarely has a
+// route back to the user's own machine, so localhost traffic through it fails
+// even when reachable directly. curl and browsers bypass these too.
 function isLoopbackHost(host: string): boolean {
   const h = host.toLowerCase().replace(/^\[|\]$/g, '');   // strip IPv6 brackets
   return h === 'localhost' || h.endsWith('.localhost')
@@ -318,12 +286,9 @@ function shouldBypassProxy(host: string, noProxy: string[]): boolean {
   return isLoopbackHost(host) || matchesNoProxy(host, noProxy);
 }
 
-// Proxied / TLS dispatchers are cached per unique {proxy, tls} configuration.
-// Each one owns a keep-alive socket pool, so building a fresh one on every send
-// (the old behaviour) leaked sockets and native memory for the whole session —
-// invisible on the default path but unbounded for proxy / client-cert users.
-// Caching gives them the same process-lifetime reuse as defaultAgent(), so no
-// caller needs to destroy anything.
+// Proxied / TLS dispatchers cached per unique {proxy, tls}. Each owns a
+// keep-alive pool, so building one per send leaked sockets for the whole
+// session; caching gives them defaultAgent()'s process-lifetime reuse.
 const _dispatcherCache = new Map<string, Dispatcher>();
 
 export async function buildDispatcher(
@@ -351,9 +316,8 @@ export async function buildDispatcher(
     if (tls.rejectUnauthorized !== undefined) {
       connectOpts['rejectUnauthorized'] = tls.rejectUnauthorized;
     }
-    // Surface an unreadable cert/key path instead of silently dropping it and
-    // failing later with an opaque TLS handshake error that gives no hint which
-    // configured path was at fault.
+    // Surface an unreadable cert/key path now, not as an opaque TLS handshake
+    // error later.
     const unreadable: string[] = [];
     const readInto = async (field: string, path?: string): Promise<void> => {
       if (!path) return;
@@ -372,11 +336,9 @@ export async function buildDispatcher(
   if (hasProxy) {
     const uri = buildProxyUri({ url: proxy!.url, auth: proxy!.auth });
     const noProxy = noProxyList();
-    // undici's ProxyAgent has no bypass list, so route per origin via Agent's
-    // factory hook: loopback / NO_PROXY hosts get a direct Pool (a configured
-    // proxy almost never has a route back to the user's own machine), every
-    // other origin goes through a ProxyAgent. Same TLS options on both so a
-    // local HTTPS target still works. Agent caches one dispatcher per origin.
+    // ProxyAgent has no bypass list, so route per origin via Agent's factory:
+    // loopback / NO_PROXY origins get a direct Pool, the rest a ProxyAgent.
+    // Same TLS options on both so a local HTTPS target still works.
     dispatcher = new Agent({
       allowH2: true,
       factory: (origin: string | URL) => {
@@ -405,11 +367,10 @@ export async function buildDispatcher(
   return dispatcher;
 }
 
-// ─── Body serialization ───────────────────────────────────────────────────────
+// Body serialization
 
-// A small, dependency-free extension→MIME map for multipart file parts. Covers
-// the common upload types; anything else falls back to application/octet-stream
-// (and the user can always set a per-part Content-Type by hand).
+// Extension->MIME map for multipart file parts; anything unlisted falls back to
+// application/octet-stream.
 const MIME_BY_EXT: Record<string, string> = {
   '.json': 'application/json', '.xml': 'application/xml', '.txt': 'text/plain',
   '.csv': 'text/csv', '.html': 'text/html', '.pdf': 'application/pdf',
@@ -434,21 +395,16 @@ function sanitizeFormName(s: string): string {
 }
 
 export interface MultipartBuildResult {
-  /** The assembled multipart/form-data payload. */
   body: Buffer
-  /** The Content-Type header value, including the generated boundary. */
+  /** Content-Type value, including the generated boundary. */
   contentType: string
-  /** Human-readable summary for the request snapshot / history (no file bytes). */
+  /** Readable summary for the snapshot / history (no file bytes). */
   preview: string
 }
 
-/**
- * Assemble a `multipart/form-data` body from the request's parts. File parts are
- * read from disk and streamed inline; text parts carry their interpolated value.
- * We build the payload with an explicit boundary (rather than handing a FormData
- * to fetch) so the exact same Buffer works across the normal, NTLM and digest
- * send paths, and so the snapshot/preview stays a readable string.
- */
+/** Assemble a `multipart/form-data` body with an explicit boundary (not a
+ *  FormData) so one Buffer works across the normal/NTLM/digest paths and the
+ *  preview stays a readable string. */
 export async function buildMultipartBody(
   parts: MultipartPart[],
   vars: Record<string, string>,
@@ -494,13 +450,8 @@ export async function buildMultipartBody(
   };
 }
 
-/**
- * Serialize the request body for the current mode and apply the Content-Type /
- * SOAPAction defaults onto `headers` (only when the user did not set them).
- *
- * Note: `multipart` mode is handled separately (async, reads files) in
- * `performHttpExchange` via `buildMultipartBody` and is a no-op here.
- */
+/** Serialize the body for the current mode, applying Content-Type / SOAPAction
+ *  defaults only when unset. `multipart` is handled elsewhere (no-op here). */
 export function buildBodyAndApplyHeaders(
   req: ApiRequest,
   vars: Record<string, string>,
@@ -509,9 +460,8 @@ export function buildBodyAndApplyHeaders(
   let body: string | undefined;
 
   if (req.body.mode === 'json' && req.body.json) {
-    // Allow // and /* */ comments in the JSON body (JSONC): strip them before
-    // interpolating, so authored comments are removed but a `//` inside an
-    // interpolated value (e.g. a URL) is left untouched.
+    // JSONC: strip comments before interpolating, so a `//` inside an
+    // interpolated value (a URL) survives.
     body = interpolate(stripJsonComments(req.body.json), vars);
     if (!headers.has('content-type')) headers.set('Content-Type', 'application/json');
   } else if (req.body.mode === 'form' && req.body.form) {
@@ -544,7 +494,7 @@ export function buildBodyAndApplyHeaders(
   return body;
 }
 
-// ─── HTTP exchange (auth handshakes included) ─────────────────────────────────
+// HTTP exchange (auth handshakes included)
 
 export interface ExchangeOptions {
   req: ApiRequest
@@ -553,8 +503,7 @@ export interface ExchangeOptions {
   dispatcher: Dispatcher | undefined
   proxy?: ProxyConfig
   tls?: TlsConfig
-  /** Called with the outgoing request snapshot just before dispatch, so the
-   *  caller still has it when the fetch itself throws. */
+  /** Outgoing snapshot, emitted before dispatch so it survives a fetch throw. */
   onSent?: (sent: SentRequest) => void
   /** Called for each frame of a streamed response, as it arrives. */
   onStreamEvent?: (ev: StreamEvent) => void
@@ -583,17 +532,13 @@ export interface ExchangeResult {
   firstEventMs?: number
 }
 
-/**
- * Perform one HTTP exchange: OAuth2 token refresh, auth headers, api-key query
- * param, body serialization, and the NTLM / digest handshakes when needed.
- * Throws on transport failure — error shaping stays with the caller.
- */
+/** One HTTP exchange: OAuth2 refresh, auth headers, api-key param, body, and
+ *  the NTLM / digest handshakes. Throws on transport failure. */
 export async function performHttpExchange(opts: ExchangeOptions): Promise<ExchangeResult> {
   const { req, resolvedUrl, dispatcher, proxy, tls, onSent } = opts;
 
-  // Inline external-secret references in the send fields (body, headers, auth).
-  // For the runner path these are already in `vars`; resolving again here (cache
-  // hit) also covers the single-send path, which does not run executeRunnerRequest.
+  // Inline external-secret refs in the send fields. Already in `vars` on the
+  // runner path (cache hit); this also covers the single-send path.
   let vars = opts.vars;
   const inlineSecrets = await resolveInlineSecrets(req, vars);
   if (Object.keys(inlineSecrets).length) vars = { ...vars, ...inlineSecrets };
@@ -636,8 +581,8 @@ export async function performHttpExchange(opts: ExchangeOptions): Promise<Exchan
     const mp = await buildMultipartBody(req.body.multipart, vars);
     effectiveBody = mp.body;
     previewBody = mp.preview;
-    // undici would auto-set a boundary only for a FormData body; we build the
-    // bytes ourselves, so set the Content-Type (unless the user forced one).
+    // We build the bytes, not a FormData, so set the Content-Type ourselves
+    // (unless the user forced one).
     if (!headers.has('content-type')) headers.set('Content-Type', mp.contentType);
   } else {
     const body = buildBodyAndApplyHeaders(req, vars, headers);
@@ -697,9 +642,8 @@ export async function performHttpExchange(opts: ExchangeOptions): Promise<Exchan
   const rawHeaders: Record<string, string> = {};
   fetchResp.headers.forEach((value, key) => { rawHeaders[key] = value; });
 
-  // Stream the body when the Content-Type is an event/line format (or the
-  // request forced it) AND the transport gave us a real ReadableStream. The
-  // NTLM path returns a non-standard response, so it falls back to buffering.
+  // Stream when the Content-Type is an event/line format (or forced) AND the
+  // transport gave a real ReadableStream. NTLM's non-standard response buffers.
   const kind = detectStreamKind(rawHeaders['content-type'], opts.forceStream);
   const bodyStream = fetchResp.body as ReadableStream<Uint8Array> | null;
   const canStream = kind !== null && bodyStream !== null && typeof bodyStream.getReader === 'function';
@@ -733,17 +677,15 @@ export async function performHttpExchange(opts: ExchangeOptions): Promise<Exchan
   };
 }
 
-// ─── Status determination ─────────────────────────────────────────────────────
+// Status determination
 
 /**
  * Derive the run status, in priority order:
- *   1. post-script crashed → 'error'
- *   2. has tests, any failed → 'failed'
- *   3. has tests, all passed → 'passed' (even on HTTP 4xx — the user
- *      intentionally expects that status, e.g. negative tests for 422)
- *   4. no tests + HTTP 4xx/5xx → 'failed'
- *   5. no tests + HTTP 2xx/3xx → 'passed' (SOAP Fault / GraphQL `errors`
- *      already became failing tests via buildProtocolFaultTests)
+ *   1. post-script crashed     -> 'error'
+ *   2. has tests, any failed    -> 'failed'
+ *   3. has tests, all passed    -> 'passed' (even on 4xx: user expects it, e.g. 422)
+ *   4. no tests + HTTP 4xx/5xx  -> 'failed'
+ *   5. no tests + HTTP 2xx/3xx  -> 'passed'
  */
 export function deriveRunStatus(
   postScriptError: string | undefined,
@@ -765,7 +707,7 @@ export function syntheticHttpFailure(status: number, statusText: string): TestRe
   };
 }
 
-// ─── Full runner-item execution (shared by GUI runner and CLI) ────────────────
+// Full runner-item execution (shared by GUI runner and CLI)
 
 export interface RunnerExecOptions {
   req: ApiRequest
@@ -797,18 +739,11 @@ export interface RunnerExecResult {
   updatedFolderVars: Record<string, string>
 }
 
-/**
- * Execute one runner item end-to-end: pre-script → HTTP exchange → schema +
- * protocol tests → post-script → status. Used verbatim by the GUI batch
- * runner and the CLI runner.
- */
-// Resolve inline external-secret references — {{vault:...}}, {{aws:...}},
-// {{azure:...}}, {{op://...}} — used anywhere in the request (URL, params,
-// headers, body, auth, scripts). interpolate() is synchronous, so these async
-// lookups run once up-front and the resolved values are added to the variable
-// scope keyed by their full reference (e.g. vars['vault:kv/data/app#k'] = 'v'),
-// so the normal {{...}} substitution then picks them up. Throws with a clear
-// message if a referenced secret cannot be resolved.
+/** Execute one runner item end-to-end: pre-script -> HTTP exchange -> schema + protocol
+ *  tests -> post-script -> status. Used verbatim by the GUI batch runner and the CLI. */
+// Resolve inline external-secret refs ({{vault:...}}, {{aws:...}} etc.) anywhere in the
+// request. interpolate() is sync, so these async lookups run up-front and land in the
+// scope keyed by their full ref. Throws if a referenced secret can't be resolved.
 export async function resolveInlineSecrets(
   req: ApiRequest,
   vars?: Record<string, string>,
@@ -841,18 +776,12 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
     status: 'running',
   };
 
-  // Dynamic built-in vars ($uuid, $timestamp, $randomInt, etc.) — generated
-  // fresh for each request so each gets unique values.
+  // Dynamic built-in vars ($uuid, $timestamp, ...), fresh per request.
   const dynamicVars = await buildDynamicVars();
 
-  // Data-driven rows (a collection- or folder-level DataSet) arrive as
-  // localVars. Resolve {{...}} references and faker/dynamic expressions inside
-  // each cell value so a data table can use {{baseUrl}}, {{$randomEmail}},
-  // {{faker.person.firstName()}}, etc. Resolved against the surrounding scopes
-  // and freshly-generated dynamic vars, so faker yields a new value per row.
-  // Request-scoped variables: the most specific static scope. Folded in as the
-  // base of localVars so they override environment/folder/collection, while
-  // data-row / runtime (sp.set) / CLI values (already in localVars) still win.
+  // Data-driven rows arrive as localVars: resolve {{...}} and faker/dynamic per cell so
+  // faker yields a new value per row. Request vars fold in as the base of localVars
+  // (they override environment/folder/collection; data-row / runtime / CLI values win).
   if (req.variables && Object.keys(req.variables).length > 0) {
     localVars = { ...req.variables, ...localVars };
   }
@@ -868,8 +797,8 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
   let updatedFolderVars = { ...folderVars };
   let preScriptError: string | undefined;
 
-  // ── MQTT request: run it as a test (connect → subscribe → [publish] →
-  // collect → assert) instead of an HTTP exchange. ──────────────────────────
+  // MQTT request: run it as a test (connect -> subscribe -> [publish] ->
+  // collect -> assert) instead of an HTTP exchange.
   if (req.protocol === 'mqtt') {
     const m = req.mqtt ?? {};
     const istr = (s?: string) => (s ? interpolate(s, vars) : undefined);
@@ -906,8 +835,8 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
     };
   }
 
-  // ── WebSocket / Socket.IO request: run it as a test (connect → [send] →
-  // collect → assert) instead of an HTTP exchange. ──────────────────────────
+  // WebSocket / Socket.IO request: run it as a test (connect -> [send] ->
+  // collect -> assert) instead of an HTTP exchange.
   if (req.protocol === 'websocket' || req.protocol === 'socketio') {
     const rtHeaders: Record<string, string> = {};
     for (const h of req.headers ?? []) if (h.enabled && h.key) rtHeaders[interpolate(h.key, vars)] = interpolate(h.value, vars);
@@ -951,7 +880,7 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
   }
 
   // Inline external-secret references ({{vault:...}} etc.) anywhere in the
-  // request/scripts — resolved once (async) and merged into the scope so the
+  // request/scripts - resolved once (async) and merged into the scope so the
   // synchronous interpolate() can substitute them.
   let inlineSecrets: Record<string, string> = {};
   try {
@@ -1001,7 +930,7 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
     const maskedBody = maskPii(exchange.responseBody, piiMaskPatterns);
     const maskedHeaders = maskHeaders(exchange.rawHeaders, piiMaskPatterns);
 
-    // Same shape with the unmasked bytes — handed to the post-script so
+    // Same shape with the unmasked bytes - handed to the post-script so
     // `sp.response.json().access_token` returns the real value, not
     // "[REDACTED]". The displayed response keeps the redacted copy.
     const scriptResponse = {
@@ -1013,9 +942,8 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
 
     // Schema validation (synthetic test results, independent of contract)
     const schemaTestResults = buildSchemaTestResults(req.schema, exchange.responseBody);
-    // Protocol-level fault check — auto-pass/fail for SOAP / GraphQL so they
-    // stop landing in 'skipped' just because no hand-written assertion was
-    // added. Empty for REST, preserving the "add assertions" nudge there.
+    // Protocol fault check: auto-pass/fail for SOAP / GraphQL so they leave
+    // 'skipped'. Empty for REST.
     const protocolFaultTests = buildProtocolFaultTests(req.body.mode, exchange.responseBody);
 
     let testResults: TestResult[] = [...schemaTestResults, ...protocolFaultTests];
@@ -1055,9 +983,8 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
 
     const status = deriveRunStatus(postScriptError, testResults, exchange.status);
 
-    // If HTTP failed and the user has NO tests at all, surface a synthetic
-    // result. But if tests exist and passed, the user intentionally expects
-    // that status code (e.g. negative tests expecting 422).
+    // HTTP failed with no tests at all: surface a synthetic failure. If tests
+    // exist and passed, the user meant to expect that status (e.g. 422).
     if (exchange.status >= 400 && testResults.length === 0) {
       testResults = [...testResults, syntheticHttpFailure(exchange.status, exchange.statusText)];
     }
@@ -1106,18 +1033,14 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
   }
 }
 
-// ─── Hook skip / failure propagation ──────────────────────────────────────────
+// Hook skip / failure propagation
 
-/**
- * Tracks hook failures across a run plan: a beforeAll failure poisons its
- * scope, a before failure poisons its single main request. Subsequent items
- * in those scopes / for that request are reported as skipped without
- * executing. Shared by the GUI runner and the CLI.
- */
+/** Tracks hook failures: a beforeAll poisons its scope, a before poisons its
+ *  main request. Later items in those are reported skipped without running. */
 export class HookSkipTracker {
-  /** Scopes whose beforeAll hook failed — all their requests are skipped. */
+  /** Scopes whose beforeAll hook failed - all their requests are skipped. */
   private readonly failedScopes = new Set<string>();
-  /** Main request IDs whose before hook failed — that request is skipped. */
+  /** Main request IDs whose before hook failed - that request is skipped. */
   private readonly skipRequests = new Set<string>();
 
   /** Returns the human-readable skip reason, or undefined to run the item. */
@@ -1151,7 +1074,7 @@ export class HookSkipTracker {
   }
 
   /** Record an executed item's outcome so later items skip when appropriate.
-   *  A 'skipped' hook (HTTP 2xx with no assertions) is not a failure — only
+   *  A 'skipped' hook (HTTP 2xx with no assertions) is not a failure - only
    *  real failures or errors propagate to dependent requests. */
   recordResult(item: RunnerItem, status: RunStatus): void {
     const failed = status === 'failed' || status === 'error';

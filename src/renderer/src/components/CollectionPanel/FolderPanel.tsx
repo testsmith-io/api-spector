@@ -11,9 +11,8 @@ import { KVTable } from '../RequestBuilder/KVTable';
 import { useAiAvailable, generateDocs, folderDocsContext } from '../../lib/ai';
 import { useT } from '../../i18n';
 
-// The folder counterpart of CollectionPanel: opened when a folder is clicked in
-// the tree, it shows the folder's Documentation, Data table, and Variables in
-// the main pane (config like auth/headers still lives in the Settings modal).
+// Folder counterpart of CollectionPanel: shows the folder's Documentation, Data
+// table, and Variables (auth/headers still live in the Settings modal).
 
 export function FolderPanel() {
   const t = useT();
@@ -25,9 +24,8 @@ export function FolderPanel() {
 
   const [activeTab, setActiveTab] = useState<'documentation' | 'data' | 'variables'>('documentation');
 
-  // Local draft rows for the variables editor (see CollectionPanel): kept in
-  // state so a freshly-added blank row survives until it has a key, which a
-  // Record<string,string> can't store. Reseeded when the folder changes.
+  // Draft rows for the variables editor: kept in state so a blank new row survives
+  // until it has a key (a Record<string,string> can't). Reseeded when the folder changes.
   const [varRows, setVarRows] = useState<KeyValuePair[]>([]);
   const folderKey = folderPanel ? `${folderPanel.collectionId}/${folderPanel.folderId}` : '';
   useEffect(() => {

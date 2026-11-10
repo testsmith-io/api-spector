@@ -3,11 +3,8 @@
 
 import type { KeyValuePair, AuthConfig, RequestBody, HttpMethod } from './types';
 
-// ─── cURL command importer ────────────────────────────────────────────────────
-//
-// Parses a `curl` command line (as copied from a browser's "Copy as cURL", the
-// terminal, or docs) into the fields of an ApiRequest. Best-effort: unknown
-// flags are ignored rather than rejected, so a partial command still imports.
+// cURL command importer: parses a `curl` command line into ApiRequest fields.
+// Unknown flags are ignored rather than rejected, so a partial command still imports.
 
 /** Flags that take an argument we deliberately consume-and-drop. */
 const SKIP_WITH_ARG = new Set([
@@ -153,8 +150,8 @@ export function parseCurl(command: string): ParsedCurl {
   // Body.
   let body: RequestBody = { mode: 'none' };
   if (isForm) {
-    // curl -F sends multipart/form-data. `name=@path` (or `<path`) is a file
-    // part; curl options after the path (`;type=`, `;filename=`) are honored.
+    // curl -F is multipart/form-data. `name=@path` (or `<path`) is a file part;
+    // `;type=` / `;filename=` suffixes are honored.
     body = {
       mode: 'multipart',
       multipart: formParts.map(kv => {

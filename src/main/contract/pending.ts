@@ -6,23 +6,14 @@ import { join, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import type { ApiRequest, ContractReport } from '../../shared/types';
 
-// ─── Pending contracts (Pact's "pending pacts") ───────────────────────────────
-//
-// A contract that has never passed provider verification is "pending": it runs
-// and its failures are reported, but they do not fail the build. Once an
-// interaction passes for the first time, it stops being pending and future
-// failures block. This lets consumers add new expectations without breaking
-// the provider's CI before the provider implements them.
-//
-// The store is a plain file, `contracts/pending.json`, committed to git like
-// everything else. The key includes a hash of the contract content, so
-// changing an interaction's expectations makes it pending again (same rule
-// Pact applies to changed pact content).
+// Pending contracts (Pact's "pending pacts"): a never-verified contract reports failures
+// without failing the build; once it passes once, future failures block. Stored in
+// contracts/pending.json (committed); the key hashes contract content, so changing it resets pending.
 
 const PENDING_FILE = 'contracts/pending.json';
 
 export interface PendingStore {
-  /** interaction key → ISO timestamp of the first successful verification */
+  /** interaction key -> ISO timestamp of the first successful verification */
   firstPassed: Record<string, string>
 }
 
@@ -50,14 +41,8 @@ export async function savePendingStore(dir: string, store: PendingStore): Promis
   await writeFile(file, JSON.stringify(store, null, 2), 'utf8');
 }
 
-/**
- * Apply pending semantics to a finished report, in place:
- * - failures of interactions that never passed before → marked `pending` and
- *   moved out of the `failed` count into `report.pending`
- * - passing interactions get their first-pass timestamp recorded in the store
- *
- * Returns the keys that passed for the first time (caller persists the store).
- */
+/** Apply pending semantics in place: failures of never-passed interactions move from
+ *  `failed` into `report.pending`; passing ones record a first-pass timestamp. Returns newly-passed keys. */
 export function applyPendingSemantics(
   report: ContractReport,
   requests: ApiRequest[],

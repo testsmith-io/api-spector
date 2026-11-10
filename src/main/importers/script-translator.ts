@@ -1,35 +1,33 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── Script translator ────────────────────────────────────────────────────────
-//
-// Converts pre/post-request scripts from Postman (pm.*), Bruno (bru.*/res.*),
-// and Insomnia (insomnia.*) into API Spector's sp.* scripting API.
+// Script translator: converts pre/post-request scripts from Postman (pm.*),
+// Bruno (bru.*/res.*), and Insomnia (insomnia.*) into API Spector's sp.* API.
 
 type Rule = [RegExp, string]
 
-// ─── Postman (pm.*) ───────────────────────────────────────────────────────────
+// Postman (pm.*)
 
 const POSTMAN_RULES: Rule[] = [
-  // Variables — environment
+  // Variables - environment
   [/\bpm\.environment\.get\(/g,                    'sp.environment.get('],
   [/\bpm\.environment\.set\(/g,                    'sp.environment.set('],
   [/\bpm\.environment\.unset\(/g,                  'sp.environment.clear('],
   [/\bpm\.environment\.has\(/g,                    'sp.environment.has('],
 
-  // Variables — collection
+  // Variables - collection
   [/\bpm\.collectionVariables\.get\(/g,            'sp.collectionVariables.get('],
   [/\bpm\.collectionVariables\.set\(/g,            'sp.collectionVariables.set('],
   [/\bpm\.collectionVariables\.unset\(/g,          'sp.collectionVariables.clear('],
   [/\bpm\.collectionVariables\.has\(/g,            'sp.collectionVariables.has('],
 
-  // Variables — globals
+  // Variables - globals
   [/\bpm\.globals\.get\(/g,                        'sp.globals.get('],
   [/\bpm\.globals\.set\(/g,                        'sp.globals.set('],
   [/\bpm\.globals\.unset\(/g,                      'sp.globals.clear('],
   [/\bpm\.globals\.has\(/g,                        'sp.globals.has('],
 
-  // Variables — local/request scope
+  // Variables - local/request scope
   [/\bpm\.variables\.get\(/g,                      'sp.variables.get('],
   [/\bpm\.variables\.set\(/g,                      'sp.variables.set('],
 
@@ -37,54 +35,54 @@ const POSTMAN_RULES: Rule[] = [
   [/\bpm\.test\(/g,                                'sp.test('],
   [/\bpm\.expect\(/g,                              'sp.expect('],
 
-  // Response — status
+  // Response - status
   [/\bpm\.response\.to\.have\.status\(/g,          'sp.response.to.have.status('],
   [/\bpm\.response\.code\b/g,                      'sp.response.code'],
   [/\bpm\.response\.status\b/g,                    'sp.response.status'],
   [/\bpm\.response\.responseTime\b/g,              'sp.response.responseTime'],
 
-  // Response — headers
+  // Response - headers
   [/\bpm\.response\.headers\.get\(/g,              'sp.response.headers.get('],
 
-  // Response — body
+  // Response - body
   [/\bpm\.response\.json\(\)/g,                    'sp.response.json()'],
   [/\bpm\.response\.text\(\)/g,                    'sp.response.text()'],
 ];
 
-// ─── Bruno (bru.* / res.*) ────────────────────────────────────────────────────
+// Bruno (bru.* / res.*)
 
 const BRUNO_RULES: Rule[] = [
-  // Variables — environment
+  // Variables - environment
   [/\bbru\.getEnvVar\(/g,                          'sp.environment.get('],
   [/\bbru\.setEnvVar\(/g,                          'sp.environment.set('],
   [/\bbru\.deleteEnvVar\(/g,                       'sp.environment.clear('],
 
-  // Variables — collection
+  // Variables - collection
   [/\bbru\.getCollectionVar\(/g,                   'sp.collectionVariables.get('],
   [/\bbru\.setCollectionVar\(/g,                   'sp.collectionVariables.set('],
   [/\bbru\.deleteCollectionVar\(/g,                'sp.collectionVariables.clear('],
 
-  // Variables — local/request scope
+  // Variables - local/request scope
   [/\bbru\.getVar\(/g,                             'sp.variables.get('],
   [/\bbru\.setVar\(/g,                             'sp.variables.set('],
   [/\bbru\.deleteVar\(/g,                          'sp.variables.clear('],
 
-  // Response — body (order matters: specific first)
+  // Response - body (order matters: specific first)
   [/\bres\.getBody\(\)\.json\(\)/g,                'sp.response.json()'],
   [/\bres\.getBody\(\)\.text\(\)/g,                'sp.response.text()'],
   [/\bres\.getBody\(\)/g,                          'sp.response.json()'],
 
-  // Response — status / headers / time
+  // Response - status / headers / time
   [/\bres\.getStatus\(\)/g,                        'sp.response.code'],
   [/\bres\.getHeader\(/g,                          'sp.response.headers.get('],
   [/\bres\.getResponseTime\(\)/g,                  'sp.response.responseTime'],
 
-  // Tests & assertions (bare expect/test — Bruno exposes them as globals)
+  // Tests & assertions (bare expect/test - Bruno exposes them as globals)
   [/(?<!\.)(?<!\w)expect\(/g,                      'sp.expect('],
   [/(?<!\.)(?<!\w)test\(/g,                        'sp.test('],
 ];
 
-// ─── Insomnia (insomnia.* / context.*) ───────────────────────────────────────
+// Insomnia (insomnia.* / context.*)
 
 const INSOMNIA_RULES: Rule[] = [
   // Older SDK: insomnia.*
@@ -106,20 +104,14 @@ const INSOMNIA_RULES: Rule[] = [
   [/\bcontext\.response\.getHeader\(/g,            'sp.response.headers.get('],
 ];
 
-// ─── Common (JS-level, any source) ────────────────────────────────────────────
-//
-// Applied after the format-specific rules, to every imported script. Postman,
-// Bruno and Insomnia all run in sandboxes that expose a `require` for a few
-// bundled libraries; API Spector's sandbox has no `require`. For `moment` there
-// is a drop-in: dayjs is a global with a compatible add()/subtract()/format()
-// API, so rewrite `require('moment')` to `dayjs` (turning
-// `var moment = require('moment')` into the alias `var moment = dayjs`, leaving
-// the rest of the script untouched).
+// Common (any source). Applied after format-specific rules. The other tools'
+// sandboxes expose `require`; ours doesn't. dayjs is a drop-in for moment
+// (compatible add()/subtract()/format()), so rewrite require('moment') to dayjs.
 const COMMON_RULES: Rule[] = [
   [/\brequire\(\s*['"]moment['"]\s*\)/g,           'dayjs'],
 ];
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// Public API
 
 export type ScriptFormat = 'postman' | 'bruno' | 'insomnia'
 

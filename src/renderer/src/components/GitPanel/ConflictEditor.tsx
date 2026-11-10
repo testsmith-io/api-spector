@@ -46,7 +46,7 @@ function assemble(parts: Part[]): string {
     if (p.choice === 'ours') return p.ours;
     if (p.choice === 'theirs') return p.theirs;
     if (p.choice === 'both') return `${p.ours}\n${p.theirs}`;
-    // Unresolved — keep the markers so nothing is silently lost.
+    // Unresolved - keep the markers so nothing is silently lost.
     return `<<<<<<< ours\n${p.ours}\n=======\n${p.theirs}\n>>>>>>> theirs`;
   }).join('\n');
 }

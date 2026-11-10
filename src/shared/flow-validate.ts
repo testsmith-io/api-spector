@@ -1,13 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Static pre-run validation for flows. The engine only discovers problems like
-// "no request selected", a dangling edge, or a recursive sub-flow once it hits
-// them mid-run, which makes a failed run hard to understand. validateFlow walks
-// the graph up front and returns a flat list of problems the editor surfaces
-// (badge, Problems panel, per-block markers) so an author can fix a flow before
-// running it. Pure — no engine, no renderer — so it is unit-tested and reused by
-// the UI and, potentially, the CLI/cloud.
+// Static pre-run validation for flows: walks the graph and returns a flat list of problems
+// (no request selected, dangling edge, recursion) the editor surfaces before a run. Pure.
 
 import type { Flow, FlowBlock, FlowRequestRef } from './types/flow';
 import { BLOCK_SPECS, outputsFor } from './flow-blocks';
@@ -16,7 +11,7 @@ export type FlowProblemSeverity = 'error' | 'warning'
 
 export interface FlowProblem {
   severity: FlowProblemSeverity
-  /** Stable machine code for the kind of problem (also handy for tests). */
+  /** Stable machine code for the kind of problem. */
   code: string
   /** Human-readable, author-facing message. */
   message: string
@@ -27,7 +22,7 @@ export interface FlowProblem {
 }
 
 export interface FlowValidateContext {
-  /** All workspace flows (including the one under validation) — for sub-flow
+  /** All workspace flows (including the one under validation) - for sub-flow
    *  existence and recursion checks. Omit to skip those checks. */
   flows?: Flow[]
   /** Whether a request ref still resolves to a saved request. Omit to skip. */
@@ -58,11 +53,8 @@ function subflowReaches(
   return false;
 }
 
-/**
- * Validate a flow's structure and block configuration. Returns problems in a
- * stable order (errors first, then warnings), each optionally anchored to a
- * block or edge. An empty array means the flow is ready to run.
- */
+/** Validate a flow's structure and block config. Problems in a stable order
+ *  (errors first, then warnings); empty means ready to run. */
 export function validateFlow(flow: Flow, ctx: FlowValidateContext = {}): FlowProblem[] {
   const errors: FlowProblem[] = [];
   const warnings: FlowProblem[] = [];
@@ -70,7 +62,7 @@ export function validateFlow(flow: Flow, ctx: FlowValidateContext = {}): FlowPro
   const edges = flow.edges ?? [];
   const byId = new Map(nodes.map(n => [n.id, n]));
 
-  // ── Start block ────────────────────────────────────────────────────────────
+  // Start block
   const starts = nodes.filter(n => n.type === 'start');
   if (starts.length === 0) {
     errors.push({ severity: 'error', code: 'no-start', message: 'The flow has no Start block, so it cannot run.' });
@@ -80,7 +72,7 @@ export function validateFlow(flow: Flow, ctx: FlowValidateContext = {}): FlowPro
     }
   }
 
-  // ── Edges: dangling targets + ports that no longer exist ────────────────────
+  // Edges: dangling targets + ports that no longer exist
   const outPorts = new Map<string, Set<string>>();   // source id -> ports actually wired
   const inDegree = new Map<string, number>();
   for (const e of edges) {
@@ -93,7 +85,7 @@ export function validateFlow(flow: Flow, ctx: FlowValidateContext = {}): FlowPro
     const ports = outputsFor(src).map(p => p.id);
     const port = e.sourcePort ?? (ports.length === 1 ? ports[0] : 'out');
     // Flag an edge leaving from a port the block no longer exposes (e.g. a
-    // condition case was deleted) — it can never fire.
+    // condition case was deleted) - it can never fire.
     if (ports.length > 0 && !ports.includes(port)) {
       warnings.push({ severity: 'warning', code: 'orphan-port', edgeId: e.id, blockId: src.id, message: `A connection leaves "${blockLabel(src)}" from a port that no longer exists; it will never fire.` });
     } else {
@@ -104,7 +96,7 @@ export function validateFlow(flow: Flow, ctx: FlowValidateContext = {}): FlowPro
     inDegree.set(e.target, (inDegree.get(e.target) ?? 0) + 1);
   }
 
-  // ── Reachability from Start ─────────────────────────────────────────────────
+  // Reachability from Start
   if (starts.length > 0) {
     const adj = new Map<string, string[]>();
     for (const e of edges) {
@@ -127,7 +119,7 @@ export function validateFlow(flow: Flow, ctx: FlowValidateContext = {}): FlowPro
     }
   }
 
-  // ── Per-block configuration ─────────────────────────────────────────────────
+  // Per-block configuration
   const flowsById = new Map((ctx.flows ?? []).map(f => [f.id, f]));
   for (const n of nodes) {
     const cfg = n.config ?? {};

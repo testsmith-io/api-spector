@@ -1,33 +1,20 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── IPC channel registry ─────────────────────────────────────────────────────
-//
-// Single source of truth for every IPC channel name used between the renderer
-// (via the preload bridge) and the main process. Both sides import from here,
-// so a typo becomes a compile error instead of a silently dead channel.
-//
-// Values must stay byte-identical to the historical string literals — they are
-// the wire protocol between preload and main.
-//
-// Most channels are invoke/handle pairs; a few are one-way event channels
-// pushed from main via `webContents.send` and consumed with `ipcRenderer.on`
-// (runner.progress, mock.hit, ws.message, ws.status, record.hit).
+// Single source of truth for every IPC channel name between renderer and main.
+// Values must stay byte-identical: they are the wire protocol.
 
 export const IPC = {
-  // ─── Workspace / File ──────────────────────────────────────────────────────
+  // Workspace / File
   file: {
     openWorkspace:       'file:openWorkspace',
     openWorkspacePath:   'file:openWorkspacePath',
     openFromGit:         'file:openFromGit',
-    /** Add an API Spector workspace into an existing local project folder,
-     *  picking/creating a subfolder; auto-enables scoped git mode when inside a repo. */
+    /** Add a workspace into an existing project folder; auto-enables scoped git mode inside a repo. */
     addToProject:        'file:addToProject',
-    /** Event (main→renderer): a `spector://open-from-git?url=…` deep link was
-     *  received; the renderer runs the same open-from-Git flow as the button. */
+    /** Event (main->renderer): a spector://open-from-git deep link; renderer runs the open-from-Git flow. */
     openFromGitDeepLink: 'file:openFromGitDeepLink',
-    /** Event (main→renderer): a `spector://import?token=…` deep link was
-     *  received; the renderer imports the shared collection/request. */
+    /** Event (main->renderer): a spector://import deep link; renderer imports the shared collection/request. */
     importShareDeepLink: 'file:importShareDeepLink',
     /** Serialize the open workspace to a secret-free snapshot for cloud sync. */
     serializeWorkspace: 'file:serializeWorkspace',
@@ -51,23 +38,23 @@ export const IPC = {
     saveHistory:         'file:saveHistory',
   },
 
-  // ─── Native dialogs ────────────────────────────────────────────────────────
+  // Native dialogs
   dialog: {
     pickDir: 'dialog:pickDir',
     /** Pick a single file on disk; returns its absolute path (e.g. a multipart upload). */
     pickFile: 'dialog:pickFile',
   },
 
-  // ─── HTTP execution ────────────────────────────────────────────────────────
+  // HTTP execution
   request: {
     send: 'request:send',
-    /** Event (main→renderer): a batch of streamed response frames. */
+    /** Event (main->renderer): a batch of streamed response frames. */
     streamEvent: 'request:stream-event',
-    /** Renderer→main: abort an in-flight streamed read by streamId. */
+    /** Renderer->main: abort an in-flight streamed read by streamId. */
     stopStream: 'request:stop-stream',
   },
 
-  // ─── Secrets ───────────────────────────────────────────────────────────────
+  // Secrets
   secret: {
     checkMasterKey: 'secret:checkMasterKey',
     setMasterKey:   'secret:setMasterKey',
@@ -77,37 +64,37 @@ export const IPC = {
     delete:         'secret:delete',
   },
 
-  // ─── AI (optional; key lives only in the OS keychain) ────────────────────────
+  // AI (optional; key lives only in the OS keychain)
   ai: {
     generateDocs: 'ai:generateDocs',
   },
 
-  // ─── Global variables ──────────────────────────────────────────────────────
+  // Global variables
   globals: {
     get: 'globals:get',
     set: 'globals:set',
   },
 
-  // ─── Collection runner ─────────────────────────────────────────────────────
+  // Collection runner
   runner: {
     start:    'runner:start',
     /** Event: per-request progress pushed from main during a run. */
     progress: 'runner:progress',
   },
 
-  // ─── Flow runner ───────────────────────────────────────────────────────────
+  // Flow runner
   flow: {
     run:      'flow:run',
     /** Event: per-block progress pushed from main during a flow run. */
     progress: 'flow:progress',
   },
 
-  // ─── Run results export ────────────────────────────────────────────────────
+  // Run results export
   results: {
     save: 'results:save',
   },
 
-  // ─── Import ────────────────────────────────────────────────────────────────
+  // Import
   import: {
     postman:           'import:postman',
     postmanEnvironment: 'import:postman-environment',
@@ -125,25 +112,25 @@ export const IPC = {
     openapiSchemasUrl: 'import:openapi-schemas-url',
   },
 
-  // ─── Code generation ───────────────────────────────────────────────────────
+  // Code generation
   generate: {
     code:    'generate:code',
     save:    'generate:save',
     saveZip: 'generate:saveZip',
   },
 
-  // ─── OAuth 2.0 ─────────────────────────────────────────────────────────────
+  // OAuth 2.0
   oauth2: {
     startFlow:    'oauth2:startFlow',
     refreshToken: 'oauth2:refreshToken',
   },
 
-  // ─── HashiCorp Vault (interactive OIDC login) ──────────────────────────────
+  // HashiCorp Vault (interactive OIDC login)
   vault: {
     oidcLogin: 'vault:oidcLogin',
   },
 
-  // ─── Mock servers ──────────────────────────────────────────────────────────
+  // Mock servers
   mock: {
     start:        'mock:start',
     stop:         'mock:stop',
@@ -154,13 +141,12 @@ export const IPC = {
     hit:          'mock:hit',
   },
 
-  // ─── WebSocket ─────────────────────────────────────────────────────────────
+  // WebSocket
   ws: {
     connect:    'ws:connect',
     send:       'ws:send',
     disconnect: 'ws:disconnect',
-    /** Run a WebSocket request as a test: connect, optionally send, collect for
-     *  a window, then assert over the received frames. */
+    /** Run a WebSocket request as a test: connect, send, collect for a window, assert over the frames. */
     test:       'ws:test',
     /** Event: inbound/outbound WS message. */
     message:    'ws:message',
@@ -168,17 +154,16 @@ export const IPC = {
     status:     'ws:status',
   },
 
-  // ─── jq (JSON response filtering) ───────────────────────────────────────────
+  // jq (JSON response filtering)
   jq: {
     filter: 'jq:filter',
   },
 
-  // ─── GraphQL subscriptions (graphql-ws) ─────────────────────────────────────
+  // GraphQL subscriptions (graphql-ws)
   graphqlws: {
     subscribe:  'graphqlws:subscribe',
     stop:       'graphqlws:stop',
-    /** Run a GraphQL subscription as a test: subscribe, collect the emitted
-     *  payloads for a window, then assert over them. */
+    /** Run a GraphQL subscription as a test: subscribe, collect payloads for a window, assert over them. */
     test:       'graphqlws:test',
     /** Event: a next / error / complete / system message. */
     message:    'graphqlws:message',
@@ -186,13 +171,12 @@ export const IPC = {
     status:     'graphqlws:status',
   },
 
-  // ─── Socket.IO ─────────────────────────────────────────────────────────────
+  // Socket.IO
   socketio: {
     connect:    'socketio:connect',
     emit:       'socketio:emit',
     disconnect: 'socketio:disconnect',
-    /** Run a Socket.IO request as a test: connect, optionally emit, collect the
-     *  received events for a window, then assert over them. */
+    /** Run a Socket.IO request as a test: connect, emit, collect events for a window, assert over them. */
     test:       'socketio:test',
     /** Event: inbound/outbound Socket.IO event, ack, or system note. */
     message:    'socketio:message',
@@ -200,15 +184,14 @@ export const IPC = {
     status:     'socketio:status',
   },
 
-  // ─── MQTT ──────────────────────────────────────────────────────────────────
+  // MQTT
   mqtt: {
     connect:     'mqtt:connect',
     publish:     'mqtt:publish',
     subscribe:   'mqtt:subscribe',
     unsubscribe: 'mqtt:unsubscribe',
     disconnect:  'mqtt:disconnect',
-    /** Run an MQTT request as a test: connect, subscribe, optionally publish,
-     *  collect for a window, then assert over the messages. */
+    /** Run an MQTT request as a test: connect, subscribe, publish, collect for a window, assert. */
     test:        'mqtt:test',
     /** Event: a published / received message, or a system note. */
     message:     'mqtt:message',
@@ -216,7 +199,7 @@ export const IPC = {
     status:      'mqtt:status',
   },
 
-  // ─── Performance (load) testing ─────────────────────────────────────────────
+  // Performance (load) testing
   perf: {
     /** Run a load test for a request; resolves with the aggregate result. */
     run:      'perf:run',
@@ -228,13 +211,13 @@ export const IPC = {
     progress: 'perf:progress',
   },
 
-  // ─── SOAP / WSDL ───────────────────────────────────────────────────────────
+  // SOAP / WSDL
   wsdl: {
     fetch:  'wsdl:fetch',
     import: 'wsdl:import',
   },
 
-  // ─── gRPC ──────────────────────────────────────────────────────────────────
+  // gRPC
   grpc: {
     /** Load a .proto (source or path) and enumerate its services/methods. */
     loadProto: 'grpc:loadProto',
@@ -248,18 +231,18 @@ export const IPC = {
     status:    'grpc:status',
   },
 
-  // ─── Docs generation ───────────────────────────────────────────────────────
+  // Docs generation
   docs: {
     generate: 'docs:generate',
   },
 
-  // ─── OpenAPI coverage ────────────────────────────────────────────────────────
+  // OpenAPI coverage
   coverage: {
     /** Read + parse an OpenAPI spec (file path, URL, or raw text). */
     loadSpec: 'coverage:loadSpec',
   },
 
-  // ─── Contract testing ──────────────────────────────────────────────────────
+  // Contract testing
   contract: {
     run:              'contract:run',
     inferSchema:      'contract:inferSchema',
@@ -274,12 +257,12 @@ export const IPC = {
     fuzz:             'contract:fuzz',
   },
 
-  // ─── Script hooks ──────────────────────────────────────────────────────────
+  // Script hooks
   script: {
     runHook: 'script:run-hook',
   },
 
-  // ─── Git ───────────────────────────────────────────────────────────────────
+  // Git
   git: {
     isRepo:         'git:isRepo',
     repoInfo:       'git:repoInfo',
@@ -332,7 +315,7 @@ export const IPC = {
     writeResolved:  'git:writeResolved',
   },
 
-  // ─── Recorder ──────────────────────────────────────────────────────────────
+  // Recorder
   record: {
     start:     'record:start',
     stop:      'record:stop',
@@ -343,26 +326,26 @@ export const IPC = {
     hit:       'record:hit',
   },
 
-  // ─── Shell ─────────────────────────────────────────────────────────────────
+  // Shell
   shell: {
     openExternal: 'shell:openExternal',
   },
 
-  // ─── App ───────────────────────────────────────────────────────────────────
+  // App
   app: {
     checkUpdate: 'app:checkUpdate',
-    /** 'auto' (packaged → electron-updater) vs 'npm' (run from the npm package). */
+    /** 'auto' (packaged -> electron-updater) vs 'npm' (run from the npm package). */
     updateMode: 'app:updateMode',
     /** Renderer asks the main process to quit and apply a downloaded update. */
     installUpdate: 'app:installUpdate',
-    /** Main → renderer auto-update events (packaged builds only). */
+    /** Main -> renderer auto-update events (packaged builds only). */
     onUpdateAvailable: 'app:updateAvailable',
     onUpdateProgress: 'app:updateProgress',
     onUpdateDownloaded: 'app:updateDownloaded',
     onUpdateError: 'app:updateError',
   },
 
-  // ─── Cloud (API Spector Cloud integration) ──────────────────────────────────
+  // Cloud (API Spector Cloud integration)
   cloud: {
     /** One-click connect: browser consent + PKCE, returns a fresh token. */
     connect:     'cloud:connect',

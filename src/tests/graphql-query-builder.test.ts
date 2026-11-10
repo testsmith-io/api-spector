@@ -6,7 +6,7 @@ import { parse } from 'graphql';
 import { insertField, mergeVariables } from '../renderer/src/lib/graphql-query-builder';
 import type { ParsedSchema, GqlType, GqlField, GqlTypeRef } from '../renderer/src/lib/graphql-introspection';
 
-// ── tiny schema builders ──
+// tiny schema builders
 const scalar = (name: string): GqlTypeRef => ({ kind: 'SCALAR', name, ofType: null });
 const obj = (name: string): GqlTypeRef => ({ kind: 'OBJECT', name, ofType: null });
 const union = (name: string): GqlTypeRef => ({ kind: 'UNION', name, ofType: null });

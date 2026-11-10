@@ -11,6 +11,7 @@ import { getAiConfig, setAiConfig, invalidateAiAvailable } from '../../lib/ai';
 import { labelCls, inputCls } from '../../lib/ui-classes';
 import { useConfirm } from './useConfirm';
 import { SyncSettingsPanel } from './SyncSettingsPanel';
+import { VarInput } from './VarInput';
 
 const { electron } = window;
 
@@ -26,7 +27,7 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
   const updateWorkspaceSettings = useStore(s => s.updateWorkspaceSettings);
   const environments = useStore(s => s.environments);
 
-  // Appearance (applied live — theme/zoom changes preview instantly)
+  // Appearance (applied live)
   const theme   = useStore(s => s.theme);
   const zoom    = useStore(s => s.zoom);
   const setTheme = useStore(s => s.setTheme);
@@ -60,16 +61,15 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
     existing.tls?.rejectUnauthorized !== false, // default true
   );
 
-  // Cloud state (token lives in the OS keychain, never in the workspace file;
-  // the endpoint is fixed for end users, so it is not shown here)
+  // Cloud state (token lives in the OS keychain, not the workspace file)
   const [cloudEnabled, setCloudEnabled] = useState(existing.cloud?.enabled ?? false);
   const [cloudToken,   setCloudToken]   = useState('');
   const [cloudTokenSet, setCloudTokenSet] = useState(existing.cloud?.tokenSet ?? false);
   const [cloudTest, setCloudTest] = useState<{ status: 'idle' | 'testing' | 'ok' | 'err'; msg?: string }>({ status: 'idle' });
   const [connecting, setConnecting] = useState(false);
 
-  // One-click connect: browser consent + PKCE in the main process, then store the
-  // returned token like a pasted one and turn cloud on.
+  // One-click connect: browser consent + PKCE in the main process, then store
+  // the returned token and turn cloud on.
   async function connectCloud() {
     setConnecting(true);
     setCloudTest({ status: 'testing' });
@@ -98,9 +98,8 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
     }
   }
 
-  // AI state. The API key lives ONLY in the OS keychain (never in the workspace
-  // file); the model choice lives in localStorage (per-machine). Nothing here is
-  // written to the .spector file, so no AI config reaches version control.
+  // AI state. Key lives only in the OS keychain, model in localStorage
+  // (per-machine); nothing reaches the .spector file or version control.
   const [aiModel, setAiModel] = useState(getAiConfig().model);
   const [aiKey, setAiKey]     = useState('');
   const [aiKeySet, setAiKeySet] = useState(false);
@@ -117,8 +116,8 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
     invalidateAiAvailable();
   }
 
-  // Secrets state — external secret-manager connection config (non-secret only;
-  // tokens/secret-ids come from the environment or the OIDC login button).
+  // Secrets state: non-secret connection config only; tokens/secret-ids come
+  // from the environment or the OIDC login button.
   const sec = existing.secrets ?? {};
   const [vAddress,   setVAddress]   = useState(sec.vault?.address ?? '');
   const [vNamespace, setVNamespace] = useState(sec.vault?.namespace ?? '');
@@ -171,8 +170,8 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
   }
 
   async function save() {
-    // Start from what's already in the workspace so live-applied appearance
-    // settings (theme, zoom) aren't wiped out by this form's rebuild.
+    // Start from the existing settings so live-applied appearance (theme, zoom)
+    // isn't wiped by this form's rebuild.
     const settings: NonNullable<NonNullable<typeof workspace>['settings']> = {
       ...workspace?.settings,
     };
@@ -205,8 +204,7 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
     }
     if (cloudToken.trim()) await electron.setSecret('cloud:token', cloudToken.trim());
 
-    // AI: key to the keychain, model to localStorage — nothing into `settings`,
-    // so the workspace file (and version control) never sees any AI config.
+    // AI: key to the keychain, model to localStorage, nothing into `settings`.
     if (aiKey.trim()) { await electron.setSecret(AI_OPENAI_TOKEN_REF, aiKey.trim()); invalidateAiAvailable(); }
     setAiConfig({ model: aiModel.trim() || DEFAULT_AI_MODEL });
 
@@ -219,12 +217,12 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
     if (performanceTesting) settings.performanceTesting = true;
     else delete settings.performanceTesting;
 
-    // Only store a non-default value, so workspaces that keep Docs stay clean.
+    // Only store a non-default value.
     if (defaultRequestTab && defaultRequestTab !== 'docs') settings.defaultRequestTab = defaultRequestTab;
     else delete settings.defaultRequestTab;
 
-    // External secret managers — non-secret connection config only. Each block is
-    // omitted when empty; the whole `secrets` block is dropped when all are empty.
+    // Non-secret connection config only; each block omitted when empty, and the
+    // whole `secrets` block dropped when all are.
     const secrets: NonNullable<typeof settings.secrets> = {};
     const vault: NonNullable<typeof secrets.vault> = {};
     if (vAddress.trim())    vault.address = vAddress.trim();
@@ -258,10 +256,10 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
     const updated = useStore.getState().workspace;
     if (updated) await electron.saveWorkspace(updated);
 
-    // Capture the current in-memory history right away when persistence is
-    // switched on, so what is already on screen is saved, not just future sends.
+    // On switching persistence on, save the current in-memory history too, not
+    // just future sends.
     if (persistHistory) {
-      await electron.saveHistory(useStore.getState().history).catch(() => { /* best effort */ });
+      await electron.saveHistory(useStore.getState().history).catch(() => {});
     }
     onClose();
   }
@@ -540,7 +538,7 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
                 </span>
               </label>
 
-              {/* One-click connect — the primary path; no token to copy. */}
+              {/* One-click connect: the primary path. */}
               <button
                 onClick={connectCloud}
                 disabled={connecting}
@@ -725,7 +723,7 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
                 {t('and set BAO_ADDR / BAO_TOKEN (VAULT_* also works).')}
               </p>
 
-              {/* HashiCorp Vault / OpenBao (OpenBao is API-compatible). */}
+              {/* HashiCorp Vault / OpenBao */}
               <div className="flex flex-col gap-2 border border-surface-800 rounded p-3">
                 <div className="text-[10px] uppercase tracking-wider text-surface-500 font-semibold">{t('HashiCorp Vault / OpenBao')}</div>
                 <div className="flex flex-col gap-1">
@@ -735,7 +733,7 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className={labelCls}>{t('Path prefix')}</label>
-                  <input value={vPathPrefix} onChange={e => setVPathPrefix(e.target.value)} placeholder="stack/1000120-test-automation/data/"
+                  <VarInput value={vPathPrefix} onChange={setVPathPrefix} placeholder="secret/data/myteam/"
                     aria-label={t('Path prefix')}
                     className={`${inputCls} placeholder-surface-600 font-mono`} />
                   <span className="text-[10px] text-surface-600 normal-case">

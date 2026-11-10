@@ -2,25 +2,14 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-/**
- * API Tester Mock Server CLI
- *
- * Starts one or more mock servers defined in a workspace and keeps them running.
- *
- * Usage:
- *   api-spector mock --workspace ./my-workspace.spector [options]
- *
- * Options:
- *   --workspace <path>   Path to workspace.json (required)
- *   --name <name>        Start only the server with this name (can be repeated)
- *   --help               Show this message
- */
+/** API Tester Mock Server CLI: starts the workspace's mock servers and keeps
+ *  them running. Usage: api-spector mock --workspace <path> [options]. */
 
 import type { Workspace, MockHit } from '../shared/types';
 import { startMock, stopAll, setHitCallback } from '../main/mock-server';
 import { C, color, parseArgs, loadWorkspace, loadMocks } from './cli-common';
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// Main
 
 async function main() {
   // --name can be repeated
@@ -113,7 +102,7 @@ async function main() {
   }
 
   if (args.log) {
-    // Build a lookup: serverId → mock name, routeId → route path
+    // Build a lookup: serverId -> mock name, routeId -> route path
     const serverNames: Record<string, string> = {};
     const routePaths: Record<string, string> = {};
     for (const mock of toStart) {

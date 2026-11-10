@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── Recorder ─────────────────────────────────────────────────────────────────
+// Recorder
 
 export interface RecorderConfig {
   upstream: string

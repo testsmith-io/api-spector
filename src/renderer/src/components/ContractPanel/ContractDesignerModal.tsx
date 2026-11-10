@@ -12,10 +12,9 @@ import type { ConsumerContract, DesignInteraction, Workspace, MockServer, KeyVal
 
 const { electron } = window;
 
-// Design-first Consumer-Driven Contract authoring. You describe the requests a
-// consumer will make and the responses it needs — before any endpoint exists —
-// then publish the compiled pact to API Spector Cloud, where the provider
-// verifies it and `deploy-check` gates on it.
+// Design-first consumer-driven contract authoring: describe the requests and
+// responses a consumer needs before any endpoint exists, then publish the
+// compiled pact to API Spector Cloud for the provider to verify and `deploy-check`.
 
 function uid(): string {
   try { return crypto.randomUUID(); } catch { return `id-${Date.now()}-${Math.floor(performance.now())}`; }
@@ -100,8 +99,7 @@ export function ContractDesignerModal({ seed, onClose }: { readonly seed?: Parti
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persist the whole list through the normal workspace-save path (writes the
-  // .spector file as-is, so designContracts travel with the workspace).
+  // Persist the list via the normal workspace-save path, so designContracts travel with the .spector file.
   async function persist(next: ConsumerContract[]) {
     if (!workspace) return;
     const updated: Workspace = { ...workspace, designContracts: next };
@@ -147,9 +145,8 @@ export function ContractDesignerModal({ seed, onClose }: { readonly seed?: Parti
     }
   }
 
-  // Turn the contract into a runnable mock the consumer can develop against
-  // (no provider). Reuses addMock() so the mock is registered in the workspace,
-  // then overwrites it with the contract-derived routes.
+  // Turn the contract into a runnable mock (no provider). Reuses addMock() to
+  // register it, then overwrites with the contract-derived routes.
   async function createMock() {
     if (!selected) return;
     try {

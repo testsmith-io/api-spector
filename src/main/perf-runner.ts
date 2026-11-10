@@ -1,18 +1,11 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Performance (load) testing engine. A pattern-agnostic scheduler: it is given
-// an iterate() that runs the target once (a single request, or a whole Flow),
-// plus a derived load schedule (executor + stages), and it drives that iterate
-// over time. Two executors:
-//   vus     — closed model: hold target(t) concurrent users; each user runs
-//             iterations back to back.
-//   arrival — open model: start target(t) iterations per second, spawning users
-//             as needed up to maxVus; arrivals that exceed the cap are dropped.
-//
-// It aggregates whole-iteration latency and per-step (per request) latency,
-// status codes, errors and a per-second series. One run at a time; stopPerfRun
-// aborts it.
+// Performance (load) testing engine: a pattern-agnostic scheduler that drives an iterate()
+// over a derived load schedule. Two executors:
+//   vus     - closed model: hold target(t) concurrent users running back to back.
+//   arrival - open model: target(t) iterations/sec up to maxVus; arrivals over the cap dropped.
+// Aggregates latency, status codes, errors and a per-second series. One run at a time; stopPerfRun aborts.
 
 import type { PerfLatency, PerfPattern, PerfProgress, PerfResult, PerfStepStat } from '../shared/types';
 import { targetAt, type DerivedLoad } from '../shared/perf-stages';
@@ -72,10 +65,9 @@ export async function runPerfTest(
   let activeVus = 0;
   let peakVus = 0;
   let dropped = 0;
-  // `stopped` is the internal wind-down signal — it is also set on normal
-  // completion to drain the workers, so it does NOT mean "the user stopped it".
-  // `stoppedEarly` is the real indicator: only a stop() call (the Stop button)
-  // sets it, so the result reflects an actual early stop, not a finished run.
+  // `stopped` is the internal wind-down signal, also set on normal completion to
+  // drain workers, so it does NOT mean "the user stopped it". `stoppedEarly` is
+  // the real indicator: only a stop() call (the Stop button) sets it.
   let stopped = false;
   let stoppedEarly = false;
 

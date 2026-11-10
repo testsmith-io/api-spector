@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, it, expect } from 'vitest';
-import { buildRunPlan, collectTagged, expandRunPlanWithData, expandFolderDataSets, parseDataRow } from '../shared/request-collection';
+import { buildRunPlan, collectTagged, expandRunPlanWithData, expandFolderDataSets, parseDataRow, stripEphemeralAuth } from '../shared/request-collection';
 import type { Collection, ApiRequest, RunnerItem, DataSet, Folder } from '../shared/types';
 
 function req(id: string, name: string, extra: Partial<ApiRequest> = {}): ApiRequest {
@@ -110,9 +110,8 @@ describe('buildRunPlan scopePath', () => {
     const plan = buildRunPlan(col, 'f-users', []);
     const users = plan.find(p => p.request.id === 'r-users');
     const admin = plan.find(p => p.request.id === 'r-adm');
-    // When you run the "Users" folder specifically, that folder becomes the
-    // root of the run — its name is omitted, nested folders start from the
-    // subfolder name.
+    // Running the "Users" folder makes it the root: its name is omitted, nested
+    // folders start from the subfolder name.
     expect(users?.scopePath).toEqual([]);
     expect(admin?.scopePath).toEqual(['Admin']);
   });
@@ -189,8 +188,8 @@ describe('buildRunPlan scopePath', () => {
   });
 
   it('folder-scoped run fires every ancestor scope in outer→inner order', () => {
-    // root → Users → Admin, each with its own before/after; running Admin
-    // should produce: root.before → Users.before → main → Users.after → root.after
+    // root -> Users -> Admin, each with its own before/after; running Admin
+    // should produce: root.before -> Users.before -> main -> Users.after -> root.after
     const col: Collection = {
       version: '1.0',
       id: 'col-nested-hooks',
@@ -426,5 +425,59 @@ describe('expandRunPlanWithData carries expected-status assertions', () => {
     expect(out[0].expectStatus).toEqual([200]);
     expect(out[0].owaspTag).toBe('FUNC-AUTH');
     expect(out[1].expectStatus).toEqual([403]);
+  });
+});
+
+describe('stripEphemeralAuth', () => {
+  const oauth2 = (extra: Record<string, unknown> = {}) => ({
+    type: 'oauth2' as const,
+    oauth2Flow: 'client_credentials' as const,
+    oauth2TokenUrl: 'https://auth.example.com/token',
+    oauth2ClientId: 'client-abc',
+    oauth2CachedToken: 'SECRET-ACCESS-TOKEN',
+    oauth2TokenExpiry: 1_900_000_000_000,
+    ...extra,
+  });
+
+  it('strips the cached token at collection, folder and request level', () => {
+    const col: Collection = {
+      version: '1.0',
+      id: 'col-1',
+      name: 'C',
+      auth: oauth2(),
+      rootFolder: {
+        id: 'root', name: 'root', description: '', folders: [
+          { id: 'f1', name: 'F1', description: '', folders: [], requestIds: ['r1'], auth: oauth2() },
+        ], requestIds: [],
+      },
+      requests: { r1: req('r1', 'R1', { auth: oauth2() }) },
+    };
+
+    stripEphemeralAuth(col);
+
+    const colAuth = col.auth as Record<string, unknown>;
+    const folderAuth = col.rootFolder.folders[0].auth as Record<string, unknown>;
+    const reqAuth = col.requests['r1'].auth as Record<string, unknown>;
+    for (const a of [colAuth, folderAuth, reqAuth]) {
+      expect(a['oauth2CachedToken']).toBeUndefined();
+      expect(a['oauth2TokenExpiry']).toBeUndefined();
+      // Non-ephemeral config is preserved.
+      expect(a['oauth2ClientId']).toBe('client-abc');
+      expect(a['oauth2TokenUrl']).toBe('https://auth.example.com/token');
+    }
+  });
+
+  it('leaves non-oauth2 auth untouched', () => {
+    const col: Collection = {
+      version: '1.0',
+      id: 'col-2',
+      name: 'C2',
+      rootFolder: { id: 'root', name: 'root', description: '', folders: [], requestIds: ['r1'] },
+      requests: { r1: req('r1', 'R1', { auth: { type: 'bearer', token: 'keep-me' } }) },
+    };
+
+    stripEphemeralAuth(col);
+
+    expect(col.requests['r1'].auth).toEqual({ type: 'bearer', token: 'keep-me' });
   });
 });

@@ -1,21 +1,15 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// The flow execution engine — a Postman-Flows-style dataflow interpreter.
-//
-// It walks the graph from the `start` block, following edges out of each
-// block's active output port(s): an `if` fires `true` or `false`, a `forEach`
-// runs its `body` once per item then continues on `done`, a `merge` (the "or"
-// block) fires on the first incoming branch to arrive. All side effects —
-// sending requests, running sp.* scripts, evaluating expressions, sleeping —
-// are injected via `deps`, so this module is pure orchestration: unit-testable
-// with stubs, and reused verbatim by the desktop UI (IPC) and the `flow` CLI.
+// Dataflow interpreter (Postman-Flows style): walks from the `start` block, following
+// each block's active output port(s). Side effects injected via `deps`, so it's pure
+// orchestration: testable with stubs, shared by the desktop UI and the CLI.
 
 import type { Flow, FlowBlock, FlowBlockType, FlowBlockConfig, FlowRequestRef } from './types/flow';
 import type { ResponsePayload, RunStatus, TestResult } from './types';
 import { BLOCK_SPECS } from './flow-blocks';
 
-// ─── Scopes + injected deps ──────────────────────────────────────────────────
+// Scopes + injected deps
 
 export interface EngineScopes {
   envVars: Record<string, string>
@@ -47,7 +41,7 @@ export interface EngineRequestResult extends EngineScopes {
   name: string
   method: string
   resolvedUrl: string
-  /** The request actually sent (resolved URL/headers/body) — for the run log. */
+  /** The request actually sent (resolved URL/headers/body) - for the run log. */
   sentRequest?: { method: string; url: string; headers: Record<string, string>; body?: string }
 }
 
@@ -67,7 +61,7 @@ export interface FlowEngineDeps {
   maxSteps?: number
 }
 
-// ─── Events + results ──────────────────────────────────────────────────────
+// Events + results
 
 export type FlowBlockStatus = 'running' | 'passed' | 'failed' | 'error' | 'done' | 'skipped'
 
@@ -85,9 +79,9 @@ export interface FlowRunEvent {
   display?: { as: string; value: unknown; label?: string }
   testResults?: TestResult[]
   iteration?: number
-  /** Block label (custom or default) — for the run log. */
+  /** Block label (custom or default) - for the run log. */
   label?: string
-  /** Milliseconds since the run started — for the run log timeline. */
+  /** Milliseconds since the run started - for the run log timeline. */
   atMs?: number
   /** Merged variable snapshot after the block ran (for the live Variables panel). */
   vars?: Record<string, string>
@@ -110,11 +104,7 @@ export interface FlowBlockRunRecord {
   display?: unknown
   /** Milliseconds since the run started. */
   atMs?: number
-  /**
-   * For request blocks: the actual HTTP request sent and response received, so
-   * a run can be inspected after the fact (especially failures) in the UI / CLI
-   * report / cloud. Bodies are truncated to keep the stored summary small.
-   */
+  /** Request blocks: the HTTP request/response as sent, for post-hoc inspection. Bodies truncated to keep the summary small. */
   http?: {
     reqHeaders?: Record<string, string>
     reqBody?: string
@@ -149,7 +139,7 @@ export interface FlowRunOptions {
   localVars?: Record<string, string>
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────
+// Helpers
 
 function toScalar(v: unknown): string {
   if (v == null) return '';
@@ -162,8 +152,7 @@ function parseBody(body: string | undefined): unknown {
   try { return JSON.parse(body); } catch { return body; }
 }
 
-// Cap a captured request/response body so the stored run summary stays small.
-// Returns the (possibly clipped) string and whether it was clipped.
+// Cap a captured body so the stored run summary stays small; returns whether it was clipped.
 const MAX_CAPTURED_BODY = 20_000;
 function clipBody(body: string | undefined): { text?: string; clipped: boolean } {
   if (body == null) return { clipped: false };
@@ -171,7 +160,7 @@ function clipBody(body: string | undefined): { text?: string; clipped: boolean }
   return { text: body.slice(0, MAX_CAPTURED_BODY) + `\n… [truncated ${body.length - MAX_CAPTURED_BODY} more chars]`, clipped: true };
 }
 
-// ─── Engine ──────────────────────────────────────────────────────────────
+// Engine
 
 export async function runFlow(
   flow: Flow,
@@ -194,9 +183,8 @@ export async function runFlow(
   const state = { steps: 0 };
   const relTime = (): number => Date.now() - startedAt;
 
-  // Record + announce the edges traversed out of a block. Kept in a set as well
-  // so the final summary carries the complete route even if a streamed `edge`
-  // event races the run's completion on the renderer side.
+  // Record + announce edges traversed out of a block; also kept in a set so the
+  // summary carries the full route even if an `edge` event races run completion.
   const takenEdges = new Set<string>();
   const emitEdges = (blockId: string, blockType: FlowBlockType, ids: string[]): void => {
     if (ids.length === 0) return;
@@ -398,11 +386,9 @@ export async function runFlow(
         }
 
         case 'parallel': {
-          // Fire every connected request at the same time, then continue on
-          // `done` once they all settle. Each dispatch shares the same input
-          // snapshot (taken now), and scope updates are merged in afterwards, so
-          // there is no mid-flight race on the shared context. `copies` fires the
-          // same request several times at once (to reproduce a server-side race).
+          // Fire all connected requests at once, continue on `done` when they
+          // settle. Each shares one input snapshot and merges scope updates
+          // after, so no mid-flight race. `copies` fires each request N times.
           const branchEdges = outEdges(block, 'branch');
           const targets = branchEdges
             .map(e => nodeById.get(e.target))

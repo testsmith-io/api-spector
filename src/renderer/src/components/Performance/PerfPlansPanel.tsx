@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 // Left-panel list of performance test plans. Plans live inline in the workspace
-// (.spector), like design contracts, so they travel with the project. Add,
-// select, rename and delete here; the selected plan is edited and run in the
-// PerformancePanel (main area).
+// (.spector) so they travel with the project; edited and run in PerformancePanel.
 
 import React, { useState } from 'react';
 import { useStore } from '../../store';

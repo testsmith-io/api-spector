@@ -6,11 +6,8 @@ import type { ApiRequest, Collection, KeyValuePair, RequestBody } from '../../sh
 import { contentTypeForSoap } from '../../shared/soap';
 import { parseWsdl } from '../ipc/soap-handler';
 
-// Turn a WSDL document into a collection of SOAP requests, one per operation,
-// each pre-filled with the operation's endpoint, Content-Type / SOAPAction
-// headers, and a ready-to-send envelope (the same template the SOAP editor
-// produces when you pick an operation). The caller routes the result through the
-// import picker, so the user can keep all operations or only a selection.
+// Turn a WSDL document into a collection of SOAP requests, one per operation, each pre-filled with
+// endpoint, Content-Type / SOAPAction headers, and a ready-to-send envelope.
 export function importWsdlCollection(wsdlText: string, name?: string): Collection {
   const parsed = parseWsdl(wsdlText);
   const requests: Record<string, ApiRequest> = {};

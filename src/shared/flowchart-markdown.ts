@@ -1,22 +1,10 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 //
-// Converts a flowchart code block (the body of a ```flow fence in a markdown
-// description) into a positioned graph the renderer draws with the app's
-// existing @xyflow/react canvas — no external diagram library.
-//
-// Supported syntax:
-//   flowchart TD            direction: TD/TB (top-down), LR, RL, BT
-//   A[Rectangle]            node shapes by bracket:
-//   A(Rounded)                [..] rect   (..) round   ([..]) stadium
-//   A([Stadium])              ((..)) circle   {..} diamond   {{..}} hexagon
-//   A{Decision}               [[..]] subroutine
-//   A --> B                  edges: --> solid, --- open, -.-> dotted, ==> thick
-//   A -->|label| B           edge label
-//   A --> B --> C            chained edges on one line
-//   %% comment               ignored
-// Unknown lines are skipped rather than throwing, so a half-typed diagram in a
-// live preview degrades gracefully.
+// Converts a flowchart code block (a ```flow fence) into a positioned graph the
+// @xyflow/react canvas draws, no external diagram library. Mermaid-ish syntax
+// (flowchart TD/LR/RL/BT, bracket node shapes, -->/---/-.->/==> edges, %% comments);
+// unknown lines are skipped so a half-typed live preview degrades gracefully.
 
 export type FlowShape = 'rect' | 'round' | 'stadium' | 'circle' | 'diamond' | 'hexagon' | 'subroutine';
 export type FlowDirection = 'TD' | 'LR' | 'RL' | 'BT';
@@ -53,10 +41,9 @@ export interface LaidOutFlowchart {
 
 const DIRECTION_RE = /^(?:flowchart|graph)\s+(TD|TB|LR|RL|BT)\b/i;
 
-// Node = identifier + optional shape wrapper. Order matters: the two-char
-// wrappers ([ ]), (( )), {{ }}, [[ ]] must be tried before the single-char ones.
-// IDs are word characters only — deliberately excluding '-' and '.' so they
-// can't swallow the '-'/'.' of an unspaced link operator (A-->B, A-.->C).
+// Node = identifier + optional shape wrapper. Order matters: two-char wrappers
+// must be tried before single-char ones. IDs are word chars only - excluding
+// '-'/'.' so they can't swallow an unspaced link operator (A-->B, A-.->C).
 const NODE_RE = /^([A-Za-z0-9_]+)(\(\[[\s\S]*?\]\)|\[\[[\s\S]*?\]\]|\(\([\s\S]*?\)\)|\{\{[\s\S]*?\}\}|\[[\s\S]*?\]|\([\s\S]*?\)|\{[\s\S]*?\})?/;
 const LINK_RE = /^\s*(-\.->|==>|-->|---)\s*(?:\|([^|]*)\|\s*)?/;
 
@@ -159,12 +146,8 @@ export function parseFlowchart(code: string): ParsedFlowchart {
   return { direction, nodes: [...nodeMap.values()], edges };
 }
 
-/**
- * Assign (x, y) to each node with a dependency-free layered layout: longest-path
- * layering over the DAG (cycles are tolerated — a back edge simply doesn't push
- * its target deeper). Layers run along the flow direction; siblings spread
- * across it. The renderer calls fitView, so absolute origin doesn't matter.
- */
+/** Assign (x, y) via a layered layout: longest-path layering over the DAG
+ *  (cycles tolerated). Layers run along the flow direction, siblings across it. */
 export function layoutFlowchart(parsed: ParsedFlowchart, opts?: {
   nodeWidth?: number; nodeHeight?: number; gapMain?: number; gapCross?: number;
 }): LaidOutFlowchart {
@@ -217,13 +200,9 @@ export function layoutFlowchart(parsed: ParsedFlowchart, opts?: {
     buckets.get(l)!.push(id);
   }
 
-  // Reduce edge crossings with the classic barycenter/median heuristic: sweep
-  // the layers a few times, reordering each layer's nodes by the median slot of
-  // their neighbours in the adjacent layer. Without this, siblings keep their
-  // declaration order and edges cross whenever children are declared out of
-  // their parents' order (the usual "lines crossing" complaint). Nodes with no
-  // neighbour on the side being swept keep their current slot, so the result is
-  // stable and declaration order still breaks ties.
+  // Reduce edge crossings with the median heuristic: sweep layers a few times,
+  // reordering each by neighbours' median slot. Nodes with no neighbour on the
+  // swept side keep their slot, so order is stable and declaration breaks ties.
   const ins = new Map<string, string[]>(ids.map(id => [id, []]));
   for (const e of parsed.edges) {
     if (!index.has(e.from) || !index.has(e.to) || e.from === e.to) continue;

@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { uniqueName, colRelPath } from '../renderer/src/store';
 
-// ─── uniqueName ───────────────────────────────────────────────────────────────
+// uniqueName
 
 describe('uniqueName', () => {
   it('returns the base name when not in the existing list', () => {
@@ -24,7 +24,7 @@ describe('uniqueName', () => {
   });
 });
 
-// ─── colRelPath ───────────────────────────────────────────────────────────────
+// colRelPath
 
 describe('colRelPath', () => {
   it('generates a slug from the name', () => {

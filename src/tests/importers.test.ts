@@ -8,7 +8,7 @@ import { importPostman } from '../main/importers/postman';
 
 const FIXTURES = join(import.meta.dirname, 'fixtures');
 
-// ─── Swagger 2.0 importer ─────────────────────────────────────────────────────
+// Swagger 2.0 importer
 
 describe('importOpenApi (Swagger 2.0)', () => {
   const all = (col: Awaited<ReturnType<typeof importOpenApi>>) => Object.values(col.requests);
@@ -67,7 +67,7 @@ describe('importOpenApi (OpenAPI 3 $ref requestBody)', () => {
   });
 });
 
-// ─── OpenAPI importer ─────────────────────────────────────────────────────────
+// OpenAPI importer
 
 describe('importOpenApi', () => {
   it('returns a collection with the spec title as name', async () => {
@@ -134,8 +134,7 @@ describe('importOpenApi', () => {
     expect(rex.source).toBe('imported');
     expect(rex.request?.body?.mode).toBe('json');
     expect(rex.request?.body?.json).toContain('"age": 7');
-    // Full snapshot: the example also captures params/headers, so it fully
-    // defines what it sends (an example replaces the request when run).
+    // Full snapshot: the example also captures params/headers (it replaces the request when run).
     expect(rex.request?.params).toBeDefined();
     expect(rex.request?.headers).toBeDefined();
   });
@@ -217,7 +216,7 @@ describe('importOpenApi', () => {
   });
 });
 
-// ─── Inline-spec helper for narrow regression tests ──────────────────────────
+// Inline-spec helper for narrow regression tests
 import { writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join as pjoin } from 'node:path';
@@ -346,7 +345,7 @@ describe('importOpenApi response-schema content-type tolerance', () => {
   });
 });
 
-// ─── Postman importer ─────────────────────────────────────────────────────────
+// Postman importer
 
 describe('importPostman', () => {
   it('returns a collection with the collection name', async () => {

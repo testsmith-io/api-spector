@@ -3,18 +3,12 @@
 
 import type { KeyValuePair } from './http';
 
-// ─── Design-first consumer contracts (CDCT) ──────────────────────────────────
-//
-// A ConsumerContract is authored up front, before any endpoint exists: you
-// describe the requests a consumer will make and the responses it needs back.
-// It compiles to a Pact v3 document (publishable to API Spector Cloud, verified
-// by the provider) and to a mock the consumer can develop against — so the
-// contract is the first artifact, not something reverse-engineered from a live
-// call.
+// Design-first consumer contracts (CDCT): authored before any endpoint exists.
+// Compile to a Pact v3 document (provider-verified) and to a mock to develop against.
 
 export interface DesignInteractionRequest {
   method: string
-  /** Path or path template, e.g. "/brands/{id}" — no host needed. */
+  /** Path or path template, e.g. "/brands/{id}"; no host. */
   path: string
   query?: KeyValuePair[]
   headers?: KeyValuePair[]
@@ -25,8 +19,8 @@ export interface DesignInteractionRequest {
 export interface DesignInteractionResponse {
   status: number
   headers?: KeyValuePair[]
-  /** Expected response body as a JSON string — used as the Pact example and,
-   *  by default, matched by TYPE not value (tolerant CDCT). */
+  /** Expected response body as JSON; the Pact example, matched by type not
+   *  value by default. */
   body?: string
 }
 
@@ -37,8 +31,8 @@ export interface DesignInteraction {
   providerState?: string
   request: DesignInteractionRequest
   response: DesignInteractionResponse
-  /** When false, response fields are matched by exact value instead of by type.
-   *  Defaults to type-matching (true) — the CDCT best practice. */
+  /** When false, response fields are matched by exact value, not type. Defaults
+   *  to type-matching (true). */
   looseMatch?: boolean
 }
 

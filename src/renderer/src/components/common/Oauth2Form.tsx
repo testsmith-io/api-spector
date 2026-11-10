@@ -1,11 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// OAuth 2.0 configuration + interactive token flow (Get token / Refresh /
-// Clear), self-contained so it can be used at every level: the request AuthTab,
-// and the folder/collection settings modals (via AuthEditor). The fetched token
-// is cached on the auth object (oauth2CachedToken), which inheritance passes
-// down to requests, and the send path uses it regardless of where it was set.
+// OAuth 2.0 config + interactive token flow, usable at every level (request AuthTab,
+// folder/collection modals). The token caches on the auth object (oauth2CachedToken),
+// which inheritance passes down to requests.
 
 import React, { useState } from 'react';
 import type { Oauth2Auth, VarResolveContext } from '../../../../shared/types';

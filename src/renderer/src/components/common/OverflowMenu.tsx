@@ -3,20 +3,16 @@
 
 import React, { useEffect, useId, useRef, useState } from 'react';
 
-// A small, accessible overflow dropdown (mouse + keyboard) used by the response
-// toolbar for "More" tabs and the "…" action menu. It is rendered inline (not a
-// portal) so it lives inside the toolbar's @container and its menu items can
-// show/hide via container-query classes. Menu items are plain <button
-// role="menuitem"> children; items hidden by a container query are skipped
-// during keyboard navigation.
+// Accessible overflow dropdown for the response toolbar. Rendered inline (not
+// portaled) so container-query show/hide works; hidden items skip keyboard nav.
 
 interface Props {
-  /** Trigger label (e.g. "More ▾" or "…"). */
+  /** Trigger label. */
   readonly button: React.ReactNode;
   readonly ariaLabel: string;
   readonly title?: string;
-  /** Classes for the relative wrapper — put container-query show/hide here so
-   *  the whole control appears only at the widths where it is needed. */
+  /** Classes for the wrapper; put container-query show/hide here so the control
+   *  appears only at the widths where it is needed. */
   readonly wrapperClassName?: string;
   readonly buttonClassName?: string;
   /** Which edge to anchor the menu to. */
@@ -31,7 +27,7 @@ export function OverflowMenu({ button, ariaLabel, title, wrapperClassName = '', 
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
 
-  // Visible (not container-query-hidden) menu items, in DOM order.
+  // Visible menu items, in DOM order.
   function items(): HTMLElement[] {
     if (!menuRef.current) return [];
     return Array.from(menuRef.current.querySelectorAll<HTMLElement>('[role="menuitem"]'))

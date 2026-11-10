@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { parseWsdl, buildEnvelopeTemplate } from '../main/ipc/soap-handler';
 
-// ─── Minimal WSDL fixtures ────────────────────────────────────────────────────
+// Minimal WSDL fixtures
 
 const SIMPLE_WSDL = `
 <definitions xmlns="http://schemas.xmlsoap.org/wsdl/"
@@ -34,7 +34,7 @@ const NO_NAMESPACE_WSDL = `
 
 const EMPTY_WSDL = `<definitions targetNamespace="http://empty.example.com"></definitions>`;
 
-// Calculator-style WSDL with full schema + service/port → drives endpoint and
+// Calculator-style WSDL with full schema + service/port -> drives endpoint and
 // param-aware envelope generation.
 const CALCULATOR_WSDL = `<?xml version="1.0" encoding="utf-8"?>
 <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
@@ -96,7 +96,7 @@ const CALCULATOR_WSDL = `<?xml version="1.0" encoding="utf-8"?>
   </wsdl:service>
 </wsdl:definitions>`;
 
-// ─── parseWsdl ────────────────────────────────────────────────────────────────
+// parseWsdl
 
 describe('parseWsdl', () => {
   it('extracts targetNamespace', () => {
@@ -142,7 +142,7 @@ describe('parseWsdl', () => {
   });
 });
 
-// ─── buildEnvelopeTemplate ────────────────────────────────────────────────────
+// buildEnvelopeTemplate
 
 describe('buildEnvelopeTemplate', () => {
   it('wraps the operation name in tns namespace', () => {
@@ -187,7 +187,7 @@ describe('buildEnvelopeTemplate', () => {
   });
 });
 
-// ─── Schema-aware parsing (calculator fixture) ───────────────────────────────
+// Schema-aware parsing (calculator fixture)
 
 describe('parseWsdl with schema + service', () => {
   it('extracts the endpoint address from service/port', () => {

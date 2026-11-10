@@ -1,12 +1,11 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── Core data model ─────────────────────────────────────────────────────────
+// Core data model
 
-// QUERY (RFC 10008): safe + idempotent like GET, but carries the query in a
-// request body — the body and its Content-Type are mandatory per the RFC.
-// The `(string & {})` arm keeps editor autocomplete for the well-known verbs
-// while still allowing any custom method (e.g. PURGE, LINK, a WebDAV verb).
+// QUERY (RFC 10008): like GET but carries the query in a mandatory request body.
+// The `(string & {})` arm keeps autocomplete for the known verbs while allowing
+// any custom method.
 export type HttpMethod =
   | 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'QUERY'
   | (string & {})
@@ -14,9 +13,8 @@ export type HttpMethod =
 /** The well-known verbs, for menus and iteration. */
 export const KNOWN_HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'QUERY'] as const;
 
-/** Normalise a raw method string from an import (trim + upper-case, GET when
- *  blank), so a malformed spec can't put `"get "` or `""` on the wire. HttpMethod
- *  intentionally accepts any string, so this is hygiene rather than validation. */
+/** Trim + upper-case an imported method string, GET when blank. Hygiene, not
+ *  validation (HttpMethod accepts any string). */
 export function normalizeHttpMethod(raw: string | null | undefined): HttpMethod {
   return (raw ?? '').trim().toUpperCase() || 'GET';
 }
@@ -26,18 +24,11 @@ export interface KeyValuePair {
   value: string
   enabled: boolean
   description?: string
-  /**
-   * For request `params` only: distinguishes path variables (substituted into
-   * the URL via `{{name}}` interpolation) from query string parameters
-   * (appended as `?key=value`). Undefined defaults to `'query'`.
-   */
+  /** Request `params` only: path variable (`{{name}}` in the URL) vs query
+   *  parameter (`?key=value`). Defaults to `'query'`. */
   paramType?: 'query' | 'path'
-  /**
-   * Allowed values for this entry. When set and non-empty, the value cell is
-   * edited as a dropdown of these choices instead of a free-text field. Captured
-   * from an OpenAPI `enum` on import, or defined by hand. Empty/undefined means
-   * free text.
-   */
+  /** Allowed values; when non-empty the value cell becomes a dropdown instead of
+   *  free text. Captured from an OpenAPI `enum` on import, or set by hand. */
   enum?: string[]
 }
 
@@ -59,7 +50,7 @@ export interface Oauth2Auth {
   oauth2ClientSecretRef?: string
   oauth2Scopes?: string
   oauth2RedirectPort?: number
-  /** In-memory cache — NOT persisted to disk. Cleared on app load. */
+  /** In-memory cache - NOT persisted to disk. Cleared on app load. */
   oauth2CachedToken?: string
   oauth2TokenExpiry?: number
   // Basic auth fields reused for oauth2 'password' flow
@@ -70,14 +61,12 @@ export interface Oauth2Auth {
 
 export type AuthConfig = NoneAuth | BasicAuth | BearerAuth | ApiKeyAuth | DigestAuth | NtlmAuth | Oauth2Auth
 
-/** Shape that allows merging any field regardless of current auth.type. Used by
- *  UI setters that spread partial updates (e.g. `setAuth({ username: 'x' })`).
- *  Narrowed AuthConfig is still the source of truth at consumer sites. */
+/** Allows merging any field regardless of auth.type, for UI setters that spread
+ *  partial updates. Narrowed AuthConfig stays the source of truth at consumers. */
 type UnionToIntersection<U> = ( U extends unknown ? ( k: U ) => void : never ) extends ( k: infer I ) => void ? I : never
 export type AuthPatch = Partial<UnionToIntersection<AuthConfig>>
 
-/** Exhaustiveness helper — put in the default of a switch to get a compile
- *  error if a new auth type is added without a handler. */
+/** Exhaustiveness helper for the default of a switch. */
 export function assertNever ( x: never ): never {
   throw new Error( `Unhandled case: ${JSON.stringify( x )}` );
 }
@@ -89,12 +78,10 @@ export interface GraphQLBody {
   /** Subscription (graphql-ws) WebSocket endpoint. Defaults to the request URL
    *  with a ws/wss scheme when empty. */
   subscriptionUrl?: string
-  /** connection_init payload for the graphql-ws handshake (JSON text), used for
-   *  auth tokens etc. */
+  /** connection_init payload for the graphql-ws handshake (JSON text). */
   connectionParams?: string
-  /** Assertion script (sp.* sandbox) run over the subscription payloads when
-   *  running the subscription as a test. Each collected payload is exposed as
-   *  an `sp.messages` entry with `.data` and `.json()`. */
+  /** Assertion script (sp.* sandbox) run over the collected subscription
+   *  payloads, each exposed as an `sp.messages` entry with `.data`/`.json()`. */
   subscriptionTestScript?: string
   /** How long to collect subscription payloads before running the test (ms). */
   subscriptionCollectMs?: number
@@ -116,18 +103,16 @@ export interface SoapBody {
   serviceName?: string
   portName?: string
   operationName?: string
-  /** SOAP version + binding of the selected operation. A WSDL can expose the
-   *  same operation name in both a 1.1 and a 1.2 binding, so these disambiguate
-   *  which one is selected (operationName alone is not unique). */
+  /** SOAP version + binding: a WSDL can expose the same operation name in both
+   *  1.1 and 1.2 bindings, so operationName alone isn't unique. */
   soapVersion?: '1.1' | '1.2'
   binding?: string
   envelope: string        // the XML envelope (hand-edited or template-generated)
   soapAction?: string
 }
 
-/** A gRPC call definition. The proto schema comes from pasted source or a file
- *  path (server reflection is a follow-up); the call targets one service/method
- *  and sends a single request message as JSON (client streaming is a follow-up). */
+/** A gRPC call: proto from pasted source or a file path, targeting one
+ *  service/method, sending a single JSON request message. */
 export interface GrpcBody {
   /** Pasted .proto source, or use protoPath. */
   protoSource?: string
@@ -160,12 +145,9 @@ export interface GrpcServiceInfo {
   methods: GrpcMethodInfo[]
 }
 
-/**
- * One part of a `multipart/form-data` body. Text parts carry a `value`; file
- * parts reference a file on disk by `filePath`, read and streamed at send time
- * (never embedded in the `.spector` file). `form` mode above stays
- * `application/x-www-form-urlencoded`; this is the distinct form-data body.
- */
+/** One part of a `multipart/form-data` body. Text parts carry a `value`; file
+ *  parts reference `filePath`, streamed at send time (never embedded in the
+ *  `.spector` file). */
 export interface MultipartPart {
   key: string
   enabled: boolean
@@ -177,8 +159,8 @@ export interface MultipartPart {
   filePath?: string
   /** File parts: override the transmitted filename. Defaults to the basename of `filePath`. */
   fileName?: string
-  /** Optional per-part Content-Type (e.g. image/png); auto-detected from the
-   *  file extension when omitted for file parts. */
+  /** Optional per-part Content-Type; auto-detected from the file extension when
+   *  omitted for file parts. */
   contentType?: string
   description?: string
 }

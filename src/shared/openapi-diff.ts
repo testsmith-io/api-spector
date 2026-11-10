@@ -1,12 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// OpenAPI diff + breaking-change detection.
-//
-// Compares two OpenAPI 3.x documents and classifies what changed as breaking or
-// not, from a consumer's point of view: a removed operation, a new required
-// field, a changed type, a dropped response field. Pure and dependency-free;
-// the CLI feeds it into an impact analysis (which tests/consumers a change hits).
+// OpenAPI diff: compares two OpenAPI 3.x docs and classifies each change as breaking
+// or not from a consumer's view. Pure and dependency-free.
 
  
 
@@ -146,7 +142,7 @@ export function diffSpecs(oldSpec: unknown, newSpec: unknown): SpecChange[] {
       }
     }
 
-    // A removed success code (e.g. 200 no longer possible).
+    // A removed success code.
     const oCodes = Object.keys(o.op?.responses ?? {}).filter(c => /^2\d\d$/.test(c));
     const nCodes = new Set(Object.keys(n.op?.responses ?? {}));
     for (const c of oCodes) {

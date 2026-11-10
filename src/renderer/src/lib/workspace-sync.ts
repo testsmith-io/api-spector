@@ -1,14 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 //
-// Cloud-synced workspace: push/pull the whole workspace through API Spector
-// Cloud so teams without git can work together. The main process serializes the
-// workspace to a secret-free snapshot and applies pulled snapshots to disk; this
-// orchestrates the network calls and tracks the per-workspace sync state
-// (mode + cloud id + base version) in workspace.settings.sync.
-//
-// The caller must reload the workspace (useWorkspaceLoader().reloadWorkspace)
-// after a successful pull/restore, since those rewrite files on disk.
+// Cloud-synced workspace: push/pull the whole workspace through API Spector Cloud
+// for teams without git. Orchestrates the calls and tracks sync state in
+// workspace.settings.sync. The caller must reload the workspace after a pull/restore.
 
 import { useStore } from '../store';
 import type { Workspace } from '../../../shared/types';
@@ -42,9 +37,8 @@ function workspaceName(manifestName: string): string {
   return manifestName.replace(/\.(spector|json)$/i, '') || 'Workspace';
 }
 
-/** Persist all in-memory workspace state to disk before a push. The app keeps
- *  collections/flows dirty until saved, and the cloud snapshot is built FROM
- *  disk — so without this, a push would ship stale (or empty) files. */
+/** Flush in-memory workspace state to disk before a push: the snapshot is built
+ *  FROM disk, so without this a push would ship stale or empty files. */
 async function flushToDisk(): Promise<void> {
   const s = useStore.getState();
   for (const { relPath, data, dirty } of Object.values(s.collections)) {
@@ -105,9 +99,9 @@ export async function pullWorkspace(): Promise<{ version: number; filesWritten: 
     throw new Error('The cloud workspace has no snapshot yet. Push from a populated workspace first.');
   }
   const applied = await electron.applyWorkspaceSnapshot({ manifest: payload.manifest, files: payload.files });
-  // NOTE: do NOT persist sync settings here — saveWorkspace would write the
-  // stale in-memory workspace back over the manifest we just applied. The caller
-  // loads `workspace` into the store first, then calls markPulled(version).
+  // Do NOT persist sync settings here: saveWorkspace would write the stale
+  // in-memory workspace over the manifest we just applied. The caller loads
+  // `workspace` into the store first, then calls markPulled(version).
   return {
     version: remote.version,
     filesWritten: applied.filesWritten,

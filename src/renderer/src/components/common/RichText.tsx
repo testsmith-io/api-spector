@@ -3,13 +3,8 @@
 
 import React from 'react';
 
-// Renders a single translatable string with lightweight inline markup so each
-// locale controls word order, emphasis, and punctuation (instead of splitting a
-// sentence into many t() fragments, which breaks translation and misplaces the
-// emphasis). Supported markers:
-//   **bold**   -> <strong>
-//   *italic*   -> <em>
-//   `code`     -> <span class="font-mono">
+// Renders a translatable string with inline markup (**bold**, *italic*, `code`)
+// so each locale controls word order and emphasis, not split t() fragments.
 const RICH_RE = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g;
 
 export function renderMarkup(text: string): React.ReactNode[] {

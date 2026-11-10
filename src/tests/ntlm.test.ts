@@ -27,7 +27,7 @@ describe('md4', () => {
   });
 });
 
-// [MS-NLMP] §4.2.4 — the canonical NTLMv2 worked example.
+// [MS-NLMP] §4.2.4 - the canonical NTLMv2 worked example.
 describe('NTLMv2 — [MS-NLMP] §4.2.4 reference vectors', () => {
   const user = 'User';
   const domain = 'Domain';

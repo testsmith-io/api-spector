@@ -1,11 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-/**
- * Build a CSS-style selector that uniquely identifies `el` within its document.
- * Walks up the parent chain, qualifying each step with `:nth-of-type` when the
- * element has multiple same-tagged siblings.
- */
+/** CSS-style selector uniquely identifying `el`; qualifies each step with
+ * `:nth-of-type` when the element has multiple same-tagged siblings. */
 export function buildSelector(el: Element): string {
   const parts: string[] = [];
   let cur: Element | null = el;

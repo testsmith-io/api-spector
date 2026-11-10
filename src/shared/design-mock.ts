@@ -12,10 +12,8 @@ function kvToHeaders(kv?: KeyValuePair[]): Record<string, string> {
   return out;
 }
 
-/** Compile a design-first consumer contract into a runnable MockServer — each
- *  interaction becomes a route returning its designed response, so the consumer
- *  can develop against the contract with no provider. Pure (shared between the
- *  renderer's "Create mock" action and the main process). */
+/** Compile a design-first consumer contract into a runnable MockServer: each
+ *  interaction becomes a route returning its designed response. Pure. */
 export function designContractToMock(cc: ConsumerContract, port = 4100): MockServer {
   const routes: MockRoute[] = cc.interactions.map((it, i) => ({
     id: it.id || `route-${i}`,

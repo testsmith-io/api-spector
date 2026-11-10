@@ -12,7 +12,7 @@ export interface ContractRunMeta {
 }
 
 export interface ContractSlice {
-  /** Latest run only — there is no run history. */
+  /** Latest run only - there is no run history. */
   lastContractReport: ContractReport | null
   /** Spec/provider labels from the run that produced lastContractReport. */
   lastContractRunMeta: ContractRunMeta | null
@@ -21,8 +21,8 @@ export interface ContractSlice {
   /** When set, contract runs use this snapshot's spec instead of a live URL. */
   activeContractSnapshotRelPath: string | null
 
-  /** Whether the Contract Designer modal is open (rendered at the app root so
-   *  it can be triggered from anywhere, e.g. "Send to contract designer"). */
+  /** Whether the Contract Designer modal is open; rendered at the app root so it can
+   *  be triggered from anywhere. */
   contractDesignerOpen: boolean
   /** Prefill for a new design interaction when the Designer is opened from a
    *  request/response. Null when opened blank from the Contracts panel. */

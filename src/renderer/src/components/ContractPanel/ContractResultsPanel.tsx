@@ -8,14 +8,14 @@ import { getMethodColor } from '../../../../shared/colors';
 import { Toast, useToast } from '../common/Toast';
 import { useT } from '../../i18n';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// Helpers
 
 function statusColor(code: number): string {
   const d = String(code)[0];
   return d === '2' ? 'text-emerald-400' : d === '3' ? 'text-amber-400' : 'text-red-400';
 }
 
-// ─── Violation row ────────────────────────────────────────────────────────────
+// Violation row
 
 function ViolationRow({ v }: { readonly v: ContractViolation }) {
   const t = useT();
@@ -52,7 +52,7 @@ function ViolationRow({ v }: { readonly v: ContractViolation }) {
   );
 }
 
-// ─── Result card ─────────────────────────────────────────────────────────────
+// Result card
 
 function ResultCard({ result }: { readonly result: ContractResult }) {
   const t = useT();
@@ -129,7 +129,7 @@ function ResultCard({ result }: { readonly result: ContractResult }) {
   );
 }
 
-// ─── Main panel ───────────────────────────────────────────────────────────────
+// Main panel
 
 export function ContractResultsPanel() {
   const report      = useStore(s => s.lastContractReport);
@@ -181,7 +181,7 @@ export function ContractResultsPanel() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* ── Summary bar ── */}
+      {/* Summary bar */}
       <div className={`flex items-center gap-4 px-6 py-3 border-b flex-shrink-0 ${
         report.failed === 0
           ? 'bg-emerald-950/30 border-emerald-800/50'
@@ -227,7 +227,7 @@ export function ContractResultsPanel() {
         </button>
       </div>
 
-      {/* ── Record form ── */}
+      {/* Record form */}
       {recordOpen && (
         <div className="flex items-center gap-2 px-6 py-2 border-b border-surface-800 bg-surface-900/60 flex-shrink-0">
           <input
@@ -256,7 +256,7 @@ export function ContractResultsPanel() {
       )}
       <Toast toast={toast} />
 
-      {/* ── Results list ── */}
+      {/* Results list */}
       <div className="flex-1 overflow-y-auto min-h-0 p-6">
         {/* Failed first, then passed */}
         {(() => {

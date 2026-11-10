@@ -1,11 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Shared performance-run orchestration: resolve a plan's target (single
-// request, a collection/folder sequence, or a visual flow) into a per-iteration
-// iterate(), derive the load schedule, run the scheduler, and evaluate
-// thresholds. Used by both the desktop IPC handler and the `perf` CLI, so a run
-// behaves identically in the app and in CI.
+// Shared perf-run orchestration: resolve a plan's target (request, sequence, or
+// flow) into a per-iteration iterate(), derive the load schedule, run it, and
+// evaluate thresholds. Used by both the desktop IPC handler and the `perf` CLI.
 
 import type { ApiRequest, Collection, Environment, Flow, PerfPlan, PerfProgress, PerfResult, SecretsSettings } from '../shared/types';
 import { runPerfTest, type PerfIterate, type PerfSchedule, type PerfStepSample } from './perf-runner';
@@ -34,11 +32,11 @@ export interface PerfRunPayload {
   globals?: Record<string, string>
   proxy?: ProxyConfig
   tls?: TlsConfig
-  /** Env vars already resolved in the main process (so a worker that runs this
-   *  never has to touch the OS keychain). When set, buildEnvVars is skipped. */
+  /** Env vars already resolved in the main process, so a worker never touches
+   *  the OS keychain. When set, buildEnvVars is skipped. */
   resolvedEnvVars?: Record<string, string>
   /** External secret-manager config, so a worker can resolve inline {{vault:…}}
-   *  references (HTTP-based providers) without the main process. */
+   *  references without the main process. */
   secretsConfig?: SecretsSettings
 }
 

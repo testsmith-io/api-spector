@@ -14,31 +14,12 @@ import { fetch, Headers } from 'undici';
 import { interpolate, buildUrl } from '../interpolation';
 import { buildAuthHeaders } from '../auth-builder';
 
-// ─── Bi-directional contract verifier ────────────────────────────────────────
-//
-// Bi-directional: both sides publish.
-//   • Consumer side  — the request's ContractExpectation (status, headers, body schema)
-//   • Provider side  — an OpenAPI spec describing what the provider actually offers
-//
-// Two things are verified:
-//   1. Static compatibility: the consumer's expected body schema is compatible
-//      with the provider's documented response schema (no live HTTP call needed).
-//   2. Live verification: the real request is sent and the response is validated
-//      against the consumer's contract (same as consumer mode).
-//
-// "Schema compatible" means every field the consumer *requires* exists in the
-// provider's schema with a compatible type.  The provider may return more fields
-// than the consumer expects — that is fine.
+// Bi-directional contract verifier: consumer side is the request's ContractExpectation,
+// provider side an OpenAPI spec. Checks (1) static schema compatibility and (2) a live request.
 
-// ─── Schema compatibility checker ────────────────────────────────────────────
+// Schema compatibility checker
 
-/**
- * Recursively check that consumerSchema expectations can be satisfied by
- * providerSchema.  Returns violations for any incompatibility found.
- *
- * The key rule: if the consumer requires a field, the provider must define it
- * with a compatible type.  Extra fields in the provider are always allowed.
- */
+/** Check consumerSchema against providerSchema: a required consumer field must exist in the provider with a compatible type; extra provider fields are allowed. */
 export function checkSchemaCompatibility(
   consumerSchema: Record<string, unknown>,
   providerSchema: Record<string, unknown>,
@@ -48,10 +29,8 @@ export function checkSchemaCompatibility(
 
   if (!consumerSchema || !providerSchema) return violations;
 
-  // ── Root type mismatch ──
-  // `type` may be a union (JSON Schema array form, e.g. ["string","null"]) and
-  // OpenAPI 3.0 expresses nullability as `nullable: true` — normalize both so
-  // a consumer expecting `null` is compatible with a provider's `string|null`.
+  // `type` may be a union (JSON Schema array form) while OpenAPI 3.0 uses
+  // `nullable: true`; normalize both so a consumer `null` matches `string|null`.
   const typesOf = (s: Record<string, unknown>): string[] => {
     const t = s['type'];
     const list = Array.isArray(t)
@@ -64,7 +43,7 @@ export function checkSchemaCompatibility(
   const pTypes = typesOf(providerSchema);
 
   if (cTypes.length && pTypes.length) {
-    // integer is compatible with number (both directions)
+    // integer and number are compatible both ways
     const compatible = (ct: string, pt: string): boolean =>
       ct === pt || (ct === 'integer' && pt === 'number') || (ct === 'number' && pt === 'integer');
     const ok = cTypes.every(ct => pTypes.some(pt => compatible(ct, pt)));
@@ -76,11 +55,11 @@ export function checkSchemaCompatibility(
         expected: cTypes.join(','),
         actual:   pTypes.join(','),
       });
-      return violations;  // no point checking properties if root type differs
+      return violations;  // root type differs, don't check properties
     }
   }
 
-  // ── Array items ──
+  // Array items
   if (cTypes.includes('array') || Array.isArray(consumerSchema['items'])) {
     const cItems = consumerSchema['items'] as Record<string, unknown> | undefined;
     const pItems = providerSchema['items'] as Record<string, unknown> | undefined;
@@ -90,7 +69,7 @@ export function checkSchemaCompatibility(
     return violations;
   }
 
-  // ── Object properties ──
+  // Object properties
   if (cTypes.includes('object') || consumerSchema['properties']) {
     const cProps    = (consumerSchema['properties'] as Record<string, unknown>) ?? {};
     const pProps    = (providerSchema['properties'] as Record<string, unknown>) ?? {};
@@ -109,7 +88,6 @@ export function checkSchemaCompatibility(
       }
     }
 
-    // Recursively check shared properties
     for (const [field, cPropSchema] of Object.entries(cProps)) {
       if (field in pProps) {
         const fieldPath = path ? `${path}.${field}` : field;
@@ -125,7 +103,7 @@ export function checkSchemaCompatibility(
   return violations;
 }
 
-// ─── Provider spec response schema lookup ────────────────────────────────────
+// Provider spec response schema lookup
 
 function getProviderResponseSchema(
   spec:            Record<string, unknown>,
@@ -139,7 +117,7 @@ function getProviderResponseSchema(
   if (!match) return null;
 
   const responses = (match.operation['responses'] as Record<string, unknown>) ?? {};
-  // Try exact status, then 2xx wildcard, then 'default'
+  // Exact status, then 2xx wildcard, then 'default'
   const candidates = [String(statusCode), `${String(statusCode)[0]}xx`, '2XX', '2xx', 'default'];
   for (const candidate of candidates) {
     const resp = responses[candidate];
@@ -155,7 +133,7 @@ function getProviderResponseSchema(
   return null;
 }
 
-// ─── HTTP execution (same as consumer) ───────────────────────────────────────
+// HTTP execution (same as consumer)
 
 async function executeRequest(
   req:  ApiRequest,
@@ -190,7 +168,7 @@ async function executeRequest(
   }
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// Public API
 
 export async function runBidirectional(
   requests:         ApiRequest[],
@@ -204,25 +182,23 @@ export async function runBidirectional(
   const vars  = { ...envVars, ...collectionVars };
   const start = Date.now();
 
-  // Only requests that have a consumer contract and are not disabled
+  // Requests with a consumer contract that aren't disabled
   const contractRequests = requests.filter(r => !r.disabled && hasContract(r.contract));
 
   const results: ContractResult[] = await Promise.all(contractRequests.map(async req => {
     const url        = buildUrl(req.url, req.params, vars);
     const violations: ContractViolation[] = [];
 
-    // ── 1. Static schema compatibility check ──
-    // The consumer's expected shape comes from bodySchema when present, else
-    // from the Pact-style bodyMatcher example (compiled to a type-only JSON
-    // Schema — compatibility cares about shape, not exact values).
+    // 1. Static schema compatibility check. Expected shape comes from bodySchema,
+    // else from the bodyMatcher example (compiled to a type-only JSON Schema).
     const expectedStatus = req.contract!.statusCode ?? 200;
     let consumerSchema: Record<string, unknown> | null = null;
     if (req.contract!.bodySchema) {
-      try { consumerSchema = JSON.parse(req.contract!.bodySchema) as Record<string, unknown>; } catch { /* invalid JSON — skip static check */ }
+      try { consumerSchema = JSON.parse(req.contract!.bodySchema) as Record<string, unknown>; } catch { /* invalid JSON, skip static check */ }
     } else if (req.contract!.bodyMatcher?.trim()) {
       try {
         consumerSchema = compileMatcherExample(JSON.parse(req.contract!.bodyMatcher), false) as Record<string, unknown>;
-      } catch { /* invalid JSON — skip static check */ }
+      } catch { /* invalid JSON, skip static check */ }
     }
 
     if (consumerSchema) {
@@ -237,7 +213,7 @@ export async function runBidirectional(
       }
     }
 
-    // ── 2. Live consumer verification ──
+    // 2. Live consumer verification
     const result = await executeRequest(req, vars);
     if (result instanceof Error) {
       violations.push({ type: 'status_mismatch', message: `Request failed: ${result.message}` });

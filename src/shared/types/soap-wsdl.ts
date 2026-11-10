@@ -1,11 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── WSDL metadata (SOAP) ─────────────────────────────────────────────────────
-//
-// Shared between the main-process WSDL parser (src/main/ipc/soap-handler.ts)
-// and the renderer's SOAP editor (RequestBuilder/SoapEditor.tsx), which
-// receives these shapes over IPC.
+// WSDL metadata (SOAP), shared between the main-process WSDL parser and the
+// renderer's SOAP editor over IPC.
 
 export interface WsdlParam {
   name: string
@@ -15,7 +12,7 @@ export interface WsdlParam {
 
 export interface WsdlOperation {
   name: string
-  /** Binding this operation is exposed by — useful when WSDL has both 1.1 and 1.2. */
+  /** Binding this operation is exposed by - useful when WSDL has both 1.1 and 1.2. */
   binding?: string
   soapAction?: string
   soapVersion: '1.1' | '1.2'

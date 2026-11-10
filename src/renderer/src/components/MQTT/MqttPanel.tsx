@@ -1,13 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// MQTT session panel: connect to a broker (mqtt://, mqtts://, ws://, wss://),
-// subscribe to topics, publish messages, and watch the live session log.
-// Mirrors the Socket.IO panel; the connection itself lives in the main process
-// (see mqtt-handler.ts) and streams messages into the store, which App.tsx
-// subscribes to once. Broker URL is edited in the shared URL bar above.
-// username / password / topics support {{var}} interpolation, so a secret can
-// be referenced with a variable instead of being stored on disk.
+// MQTT session panel: connect, subscribe, publish, watch the log. Connection
+// lives in the main process (mqtt-handler.ts); fields support {{var}} interpolation.
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../../store';

@@ -30,7 +30,7 @@ import {
   makeXmlExtractSnippet,
 } from '../renderer/src/components/ResponseViewer/InteractiveBody/utils/snippets';
 
-// ─── formatters ──────────────────────────────────────────────────────────────
+// formatters
 
 describe('prettyJson', () => {
   it('pretty-prints valid JSON with 2-space indent', () => {
@@ -65,7 +65,7 @@ describe('prettyXml', () => {
   });
 });
 
-// ─── diffEngine ──────────────────────────────────────────────────────────────
+// diffEngine
 
 describe('computeLineDiff', () => {
   it('returns all equal lines when inputs are identical', () => {
@@ -110,7 +110,7 @@ describe('computeLineDiff', () => {
   });
 });
 
-// ─── format ──────────────────────────────────────────────────────────────────
+// format
 
 describe('esc', () => {
   it('escapes backslashes, quotes, and newlines', () => {
@@ -138,7 +138,7 @@ describe('toLit', () => {
   });
 });
 
-// ─── jsonPath ────────────────────────────────────────────────────────────────
+// jsonPath
 
 describe('jsonAccessor', () => {
   it('returns just `json` for an empty path', () => {
@@ -218,8 +218,7 @@ describe('toJsonPathExpr', () => {
   });
 
   it('handles root-level arrays without a trailing dot', () => {
-    // When the response is a bare array like [{ id: "x", name: "Hand Tools" }],
-    // the path is [0, 'id'] — no named prefix before the array index.
+    // Bare-array response: path is [0, 'id'], no named prefix before the index.
     const path: JsonPath = [0, 'id'];
     expect(toJsonPathExpr(path, 'name', 'Hand Tools')).toBe('$[?(@.name=="Hand Tools")].id');
   });
@@ -244,7 +243,7 @@ describe('varNameFromPath', () => {
   });
 });
 
-// ─── snippets ────────────────────────────────────────────────────────────────
+// snippets
 
 describe('makeJsonSnippet', () => {
   const path: JsonPath = ['user', 'name'];
@@ -252,8 +251,7 @@ describe('makeJsonSnippet', () => {
   it('builds an equals assertion', () => {
     const out = makeJsonSnippet(path, 'alice', 'equals');
     expect(out).toContain("sp.test('user.name equals \"alice\"'");
-    // `const json = sp.response.json();` is now hoisted by appendSnippetToScript,
-    // not embedded in every sp.test block. Snippets reference `json` directly.
+    // `const json = sp.response.json();` is hoisted by appendSnippetToScript, so snippets reference `json` directly.
     expect(out).not.toContain('const json = sp.response.json();');
     expect(out).toContain('sp.expect(json.user.name).to.equal("alice");');
   });
@@ -317,8 +315,7 @@ describe('extract snippets', () => {
   });
 
   it('makeJsonExtractSnippet supports the carry-over scopes', () => {
-    // Named scopes persist for the session (usable in the next request); each
-    // maps to its sp.* accessor so the generated snippet writes to that scope.
+    // Named scopes persist for the session; each maps to its sp.* accessor.
     expect(makeJsonExtractSnippet(['user', 'token'], 'environment')).toContain('sp.environment.set("token"');
     expect(makeJsonExtractSnippet(['user', 'token'], 'collectionVariables')).toContain('sp.collectionVariables.set("token"');
     expect(makeJsonExtractSnippet(['user', 'token'], 'folder')).toContain('sp.folder.set("token"');

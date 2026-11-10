@@ -1,11 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Socket.IO session panel: connect to a Socket.IO server, emit named events
-// with JSON arguments (optionally waiting for an acknowledgement), and watch the
-// live session log. Mirrors the WebSocket panel; the connection itself lives in
-// the main process (see socketio-handler.ts) and streams events into the store,
-// which App.tsx subscribes to once.
+// Socket.IO session panel: connect, emit named events (optional ack), watch the
+// log. The connection lives in the main process (socketio-handler.ts).
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../../store';

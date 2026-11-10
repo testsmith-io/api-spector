@@ -13,7 +13,7 @@ function req(over: Partial<ApiRequest> = {}): ApiRequest {
   };
 }
 
-// ─── secretManagerOf ──────────────────────────────────────────────────────────
+// secretManagerOf
 
 describe('secretManagerOf', () => {
   it('maps each reference scheme to its provider', () => {
@@ -28,7 +28,7 @@ describe('secretManagerOf', () => {
   });
 });
 
-// ─── generateCiContent: encrypted secrets vs references ───────────────────────
+// generateCiContent: encrypted secrets vs references
 
 describe('generateCiContent (GitHub)', () => {
   it('omits the master key when there are no encrypted secrets or references', () => {
@@ -82,7 +82,7 @@ describe('generateCiContent (GitLab / Azure use AppRole)', () => {
   });
 });
 
-// ─── inline reference detection ───────────────────────────────────────────────
+// inline reference detection
 
 describe('inlineSecretManagers', () => {
   it('detects each scheme wrapped in {{ }}', () => {

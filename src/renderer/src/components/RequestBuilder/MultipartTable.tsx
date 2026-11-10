@@ -18,11 +18,8 @@ function baseName(p: string): string {
   return parts[parts.length - 1] || p;
 }
 
-/**
- * Editor for a multipart/form-data body. Each row is either a text field or a
- * file field; file rows pick a path from disk via the native dialog (the file is
- * read at send time, never stored in the collection).
- */
+/** Editor for a multipart/form-data body. File rows pick a path via the native
+ * dialog; the file is read at send time, never stored in the collection. */
 export function MultipartTable({ rows, onChange }: Props) {
   const t = useT();
 

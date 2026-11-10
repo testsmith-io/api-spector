@@ -1,11 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Headless flow runner — wires the shared flow engine to the real request /
-// script primitives, resolving request blocks from a pre-baked requests map
-// (keyed "collectionId:requestId"). Node-only, no Electron: this is what the
-// cloud `runtime/flow` worker imports via @testsmith/api-spector/engine to run
-// an uploaded flow with semantics identical to the desktop app and CLI.
+// Headless flow runner: wires the shared flow engine to real request/script primitives,
+// resolving request blocks from a pre-baked map (keyed "collectionId:requestId"). Node-only
+// (no Electron); the cloud runtime/flow worker imports it to run flows like the desktop app and CLI.
 
 import { runFlow } from '../shared/flow-engine';
 import type { FlowEngineDeps, FlowRunSummary, FlowRunEvent } from '../shared/flow-engine';

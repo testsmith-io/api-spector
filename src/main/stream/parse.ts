@@ -1,12 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Streaming response support (Phase 0).
-//
-// A response is streamed when its Content-Type is a known event/line format, or
-// when the request opts in. The framer below is pure and unit-tested: feed it
-// decoded text chunks and it emits complete frames, buffering any partial frame
-// that straddles a chunk boundary. The reader drives it over the response body.
+// Streaming response support (Phase 0): streamed when the Content-Type is a known event/line format
+// or the request opts in. The framer is pure; feed it text chunks and it emits frames, buffering partials.
 
 import type { StreamEvent, StreamClose } from '../../shared/types';
 
@@ -19,9 +15,8 @@ export interface RawFrame {
   data: string
 }
 
-/** Decide how (or whether) to stream from the response Content-Type.
- *  `forceStream` opts a request in regardless — unknown types then read as raw
- *  chunks. Returns null to buffer as a normal response. */
+/** Pick a stream kind from the Content-Type. `forceStream` reads unknown types as
+ *  raw chunks; null means buffer as a normal response. */
 export function detectStreamKind(contentType: string | undefined, forceStream = false): StreamKind | null {
   const ct = (contentType || '').toLowerCase();
   if (ct.includes('text/event-stream')) return 'sse';
@@ -34,7 +29,7 @@ export function detectStreamKind(contentType: string | undefined, forceStream = 
 }
 
 /** Incremental framer for SSE and NDJSON (json-seq is NDJSON with a leading
- *  record-separator that we strip). Holds a carry buffer across chunks. */
+ *  record-separator, stripped). Carries a buffer across chunks. */
 export class StreamFramer {
   private carry = '';
   constructor(private readonly mode: 'sse' | 'ndjson') {}
@@ -46,8 +41,7 @@ export class StreamFramer {
     return this.mode === 'sse' ? this.drainSse() : this.drainNdjson();
   }
 
-  /** Emit whatever remains once the stream closes (a last line/block with no
-   *  trailing delimiter). */
+  /** Emit a last line/block that had no trailing delimiter when the stream closed. */
   flush(): RawFrame[] {
     const rest = this.carry;
     this.carry = '';
@@ -82,8 +76,7 @@ export class StreamFramer {
       else if (field === 'id')    id = value;
       // "retry:" and unknown fields are ignored.
     }
-    // Per the SSE spec, a block with no data is not dispatched (covers comment
-    // keep-alives and lone id/retry lines).
+    // Per the SSE spec, a block with no data is not dispatched.
     if (dataLines.length === 0) return null;
     return { name: name ?? 'message', id, data: dataLines.join('\n') };
   }
@@ -112,7 +105,7 @@ function toEvent(frame: RawFrame, kind: StreamKind, seq: number, tMs: number): S
   let json: unknown;
   const trimmed = frame.data.trim();
   if (trimmed && (trimmed.startsWith('{') || trimmed.startsWith('['))) {
-    try { json = JSON.parse(trimmed); } catch { /* leave undefined (e.g. "[DONE]") */ }
+    try { json = JSON.parse(trimmed); } catch { /* non-JSON like "[DONE]": leave undefined */ }
   }
   const ev: StreamEvent = { seq, tMs, kind, data: frame.data };
   if (frame.name !== undefined) ev.name = frame.name;
@@ -126,8 +119,8 @@ export interface ReadStreamOptions {
   maxEvents?: number
   /** Total wall-clock cap in ms (default 300000; <=0 disables). */
   maxMs?: number
-  /** Idle cap in ms — close if no frame arrives for this long (default 60000;
-   *  <=0 disables). This is what catches a stream that connects then hangs. */
+  /** Idle cap in ms: close if no frame arrives for this long (default 60000; <=0
+   *  disables). Catches a stream that connects then hangs. */
   idleMs?: number
   signal?: AbortSignal
   /** Called for each event as it is parsed, for the live UI. */
@@ -138,15 +131,14 @@ export interface ReadStreamOptions {
 
 export interface ReadStreamResult {
   events: StreamEvent[]
-  /** Full concatenated body text — the back-compat responseBody. */
+  /** Full concatenated body text - the back-compat responseBody. */
   text: string
   close: StreamClose
   firstEventMs: number
 }
 
-/** Drive the framer over a WHATWG ReadableStream (undici's `response.body`),
- *  emitting events live and returning the aggregate. Never rejects on stream
- *  errors — it closes with `'error'` so the caller always gets what arrived. */
+/** Drive the framer over undici's `response.body`, emitting events live and
+ *  returning the aggregate. Never rejects: on a stream error it closes with `'error'`. */
 export async function readStream(
   body: ReadableStream<Uint8Array> | null,
   kind: StreamKind,
@@ -184,15 +176,14 @@ export async function readStream(
   try {
     for (;;) {
       if (opts.signal?.aborted) { close = 'stopped'; break; }
-      // Whichever budget runs out first cuts the read: total wall-clock or idle
-      // (no frame for idleMs). <=0 disables that budget.
+      // Whichever budget runs out first cuts the read; <=0 disables that budget.
       const totalRem = maxMs  > 0 ? maxMs  - (now() - startMs)      : Infinity;
       const idleRem  = idleMs > 0 ? idleMs - (now() - lastActivity) : Infinity;
       if (totalRem <= 0 || idleRem <= 0) { close = 'timeout'; break; }
       const wait = Math.min(totalRem, idleRem);
 
-      // Race the read against the tighter budget so a silent/never-ending stream
-      // is cut off. With both budgets disabled we just await the next frame.
+      // Race the read against the tighter budget so a silent stream is cut off;
+      // with both budgets disabled, just await the next frame.
       let step: ReadableStreamReadResult<Uint8Array> | 'timeout';
       if (wait === Infinity) {
         step = await reader.read();
@@ -207,7 +198,7 @@ export async function readStream(
       const { value, done } = step;
       if (done) break;
       if (!value) continue;
-      lastActivity = now(); // a frame arrived — reset the idle clock
+      lastActivity = now(); // a frame arrived - reset the idle clock
 
       const chunkText = decoder.decode(value, { stream: true });
       text += chunkText;

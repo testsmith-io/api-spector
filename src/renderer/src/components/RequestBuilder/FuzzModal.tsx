@@ -14,12 +14,8 @@ const { electron } = window;
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
-/**
- * Per-request fuzzing: hammer THIS request with malformed inputs, inline, using
- * its own URL / auth / environment. Complements the batch fuzz in the Contracts
- * panel (which sweeps the whole workspace against a provider base URL). Both
- * call the same engine; here the request list is just [request].
- */
+/** Per-request fuzzing: hammer this one request with malformed inputs using its own
+ *  URL/auth/env. Same engine as the Contracts-panel batch fuzz; here the list is just [request]. */
 export function FuzzModal({ request, onClose }: { readonly request: ApiRequest; readonly onClose: () => void }) {
   const t = useT();
   const environments        = useStore(s => s.environments);

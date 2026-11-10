@@ -10,7 +10,7 @@ import {
   jsJsonPathExpr, folderUsesJsonPath, collectionUsesJsonPath,
 } from './generator-utils';
 
-// ─── Supertest + Jest JavaScript generator ────────────────────────────────────
+// Supertest + Jest JavaScript generator
 
 function buildJestConfig(): string {
   return `\
@@ -216,7 +216,7 @@ ${tests.join('\n\n')}
 `;
 }
 
-// ─── Project scaffolding files ────────────────────────────────────────────────
+// Project scaffolding files
 
 function buildPackageJson(collectionName: string, usesJsonPath: boolean): string {
   const name = collectionName.replaceAll(/\W+/g, '-').toLowerCase();

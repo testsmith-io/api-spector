@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 // Barrel for the shared type modules. Import sites throughout the codebase
-// reference '../shared/types' — keep this file a pure re-export so those
+// reference '../shared/types' - keep this file a pure re-export so those
 // paths never need to change. The actual definitions live in ./types/*.
 
 export * from './types/http';

@@ -4,7 +4,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-// ─── In-memory globals singleton ─────────────────────────────────────────────
+// In-memory globals singleton
 
 let globals: Record<string, string> = {};
 let currentDir: string | null = null;

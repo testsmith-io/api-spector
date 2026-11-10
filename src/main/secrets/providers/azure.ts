@@ -4,15 +4,9 @@
 import { getSecretsConfig } from '../config';
 import type { SecretProvider } from '../types';
 
-// Azure Key Vault provider. References look like:
-//   azure:<vault>/<secret>              e.g. azure:acme-kv/db-password
-//   azure:<vault>/<secret>/<version>
-//   azure:https://acme-kv.vault.azure.net/secrets/db-password
-//
-// Authenticates to Entra ID with client credentials (AZURE_TENANT_ID,
-// AZURE_CLIENT_ID, AZURE_CLIENT_SECRET) and reads over the Key Vault REST API.
-// In CI you can supply a federated-credential client secret, or export those
-// three from your OIDC step.
+// Azure Key Vault provider. Refs: azure:<vault>/<secret>[/<version>] or a full
+// azure:https://...vault.azure.net/secrets/... URL. Authenticates to Entra ID with client
+// credentials (AZURE_TENANT_ID/CLIENT_ID/CLIENT_SECRET) and reads over the Key Vault REST API.
 
 interface AzureConn {
   tenantId: string;

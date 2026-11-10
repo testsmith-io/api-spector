@@ -1,11 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Runs a flow for the desktop UI. The renderer passes its in-memory
-// collections/flows/environment (main doesn't hold the store), and this handler
-// injects the real request/script primitives into the shared flow engine, then
-// streams per-block progress back over IPC. The engine itself (and therefore
-// the flow semantics) is identical to what the `flow` CLI command runs.
+// Runs a flow for the desktop UI: injects the real request/script primitives into the
+// shared flow engine and streams per-block progress over IPC. Same engine as the `flow` CLI.
 
 import { type IpcMain, type IpcMainInvokeEvent } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
@@ -58,7 +55,7 @@ export function registerFlowHandler(ipc: IpcMain): void {
             dispatcher,
             // Flows chain on the real response (e.g. extracting an access_token
             // the next block sends as a Bearer), so the body must NOT be PII-
-            // masked here — masking would feed downstream blocks a sentinel.
+            // masked here - masking would feed downstream blocks a sentinel.
             piiMaskPatterns: [],
             proxy,
             tls,
@@ -84,7 +81,7 @@ export function registerFlowHandler(ipc: IpcMain): void {
           method: result.method,
           resolvedUrl: result.resolvedUrl,
           // The request actually sent (resolved headers/body), so the run log
-          // and report can show it — especially on failures.
+          // and report can show it - especially on failures.
           sentRequest: result.sentRequest
             ? { method: result.method, url: result.resolvedUrl, headers: result.sentRequest.headers, body: result.sentRequest.body }
             : undefined,

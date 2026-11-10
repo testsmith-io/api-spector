@@ -1,20 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// ─── Flows ──────────────────────────────────────────────────────────────────
-//
-// A flow is a visual, Postman-Flows-style dataflow graph of typed blocks. It
-// starts at a `start` block and runs along edges; blocks route on named output
-// ports (e.g. an `if` block fires `true` or `false`). Blocks fall into four
-// categories — action (request / sub-flow), logic (if / condition / validate /
-// evaluate / delay / merge), looping (forEach / repeat / collect) and visualize
-// (display / log). Logic is written in the same `sp.*` JavaScript sandbox used
-// by request pre/post scripts.
-//
-// Flows are workspace artifacts stored one-file-per-flow under `flows/`
-// (plain JSON). The execution engine (src/shared/flow-engine.ts) is shared by
-// the desktop UI (IPC) and the `api-spector flow` CLI command, so both run
-// byte-identical logic.
+// Flows: a visual dataflow graph of typed blocks (action/logic/looping/visualize),
+// routed along edges by named output ports; logic uses the `sp.*` sandbox. Stored
+// one-file-per-flow under `flows/` (JSON); engine (flow-engine.ts) shared by UI + CLI.
 
 import type { Collection, Environment, TlsSettings } from './collection';
 
@@ -67,8 +56,7 @@ export interface FlowBlockConfig {
   indexVar?: string
   /** repeat: number of iterations */
   count?: number
-  /** parallel: how many times to fire each connected request concurrently
-   *  (default 1). Set higher to hit the same endpoint several times at once. */
+  /** parallel: times to fire each connected request concurrently (default 1). */
   copies?: number
   /** collect: variable (data channel) to append each iteration's value into */
   intoVar?: string
@@ -80,7 +68,7 @@ export interface FlowBlockConfig {
   scope?: 'local' | 'collection' | 'environment' | 'global'
   /** start: flow input variables, seeded into the local scope before the run */
   inputs?: { key: string; value: string }[]
-  /** display / log: message — a {{template}} or, when `expression` form, JS */
+  /** display / log: message - a {{template}} or, when `expression` form, JS */
   message?: string
   /** display: how to render the value */
   as?: 'text' | 'json' | 'table'
@@ -116,11 +104,10 @@ export interface Flow {
   edges: FlowEdge[]
 }
 
-// ─── Run payload (renderer → main IPC) ───────────────────────────────────────
+// Run payload (renderer -> main IPC)
 
-/** Everything the main-process flow engine needs to run a flow headlessly.
- *  The renderer passes its in-memory collections/flows/environment, since main
- *  doesn't hold the renderer's store (mirrors RunnerPayload). */
+/** What the main-process flow engine needs to run a flow headlessly; the renderer
+ *  passes its in-memory state since main doesn't hold the store (mirrors RunnerPayload). */
 export interface RunFlowPayload {
   flow: Flow
   collections: Collection[]

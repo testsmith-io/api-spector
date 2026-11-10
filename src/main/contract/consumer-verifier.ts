@@ -14,11 +14,8 @@ import { interpolate, buildUrl, rebaseUrl } from '../interpolation';
 import { buildAuthHeaders } from '../auth-builder';
 import { compileMatcherExample } from './matchers';
 
-// ─── Consumer contract verifier ───────────────────────────────────────────────
-//
-// Consumer-driven contract testing: the consumer (this collection) defines
-// what it *expects* from the provider — status code, required headers, and a
-// response body JSON Schema.  We send the real request and assert the contract.
+// Consumer contract verifier: the consumer (this collection) defines what it
+// expects from the provider (status code, required headers, body JSON Schema).
 
 const ajv = new Ajv({ allErrors: true, strict: false });
 
@@ -32,12 +29,10 @@ export function hasContract(contract?: ContractExpectation): contract is Contrac
   );
 }
 
-// ─── Pure validation (no HTTP) — exported for unit testing ───────────────────
+// Pure validation (no HTTP) - exported for unit testing
 
-/**
- * Validate an already-received response against a ContractExpectation.
- * Returns an array of violations (empty = passed).
- */
+/** Validate a received response against a ContractExpectation; violations are
+ *  empty when it passes. */
 export function validateConsumerResponse(
   contract: ContractExpectation,
   actualStatus: number,
@@ -46,7 +41,7 @@ export function validateConsumerResponse(
 ): ContractViolation[] {
   const violations: ContractViolation[] = [];
 
-  // ── Status code ──
+  // Status code
   if (contract.statusCode !== undefined && actualStatus !== contract.statusCode) {
     violations.push({
       type:     'status_mismatch',
@@ -56,7 +51,7 @@ export function validateConsumerResponse(
     });
   }
 
-  // ── Required headers ──
+  // Required headers
   for (const expected of contract.headers ?? []) {
     if (!expected.required) continue;
     const actual = actualHeaders[expected.key.toLowerCase()];
@@ -77,7 +72,7 @@ export function validateConsumerResponse(
     }
   }
 
-  // ── Body schema (hand-written JSON Schema) ──
+  // Body schema (hand-written JSON Schema)
   if (contract.bodySchema?.trim()) {
     let schema: unknown;
     try {
@@ -92,7 +87,7 @@ export function validateConsumerResponse(
     violations.push(...validateBody(schema, bodyText));
   }
 
-  // ── Body matchers (Pact-style example) ──
+  // Body matchers (Pact-style example)
   // Compiled to a JSON Schema and validated the same way as bodySchema.
   if (contract.bodyMatcher?.trim()) {
     let example: unknown;
@@ -147,7 +142,7 @@ function validateBody(schema: unknown, bodyText: string): ContractViolation[] {
   return violations;
 }
 
-// ─── HTTP execution ───────────────────────────────────────────────────────────
+// HTTP execution
 
 async function executeContract(
   req: ApiRequest,
@@ -155,13 +150,12 @@ async function executeContract(
   providerBaseUrl?: string,
 ): Promise<ContractResult> {
   // Rebase onto the provider base URL when given, so host-less contracts (a
-  // design-first pact carries only a path, e.g. `/brands`) can be sent. Without
-  // a base, the request's own URL is used as-is.
+  // design-first pact carries only a path) can be sent.
   const url   = rebaseUrl(buildUrl(req.url, req.params, vars), providerBaseUrl);
   const start = Date.now();
 
-  // A bare path with no base URL can't be fetched ("Failed to parse URL from
-  // /brands"). Fail with an actionable message instead of the raw parse error.
+  // A bare path with no base URL can't be fetched; fail with an actionable
+  // message instead of the raw parse error.
   if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) {
     return {
       requestId:   req.id,
@@ -231,7 +225,7 @@ async function executeContract(
   }
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// Public API
 
 export async function runConsumerContracts(
   requests: ApiRequest[],
@@ -240,8 +234,7 @@ export async function runConsumerContracts(
   providerBaseUrl?: string,
 ): Promise<ContractReport> {
   const vars = { ...envVars, ...collectionVars };
-  // Only run requests that have a contract with at least one expectation
-  // and are not disabled
+  // Only enabled requests with at least one contract expectation.
   const contractRequests = requests.filter(r => !r.disabled && hasContract(r.contract));
 
   const start   = Date.now();

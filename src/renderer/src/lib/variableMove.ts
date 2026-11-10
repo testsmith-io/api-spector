@@ -1,12 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 //
-// Move a variable from one scope to another, anywhere variables can be defined:
-// request, folder, collection, environment, globals. Reads the value at the
-// source, refuses the move if the destination already has a same-named variable
-// (block & warn), writes it to the destination, then removes the source copy.
-// All mutations go through the normal store actions so they persist like any
-// other edit.
+// Move a variable between scopes; refuses when the destination already has that
+// name. Mutations go through the normal store actions so they persist.
 
 import { useStore } from '../store';
 import { findFolder } from '../../../shared/folder-tree';
@@ -14,8 +10,7 @@ import type { Folder } from '../../../shared/types';
 
 export type VarScopeKind = 'request' | 'folder' | 'collection' | 'environment' | 'global';
 
-/** A concrete place a variable lives — a scope kind plus the ids that pin it to
- *  one instance (none for globals). */
+/** A concrete place a variable lives: a scope kind plus the ids pinning it to one instance. */
 export interface VarLoc {
   kind: VarScopeKind
   collectionId?: string
@@ -53,7 +48,7 @@ export function describeLoc(loc: VarLoc): string {
   }
 }
 
-// ─── Read / exists ────────────────────────────────────────────────────────────
+// Read / exists
 
 export function readVarAt(loc: VarLoc, key: string): string | undefined {
   const s = useStore.getState();
@@ -88,15 +83,15 @@ export function hasVarAt(loc: VarLoc, key: string): boolean {
   }
 }
 
-/** True when this variable is an encrypted environment secret — its stored value
- *  is ciphertext, so moving it to a plain scope would carry garbage. */
+/** True when this is an encrypted environment secret (stored value is ciphertext,
+ *  so moving it to a plain scope would carry garbage). */
 export function isEncryptedEnvSecret(loc: VarLoc, key: string): boolean {
   if (loc.kind !== 'environment') return false;
   const v = useStore.getState().environments[loc.environmentId ?? '']?.data.variables.find(x => x.key === key);
   return !!(v?.secret && v.secretEncrypted);
 }
 
-// ─── Mutate ───────────────────────────────────────────────────────────────────
+// Mutate
 
 function omit(map: Record<string, string> | undefined, key: string): Record<string, string> {
   const next = { ...(map ?? {}) };
@@ -174,7 +169,7 @@ function removeVarAt(loc: VarLoc, key: string): void {
   }
 }
 
-// ─── Move ───────────────────────────────────────────────────────────────────
+// Move
 
 export interface MoveResult { ok: boolean; error?: string }
 
@@ -197,7 +192,7 @@ export function moveVariable(src: VarLoc, dst: VarLoc, key: string): MoveResult 
   return { ok: true };
 }
 
-// ─── Instance enumeration (for the destination picker) ─────────────────────────
+// Instance enumeration (for the destination picker)
 
 export interface ScopeInstance { loc: VarLoc; label: string }
 

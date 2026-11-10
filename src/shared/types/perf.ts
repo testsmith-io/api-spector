@@ -1,13 +1,9 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-// Shared types for the Performance (load) testing feature, used by the engine
-// (main), the preload bridge, and the Performance panel (renderer).
-//
-// A plan targets either a single request or a Flow (so authenticated, multi
-// step scenarios can be load tested). The load profile is described by one of
-// four patterns (basic / stepping / arrivals / custom), each of which derives a
-// unified schedule of stages (see shared/perf-stages.ts).
+// Shared types for the Performance (load) testing feature. A plan targets a
+// request or Flow; its load profile is one of four patterns (basic / stepping /
+// arrivals / custom), each deriving a schedule of stages (see shared/perf-stages.ts).
 
 export type PerfPattern = 'basic' | 'stepping' | 'arrivals' | 'custom';
 
@@ -49,8 +45,8 @@ export interface PerfThresholdResult extends PerfThreshold {
   passed: boolean
 }
 
-/** A pause each virtual user takes between iterations (models user think time).
- *  A random value is picked in [minSec, maxSec]; 0/0 disables it. */
+/** Pause each virtual user takes between iterations. Random in [minSec, maxSec];
+ *  0/0 disables it. */
 export interface PerfThinkTime { minSec: number; maxSec: number }
 
 /** A saved performance test plan. Stored inline in the workspace (.spector), so

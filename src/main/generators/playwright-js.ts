@@ -10,9 +10,9 @@ import {
   jsJsonPathExpr, folderUsesJsonPath, collectionUsesJsonPath,
 } from './generator-utils';
 
-// ─── Playwright JavaScript generator ─────────────────────────────────────────
+// Playwright JavaScript generator
 
-// ─── playwright.config.js ─────────────────────────────────────────────────────
+// playwright.config.js
 
 function buildPlaywrightConfig(environment: Environment | null): string {
   const baseUrl = getEnvBaseUrl(environment, 'http://localhost:3000');
@@ -33,7 +33,7 @@ module.exports = defineConfig({
 `;
 }
 
-// ─── Test spec ────────────────────────────────────────────────────────────────
+// Test spec
 
 /** Build lines for a hook request, extracting variables from the response. */
 function buildHookLines(req: ApiRequest, sharedVars: Set<string>): string[] {
@@ -58,8 +58,7 @@ function buildHookLines(req: ApiRequest, sharedVars: Set<string>): string[] {
   if (req.body.mode === 'json' && req.body.json && !['get', 'head'].includes(method)) {
     try { optParts.push(`data: ${renderJsValue(JSON.parse(req.body.json), '        ')}`); } catch { /* skip */ }
   }
-  // Non-standard verbs (e.g. QUERY, RFC 10008) go through fetch() with an
-  // explicit method option — APIRequestContext has no helper for them.
+  // Non-standard verbs (e.g. QUERY) go through fetch(): APIRequestContext has no helper.
   const nativeVerb = PLAYWRIGHT_VERBS.includes(method);
   if (!nativeVerb) optParts.unshift(`method: '${req.method}'`);
   const opts = optParts.length ? `, { ${optParts.join(', ')} }` : '';
@@ -184,8 +183,7 @@ function buildSpec(folderName: string, folder: Folder, collection: Collection, n
       }
     }
 
-    // Non-standard verbs (e.g. QUERY, RFC 10008) go through fetch() with an
-    // explicit method option — APIRequestContext has no helper for them.
+    // Non-standard verbs (e.g. QUERY) go through fetch(): APIRequestContext has no helper.
     const nativeVerb = PLAYWRIGHT_VERBS.includes(method);
     if (!nativeVerb) optionParts.unshift(`      method: '${req.method}'`);
     const optionsStr = optionParts.length ? `, {\n${optionParts.join(',\n')},\n    }` : '';
@@ -248,7 +246,7 @@ ${tests.join('\n\n')}
 `;
 }
 
-// ─── Project scaffolding ──────────────────────────────────────────────────────
+// Project scaffolding
 
 function buildPackageJson(collectionName: string, usesJsonPath: boolean): string {
   const name = collectionName.replaceAll(/\W+/g, '-').toLowerCase();
@@ -290,7 +288,7 @@ npm test
 `;
 }
 
-// ─── Entry point ──────────────────────────────────────────────────────────────
+// Entry point
 
 export function generatePlaywrightJs(
   collection:  Collection,

@@ -2,20 +2,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-/**
- * API Spector Record Proxy CLI
- *
- * Usage:
- *   api-spector record --upstream https://api.example.com [options]
- *
- * Options:
- *   --upstream <url>    Real API base URL (required)
- *   --port <n>          Local port to listen on (default: 4001)
- *   --output <path>     Output directory (default: ./recordings)
- *   --mask <header>     Mask this header value with *** (repeatable)
- *   --ignore <header>   Omit this header from recordings entirely (repeatable)
- *   --help              Show this message
- */
+// API Spector record-proxy CLI. See --help (below) for usage and options.
 
 import { writeFile, mkdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
@@ -25,7 +12,7 @@ import {
 import type { RecordedEntry } from '../shared/types';
 import { C, color, parseArgs } from './cli-common';
 
-// ─── ANSI helpers ─────────────────────────────────────────────────────────────
+// ANSI helpers
 
 function methodBadge(method: string): string {
   const m = method.toUpperCase();
@@ -34,7 +21,7 @@ function methodBadge(method: string): string {
   return color(m.padEnd(7), c, C.bold);
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// Main
 
 async function main() {
   // --mask and --ignore can be repeated

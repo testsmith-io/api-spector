@@ -1,17 +1,8 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-/**
- * Parse a provider self-verification report (the outcome of running the
- * provider's own tests against its OpenAPI spec) into the shape the broker
- * stores alongside the spec: { success, total, passed, failed, source }.
- *
- * Accepts JUnit XML (Postman/newman, Schemathesis, pytest, …) or JSON. JSON that
- * already carries a boolean `success` is passed through; otherwise a numeric
- * `total`/`tests` (+ optional `failed`/`failures`) is used to derive it.
- *
- * Throws on unparseable input.
- */
+/** Parse a provider self-verification report (JUnit XML or JSON) into the broker's shape
+ *  { success, total, passed, failed, source }. Throws on unparseable input. */
 export function parseSelfVerification(text: string, path: string): Record<string, unknown> {
   const trimmed = text.trimStart();
   const isXml = path.toLowerCase().endsWith('.xml') || trimmed.startsWith('<');

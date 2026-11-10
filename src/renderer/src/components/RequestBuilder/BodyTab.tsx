@@ -14,15 +14,13 @@ import { useVarNames } from '../../hooks/useVarNames';
 import { useVarValues } from '../../hooks/useVarValues';
 import { useT } from '../../i18n';
 
-// GraphQL (graphql + cm6-graphql) and SOAP (WSDL/XML) editors are heavy and only
-// used for those body modes, so they load on demand to keep startup lean.
+// GraphQL and SOAP editors are heavy, so they load on demand for those modes.
 const GraphQLEditor = lazy(() => import('./GraphQLEditor').then(m => ({ default: m.GraphQLEditor })));
 const SoapEditor = lazy(() => import('./SoapEditor').then(m => ({ default: m.SoapEditor })));
 
 type BodyMode = RequestBody['mode']
 
-// Disambiguate the two form bodies in the picker: `form` is urlencoded, the new
-// `multipart` is form-data with file uploads. Other modes show their bare name.
+// Disambiguate the form bodies: `form` is urlencoded, `multipart` is form-data.
 const MODE_LABELS: Partial<Record<BodyMode, string>> = {
   form: 'form-url',
   multipart: 'form-data',
@@ -45,9 +43,7 @@ export function BodyTab({ request, onChange }: { readonly request: ApiRequest; r
     onChange({ body: { ...body, mode: m } });
   }
 
-  // SOAP requests skip the body-mode picker — the protocol decides everything.
-  // Hand the entire pane to SoapEditor so the WSDL-driven UX is the only thing
-  // shown.
+  // SOAP requests skip the body-mode picker; hand the whole pane to SoapEditor.
   if (isSoap) {
     return (
       <div className="flex flex-col h-full min-h-0">
@@ -56,8 +52,7 @@ export function BodyTab({ request, onChange }: { readonly request: ApiRequest; r
     );
   }
 
-  // The 'soap' option here is kept for users who still want raw control
-  // (advanced) — it's reachable but no longer the main entry point.
+  // The 'soap' option is kept for raw control; reachable but not the main entry.
   return (
     <div className="flex flex-col gap-2 h-full min-h-0">
       {/* Mode selector */}
@@ -140,9 +135,8 @@ export function BodyTab({ request, onChange }: { readonly request: ApiRequest; r
               height="300px"
               maxHeight="50vh"
               theme={oneDark}
-              // XML payloads (application/xml, text/xml, image/svg+xml, ...) get the
-              // XML language so Cmd/Ctrl+/ toggles <!-- --> comments; anything else
-              // stays plain text with the same keymap (a no-op without comment tokens).
+              // XML payloads get the XML language so Cmd/Ctrl+/ toggles <!-- -->
+              // comments; anything else stays plain text with the same keymap.
               extensions={[...(/xml/i.test(body.rawContentType ?? '') ? [xmlWithComments(), varExt] : [commentKeymap, varExt]), ...cmLabel(t('Request body'))]}
               onChange={val => onChange({ body: { ...body, raw: val } })}
               basicSetup={{ lineNumbers: true, foldGutter: false, autocompletion: false }}

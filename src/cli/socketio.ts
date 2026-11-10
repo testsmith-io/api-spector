@@ -3,32 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * API Spector CLI — Socket.IO
- *
- * Connect to a Socket.IO server, emit events, and capture what comes back.
- * Useful in CI to smoke-test a realtime endpoint, or to script an emit/observe
- * exchange. Uses the same socket.io-client the desktop app uses.
- *
- * Usage:
- *   api-spector socketio --url <url> [options]
- *   api-spector socketio --workspace <path> --request <name> [options]
- *
- * Options:
- *   --url         <url>       Socket.IO server URL (e.g. https://example.com)
- *   --workspace   <path>      Take url/headers/namespace/auth from a saved request
- *   --request     <name>      Name of the Socket.IO request in the workspace
- *   --namespace   <ns>        Namespace, e.g. /admin (default: /)
- *   --auth        <json>      Handshake auth as JSON, e.g. '{"token":"abc"}'
- *   --path        <path>      Engine.IO path (default: /socket.io)
- *   --header      <k:v>       Handshake header (repeatable)
- *   --emit        <event[:json]>  Emit an event; JSON after the first ':' is the
- *                             argument(s), e.g. --emit 'chat:["hello"]' (repeatable)
- *   --ack                     Wait for an acknowledgement on each --emit
- *   --listen      <seconds>   Keep listening for events after emitting (default 5)
- *   --json                    Print the session as JSON instead of a log
- *   --help                    Show this message
- *
- * Exit code is non-zero when the connection fails.
+ * API Spector CLI - Socket.IO: connect to a server, emit events, and capture what
+ * comes back (same socket.io-client as the desktop app). See `--help` for options;
+ * exit code is non-zero when the connection fails.
  */
 
 import { io, type Socket } from 'socket.io-client';
@@ -90,7 +67,7 @@ async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2), ['emit', 'header']);
   if (args.help || args.h) { printHelp(); return; }
 
-  // ── Resolve connection config ──
+  // Resolve connection config
   let url = typeof args.url === 'string' ? args.url : '';
   let headers: Record<string, string> = {};
   let namespace = typeof args.namespace === 'string' ? args.namespace : undefined;
