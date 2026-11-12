@@ -7,6 +7,15 @@ vi.mock('../main/ipc/secret-handler', () => ({
   getSecret: vi.fn().mockResolvedValue(null),
 }));
 
+// Capture the token-request body so the scope-omission tests can inspect it.
+const undiciCapture = vi.hoisted(() => ({ lastBody: '' }));
+vi.mock('undici', () => ({
+  fetch: vi.fn(async (_url, init) => {
+    undiciCapture.lastBody = init?.body ?? '';
+    return { ok: true, json: async () => ({ access_token: 'tok', expires_in: 3600 }) };
+  }),
+}));
+
 import { buildAuthHeaders, buildApiKeyParam, buildDigestAuthHeader, fetchOAuth2Token } from '../main/auth-builder';
 import { getSecret } from '../main/ipc/secret-handler';
 
@@ -226,5 +235,40 @@ describe('fetchOAuth2Token error branches', () => {
   it('throws when tokenUrl is missing', async () => {
     await expect(fetchOAuth2Token({ type: 'oauth2', oauth2Flow: 'client_credentials' }, {}))
       .rejects.toThrow('tokenUrl is required');
+  });
+});
+
+// fetchOAuth2Token - scope is omitted when empty (sending `scope=` triggers
+// invalid_scope on strict servers; Postman omits it too).
+describe('fetchOAuth2Token scope omission', () => {
+  const base = {
+    type: 'oauth2' as const,
+    oauth2Flow: 'client_credentials' as const,
+    oauth2TokenUrl: 'https://auth.test/token',
+    oauth2ClientId: 'id',
+    oauth2ClientSecret: 'secret',
+  };
+  const scopeOf = () => new URLSearchParams(undiciCapture.lastBody);
+
+  beforeEach(() => { undiciCapture.lastBody = ''; });
+
+  it('omits scope when the field is empty', async () => {
+    await fetchOAuth2Token({ ...base, oauth2Scopes: '' }, {});
+    expect(scopeOf().has('scope')).toBe(false);
+  });
+
+  it('omits scope when the field is only whitespace', async () => {
+    await fetchOAuth2Token({ ...base, oauth2Scopes: '   ' }, {});
+    expect(scopeOf().has('scope')).toBe(false);
+  });
+
+  it('omits scope when a {{var}} interpolates to empty', async () => {
+    await fetchOAuth2Token({ ...base, oauth2Scopes: '{{sc}}' }, { sc: '' });
+    expect(scopeOf().has('scope')).toBe(false);
+  });
+
+  it('sends scope when present', async () => {
+    await fetchOAuth2Token({ ...base, oauth2Scopes: 'read write' }, {});
+    expect(scopeOf().get('scope')).toBe('read write');
   });
 });

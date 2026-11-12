@@ -331,7 +331,10 @@ export async function fetchOAuth2Token(
   params.set('grant_type', flow === 'password' ? 'password' : 'client_credentials');
   params.set('client_id', clientId);
   params.set('client_secret', clientSecret);
-  if (auth.oauth2Scopes) params.set('scope', interpolate(auth.oauth2Scopes, vars));
+  // Omit scope entirely when it is empty (or interpolates to empty/whitespace).
+  // Sending `scope=` makes strict servers return invalid_scope; it is optional.
+  const scope = interpolate(auth.oauth2Scopes ?? '', vars).trim();
+  if (scope) params.set('scope', scope);
 
   if (flow === 'password') {
     let password = auth.password ?? '';

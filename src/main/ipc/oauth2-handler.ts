@@ -57,7 +57,7 @@ async function browserFlow(
   authUrlFull.searchParams.set('client_id', clientId);
   authUrlFull.searchParams.set('redirect_uri', redirectUri);
   authUrlFull.searchParams.set('state', state);
-  const scopes = interpolate(auth.oauth2Scopes ?? '', vars);
+  const scopes = interpolate(auth.oauth2Scopes ?? '', vars).trim();
   if (scopes) authUrlFull.searchParams.set('scope', scopes);
 
   const captured = await new Promise<Record<string, string>>((resolve, reject) => {
