@@ -9,7 +9,7 @@ import { DragCtx, SelectionCtx, TagChips } from './CollectionTree';
 import { InlineEdit } from '../common/InlineEdit';
 import { type MenuItem, DotsBtn } from '../common/ContextMenu';
 import { onActivateKey } from '../../lib/a11y';
-import { PencilIcon, CopyIcon, TagIcon, SyncIcon, TrashIcon, ShieldIcon, BanIcon, SortAzIcon, FileCodeIcon, KeyIcon } from '../common/icons';
+import { PencilIcon, CopyIcon, TagIcon, SyncIcon, TrashIcon, ShieldIcon, BanIcon, SortAzIcon, FileCodeIcon, KeyIcon, PlayIcon } from '../common/icons';
 import { useStore } from '../../store';
 import { useToast, Toast } from '../common/Toast';
 import { CloudRequiredModal } from '../common/CloudRequiredModal';
@@ -118,11 +118,13 @@ export function RequestRow({
   const [showCloudRequired, setShowCloudRequired] = useState(false);
   const [showShare, setShowShare] = useState(false);
 
-  // Cmd/Ctrl+click toggles into the multi-selection; a plain click clears it
-  // and opens the request.
+  // Shift+click selects a contiguous range from the anchor; Cmd/Ctrl+click toggles
+  // one into the multi-selection; a plain click clears it and opens the request.
   function handleRowClick(e: React.MouseEvent) {
-    if (e.metaKey || e.ctrlKey) { e.preventDefault(); sel.toggle(collectionId, reqId); return; }
+    if (e.shiftKey) { e.preventDefault(); sel.rangeTo(collectionId, reqId); return; }
+    if (e.metaKey || e.ctrlKey) { e.preventDefault(); sel.toggle(collectionId, reqId); sel.setAnchor(collectionId, reqId); return; }
     if (sel.active) sel.clear();
+    sel.setAnchor(collectionId, reqId);
     onSelect();
   }
 
@@ -289,6 +291,10 @@ export function RequestRow({
 
         <div className="shrink-0">
           <DotsBtn items={[
+            ...(sel.active && sel.isSelected(collectionId, reqId) && sel.canRun ? [
+              { type: 'item' as const, label: t('Run selected (:count)', { count: sel.count }), icon: <PlayIcon />, onClick: sel.run },
+              { type: 'separator' as const },
+            ] : []),
             ...(onAddExample && canAddExample ? [
               { type: 'item' as const, label: t('Add Example'), icon: <CopyIcon />, onClick: () => { onAddExample(); setExamplesOpen(true); } },
             ] : []),

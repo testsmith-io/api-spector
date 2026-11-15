@@ -95,10 +95,21 @@ function DropLine ( { collectionId, parentFolderId, index, indent }: {
 export const SelectionCtx = createContext<{
   active: boolean
   count: number
+  /** True when the current selection can be run: non-empty and within one collection. */
+  canRun: boolean
   isSelected: ( collectionId: string, requestId: string ) => boolean
   toggle: ( collectionId: string, requestId: string ) => void
+  /** Remember the row a Shift-range should extend from (set on plain / Cmd-Ctrl click). */
+  setAnchor: ( collectionId: string, requestId: string ) => void
+  /** Select the contiguous range from the anchor to this row, in tree display order. */
+  rangeTo: ( collectionId: string, requestId: string ) => void
+  /** Run the selected requests sequentially via the Runner (no-op if multi-collection). */
+  run: () => void
   clear: () => void
-}>( { active: false, count: 0, isSelected: () => false, toggle: () => { }, clear: () => { } } );
+}>( {
+  active: false, count: 0, canRun: false, isSelected: () => false, toggle: () => { },
+  setAnchor: () => { }, rangeTo: () => { }, run: () => { }, clear: () => { },
+} );
 
 // Tag chips
 
@@ -228,6 +239,7 @@ export function CollectionTree () {
   const updateRequestTags = useStore( s => s.updateRequestTags );
   const updateRequest = useStore( s => s.updateRequest );
   const openRunner = useStore( s => s.openRunner );
+  const openRunnerForSelection = useStore( s => s.openRunnerForSelection );
 
   const moveRequest = useStore( s => s.moveRequest );
   const copyRequest = useStore( s => s.copyRequest );
@@ -242,23 +254,67 @@ export function CollectionTree () {
 
   // Multi-select
   const [selected, setSelected] = useState<Set<string>>( () => new Set() );
-  const selKey = ( c: string, r: string ) => `${c} ${r}`;
+  const selKey = ( c: string, r: string ) => `${c} ${r}`;
+  const colOf = ( k: string ) => k.slice( 0, k.indexOf( ' ' ) );
+  // Row a Shift-range extends from; a ref so updating it never re-renders the tree.
+  const anchorRef = useRef<string | null>( null );
   // Memoized so it changes only with the selection; otherwise every RequestRow
   // consumer re-renders on every tree render.
-  const selectionCtx = useMemo( () => ( {
-    active:     selected.size > 0,
-    count:      selected.size,
-    isSelected: ( c: string, r: string ) => selected.has( selKey( c, r ) ),
-    toggle:     ( c: string, r: string ) => setSelected( prev => {
-      const next = new Set( prev );
-      const k = selKey( c, r );
-      if ( next.has( k ) ) next.delete( k ); else next.add( k );
-      return next;
-    } ),
-    clear:      () => setSelected( new Set() ),
-  } ), [selected] );
+  const selectionCtx = useMemo( () => {
+    // Request keys in tree display order, read live from the store so collection edits
+    // between selection changes don't make this stale. onlySelected limits to the selection.
+    const orderedKeys = ( onlySelected: boolean ): string[] => {
+      const out: string[] = [];
+      const walk = ( collectionId: string, folder: Folder ): void => {
+        for ( const child of orderedChildren( folder ) ) {
+          if ( child.type === 'request' ) {
+            const k = selKey( collectionId, child.id );
+            if ( !onlySelected || selected.has( k ) ) out.push( k );
+          } else {
+            const sub = folder.folders.find( f => f.id === child.id );
+            if ( sub ) walk( collectionId, sub );
+          }
+        }
+      };
+      for ( const { data } of Object.values( useStore.getState().collections ) ) walk( data.id, data.rootFolder );
+      return out;
+    };
+    const selCollIds = new Set<string>();
+    selected.forEach( k => selCollIds.add( colOf( k ) ) );
+    return {
+      active:     selected.size > 0,
+      count:      selected.size,
+      canRun:     selected.size > 0 && selCollIds.size === 1,
+      isSelected: ( c: string, r: string ) => selected.has( selKey( c, r ) ),
+      toggle:     ( c: string, r: string ) => setSelected( prev => {
+        const next = new Set( prev );
+        const k = selKey( c, r );
+        if ( next.has( k ) ) next.delete( k ); else next.add( k );
+        return next;
+      } ),
+      setAnchor:  ( c: string, r: string ) => { anchorRef.current = selKey( c, r ); },
+      rangeTo:    ( c: string, r: string ) => {
+        const target = selKey( c, r );
+        const keys   = orderedKeys( false );
+        const ti     = keys.indexOf( target );
+        if ( ti < 0 ) return;
+        const ai = anchorRef.current ? keys.indexOf( anchorRef.current ) : -1;
+        if ( ai < 0 ) { anchorRef.current = target; setSelected( new Set( [target] ) ); return; }
+        const [lo, hi] = ai <= ti ? [ai, ti] : [ti, ai];
+        setSelected( new Set( keys.slice( lo, hi + 1 ) ) );
+      },
+      run:        () => {
+        const keys = orderedKeys( true );
+        if ( keys.length === 0 ) return;
+        const cid = colOf( keys[0] );
+        if ( keys.some( k => colOf( k ) !== cid ) ) return;   // single-collection only
+        openRunnerForSelection( cid, keys.map( k => k.slice( k.indexOf( ' ' ) + 1 ) ) );
+      },
+      clear:      () => setSelected( new Set() ),
+    };
+  }, [selected, openRunnerForSelection] );
   function forEachSelected ( fn: ( collectionId: string, requestId: string ) => void ) {
-    selected.forEach( k => { const i = k.indexOf( ' ' ); fn( k.slice( 0, i ), k.slice( i + 1 ) ); } );
+    selected.forEach( k => { const i = k.indexOf( ' ' ); fn( k.slice( 0, i ), k.slice( i + 1 ) ); } );
   }
   const [newRequestId, setNewRequestId] = useState<string | null>( null );
   const [dragging, setDragging] = useState<DragState | null>( null );
@@ -465,6 +521,12 @@ export function CollectionTree () {
         {selected.size > 0 && (
           <div className="shrink-0 border-t border-surface-700 bg-surface-900 px-2 py-1.5 flex items-center gap-1 text-xs">
             <span className="text-surface-300 mr-auto">{t( ':count selected', { count: selected.size } )}</span>
+            <button
+              onClick={selectionCtx.run}
+              disabled={!selectionCtx.canRun}
+              className="px-2 py-0.5 rounded text-emerald-400 hover:bg-emerald-900/40 disabled:text-surface-600 disabled:hover:bg-transparent transition-colors flex items-center gap-1"
+              title={selectionCtx.canRun ? t( 'Run selected requests' ) : t( 'Select requests in a single collection to run them' )}
+            ><PlayIcon />{t( 'Run' )}</button>
             <button
               onClick={() => forEachSelected( ( _c, r ) => updateRequest( r, { disabled: false } ) )}
               className="px-2 py-0.5 rounded hover:bg-surface-800 text-surface-300 transition-colors"

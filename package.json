@@ -1,7 +1,7 @@
 {
   "name": "@testsmith/api-spector",
   "productName": "API Spector",
-  "version": "0.9.16",
+  "version": "0.9.17",
   "description": "Local-first API testing tool to inspect, test and mock APIs",
   "repository": {
     "type": "git",
@@ -116,7 +116,7 @@
     "zustand": "^5.0.12"
   },
   "optionalDependencies": {
-    "electron": "^43.3.0"
+    "electron": "^45.3.2"
   },
   "build": {
     "appId": "com.apispector.app",
@@ -169,7 +169,13 @@
       "artifactName": "API-Spector-Setup-${version}.${ext}"
     },
     "linux": {
-      "target": "AppImage"
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "maintainer": "Testsmith <hello@api-spector.dev>",
+      "category": "Development",
+      "artifactName": "API-Spector-${version}-${arch}.${ext}"
     },
     "publish": {
       "provider": "github",

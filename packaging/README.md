@@ -1,4 +1,28 @@
-# Windows package managers
+# Package managers
+
+API Spector is published to per-OS package managers so users can install without
+the npm / Node.js path. Each subfolder holds the package definition plus a README
+with the one-time setup and per-release steps.
+
+| OS | Manager | Definition | Source asset |
+|----|---------|-----------|--------------|
+| Windows | **Chocolatey** | [`chocolatey/`](chocolatey/) | `API-Spector-Setup-<version>.exe` |
+| Windows | **Scoop** (self-hosted bucket) | live at [`testsmith-io/scoop-bucket`](https://github.com/testsmith-io/scoop-bucket) | `API-Spector-<version>-x64.zip` |
+
+The Linux AppImage/`.deb` are built and attached to each GitHub Release by
+[`desktop-release.yml`](../.github/workflows/desktop-release.yml) alongside the
+Windows `.exe`. All release tags are the bare version (e.g. `0.9.16`, no `v`
+prefix), and asset names are space-free and versioned so the `checkver`/bump
+automation stays stable.
+
+> **macOS** is distributed via the npm package (it runs under Electron's own
+> notarized binary, so no Gatekeeper prompt). A Homebrew cask was considered but
+> dropped for now: it would require a `.dmg` that is signed **and** Apple-notarized
+> (paid Developer Program) to avoid Gatekeeper, which we don't want to take on yet.
+
+---
+
+## Windows installer facts
 
 API Spector for Windows is distributed as a **code-signed NSIS installer**
 (`API-Spector-Setup-<version>.exe`) and a **portable zip**
@@ -18,32 +42,32 @@ Fill in the `REPLACE_WITH_...` placeholders per release (or let the automation d
 
 ## Scoop  (self-hosted bucket — you control it, no approval)
 
-Manifest: [`scoop/api-spector.json`](scoop/api-spector.json). It uses the
+**Already live and self-maintaining** at
+[`testsmith-io/scoop-bucket`](https://github.com/testsmith-io/scoop-bucket)
+(built from the ScoopInstaller bucket template). The **Excavator** workflow there
+runs on a schedule and bumps `bucket/api-spector.json` to each new release via the
+manifest's `checkver`/`autoupdate` blocks — no manual steps. It tracks the
 **portable zip** (Electron NSIS installers don't 7-zip-extract cleanly).
 
-**One-time setup:**
-1. Create a repo `testsmith-io/scoop-bucket`.
-2. Copy `scoop/api-spector.json` into it (root or a `bucket/` folder).
-3. Fill `version` + the `hash` (sha256 of the zip) for the current release, or run
-   `scoop update` locally which uses the `autoupdate` block to fill them.
-4. Add a scheduled GitHub Action in the bucket repo (the community
-   `scoop-update` action) so `checkver`/`autoupdate` bumps it automatically.
-
-Users then:
+Users install with:
 ```
 scoop bucket add testsmith https://github.com/testsmith-io/scoop-bucket
 scoop install api-spector
 ```
 
-> Note: verify on Windows that `API Spector.exe` sits at the **root** of the zip
-> (electron-builder's zip target). If it's nested, adjust `bin`/`shortcuts`.
-
 ---
+
+## Chocolatey  (community repo — first version is moderated)
+
+Package: [`chocolatey/`](chocolatey/). Downloads the signed `.exe` and verifies
+its checksum. See [`chocolatey/README.md`](chocolatey/README.md) for pack/push.
+
+```
+choco install api-spector
+```
 
 ## Not covered
 
 - **PatchMyPC** is **curated by PatchMyPC** — you don't self-publish. Request
   inclusion via their "request a product" process; the signed installer + `/S`
   switch + stable download URL above are what they need.
-- **Homebrew (macOS)** would need the macOS build re-added **and** Apple
-  notarization ($99/yr) to avoid Gatekeeper — deferred; mac/Linux use npm.

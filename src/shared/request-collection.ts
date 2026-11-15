@@ -468,6 +468,16 @@ export function buildRunPlan(
   return tag(result);
 }
 
+/** Run plan for an explicit set of request ids (a sidebar multi-selection), in tree
+ *  order. Reuses buildRunPlan so collection/folder variables and the collection name
+ *  are resolved the same way, then keeps only the chosen requests. Lifecycle hooks are
+ *  dropped: a flat selection runs just the picked requests, not folder/collection hooks.
+ *  Disabled requests are already excluded by buildRunPlan. */
+export function buildSelectionRunPlan(collection: Collection, requestIds: string[]): RunnerItem[] {
+  const ids = new Set(requestIds);
+  return buildRunPlan(collection, null, []).filter(it => !it.isHook && ids.has(it.request.id));
+}
+
 /** Repeat a run plan once per DataSet row, tagging each copy with the row's values
  *  (dataRow) and a `1/N` label. No rows = plan returned unchanged. */
 export function expandRunPlanWithData(items: RunnerItem[], ds: DataSet | undefined): RunnerItem[] {
