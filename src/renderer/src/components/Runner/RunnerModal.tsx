@@ -5,7 +5,7 @@ import { Fragment, useEffect, useRef, useState, useCallback } from 'react';
 import { useStore, findFolder } from '../../store';
 import type { RunRequestResult, RunSummary, RunnerItem } from '../../../../shared/types';
 import { buildJsonReport, buildJUnitReport, buildHtmlReport, buildSarifReport } from '../../../../shared/report';
-import { collectAllTags, buildRunPlan, expandRunPlanWithData, expandFolderDataSets, resolveInheritedAuthAndHeaders, authIsConfigured } from '../../../../shared/request-collection';
+import { collectAllTags, buildRunPlan, buildSelectionRunPlan, expandRunPlanWithData, expandFolderDataSets, resolveInheritedAuthAndHeaders, authIsConfigured } from '../../../../shared/request-collection';
 import { buildCliArgs, generateGitHub, generateAzure, generateGitLab } from '../../../../shared/ci-generators';
 import { getMethodColor, getStatusColor } from '../../../../shared/colors';
 import { askVarsInRequest, resolveAskValues, type AskVar } from '../../../../shared/ask-vars';
@@ -224,23 +224,50 @@ export function RunnerModal() {
     progressIdxRef.current = 0;
   }, [runnerModal.open]);
 
+  // Register the run-progress listener once and keep it for the component's lifetime.
+  // Removing it per-run (in run's finally) raced the last progress events against the
+  // invoke reply and dropped them, leaving rows stale; a persistent listener can't.
+  useEffect(() => {
+    electron.onRunProgress((result: RunRequestResult) => {
+      // A parallel run reports out of order, so prefer the runner's stamped index;
+      // fall back to the running counter.
+      const idx = result.index ?? progressIdxRef.current;
+      patchRunnerResult(idx, result);
+      if (result.index === undefined && result.status !== 'running') progressIdxRef.current++;
+    });
+    return () => electron.offRunProgress();
+  }, [patchRunnerResult]);
+
   const toggleTag = (tag: string) =>
     setFilterTags(prev => prev.includes(tag) ? prev.filter(tg => tg !== tag) : [...prev, tag]);
 
+  // "Run selected" opens the modal already running against the selection: start once
+  // per selection, using the active environment directly (selectedEnvId state may not
+  // have flushed yet on the opening render).
+  const autoRanRef = useRef<object | null>(null);
+
   // Run
 
-  const run = useCallback(async () => {
+  const run = useCallback(async (envIdOverride?: string) => {
+    const selection = runnerModal.selection;
     const ds =
       ((folderId && colEntry ? findFolder(colEntry.data.rootFolder, folderId)?.dataSet : null)
         ?? colEntry?.data.dataSet) ?? { columns: [], rows: [] };
-    const baseItems = collectionId ? collectRequests(collectionId, folderId, filterTags) : [];
+    // Selection runs execute exactly the picked requests, once each, in tree order; a
+    // normal run expands the folder/collection scope and its data tables.
+    const baseItems = selection && colEntry
+      ? buildSelectionRunPlan(colEntry.data, selection.requestIds)
+      : collectionId ? collectRequests(collectionId, folderId, filterTags) : [];
     if (baseItems.length === 0) return;
 
     // Data-table expansion: each folder's table iterates its requests; the whole-scope
     // table repeats the plan per row. expectStatus/owasp columns act as an access-control matrix.
+    // Skipped for a selection run - the user chose specific requests, not "run the scope N times".
     let items: RunnerItem[] = baseItems;
-    if (!folderId && colEntry) items = expandFolderDataSets(items, colEntry.data);
-    items = expandRunPlanWithData(items, ds);
+    if (!selection) {
+      if (!folderId && colEntry) items = expandFolderDataSets(items, colEntry.data);
+      items = expandRunPlanWithData(items, ds);
+    }
 
     // Merge inherited collection/folder auth/headers into each request so the
     // runner sees the effective auth. Deep-clone: store objects are Immer-frozen.
@@ -260,7 +287,7 @@ export function RunnerModal() {
       });
     }
 
-    const env = resolveEnvironmentById(environments, selectedEnvId || null);
+    const env = resolveEnvironmentById(environments, (envIdOverride ?? selectedEnvId) || null);
 
     // Ask variables ({{@Message}}) anywhere in the run: prompt once up front,
     // then inject answers into every item so the run stays unattended.
@@ -290,14 +317,10 @@ export function RunnerModal() {
     setSummary(null);
     setRunnerRunning(true);
     progressIdxRef.current = 0;
-
-    electron.onRunProgress((result: RunRequestResult) => {
-      // A parallel run reports out of order, so prefer the runner's stamped
-      // index; fall back to the running counter.
-      const idx = result.index ?? progressIdxRef.current;
-      patchRunnerResult(idx, result);
-      if (result.index === undefined && result.status !== 'running') progressIdxRef.current++;
-    });
+    // The progress listener is registered once for the modal's lifetime (see the
+    // effect below), never per-run: tearing it down here would race the last
+    // in-flight progress events (invoke reply and progress events are separate IPC
+    // routes with no ordering guarantee) and leave rows stuck on a stale status.
 
     try {
       const s: RunSummary = await electron.runCollection({
@@ -308,15 +331,25 @@ export function RunnerModal() {
         tls:             workspaceSettings?.tls,
         piiMaskPatterns: workspaceSettings?.piiMaskPatterns,
         requestDelay,
-        concurrency,
+        // A selection run is always sequential, one request after another.
+        concurrency: runnerModal.selection ? 1 : concurrency,
       });
       setSummary(s);
     } finally {
-      electron.offRunProgress();
       setRunnerRunning(false);
     }
-   
-  }, [collectionId, folderId, filterTags, selectedEnvId, environments, globals, colEntry, requestDelay, concurrency, workspaceSettings, setRunnerResults, patchRunnerResult, setRunnerRunning]);
+
+  }, [collectionId, folderId, filterTags, selectedEnvId, environments, globals, colEntry, requestDelay, concurrency, workspaceSettings, runnerModal.selection, setRunnerResults, setRunnerRunning]);
+
+  // Auto-start a selection run once, as soon as the modal is open with a selection.
+  // Guarded by selection identity so the run fires exactly once even as `run` is
+  // recreated when state settles. Env is passed explicitly (active env at open).
+  useEffect(() => {
+    if (!runnerModal.open || !runnerModal.selection || !runnerModal.autoRun) { autoRanRef.current = null; return; }
+    if (autoRanRef.current === runnerModal.selection) return;
+    autoRanRef.current = runnerModal.selection;
+    void run(initEnvIdRef.current ?? '');
+  }, [runnerModal.open, runnerModal.selection, runnerModal.autoRun, run]);
 
   if (!runnerModal.open) return null;
 
@@ -327,11 +360,17 @@ export function RunnerModal() {
       onClose={closeRunner}
       overlayClassName="bg-black/50 z-50 flex items-start justify-center pt-16"
       panelClassName="bg-surface-900 border border-surface-800 rounded-lg shadow-2xl flex flex-col w-[680px] max-h-[80vh]"
-      title={folderName ? t('Run: :name', { name: folderName }) : t('Run: :name', { name: colName })}
+      title={
+        runnerModal.selection
+          ? t('Run: :count selected request|Run: :count selected requests', { count: runnerModal.selection.requestIds.length })
+          : folderName ? t('Run: :name', { name: folderName }) : t('Run: :name', { name: colName })
+      }
       subtitle={
         <>
-          {folderName ? t('Folder in :name', { name: colName }) : t('Full collection')}
-          {iterCount > 0 ? t(' · :count data iteration| · :count data iterations', { count: iterCount }) : ''}
+          {runnerModal.selection
+            ? t('Selected requests in :name', { name: colName })
+            : folderName ? t('Folder in :name', { name: colName }) : t('Full collection')}
+          {!runnerModal.selection && iterCount > 0 ? t(' · :count data iteration| · :count data iterations', { count: iterCount }) : ''}
         </>
       }
     >
@@ -376,7 +415,7 @@ export function RunnerModal() {
               />
             </div>
             <button
-              onClick={run}
+              onClick={() => run()}
               disabled={runnerRunning}
               className="px-4 py-1.5 text-xs text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-surface-800 disabled:text-surface-400 rounded font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap"
             >

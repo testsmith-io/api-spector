@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, it, expect } from 'vitest';
-import { buildRunPlan, collectTagged, expandRunPlanWithData, expandFolderDataSets, parseDataRow, stripEphemeralAuth } from '../shared/request-collection';
+import { buildRunPlan, buildSelectionRunPlan, collectTagged, expandRunPlanWithData, expandFolderDataSets, parseDataRow, stripEphemeralAuth } from '../shared/request-collection';
 import type { Collection, ApiRequest, RunnerItem, DataSet, Folder } from '../shared/types';
 
 function req(id: string, name: string, extra: Partial<ApiRequest> = {}): ApiRequest {
@@ -91,6 +91,74 @@ describe('collectTagged scopePath', () => {
     for (const item of items) {
       expect(item.scopePath).not.toContain('root');
     }
+  });
+});
+
+describe('buildSelectionRunPlan', () => {
+  // Collection with a hook, a disabled request, collection + folder variables.
+  function makeSelectionCollection(): Collection {
+    return {
+      version: '1.0',
+      id: 'col-sel',
+      name: 'Selectable',
+      collectionVariables: { base: 'https://api.test' },
+      rootFolder: {
+        id: 'root',
+        name: 'root',
+        description: '',
+        folders: [
+          {
+            id: 'f-users', name: 'Users', description: '',
+            folders: [], requestIds: ['r-hook', 'r-users'],
+            variables: { team: 'core' },
+          },
+          {
+            id: 'f-orders', name: 'Orders', description: '',
+            folders: [], requestIds: ['r-orders'],
+          },
+        ],
+        requestIds: ['r-root', 'r-disabled'],
+      },
+      requests: {
+        'r-root':     req('r-root',     'Root request'),
+        'r-disabled': req('r-disabled', 'Disabled request', { disabled: true }),
+        'r-hook':     req('r-hook',     'Setup hook', { hookType: 'beforeAll' }),
+        'r-users':    req('r-users',    'List users'),
+        'r-orders':   req('r-orders',   'List orders'),
+      },
+    };
+  }
+
+  it('returns only the selected requests, in tree order regardless of input order', () => {
+    const col = makeSelectionCollection();
+    const plan = buildSelectionRunPlan(col, ['r-orders', 'r-root', 'r-users']);
+    expect(plan.map(p => p.request.id)).toEqual(['r-root', 'r-users', 'r-orders']);
+  });
+
+  it('excludes lifecycle hooks even when their id is selected', () => {
+    const col = makeSelectionCollection();
+    const plan = buildSelectionRunPlan(col, ['r-hook', 'r-users']);
+    expect(plan.map(p => p.request.id)).toEqual(['r-users']);
+    expect(plan.some(p => p.isHook)).toBe(false);
+  });
+
+  it('excludes disabled requests even when selected', () => {
+    const col = makeSelectionCollection();
+    const plan = buildSelectionRunPlan(col, ['r-root', 'r-disabled']);
+    expect(plan.map(p => p.request.id)).toEqual(['r-root']);
+  });
+
+  it('resolves collection and folder variables on each item', () => {
+    const col = makeSelectionCollection();
+    const plan = buildSelectionRunPlan(col, ['r-users']);
+    expect(plan[0].collectionVars).toMatchObject({ base: 'https://api.test' });
+    expect(plan[0].folderVars).toMatchObject({ team: 'core' });
+  });
+
+  it('ignores ids that are not in the collection and returns [] for an empty selection', () => {
+    const col = makeSelectionCollection();
+    expect(buildSelectionRunPlan(col, ['nope'])).toEqual([]);
+    expect(buildSelectionRunPlan(col, [])).toEqual([]);
   });
 });
 

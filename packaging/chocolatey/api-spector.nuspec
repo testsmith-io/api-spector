@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Chocolatey package for API Spector (Windows).
+
+  The version below is a placeholder: set it to the release version at pack time
+  (pass the version flag to `choco pack`, or edit this file in CI). The install
+  script downloads the matching signed .exe from GitHub Releases and verifies its
+  checksum. See README.md in this folder for the publish steps.
+-->
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>api-spector</id>
+    <version>0.0.0</version>
+    <packageSourceUrl>https://github.com/testsmith-io/api-spector/tree/main/packaging/chocolatey</packageSourceUrl>
+    <owners>Testsmith</owners>
+    <title>API Spector</title>
+    <authors>Testsmith</authors>
+    <projectUrl>https://api-spector.dev</projectUrl>
+    <iconUrl>https://cdn.jsdelivr.net/gh/testsmith-io/api-spector@main/build/icon.png</iconUrl>
+    <projectSourceUrl>https://github.com/testsmith-io/api-spector</projectSourceUrl>
+    <docsUrl>https://api-spector.dev/docs</docsUrl>
+    <bugTrackerUrl>https://github.com/testsmith-io/api-spector/issues</bugTrackerUrl>
+    <licenseUrl>https://github.com/testsmith-io/api-spector/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <tags>api api-testing postman-alternative rest graphql grpc soap contract-testing pact mock-server developer-tools</tags>
+    <summary>Local-first API testing tool: requests, mocks, contract testing, and test-code generation.</summary>
+    <description>
+API Spector is a free, open-source, local-first API testing tool. Send REST, GraphQL, gRPC, SOAP, and WebSocket requests; run local mock servers; author and verify contracts (Pact-compatible); and generate runnable Robot Framework and Playwright tests from your requests.
+
+The desktop app collects no telemetry and needs no account; your requests, environments, tokens, and responses never leave your machine. An optional hosted cloud adds a shared contract broker, deploy gate, always-on mocks, and monitoring for teams.
+
+This package installs the code-signed Windows build from the project's GitHub Releases.
+    </description>
+    <releaseNotes>https://github.com/testsmith-io/api-spector/releases</releaseNotes>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
