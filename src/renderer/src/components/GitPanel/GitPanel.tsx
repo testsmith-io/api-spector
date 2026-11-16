@@ -356,7 +356,7 @@ function ChangesTab({ status, onRefresh, reloadWorkspace, scoped }: { readonly s
               onClick={rebaseContinue}
               disabled={status.conflicted.length > 0}
               title={status.conflicted.length > 0 ? t('Resolve all conflicts first') : t('Continue the rebase')}
-              className="px-1.5 py-0.5 rounded bg-amber-800/40 hover:bg-amber-700/50 text-amber-100 disabled:opacity-40 disabled:cursor-default"
+              className="px-1.5 py-0.5 rounded bg-amber-800/40 hover:bg-amber-700/50 text-amber-200 disabled:opacity-40 disabled:cursor-default"
             >{t('Continue')}</button>
             <button
               onClick={rebaseAbort}

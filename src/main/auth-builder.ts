@@ -302,6 +302,22 @@ export interface OAuth2TokenResult {
   refreshToken?: string
 }
 
+/** undici throws a bare `TypeError: fetch failed` for connection-level failures
+ *  (connection refused, DNS, TLS), with the real reason on `.cause`. Rebuild it
+ *  as a clear, attributed error that names the OAuth endpoint and the underlying
+ *  code, so an unreachable token server is not mistaken for the request that
+ *  triggered the token fetch. `label` is e.g. "token request" / "token refresh". */
+export function oauth2FetchError(err: unknown, url: string, label: string): Error {
+  const cause = err && typeof err === 'object' ? (err as { cause?: unknown }).cause : undefined;
+  const causeObj = cause && typeof cause === 'object'
+    ? (cause as { message?: unknown; code?: unknown })
+    : undefined;
+  const detail = (typeof causeObj?.message === 'string' && causeObj.message)
+    || (err instanceof Error ? err.message : String(err));
+  const code = typeof causeObj?.code === 'string' ? ` (${causeObj.code})` : '';
+  return new Error(`OAuth 2.0 ${label} to ${url} failed: ${detail}${code}`);
+}
+
 /** Fetch an OAuth 2.0 token for client_credentials or password flows. Not cached
  *  here; callers store it in auth.oauth2CachedToken. */
 export async function fetchOAuth2Token(
@@ -345,11 +361,16 @@ export async function fetchOAuth2Token(
   }
 
   const { fetch: nodeFetch } = await import('undici');
-  const resp = await nodeFetch(tokenUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params.toString(),
-  });
+  let resp;
+  try {
+    resp = await nodeFetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+  } catch (err) {
+    throw oauth2FetchError(err, tokenUrl, 'token request');
+  }
 
   if (!resp.ok) {
     const body = await resp.text();

@@ -282,6 +282,41 @@ textarea::placeholder {
 :root.light .fill-amber-500\/50   { fill: #f59e0b !important; }
 :root.light .fill-amber-500\/25   { fill: rgba(245, 158, 11, 0.3) !important; }
 
+/* ─── Light mode: translucent callout tints (git / flow / import panels) ─────── */
+/* These amber/violet/sky tints are dark-on-dark-surface by design, with light
+   100/200-shade text. In light mode the base remaps above miss them, leaving
+   light text on a tint that stays dark (or, for bg-amber-800/40, text and tint
+   resolving to the SAME light value = invisible). Flip the tint to a light shade
+   and darken the text, same as the red/emerald/blue callouts already do. None of
+   these tokens appear on the white-forced coloured chips, so there is no clash. */
+:root.light .bg-amber-900\/20 { background-color: #fef3c7 !important; }  /* amber-100 */
+:root.light .bg-amber-900\/30 { background-color: #fde68a !important; }  /* amber-200 */
+:root.light .hover\:bg-amber-900\/50:hover { background-color: #fde68a !important; } /* amber-200 */
+:root.light .bg-blue-950\/20  { background-color: #eff6ff !important; }  /* blue-50   */
+:root.light .bg-sky-900\/40   { background-color: #e0f2fe !important; }  /* sky-100   */
+:root.light .hover\:bg-sky-900\/60:hover { background-color: #bae6fd !important; }  /* sky-200   */
+:root.light .bg-violet-900\/40 { background-color: #ede9fe !important; } /* violet-100 */
+:root.light .hover\:bg-violet-900\/60:hover { background-color: #ddd6fe !important; } /* violet-200 */
+
+/* Hover tints: the base-colour remaps above darken the text, so the hover
+   background must flip to a light shade too, or the hover state is dark-on-dark. */
+:root.light .hover\:bg-red-900\/30:hover  { background-color: #fee2e2 !important; } /* red-100   */
+:root.light .hover\:bg-red-900\/40:hover  { background-color: #fee2e2 !important; } /* red-100   */
+:root.light .hover\:bg-red-900\/50:hover  { background-color: #fee2e2 !important; } /* red-100   */
+:root.light .hover\:bg-red-900\/60:hover  { background-color: #fecaca !important; } /* red-200   */
+:root.light .hover\:bg-red-950\/50:hover  { background-color: #fecaca !important; } /* red-200   */
+:root.light .hover\:bg-blue-900\/50:hover { background-color: #dbeafe !important; } /* blue-100  */
+:root.light .hover\:bg-emerald-900\/40:hover { background-color: #dcfce7 !important; } /* green-100 */
+:root.light .hover\:bg-emerald-900\/50:hover { background-color: #dcfce7 !important; } /* green-100 */
+:root.light .hover\:bg-sky-900\/50:hover  { background-color: #e0f2fe !important; } /* sky-100   */
+
+:root.light .text-amber-200        { color: #92400e !important; }  /* amber-800 */
+:root.light .text-amber-200\/80    { color: #92400e !important; }  /* amber-800 */
+:root.light .hover\:text-amber-100:hover { color: #92400e !important; } /* amber-800 */
+:root.light .text-sky-200          { color: #0c4a6e !important; }  /* sky-900   */
+:root.light .text-violet-200       { color: #5b21b6 !important; }  /* violet-800 */
+:root.light .text-emerald-200\/90  { color: #166534 !important; }  /* green-800 */
+
 /* ─── Keyboard focus visibility ─────────────────────────────────────────────── */
 /* Most controls clear the native outline (`outline-none` / `focus:outline-none`)
    and add no ring of their own, leaving keyboard users with no visible focus
