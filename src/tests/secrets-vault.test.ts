@@ -301,3 +301,43 @@ describe('buildEnvVars with a vault secretRef', () => {
     warn.mockRestore();
   });
 });
+
+// A braced {{vault:...}} token in a var value resolves like the bare vault:... form.
+describe('buildEnvVars with a braced inline vault token in a var value', () => {
+  beforeEach(() => {
+    process.env.VAULT_ADDR = 'https://vault.test';
+    process.env.VAULT_TOKEN = 't';
+    mockVault((url) => (url.endsWith('/v1/secret/data/oauth')
+      ? { data: { data: { clientId: 'demo-client' }, metadata: {} } }
+      : undefined));
+  });
+
+  it('resolves a value that is a single {{vault:...}} token', async () => {
+    const env: Environment = {
+      version: '1.0', id: 'e1', name: 'prod',
+      variables: [{ key: 'clientId', value: '{{vault:secret/data/oauth#clientId}}', enabled: true }],
+    };
+    const vars = await buildEnvVars(env);
+    expect(vars.clientId).toBe('demo-client');
+    // And a field using {{clientId}} now expands to the real secret.
+    expect(interpolate('{{clientId}}', vars)).toBe('demo-client');
+  });
+
+  it('resolves a {{vault:...}} token embedded in a larger value', async () => {
+    const env: Environment = {
+      version: '1.0', id: 'e1', name: 'prod',
+      variables: [{ key: 'id', value: 'app-{{vault:secret/data/oauth#clientId}}-x', enabled: true }],
+    };
+    const vars = await buildEnvVars(env);
+    expect(vars.id).toBe('app-demo-client-x');
+  });
+
+  it('still resolves the bare vault:... value form', async () => {
+    const env: Environment = {
+      version: '1.0', id: 'e1', name: 'prod',
+      variables: [{ key: 'clientId', value: 'vault:secret/data/oauth#clientId', enabled: true }],
+    };
+    const vars = await buildEnvVars(env);
+    expect(vars.clientId).toBe('demo-client');
+  });
+});

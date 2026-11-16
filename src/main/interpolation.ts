@@ -198,6 +198,22 @@ export async function buildEnvVars(environment: Environment | null): Promise<Rec
       console.warn(`[secrets] could not resolve ${key} (${ref}): ${(err as Error).message}`);
     }
   }
+  // A var value may wrap the ref in braces ({{vault:...}}) rather than the bare
+  // scheme form above; resolve those inline tokens so the var holds the secret.
+  for (const key of Object.keys(vars)) {
+    const val = vars[key];
+    if (!val || !val.includes('{{')) continue;
+    try {
+      const secretMap = await resolveInlineSecretRefs(val, vars);
+      if (Object.keys(secretMap).length === 0) continue;
+      vars[key] = val.replaceAll(/\{\{\s*([^}]+?)\s*\}\}/g, (m, inner) => {
+        const ref = String(inner).trim();
+        return ref in secretMap ? secretMap[ref] : m;
+      });
+    } catch (err) {
+      console.warn(`[secrets] could not resolve inline ref in ${key}: ${(err as Error).message}`);
+    }
+  }
   return vars;
 }
 

@@ -264,7 +264,7 @@ export function Oauth2Form({ auth, onChange }: {
         <p className="text-emerald-400 text-[10px] font-mono bg-surface-800 rounded px-2 py-1">{t('Token:')} {tokenPreview}</p>
       )}
       {status === 'error' && (
-        <p className="text-red-400 text-[10px] bg-red-950 border border-red-800 rounded px-2 py-1">{error}</p>
+        <p className="text-red-400 text-[10px] bg-red-950/30 border border-red-800 rounded px-2 py-1">{error}</p>
       )}
     </div>
   );

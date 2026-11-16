@@ -8,7 +8,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { AuthConfig, Oauth2Auth, VarResolveContext } from '../../shared/types';
 import { getSecret } from './secret-handler';
 import { interpolate, buildEnvVars, buildDynamicVars, mergeVars, resolveInlineSecretRefs } from '../interpolation';
-import { fetchOAuth2Token } from '../auth-builder';
+import { fetchOAuth2Token, oauth2FetchError } from '../auth-builder';
 
 interface OAuth2TokenResult { accessToken: string; expiresAt: number; refreshToken?: string }
 
@@ -128,11 +128,16 @@ async function browserFlow(
   params.set('client_id', clientId);
   if (clientSecret) params.set('client_secret', clientSecret);
 
-  const resp = await nodeFetch(tokenUrl, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body:    params.toString(),
-  });
+  let resp;
+  try {
+    resp = await nodeFetch(tokenUrl, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:    params.toString(),
+    });
+  } catch (err) {
+    throw oauth2FetchError(err, tokenUrl, 'token exchange');
+  }
 
   if (!resp.ok) {
     const body = await resp.text();
@@ -196,11 +201,16 @@ export function registerOAuth2Handlers(ipc: IpcMain): void {
     params.set('client_id', clientId);
     if (clientSecret) params.set('client_secret', clientSecret);
 
-    const resp = await nodeFetch(tokenUrl, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body:    params.toString(),
-    });
+    let resp;
+    try {
+      resp = await nodeFetch(tokenUrl, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body:    params.toString(),
+      });
+    } catch (err) {
+      throw oauth2FetchError(err, tokenUrl, 'token refresh');
+    }
 
     if (!resp.ok) {
       const body = await resp.text();

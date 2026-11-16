@@ -236,6 +236,27 @@ describe('fetchOAuth2Token error branches', () => {
     await expect(fetchOAuth2Token({ type: 'oauth2', oauth2Flow: 'client_credentials' }, {}))
       .rejects.toThrow('tokenUrl is required');
   });
+
+  // A refused/unreachable token endpoint makes undici throw a bare
+  // "TypeError: fetch failed" with the real reason on .cause. The failure must
+  // name the token endpoint and code so it is not mistaken for the resource
+  // request that triggered the token fetch.
+  it('wraps a connection-level failure with the token endpoint and cause', async () => {
+    const { fetch } = await import('undici');
+    vi.mocked(fetch).mockImplementationOnce(() => {
+      const cause = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:8300'), { code: 'ECONNREFUSED' });
+      return Promise.reject(new TypeError('fetch failed', { cause }));
+    });
+    await expect(fetchOAuth2Token({
+      type: 'oauth2',
+      oauth2Flow: 'client_credentials',
+      oauth2TokenUrl: 'http://localhost:8300/token',
+      oauth2ClientId: 'id',
+      oauth2ClientSecret: 's',
+    }, {})).rejects.toThrow(
+      'OAuth 2.0 token request to http://localhost:8300/token failed: connect ECONNREFUSED 127.0.0.1:8300 (ECONNREFUSED)',
+    );
+  });
 });
 
 // fetchOAuth2Token - scope is omitted when empty (sending `scope=` triggers
