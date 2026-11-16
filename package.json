@@ -1,8 +1,9 @@
 {
   "name": "@testsmith/api-spector",
   "productName": "API Spector",
-  "version": "0.9.17",
+  "version": "0.9.18",
   "description": "Local-first API testing tool to inspect, test and mock APIs",
+  "author": "Testsmith <hello@api-spector.dev>",
   "repository": {
     "type": "git",
     "url": "https://github.com/testsmith-io/api-spector"
@@ -173,6 +174,7 @@
         "AppImage",
         "deb"
       ],
+      "executableName": "api-spector",
       "maintainer": "Testsmith <hello@api-spector.dev>",
       "category": "Development",
       "artifactName": "API-Spector-${version}-${arch}.${ext}"

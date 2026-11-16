@@ -292,6 +292,7 @@ export function registerCloudHandlers(ipc: IpcMain): void {
       slug: slugify(server.name),
       enabled: true,
       auth_type: 'none',
+      proxy_base_url: server.proxyBaseUrl ?? null,
       routes: (server.routes ?? []).map(r => ({
         method: r.method,
         path: r.path,
@@ -300,6 +301,10 @@ export function registerCloudHandlers(ipc: IpcMain): void {
         body: r.body ?? '',
         delay: r.delay ?? 0,
         script: r.script ?? null,
+        fault: r.fault ?? null,
+        scenario: r.scenario ?? null,
+        requiredState: r.requiredState ?? null,
+        newState: r.newState ?? null,
       })),
     };
     return cloudFetch('/api/mocks', 'POST', payload);

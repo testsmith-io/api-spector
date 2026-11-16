@@ -23,6 +23,10 @@ const { electron } = window;
 
 const METHODS_PLUS_ANY = ['ANY', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'QUERY'] as const;
 
+const MOCK_FAULTS = [
+  'EMPTY_RESPONSE', 'MALFORMED_RESPONSE_CHUNK', 'RANDOM_DATA_THEN_CLOSE', 'CONNECTION_RESET_BY_PEER',
+] as const;
+
 // Route row
 
 function RouteRow({
@@ -42,6 +46,7 @@ function RouteRow({
   const [editing,      setEditing]      = useState(initialEditing);
   const [draft,        setDraft]        = useState(route);
   const [scriptOpen,   setScriptOpen]   = useState(!!(route.script?.trim()));
+  const [scenarioOpen, setScenarioOpen] = useState(!!(route.scenario?.trim()));
 
   // Derive path param names (e.g. /users/:id -> ['id'])
   const pathParamNames = useMemo(
@@ -71,6 +76,12 @@ function RouteRow({
         )}
         {draft.script?.trim() && (
           <span className="text-[10px] text-purple-400/70 shrink-0">⚡ {t('script')}</span>
+        )}
+        {draft.fault && (
+          <span className="text-[10px] text-red-400/80 shrink-0" title={draft.fault}>⚠ {t('fault')}</span>
+        )}
+        {draft.scenario?.trim() && (
+          <span className="text-[10px] text-blue-400/80 shrink-0 truncate max-w-[120px]" title={draft.scenario}>◆ {draft.scenario}</span>
         )}
         <span className={`text-xs font-mono w-10 text-right shrink-0 ${getStatusColor(draft.statusCode)}`}>{draft.statusCode}</span>
         {draft.delay ? (
@@ -142,6 +153,71 @@ function RouteRow({
             className="w-24 bg-surface-800 border border-surface-700 rounded px-2 py-1.5 text-sm font-mono focus:outline-none focus:border-blue-500 placeholder-surface-700"
           />
         </div>
+      </div>
+
+      {/* Fault injection */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <label className="text-xs text-surface-400 shrink-0">{t('Fault')}</label>
+        <select
+          value={draft.fault ?? ''}
+          onChange={e => setDraft(d => ({ ...d, fault: (e.target.value || undefined) as MockRoute['fault'] }))}
+          className="bg-surface-800 border border-surface-700 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-500"
+        >
+          <option value="">{t('None (normal response)')}</option>
+          {MOCK_FAULTS.map(f => <option key={f} value={f}>{f}</option>)}
+        </select>
+        {draft.fault && (
+          <span className="text-[11px] text-amber-400/80">{t('Replaces the response; status/body/headers ignored. Delay still applies.')}</span>
+        )}
+      </div>
+
+      {/* Stateful (scenario) */}
+      <div>
+        <button
+          onClick={() => setScenarioOpen(o => !o)}
+          className="flex items-center gap-1.5 text-[11px] text-surface-400 uppercase tracking-wider hover:text-white transition-colors"
+        >
+          <span className="text-[22px] leading-none">{scenarioOpen ? '▾' : '▸'}</span>
+          <span>{t('Stateful (scenario)')}</span>
+          {draft.scenario?.trim() && <span className="text-blue-400 normal-case font-normal tracking-normal ml-1">◆ {draft.scenario}</span>}
+        </button>
+
+        {scenarioOpen && (
+          <div className="mt-2 flex flex-col gap-1.5">
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="block text-[10px] text-surface-500 mb-1">{t('Scenario')}</label>
+                <input
+                  value={draft.scenario ?? ''}
+                  onChange={e => setDraft(d => ({ ...d, scenario: e.target.value || undefined }))}
+                  placeholder={t('e.g. checkout')}
+                  className="w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500 placeholder-surface-700"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-surface-500 mb-1">{t('Required state')}</label>
+                <input
+                  value={draft.requiredState ?? ''}
+                  onChange={e => setDraft(d => ({ ...d, requiredState: e.target.value || undefined }))}
+                  placeholder="Started"
+                  className="w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:border-blue-500 placeholder-surface-700"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-surface-500 mb-1">{t('Then set state')}</label>
+                <input
+                  value={draft.newState ?? ''}
+                  onChange={e => setDraft(d => ({ ...d, newState: e.target.value || undefined }))}
+                  placeholder={t('(no change)')}
+                  className="w-full bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:border-blue-500 placeholder-surface-700"
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-surface-600">
+              {t('This route serves only while the scenario is in the required state (default Started); after it serves, the scenario moves to the new state. Lets one path answer differently in sequence.')}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Response body */}
@@ -273,7 +349,8 @@ function timeAgo(ts: number, t: ReturnType<typeof useT>): string {
 function HitRow({ hit, matched }: { readonly hit: MockHit; readonly matched: MockRoute | undefined | null }) {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const unmatched = !hit.matchedRouteId;
+  const proxied   = !!hit.proxied;
+  const unmatched = !hit.matchedRouteId && !proxied;
 
   // Pretty-print JSON response body if possible
   const prettyBody = useMemo(() => {
@@ -283,7 +360,7 @@ function HitRow({ hit, matched }: { readonly hit: MockHit; readonly matched: Moc
   }, [hit.responseBody]);
 
   return (
-    <div className={`border-b border-surface-800/40 ${unmatched ? 'bg-red-950/20' : ''}`}>
+    <div className={`border-b border-surface-800/40 ${unmatched ? 'bg-red-950/20' : proxied ? 'bg-amber-950/10' : ''}`}>
       {/* Summary row */}
       <button
         onClick={() => setOpen(o => !o)}
@@ -301,7 +378,11 @@ function HitRow({ hit, matched }: { readonly hit: MockHit; readonly matched: Moc
         <span className="w-32 shrink-0 truncate text-surface-600 text-xs font-sans" title={matched?.description ?? matched?.path ?? ''}>
           {unmatched
             ? <span className="text-red-400">{t('no match')}</span>
-            : (matched?.description || matched?.path || '-')}
+            : hit.fault
+              ? <span className="text-red-400" title={hit.fault}>⚠ {hit.fault}</span>
+              : proxied
+                ? <span className="text-amber-400">⇄ {t('proxied')}</span>
+                : (matched?.description || matched?.path || '-')}
         </span>
         <span className={`w-12 text-right shrink-0 text-xs ${getStatusColor(hit.status)}`}>{hit.status}</span>
         <span className="w-14 text-right shrink-0 text-surface-600 text-xs">{hit.durationMs}ms</span>
@@ -419,6 +500,7 @@ export function MockDetailPanel({ mockId }: { readonly mockId: string }) {
   const [editMeta,   setEditMeta]   = useState(false);
   const [nameDraft,  setNameDraft]  = useState(entry?.data.name ?? '');
   const [portDraft,  setPortDraft]  = useState(String(entry?.data.port ?? ''));
+  const [proxyDraft, setProxyDraft] = useState(entry?.data.proxyBaseUrl ?? '');
   const [error,      setError]      = useState<string | null>(null);
   const [newRouteId, setNewRouteId] = useState<string | null>(null);
   const [activeTab,  setActiveTab]  = useState<'routes' | 'requests'>('routes');
@@ -436,11 +518,15 @@ export function MockDetailPanel({ mockId }: { readonly mockId: string }) {
   if (!entry) return null;
   const { data: mock, running } = entry;
   const routes = mock.routes ?? [];
+  const hasScenarios = routes.some(r => r.scenario?.trim());
 
   async function save(updated: MockServer) {
     updateMock(mock.id, updated);
     await electron.saveMock(entry.relPath, updated);
-    if (running) await electron.mockUpdateRoutes(mock.id, updated.routes ?? []);
+    if (running) {
+      await electron.mockUpdateRoutes(mock.id, updated.routes ?? []);
+      await electron.mockUpdateProxy(mock.id, updated.proxyBaseUrl ?? null);
+    }
     if (workspace) await electron.saveWorkspace(workspace);
   }
 
@@ -478,7 +564,7 @@ export function MockDetailPanel({ mockId }: { readonly mockId: string }) {
   function saveMeta() {
     const port = Number(portDraft);
     if (!port || port < 1 || port > 65535) return;
-    save({ ...mock, name: nameDraft, port });
+    save({ ...mock, name: nameDraft, port, proxyBaseUrl: proxyDraft.trim() || undefined });
     setEditMeta(false);
   }
 
@@ -488,32 +574,51 @@ export function MockDetailPanel({ mockId }: { readonly mockId: string }) {
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-3 border-b border-surface-800 flex-shrink-0 bg-surface-950">
         {editMeta ? (
-          <div className="flex items-center gap-2 flex-1">
-            <input
-              autoFocus
-              value={nameDraft}
-              onChange={e => setNameDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') saveMeta(); if (e.key === 'Escape') setEditMeta(false); }}
-              className="flex-1 max-w-xs bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500"
-            />
-            <span className="text-surface-400">:</span>
-            <input
-              value={portDraft}
-              onChange={e => setPortDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') saveMeta(); if (e.key === 'Escape') setEditMeta(false); }}
-              className="w-20 bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:border-blue-500"
-            />
-            <button onClick={saveMeta} className="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded text-sm transition-colors">{t('Save')}</button>
-            <button onClick={() => setEditMeta(false)} className="px-3 py-1 bg-surface-800 hover:bg-surface-700 rounded text-sm transition-colors">{t('Cancel')}</button>
+          <div className="flex flex-col gap-2 flex-1">
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                value={nameDraft}
+                onChange={e => setNameDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveMeta(); if (e.key === 'Escape') setEditMeta(false); }}
+                className="flex-1 max-w-xs bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500"
+              />
+              <span className="text-surface-400">:</span>
+              <input
+                value={portDraft}
+                onChange={e => setPortDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveMeta(); if (e.key === 'Escape') setEditMeta(false); }}
+                className="w-20 bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:border-blue-500"
+              />
+              <button onClick={saveMeta} className="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded text-sm transition-colors">{t('Save')}</button>
+              <button onClick={() => setEditMeta(false)} className="px-3 py-1 bg-surface-800 hover:bg-surface-700 rounded text-sm transition-colors">{t('Cancel')}</button>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-surface-400 shrink-0" htmlFor="mock-proxy-url">{t('Proxy unmatched to')}</label>
+              <input
+                id="mock-proxy-url"
+                value={proxyDraft}
+                onChange={e => setProxyDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveMeta(); if (e.key === 'Escape') setEditMeta(false); }}
+                placeholder="https://api.example.com"
+                className="flex-1 max-w-md bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:border-blue-500 placeholder-surface-700"
+              />
+              <span className="text-[11px] text-surface-600">{t('Forward requests that match no route to this real server (optional).')}</span>
+            </div>
           </div>
         ) : (
           <button
-            onClick={() => { setNameDraft(mock.name); setPortDraft(String(mock.port)); setEditMeta(true); }}
+            onClick={() => { setNameDraft(mock.name); setPortDraft(String(mock.port)); setProxyDraft(mock.proxyBaseUrl ?? ''); setEditMeta(true); }}
             className="flex items-center gap-2 hover:text-blue-400 transition-colors group"
-            title={t('Click to edit name and port')}
+            title={t('Click to edit name, port, and proxy')}
           >
             <span className="text-sm font-semibold">{mock.name}</span>
             <span className="text-surface-600 text-sm font-mono">:{mock.port}</span>
+            {mock.proxyBaseUrl && (
+              <span className="text-[10px] font-mono text-amber-400/80 border border-amber-800/40 rounded px-1.5 py-0.5" title={t('Unmatched requests are proxied to :url', { url: mock.proxyBaseUrl })}>
+                ⇄ {t('proxy')}
+              </span>
+            )}
             <span className="text-[10px] text-surface-400 opacity-0 group-hover:opacity-100 transition-opacity">✎</span>
           </button>
         )}
@@ -533,6 +638,15 @@ export function MockDetailPanel({ mockId }: { readonly mockId: string }) {
           {showPush && <PushToCloudModal mock={mock} onClose={() => setShowPush(false)} />}
           {error && (
             <span className="text-xs text-red-400 max-w-xs truncate" title={error}>⚠ {error}</span>
+          )}
+          {hasScenarios && running && (
+            <button
+              onClick={() => electron.mockResetScenarios(mock.id)}
+              className="px-3 py-1.5 rounded text-sm font-medium bg-surface-800 hover:bg-surface-700 text-surface-300 border border-surface-700"
+              title={t('Reset every scenario on this mock back to the Started state')}
+            >
+              ↺ {t('Reset state')}
+            </button>
           )}
           {cloudEnabled() && (
             <button

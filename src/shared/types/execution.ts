@@ -50,6 +50,9 @@ export interface SendRequestPayload {
   streamId?: string
   /** Force streaming regardless of Content-Type (the "Stream response" toggle). */
   forceStream?: boolean
+  /** Folder/collection the auth was inherited from, for the console report only
+   *  (the auth is already merged into `request.auth`). */
+  inheritedAuthSource?: string
 }
 
 /** One frame from a streamed response (SSE / NDJSON / raw chunk). Emitted live

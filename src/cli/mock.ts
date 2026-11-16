@@ -87,6 +87,9 @@ async function main() {
           delay
         );
       }
+      if (mock.proxyBaseUrl) {
+        console.log(color(`       unmatched requests  →  ${mock.proxyBaseUrl}`, C.cyan));
+      }
       started++;
     } catch (e) {
       console.error(
@@ -120,13 +123,29 @@ async function main() {
       const status  = color(String(hit.status), hit.status < 400 ? C.green : C.red);
       const dur     = color(`${hit.durationMs}ms`, C.gray);
 
-      if (matched) {
+      if (hit.fault) {
+        // Matched a route that injected a fault.
+        console.log(
+          color(`  ${ts}`, C.gray) + `  ${server}  ` +
+          color(method, C.red) + color(hit.path, C.white) +
+          `  ${dur}` +
+          color(`  ⚠ fault: ${hit.fault}`, C.red)
+        );
+      } else if (matched) {
         const route = color(routePaths[hit.matchedRouteId!] ?? hit.matchedRouteId!, C.gray);
         console.log(
           color(`  ${ts}`, C.gray) + `  ${server}  ` +
           color(method, C.cyan) + color(hit.path, C.white) +
           `  ${status}  ${dur}` +
           color(`  → ${route}`, C.gray)
+        );
+      } else if (hit.proxied) {
+        // No match, proxied to the upstream.
+        console.log(
+          color(`  ${ts}`, C.gray) + `  ${server}  ` +
+          color(method, C.cyan) + color(hit.path, C.white) +
+          `  ${status}  ${dur}` +
+          color('  → proxy (no match)', C.cyan)
         );
       } else {
         console.log(

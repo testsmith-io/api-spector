@@ -137,6 +137,8 @@ export const IPC = {
     isRunning:    'mock:isRunning',
     runningIds:   'mock:runningIds',
     updateRoutes: 'mock:updateRoutes',
+    updateProxy:  'mock:updateProxy',
+    resetScenarios: 'mock:resetScenarios',
     /** Event: a mock server route was hit. */
     hit:          'mock:hit',
   },

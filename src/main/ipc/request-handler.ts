@@ -26,6 +26,7 @@ import {
   maskHeaders,
   buildSchemaTestResults,
 } from '../request-exec';
+import { authTypeLabel, oauth2FlowLabel } from '../../shared/request-collection';
 
 // Re-export the shared-core helpers so existing import sites keep working.
 export {
@@ -166,6 +167,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
       streamId,
       forceStream,
       dataRow,
+      inheritedAuthSource,
     } = payload;
     applyRequestDefaults(req);
 
@@ -196,8 +198,9 @@ export function registerRequestHandler(ipc: IpcMain): void {
     const envVars = await buildEnvVars(environment);
     let localVars: Record<string, string> = {};
 
-    // Detect secrets that could not be decrypted
+    // System console lines, prepended before any script output.
     const decryptionWarnings: string[] = [];
+    const authNotes: string[] = [];
     if (environment) {
       const masterKeySet = Boolean(process.env['API_SPECTOR_MASTER_KEY']);
       for (const v of environment.variables) {
@@ -327,6 +330,14 @@ export function registerRequestHandler(ipc: IpcMain): void {
           : undefined,
       });
 
+      // Report inherited auth and the OAuth2 token action in the console.
+      if (inheritedAuthSource) {
+        authNotes.push(`[auth] Applied ${authTypeLabel(req.auth)} inherited from "${inheritedAuthSource}"`);
+      }
+      if (exchange.oauth2) {
+        authNotes.push(`[auth] OAuth2 (${oauth2FlowLabel(exchange.oauth2.flow)}): ${exchange.oauth2.fetched ? 'token fetched' : 'reused cached token'}`);
+      }
+
       // PII masking
       const maskedBody    = maskPii(exchange.responseBody, piiMaskPatterns);
       const maskedHeaders = maskHeaders(exchange.rawHeaders, piiMaskPatterns);
@@ -436,7 +447,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
 
     const scriptResult: ScriptExecutionMeta = {
       testResults:          combinedTestResults,
-      consoleOutput:        [...decryptionWarnings, ...preScriptMeta.consoleOutput, ...postConsole],
+      consoleOutput:        [...decryptionWarnings, ...authNotes, ...preScriptMeta.consoleOutput, ...postConsole],
       // Persist only what the scripts actually changed, so echoed inputs (the
       // sent session/collection vars, the seeded request/data vars) don't get
       // written back and overwrite stored values.

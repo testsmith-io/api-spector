@@ -391,6 +391,54 @@ export function inheritedHeadersWithSource(requestId: string, collection: Collec
   return out;
 }
 
+/** The auth a request inherits, tagged with the collection/folder it comes from.
+ *  Nearest ancestor wins; null when no ancestor sets a non-'none' auth. */
+export interface InheritedAuth {
+  auth: AuthConfig
+  source: string
+}
+
+export function inheritedAuthWithSource(requestId: string, collection: Collection): InheritedAuth | null {
+  let result: InheritedAuth | null =
+    collection.auth && collection.auth.type !== 'none'
+      ? { auth: collection.auth, source: collection.name }
+      : null;
+  for (const folder of folderPathTo(collection.rootFolder, requestId)) {
+    if (folder.auth && folder.auth.type !== 'none') result = { auth: folder.auth, source: folder.name };
+  }
+  return result;
+}
+
+const OAUTH2_FLOW_LABELS: Record<string, string> = {
+  client_credentials: 'Client Credentials',
+  authorization_code: 'Authorization Code',
+  password: 'Password',
+  implicit: 'Implicit',
+};
+
+/** Human label for an OAuth2 flow id, for UI + logs. */
+export function oauth2FlowLabel(flow?: string): string {
+  return (flow && OAUTH2_FLOW_LABELS[flow]) || 'OAuth2';
+}
+
+/** Short, human label for an auth config (e.g. "OAuth2 (Client Credentials)",
+ *  "Bearer token"). API terms stay English. */
+export function authTypeLabel(auth?: AuthConfig): string {
+  if (!auth || auth.type === 'none') return 'None';
+  switch (auth.type) {
+    case 'bearer': return 'Bearer token';
+    case 'basic':  return 'Basic';
+    case 'digest': return 'Digest';
+    case 'ntlm':   return 'NTLM';
+    case 'apikey': return 'API key';
+    case 'oauth2': {
+      const f = auth.oauth2Flow ? OAUTH2_FLOW_LABELS[auth.oauth2Flow] : undefined;
+      return f ? `OAuth2 (${f})` : 'OAuth2';
+    }
+    default:       return 'Auth';
+  }
+}
+
 /** Flat RunnerItem list with hooks (request.hookType, scoped to their folder) interleaved. */
 export function buildRunPlan(
   collection: Collection,

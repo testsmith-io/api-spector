@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { startMock, stopMock, isRunning, updateMockRoutes } from '../main/mock-server';
+import { createServer, type Server } from 'node:http';
+import { startMock, stopMock, isRunning, updateMockRoutes, setMockProxy, resetScenarios, scenarioStateOf } from '../main/mock-server';
 import type { MockServer, MockRoute } from '../shared/types';
 
 // Helpers
@@ -377,5 +378,177 @@ describe('mock server: pre-response scripts', () => {
     await startMock(mock);
     expect((await hit(port, '/items/1')).status).toBe(200);
     expect((await hit(port, '/items/99')).status).toBe(404);
+  });
+});
+
+// Passthrough proxy: unmatched requests forwarded to the real server
+
+describe('mock server passthrough proxy', () => {
+  // A throwaway "real server" that echoes method/path/body so tests can prove the
+  // request was forwarded. Tracked for teardown.
+  const upstreams: Server[] = [];
+
+  afterEach(async () => {
+    await Promise.all(upstreams.map(s => new Promise<void>(r => s.close(() => r()))));
+    upstreams.length = 0;
+  });
+
+  async function startUpstream(): Promise<string> {
+    const port = nextPort();
+    const server = createServer((req, res) => {
+      let body = '';
+      req.on('data', c => { body += c; });
+      req.on('end', () => {
+        res.writeHead(201, { 'Content-Type': 'application/json', 'X-Upstream': 'yes' });
+        res.end(JSON.stringify({ from: 'upstream', method: req.method, path: req.url, body }));
+      });
+    });
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(port, '127.0.0.1', resolve);
+    });
+    upstreams.push(server);
+    return `http://127.0.0.1:${port}`;
+  }
+
+  it('forwards an unmatched request to the upstream and relays its response', async () => {
+    const upstream = await startUpstream();
+    const port = nextPort();
+    const mock = makeMock(port, [makeRoute({ path: '/mock-only', body: 'from-mock' })]);
+    mock.proxyBaseUrl = upstream;
+    cleanup.push(mock.id);
+    await startMock(mock);
+
+    // Unmatched -> proxied to the real server (upstream returns 201).
+    const proxied = await hit(port, '/live/users/5?q=1');
+    expect(proxied.status).toBe(201);
+    const payload = JSON.parse(proxied.text);
+    expect(payload.from).toBe('upstream');
+    expect(payload.path).toBe('/live/users/5?q=1');
+
+    // A defined route still serves the mock; the proxy is only a fallback.
+    const matched = await hit(port, '/mock-only');
+    expect(matched.status).toBe(200);
+    expect(matched.text).toBe('from-mock');
+  });
+
+  it('forwards the method and body of an unmatched request', async () => {
+    const upstream = await startUpstream();
+    const port = nextPort();
+    const mock = makeMock(port, []);
+    mock.proxyBaseUrl = upstream;
+    cleanup.push(mock.id);
+    await startMock(mock);
+
+    const resp = await hit(port, '/echo', 'POST', '{"hello":"world"}');
+    expect(resp.status).toBe(201);
+    const payload = JSON.parse(resp.text);
+    expect(payload.method).toBe('POST');
+    expect(payload.body).toBe('{"hello":"world"}');
+  });
+
+  it('still returns 404 for an unmatched request when no proxy is configured', async () => {
+    const port = nextPort();
+    const mock = makeMock(port, [makeRoute({ path: '/known' })]);
+    cleanup.push(mock.id);
+    await startMock(mock);
+    expect((await hit(port, '/unknown')).status).toBe(404);
+  });
+
+  it('setMockProxy toggles passthrough on a running server', async () => {
+    const upstream = await startUpstream();
+    const port = nextPort();
+    const mock = makeMock(port, []);
+    cleanup.push(mock.id);
+    await startMock(mock);
+
+    expect((await hit(port, '/anything')).status).toBe(404);   // no proxy yet
+
+    setMockProxy(mock.id, upstream);
+    expect((await hit(port, '/anything')).status).toBe(201);   // now proxied
+
+    setMockProxy(mock.id, '');                                 // cleared again
+    expect((await hit(port, '/anything')).status).toBe(404);
+  });
+
+  it('returns 502 when the upstream is unreachable', async () => {
+    const port = nextPort();
+    const mock = makeMock(port, []);
+    mock.proxyBaseUrl = `http://127.0.0.1:${nextPort()}`;       // nothing listening
+    cleanup.push(mock.id);
+    await startMock(mock);
+    expect((await hit(port, '/anything')).status).toBe(502);
+  });
+});
+
+// Protocol-level faults
+
+describe('mock server faults', () => {
+  // Every fault breaks the connection, so the client's fetch rejects rather than
+  // returning a response. (The exact error varies by OS/undici; we only assert it
+  // fails to complete a normal request.)
+  for (const fault of ['EMPTY_RESPONSE', 'MALFORMED_RESPONSE_CHUNK', 'RANDOM_DATA_THEN_CLOSE', 'CONNECTION_RESET_BY_PEER'] as const) {
+    it(`fault ${fault} breaks the connection instead of responding`, async () => {
+      const port = nextPort();
+      const mock = makeMock(port, [makeRoute({ path: '/boom', fault })]);
+      cleanup.push(mock.id);
+      await startMock(mock);
+      await expect(hit(port, '/boom')).rejects.toThrow();
+    });
+  }
+
+  it('a route without a fault still responds normally', async () => {
+    const port = nextPort();
+    const mock = makeMock(port, [makeRoute({ path: '/ok', body: 'fine' })]);
+    cleanup.push(mock.id);
+    await startMock(mock);
+    const res = await hit(port, '/ok');
+    expect(res.status).toBe(200);
+    expect(res.text).toBe('fine');
+  });
+});
+
+// Stateful behavior (scenarios)
+
+describe('mock server scenarios', () => {
+  it('serves different responses as the scenario state advances', async () => {
+    const port = nextPort();
+    const mock = makeMock(port, [
+      // Same method+path, distinguished by scenario state.
+      makeRoute({ id: 'a', path: '/next', body: 'first', scenario: 'flow', newState: 'second' }),
+      makeRoute({ id: 'b', path: '/next', body: 'second', scenario: 'flow', requiredState: 'second' }),
+    ]);
+    cleanup.push(mock.id);
+    await startMock(mock);
+
+    expect(scenarioStateOf(mock.id, 'flow')).toBe('Started');
+    expect((await hit(port, '/next')).text).toBe('first');   // Started -> second
+    expect(scenarioStateOf(mock.id, 'flow')).toBe('second');
+    expect((await hit(port, '/next')).text).toBe('second');  // stays in 'second'
+    expect((await hit(port, '/next')).text).toBe('second');
+
+    resetScenarios(mock.id);
+    expect(scenarioStateOf(mock.id, 'flow')).toBe('Started');
+    expect((await hit(port, '/next')).text).toBe('first');   // rewound
+  });
+
+  it('404s when no stub is eligible in the current state', async () => {
+    const port = nextPort();
+    const mock = makeMock(port, [
+      makeRoute({ id: 'only', path: '/gated', body: 'ok', scenario: 's', requiredState: 'ready' }),
+    ]);
+    cleanup.push(mock.id);
+    await startMock(mock);
+    // Scenario starts in "Started", the only stub needs "ready".
+    expect((await hit(port, '/gated')).status).toBe(404);
+  });
+
+  it('routes without a scenario are unaffected by state', async () => {
+    const port = nextPort();
+    const mock = makeMock(port, [makeRoute({ path: '/plain', body: 'always' })]);
+    cleanup.push(mock.id);
+    await startMock(mock);
+    expect((await hit(port, '/plain')).text).toBe('always');
+    expect((await hit(port, '/plain')).text).toBe('always');
   });
 });

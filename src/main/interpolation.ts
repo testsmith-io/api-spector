@@ -180,6 +180,10 @@ export async function buildEnvVars(environment: Environment | null): Promise<Rec
       if (process.env[v.key] !== undefined) {
         vars[v.key] = process.env[v.key]!;
       }
+    } else if (v.value && hasSecretScheme(v.value)) {
+      // A plain value that is itself a scheme ref (vault:..., aws:...) resolves
+      // like secretRef, instead of being passed through literally.
+      deferredSecretRefs.push({ key: v.key, ref: v.value });
     } else {
       vars[v.key] = v.value;
     }
