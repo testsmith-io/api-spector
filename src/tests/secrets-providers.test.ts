@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createCipheriv, pbkdf2Sync, randomBytes } from 'node:crypto';
-import { resolveExternalSecret } from '../main/secrets';
+import { resolveExternalSecret, registerSecretProvider } from '../main/secrets';
 import { signSigV4 } from '../main/secrets/providers/sigv4';
 import { _resetAwsCache } from '../main/secrets/providers/aws';
 import { _resetAzureCache } from '../main/secrets/providers/azure';
@@ -180,5 +180,23 @@ describe('local AES-256-GCM secrets still resolve (unchanged by providers)', () 
     };
     const vars = await buildEnvVars(env);
     expect(vars.LOCAL).toBe('local-secret');
+  });
+});
+
+// An env var whose VALUE is itself an external-secret reference (vault:, aws:, ...)
+// must be resolved, not used literally.
+describe('env var value that is an external-secret reference', () => {
+  it('resolves a scheme-bearing value and leaves plain values untouched', async () => {
+    registerSecretProvider({ scheme: 'faketest', resolve: async (body) => `resolved:${body}` });
+    const env: Environment = {
+      version: '1.0', id: 'e1', name: 'prod',
+      variables: [
+        { key: 'FROM_VAULT', value: 'faketest:secret/data/app#clientSecret', enabled: true },
+        { key: 'PLAIN', value: 'literal-value', enabled: true },
+      ],
+    };
+    const vars = await buildEnvVars(env);
+    expect(vars.FROM_VAULT).toBe('resolved:secret/data/app#clientSecret'); // not the literal ref
+    expect(vars.PLAIN).toBe('literal-value');
   });
 });

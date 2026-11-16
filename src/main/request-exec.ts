@@ -530,6 +530,8 @@ export interface ExchangeResult {
   events?: StreamEvent[]
   streamClose?: StreamClose
   firstEventMs?: number
+  /** Set for OAuth2 requests: the flow, and whether a token was fetched or reused. */
+  oauth2?: { flow: string; fetched: boolean }
 }
 
 /** One HTTP exchange: OAuth2 refresh, auth headers, api-key param, body, and
@@ -546,15 +548,18 @@ export async function performHttpExchange(opts: ExchangeOptions): Promise<Exchan
   const start = Date.now();
 
   // OAuth2: ensure a fresh token before building headers
+  let oauth2Meta: { flow: string; fetched: boolean } | undefined;
   if (req.auth.type === 'oauth2') {
     const now = Date.now();
     const tokenMissing = !req.auth.oauth2CachedToken;
     const tokenExpired = req.auth.oauth2TokenExpiry ? req.auth.oauth2TokenExpiry <= now + 5000 : true;
-    if (tokenMissing || tokenExpired) {
+    const fetched = tokenMissing || tokenExpired;
+    if (fetched) {
       const result = await fetchOAuth2Token(req.auth, vars);
       req.auth.oauth2CachedToken = result.accessToken;
       req.auth.oauth2TokenExpiry = result.expiresAt;
     }
+    oauth2Meta = { flow: req.auth.oauth2Flow ?? 'client_credentials', fetched };
   }
 
   const authHeaders = await buildAuthHeaders(req.auth, vars);
@@ -673,6 +678,7 @@ export async function performHttpExchange(opts: ExchangeOptions): Promise<Exchan
     sentHeaders,
     sentBody: previewBody,
     finalUrl,
+    oauth2: oauth2Meta,
     ...streamFields,
   };
 }

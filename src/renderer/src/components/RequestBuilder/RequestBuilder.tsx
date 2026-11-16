@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../../store';
 import type { ApiRequest, HttpMethod, KeyValuePair, RunRequestResult } from '../../../../shared/types';
-import { getHooksForRequest, authIsConfigured } from '../../../../shared/request-collection';
+import { getHooksForRequest, authIsConfigured, inheritedAuthWithSource } from '../../../../shared/request-collection';
 import { findFolderContaining } from '../../../../shared/folder-tree';
 import { syncParamsFromUrl, buildPreviewUrl } from '../../../../shared/url-params';
 import { resolveEnvironmentById, withEnvOverrides } from '../../hooks/useActiveEnvironment';
@@ -286,6 +286,11 @@ export function RequestBuilder({ request }: Props) {
         ...request.headers,
       ];
       const mergedRequest = { ...request, auth: mergedAuth, headers: mergedHeaders };
+      // Source of the inherited auth, for the console report on send.
+      const owningForAuth = Object.values(collections).find(c => request.id in c.data.requests)?.data;
+      const inheritedAuthSource = (!authIsConfigured(request.auth) && owningForAuth)
+        ? inheritedAuthWithSource(request.id, owningForAuth)?.source
+        : undefined;
 
       // Ask variables ({{@Message}}): prompt before anything is sent
       const asks = askVarsInRequest(mergedRequest);
@@ -366,6 +371,7 @@ export function RequestBuilder({ request }: Props) {
           ...basePayload,
           environment: freshEnv,
           request: mergedRequest,
+          inheritedAuthSource,
           folderVars,
           collectionVars: { ...collectionVars, ...liveLocalVars },
           globals: liveGlobals,

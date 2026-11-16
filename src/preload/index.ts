@@ -329,6 +329,10 @@ const api = {
     ipcRenderer.invoke(IPC.file.loadFlow, relPath),
   mockUpdateRoutes: (id: string, routes: MockRoute[]): Promise<void> =>
     ipcRenderer.invoke(IPC.mock.updateRoutes, id, routes),
+  mockUpdateProxy: (id: string, baseUrl: string | null): Promise<void> =>
+    ipcRenderer.invoke(IPC.mock.updateProxy, id, baseUrl),
+  mockResetScenarios: (id: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.mock.resetScenarios, id),
   onMockHit:    (cb: (hit: MockHit) => void): void => {
     ipcRenderer.on(IPC.mock.hit, (_e, hit) => cb(hit));
   },

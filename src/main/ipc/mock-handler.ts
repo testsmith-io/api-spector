@@ -7,7 +7,7 @@ import { handleIpc } from './handle';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import type { MockServer, MockRoute } from '../../shared/types';
-import { startMock, stopMock, isRunning, getRunningIds, setHitCallback, updateMockRoutes } from '../mock-server';
+import { startMock, stopMock, isRunning, getRunningIds, setHitCallback, updateMockRoutes, setMockProxy, resetScenarios } from '../mock-server';
 import { getWorkspaceDir } from './file-handler';
 
 export function registerMockHandlers(ipc: IpcMain): void {
@@ -24,6 +24,14 @@ export function registerMockHandlers(ipc: IpcMain): void {
 
   handleIpc(ipc, IPC.mock.updateRoutes, (_e, id: string, routes: MockRoute[]) => {
     updateMockRoutes(id, routes);
+  });
+
+  handleIpc(ipc, IPC.mock.updateProxy, (_e, id: string, baseUrl: string | null) => {
+    setMockProxy(id, baseUrl);
+  });
+
+  handleIpc(ipc, IPC.mock.resetScenarios, (_e, id: string) => {
+    resetScenarios(id);
   });
 
   handleIpc(ipc, IPC.mock.runningIds, () => getRunningIds());

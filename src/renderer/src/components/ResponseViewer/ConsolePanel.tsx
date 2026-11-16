@@ -41,6 +41,7 @@ export function ConsolePanel({ scriptResult }: { readonly scriptResult: ScriptEx
                 line.startsWith('[error]') ? 'text-red-300' :
                 line.startsWith('[warn]')  ? 'text-amber-300' :
                 line.startsWith('[set]')   ? 'text-cyan-400' :
+                line.startsWith('[auth]')  ? 'text-emerald-300/90' :
                 'text-surface-400'
               }`}
             >

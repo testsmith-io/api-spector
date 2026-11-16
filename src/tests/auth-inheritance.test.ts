@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, it, expect } from 'vitest';
-import { authIsConfigured, resolveInheritedAuthAndHeaders } from '../shared/request-collection';
+import { authIsConfigured, resolveInheritedAuthAndHeaders, inheritedAuthWithSource, authTypeLabel } from '../shared/request-collection';
 import type { Collection } from '../shared/types';
 
 describe('authIsConfigured', () => {
@@ -55,5 +55,51 @@ describe('folder auth inheritance with imported stubs', () => {
     const own = { type: 'bearer', token: 'OWN' };
     const effective2 = authIsConfigured(own) ? own : inherited.auth;
     expect(effective2).toEqual({ type: 'bearer', token: 'OWN' });
+  });
+});
+
+describe('inheritedAuthWithSource', () => {
+  // Collection auth + a nested "Payments" folder with its own OAuth2.
+  const build = (opts: { collAuth?: object; folderAuth?: object }): Collection => ({
+    version: '1.0', id: 'c', name: 'Toolshop API',
+    auth: opts.collAuth as never,
+    rootFolder: { id: 'root', name: 'root', description: '', folders: [
+      { id: 'f1', name: 'Payments', description: '', folders: [], requestIds: ['r1'], auth: opts.folderAuth as never },
+    ], requestIds: [] },
+    requests: { r1: { id: 'r1', name: 'r', method: 'GET', url: 'http://x/y', headers: [], params: [], auth: { type: 'none' } as never, body: { mode: 'none' } } },
+  } as Collection);
+
+  it('names the folder when the folder sets auth', () => {
+    const got = inheritedAuthWithSource('r1', build({ folderAuth: { type: 'oauth2', oauth2Flow: 'client_credentials', oauth2ClientId: 'id' } }));
+    expect(got?.source).toBe('Payments');
+    expect(got?.auth.type).toBe('oauth2');
+  });
+
+  it('names the collection when only the collection sets auth', () => {
+    const got = inheritedAuthWithSource('r1', build({ collAuth: { type: 'bearer', token: 'T' } }));
+    expect(got?.source).toBe('Toolshop API');
+  });
+
+  it('the nearest ancestor wins (folder over collection)', () => {
+    const got = inheritedAuthWithSource('r1', build({ collAuth: { type: 'bearer', token: 'T' }, folderAuth: { type: 'oauth2', oauth2ClientId: 'id' } }));
+    expect(got?.source).toBe('Payments');
+    expect(got?.auth.type).toBe('oauth2');
+  });
+
+  it('is null when nothing sets auth', () => {
+    expect(inheritedAuthWithSource('r1', build({}))).toBeNull();
+  });
+});
+
+describe('authTypeLabel', () => {
+  it('labels common types', () => {
+    expect(authTypeLabel({ type: 'none' })).toBe('None');
+    expect(authTypeLabel({ type: 'bearer', token: 'x' })).toBe('Bearer token');
+    expect(authTypeLabel({ type: 'apikey', apiKeyValue: 'x' })).toBe('API key');
+  });
+  it('includes the OAuth2 flow', () => {
+    expect(authTypeLabel({ type: 'oauth2', oauth2Flow: 'client_credentials' })).toBe('OAuth2 (Client Credentials)');
+    expect(authTypeLabel({ type: 'oauth2', oauth2Flow: 'authorization_code' })).toBe('OAuth2 (Authorization Code)');
+    expect(authTypeLabel({ type: 'oauth2' })).toBe('OAuth2');
   });
 });
