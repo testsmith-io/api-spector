@@ -3,7 +3,9 @@
 
 import type { CompletionContext, CompletionResult, Completion } from '@codemirror/autocomplete';
 import { autocompletion } from '@codemirror/autocomplete';
-import { hoverTooltip } from '@codemirror/view';
+import { hoverTooltip, showTooltip, type Tooltip } from '@codemirror/view';
+import { StateField } from '@codemirror/state';
+import { syntaxTree } from '@codemirror/language';
 import { FAKER_NS_ALL, FAKER_ALL } from './fakerCatalog';
 
 // Built-in dynamic variables
@@ -50,6 +52,18 @@ export const DYNAMIC_VAR_INFO: Record<string, string> = {
 
 // sp API
 
+// Top-level identifiers available in a script, offered on Ctrl+Space and while
+// typing in a neutral position. `apply` adds the member dot / call parens.
+const TOP_LEVEL_GLOBALS: Completion[] = [
+  { label: 'sp',      type: 'namespace', apply: 'sp.',      info: 'API Spector scripting API', boost: 2 },
+  { label: 'faker',   type: 'namespace', apply: 'faker.',   info: 'Fake data generators' },
+  { label: 'dayjs',   type: 'function',  apply: 'dayjs()',  info: 'Date/time library' },
+  { label: 'console', type: 'namespace', apply: 'console.', info: 'log / warn / error / info' },
+  { label: 'tv4',     type: 'namespace', apply: 'tv4.',     info: 'JSON Schema validation' },
+  { label: 'JSON',    type: 'namespace', apply: 'JSON.' },
+  { label: 'Math',    type: 'namespace', apply: 'Math.' },
+];
+
 const AT_TOP: Completion[] = [
   { label: 'test',                type: 'function', detail: '(name, fn)',    info: 'Define a named test' },
   { label: 'expect',              type: 'function', detail: '(value)',       info: 'Create a chainable assertion' },
@@ -59,6 +73,10 @@ const AT_TOP: Completion[] = [
   { label: 'collectionVariables', type: 'property',                         info: 'Collection variable scope' },
   { label: 'folder',              type: 'property',                         info: 'Folder variable scope (shared by requests in the same folder during a run)' },
   { label: 'globals',             type: 'property',                         info: 'Global variable scope' },
+  { label: 'sendRequest',         type: 'function', detail: '(urlOrReq, cb?)', info: 'Send an HTTP request from the script (await it or pass a callback)' },
+  { label: 'require',             type: 'function', detail: '(name)',       info: 'Load a reusable library (or npm package)' },
+  { label: 'jsonPath',            type: 'function', detail: '(data, expr)',  info: 'Query a value with a JSONPath expression' },
+  { label: 'totp',                type: 'function', detail: '(secret, opts?)', info: 'Generate a TOTP code from a base32 secret' },
 ];
 
 const SCOPE_METHODS: Completion[] = [
@@ -308,12 +326,157 @@ export const FAKER_SUB: Record<string, Completion[]> = Object.fromEntries(
   }),
 );
 
+// Libraries (sp.require)
+
+/** Exported symbol names from a TypeScript library source, by shallow scan.
+ *  Handles `export const/let/var/function/class NAME`, `export { a, b as c }`
+ *  and `export default`. Good enough to drive member completion. */
+export function parseLibraryExports(code: string): string[] {
+  const names = new Set<string>();
+  for (const m of code.matchAll(/\bexport\s+(?:async\s+)?(?:function|class|const|let|var)\s+([A-Za-z_$][\w$]*)/g)) {
+    names.add(m[1]);
+  }
+  for (const m of code.matchAll(/\bexport\s*\{([^}]*)\}/g)) {
+    for (const part of m[1].split(',')) {
+      const seg = part.trim();
+      if (!seg || seg.startsWith('type ')) continue;
+      const asMatch = /\bas\s+([A-Za-z_$][\w$]*)/.exec(seg);
+      const name = asMatch ? asMatch[1] : seg.split(/\s+/)[0];
+      if (/^[A-Za-z_$][\w$]*$/.test(name) && name !== 'default') names.add(name);
+    }
+  }
+  return [...names];
+}
+
+export interface LibrarySource { name: string; code: string }
+
+/** Balanced `(...)` contents starting at the `(` at `openIdx`. */
+function balancedParens(code: string, openIdx: number): string {
+  let depth = 0;
+  for (let i = openIdx; i < code.length; i++) {
+    const c = code[i];
+    if (c === '(') depth++;
+    else if (c === ')') { depth--; if (depth === 0) return code.slice(openIdx + 1, i); }
+  }
+  return '';
+}
+
+/** Parameter signatures for a library's exported functions, as name -> "(params)".
+ *  Covers `export function f(...)`, `export const f = (...) =>` and
+ *  `export const f = function(...)`. Whitespace/newlines in params are collapsed. */
+export function parseLibrarySignatures(code: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const add = (name: string, openIdx: number) => {
+    const params = balancedParens(code, openIdx).replace(/\s+/g, ' ').trim();
+    out[name] = `(${params})`;
+  };
+  let m: RegExpExecArray | null;
+  const reFn = /\bexport\s+(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)\s*\(/g;
+  while ((m = reFn.exec(code))) add(m[1], reFn.lastIndex - 1);
+  const reConst = /\bexport\s+(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?(?:function\s*\*?\s*[A-Za-z_$]*\s*)?\(/g;
+  while ((m = reConst.exec(code))) add(m[1], reConst.lastIndex - 1);
+  return out;
+}
+
+/** The function name of the innermost unclosed call ending at the cursor, e.g.
+ *  "foo.bar(1, " -> "bar". Null when the cursor is not inside a call. */
+export function callNameBeforeCursor(textBefore: string): string | null {
+  let depth = 0;
+  for (let i = textBefore.length - 1; i >= 0; i--) {
+    const c = textBefore[i];
+    if (c === ')') depth++;
+    else if (c === '(') {
+      if (depth === 0) {
+        const name = /([A-Za-z_$][\w$]*)\s*$/.exec(textBefore.slice(0, i));
+        return name ? name[1] : null;
+      }
+      depth--;
+    }
+  }
+  return null;
+}
+
 // Completion source factory
 
-export function makeAtCompletionSource(varNames: string[]) {
+export function makeAtCompletionSource(varNames: string[], libraries: LibrarySource[] = []) {
+  const libNames = libraries.map(l => l.name);
+  const exportsByLib = new Map(libraries.map(l => [l.name, parseLibraryExports(l.code)] as const));
+  // name -> "(params)" across all libraries, so the completion shows the call
+  // signature next to each function.
+  const sigByName: Record<string, string> = {};
+  for (const lib of libraries) for (const [n, s] of Object.entries(parseLibrarySignatures(lib.code))) sigByName[n] ??= s;
+  const memberOptions = (libName: string, q: string): Completion[] =>
+    (exportsByLib.get(libName) ?? [])
+      .filter(n => n.toLowerCase().includes(q.toLowerCase()))
+      .map(n => ({ label: n, type: n in sigByName ? 'function' : 'variable', detail: sigByName[n], info: `Exported by '${libName}'` }));
+
   return function atSource(context: CompletionContext): CompletionResult | null {
     const line       = context.state.doc.lineAt(context.pos);
     const textBefore = line.text.slice(0, context.pos - line.from);
+
+    // sp.require bindings across the whole script: namespace (var -> lib) and
+    // the names pulled out by destructuring (so both can be completed later).
+    const doc = context.state.doc.toString();
+    const namespaceBindings = new Map<string, string>();
+    const destructuredNames = new Set<string>();
+    for (const m of doc.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*sp\.require\(\s*['"]([\w-]+)['"]\s*\)/g)) {
+      namespaceBindings.set(m[1], m[2]);
+    }
+    for (const m of doc.matchAll(/\b(?:const|let|var)\s*\{([^{}]*)\}\s*=\s*sp\.require\(/g)) {
+      for (const part of m[1].split(',')) {
+        const seg = part.trim();
+        if (!seg) continue;
+        const asM = /\bas\s+([A-Za-z_$][\w$]*)/.exec(seg);
+        const name = asM ? asM[1] : seg.split(/[:\s]/)[0];
+        if (/^[A-Za-z_$][\w$]*$/.test(name)) destructuredNames.add(name);
+      }
+    }
+
+    // sp.require('name - complete the library name inside the quotes
+    const reqNameMatch = /\bsp\.require\(\s*['"]([\w-]*)$/.exec(textBefore);
+    if (reqNameMatch) {
+      const q = reqNameMatch[1].toLowerCase();
+      return {
+        from: context.pos - reqNameMatch[1].length,
+        options: libNames
+          .filter(n => n.toLowerCase().includes(q))
+          .map(n => ({ label: n, type: 'module', info: 'Reusable library (sp.require)', boost: 2 })),
+        validFor: /^[\w-]*$/,
+      };
+    }
+
+    // sp.require('name').member - complete exports directly off the require call
+    const reqChainMatch = /\bsp\.require\(\s*['"]([\w-]+)['"]\)\.(\w*)$/.exec(textBefore);
+    if (reqChainMatch) {
+      return { from: context.pos - reqChainMatch[2].length, options: memberOptions(reqChainMatch[1], reqChainMatch[2]), validFor: /^\w*$/ };
+    }
+
+    // const { a, b| } = sp.require('name') - complete export names inside the braces
+    // (works once the require part exists, e.g. when editing the destructure).
+    const destructure = /\b(?:const|let|var)\s*\{([^{}]*)\}\s*=\s*sp\.require\(\s*['"]([\w-]+)['"]\s*\)/.exec(line.text);
+    if (destructure) {
+      const braceOpen  = line.text.indexOf('{', destructure.index);
+      const braceClose = line.text.indexOf('}', braceOpen);
+      const posInLine  = context.pos - line.from;
+      if (posInLine > braceOpen && posInLine <= braceClose) {
+        const partial = (/([A-Za-z_$][\w$]*)?$/.exec(textBefore)?.[1]) ?? '';
+        const already = new Set(destructure[1].split(',').map(s => s.trim().replace(/\s+as\s+.*/, '').split(/[:\s]/)[0]).filter(Boolean));
+        const opts = (exportsByLib.get(destructure[2]) ?? [])
+          .filter(n => n.toLowerCase().includes(partial.toLowerCase()) && (!already.has(n) || n === partial))
+          .map(n => ({ label: n, type: n in sigByName ? 'function' : 'variable', detail: sigByName[n], info: `Exported by '${destructure[2]}'` }));
+        if (opts.length) return { from: context.pos - partial.length, options: opts, validFor: /^\w*$/ };
+      }
+    }
+
+    // <binding>.member where `const <binding> = sp.require('name')` appears anywhere
+    const bindMatch = /\b([A-Za-z_$][\w$]*)\.(\w*)$/.exec(textBefore);
+    if (bindMatch && bindMatch[1] !== 'sp' && bindMatch[1] !== 'faker') {
+      const libName = namespaceBindings.get(bindMatch[1]);
+      if (libName) {
+        const opts = memberOptions(libName, bindMatch[2]);
+        if (opts.length) return { from: context.pos - bindMatch[2].length, options: opts, validFor: /^\w*$/ };
+      }
+    }
 
     // {{varname}} - must be highest priority so it works inside strings too
     const varMatch = /\{\{(\w*)$/.exec(textBefore);
@@ -374,13 +537,70 @@ export function makeAtCompletionSource(varNames: string[]) {
       return { from: context.pos - fakerMatch[1].length, options: FAKER_NAMESPACES, validFor: /^\w*$/ };
     }
 
+    // Top-level identifiers: sandbox globals (sp, faker, dayjs, ...) plus names
+    // imported via sp.require. Drives Ctrl+Space and as-you-type suggestions in a
+    // neutral position. Skipped after a dot (member access, handled above) and
+    // inside strings / comments.
+    {
+      const word  = /([A-Za-z_$][\w$]*)$/.exec(textBefore);
+      const start = word ? context.pos - word[1].length : context.pos;
+      const prevInLine = start - line.from - 1;
+      const prev  = prevInLine >= 0 ? line.text[prevInLine] : '';
+      const node  = syntaxTree(context.state).resolveInner(context.pos, -1).name;
+      const inStringOrComment = /String|Comment|TemplateString/.test(node);
+      if ((context.explicit || word) && prev !== '.' && !inStringOrComment) {
+        const q = (word?.[1] ?? '').toLowerCase();
+        const bindingNames = [...new Set([...destructuredNames, ...namespaceBindings.keys()])];
+        const importOpts: Completion[] = bindingNames.map(n => ({
+          label: n, type: namespaceBindings.has(n) ? 'variable' : 'function',
+          detail: sigByName[n], info: 'Imported with sp.require', boost: 1,
+        }));
+        const opts = [...importOpts, ...TOP_LEVEL_GLOBALS].filter(o => o.label.toLowerCase().includes(q));
+        if (opts.length) return { from: start, options: opts, validFor: /^[\w$]*$/ };
+      }
+    }
+
     return null;
   };
 }
 
-/** CodeMirror extension: at.* API + {{varname}} completions for script editors. */
-export function atCompletionExtension(varNames: string[]) {
-  return autocompletion({ override: [makeAtCompletionSource(varNames)] });
+/** CodeMirror extension: at.* API + {{varname}} + sp.require completions for script editors. */
+export function atCompletionExtension(varNames: string[], libraries: LibrarySource[] = []) {
+  return autocompletion({ override: [makeAtCompletionSource(varNames, libraries)] });
+}
+
+/** CodeMirror extension: a parameter-hint tooltip while the cursor is inside a
+ *  call to a library function, e.g. `parseToken(` shows `parseToken(body)`. */
+export function signatureHelpExtension(libraries: LibrarySource[] = []) {
+  const sigs: Record<string, string> = {};
+  for (const lib of libraries) for (const [n, s] of Object.entries(parseLibrarySignatures(lib.code))) sigs[n] ??= s;
+  if (!Object.keys(sigs).length) return [];
+
+  const field = StateField.define<readonly Tooltip[]>({
+    create: () => [],
+    update(value, tr) {
+      if (!tr.docChanged && !tr.selection) return value;
+      const sel = tr.state.selection.main;
+      if (!sel.empty) return [];
+      const line = tr.state.doc.lineAt(sel.head);
+      const name = callNameBeforeCursor(line.text.slice(0, sel.head - line.from));
+      if (!name || !(name in sigs)) return [];
+      return [{
+        pos: sel.head,
+        above: true,
+        create: () => {
+          const dom = document.createElement('div');
+          dom.style.cssText = 'padding:3px 8px;font:11px/1.5 ui-monospace,SFMono-Regular,monospace;';
+          const nm = document.createElement('span'); nm.style.color = '#60a5fa'; nm.textContent = name;
+          const pr = document.createElement('span'); pr.style.color = '#cbd5e1'; pr.textContent = sigs[name];
+          dom.append(nm, pr);
+          return { dom };
+        },
+      }];
+    },
+    provide: f => showTooltip.computeN([f], state => state.field(f)),
+  });
+  return [field];
 }
 
 // Hover tooltip

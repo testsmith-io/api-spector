@@ -9,7 +9,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import type { ApiRequest } from '../../../../shared/types';
 import { SNIPPET_GROUPS } from './scriptSnippets';
 import { appendSnippetToScript } from './scriptAppend';
-import { atCompletionExtension, varHoverTooltipExtension } from './atCompletions';
+import { atCompletionExtension, varHoverTooltipExtension, signatureHelpExtension } from './atCompletions';
 import { useVarNames } from '../../hooks/useVarNames';
 import { useVarValues } from '../../hooks/useVarValues';
 import { useStore } from '../../store';
@@ -37,9 +37,18 @@ export function ScriptsTab({ request, onChange }: Props) {
 
   const varNames   = useVarNames();
   const varValues  = useVarValues();
+  // Libraries in scope for this request, for sp.require() name + member completion.
+  // libraryContents is the real input (getScopedLibraries reads it from the store),
+  // so it drives recomputation even though it isn't referenced textually.
+  const libraryContents = useStore(s => s.libraryContents);
+  const libraries = useMemo(
+    () => useStore.getState().getScopedLibraries(request.id),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [request.id, libraryContents],
+  );
   const extensions = useMemo(
-    () => [javascript(), atCompletionExtension(varNames), varHoverTooltipExtension(varValues)],
-    [varNames, varValues],
+    () => [javascript({ typescript: true }), atCompletionExtension(varNames, libraries), signatureHelpExtension(libraries), varHoverTooltipExtension(varValues)],
+    [varNames, varValues, libraries],
   );
 
   const isGraphQL = request.body.mode === 'graphql';
@@ -69,7 +78,7 @@ export function ScriptsTab({ request, onChange }: Props) {
   return (
     <div className="flex gap-3 h-full min-h-0">
       {/* Editor pane */}
-      <div className="flex flex-col flex-1 min-w-0 gap-2">
+      <div className="flex flex-col flex-1 min-w-0 min-h-0 gap-2">
         {/* Sub-tabs */}
         <div className="flex gap-0 border-b border-surface-700">
           {(['pre', 'post', ...(isGraphQL ? ['gql' as ScriptType] : [])] as ScriptType[]).map(st => (

@@ -91,6 +91,11 @@ export function useWorkspaceLoader() {
       } catch { /* ignore missing / malformed flow files */ }
     }
 
+    // Reusable TypeScript library files (lib/) available to sp.require().
+    try {
+      await useStore.getState().loadLibraryContents();
+    } catch { /* no lib/ dir yet */ }
+
     // Load contract snapshots referenced by the workspace, plus orphan
     // `.contract.json` files in contracts/ (the handler unions both).
     try {

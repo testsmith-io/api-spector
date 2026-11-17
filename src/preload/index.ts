@@ -122,6 +122,12 @@ const api = {
     ipcRenderer.invoke(IPC.file.loadHistory) as Promise<HistoryEntry[]>,
   saveHistory: (entries: HistoryEntry[]): Promise<void> =>
     ipcRenderer.invoke(IPC.file.saveHistory, entries),
+  /** Read every reusable library file under lib/ (path -> TypeScript source). */
+  loadLibraries: (): Promise<Record<string, string>> =>
+    ipcRenderer.invoke(IPC.file.loadLibraries) as Promise<Record<string, string>>,
+  /** Write one library file under lib/ (path, content). */
+  saveLibrary: (relPath: string, content: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.file.saveLibrary, relPath, content),
 
   // HTTP execution
   sendRequest: (payload: SendRequestPayload): Promise<RequestExecutionResult> =>

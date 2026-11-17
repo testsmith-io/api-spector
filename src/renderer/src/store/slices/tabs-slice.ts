@@ -15,9 +15,9 @@ import type { FullState } from '../index';
 
 // Tab model
 
-/** What a tab shows; collections and folders open as tabs too, so the whole main
- *  area is one tab strip. */
-export type TabKind = 'request' | 'folder' | 'collection'
+/** What a tab shows; collections, folders and library files open as tabs too, so
+ *  the whole main area is one tab strip. */
+export type TabKind = 'request' | 'folder' | 'collection' | 'library'
 
 export interface AppTab {
   id: string
@@ -28,6 +28,8 @@ export interface AppTab {
   /** When set, this tab is editing an EXAMPLE of `requestId` (its overrides +
    *  saved response), not the base request. Null/undefined = the base request. */
   exampleId?: string | null
+  /** Set on a library tab - the workspace-relative lib/ path it edits. */
+  libraryPath?: string | null
   scriptTab: 'pre' | 'post'
   collectionId: string | null
   lastResponse: ResponsePayload | null
@@ -74,6 +76,10 @@ export function makeFolderTab(collectionId: string, folderId: string): AppTab {
 
 export function makeCollectionTab(collectionId: string): AppTab {
   return { ...baseTab(collectionId), kind: 'collection', requestId: null, folderId: null, exampleId: null, requestTab: 'docs' };
+}
+
+export function makeLibraryTab(libraryPath: string): AppTab {
+  return { ...baseTab(null), kind: 'library', requestId: null, folderId: null, exampleId: null, libraryPath, requestTab: 'docs' };
 }
 
 /** Keep the legacy panel flags (folderPanel, collectionPanelOpen) and activeCollectionId
@@ -129,6 +135,8 @@ export interface TabsSliceActions {
   openFolderTab: (collectionId: string, folderId: string) => void
   /** Open (or focus) a tab showing a collection's data panel. */
   openCollectionTab: (collectionId: string) => void
+  /** Open (or focus) a tab editing a library file by its lib/ path. */
+  openLibraryTab: (libraryPath: string) => void
   closeTab: (tabId: string) => void
   closeAllTabs: () => void
   closeOtherTabs: (keepTabId: string) => void
@@ -190,6 +198,13 @@ export const createTabsSlice: StateCreator<
     const existing = s.tabs.find(t => t.kind === 'collection' && t.collectionId === collectionId);
     if (existing) s.activeTabId = existing.id;
     else { const tab = makeCollectionTab(collectionId); s.tabs.push(tab); s.activeTabId = tab.id; }
+    syncPanelsToActiveTab(s);
+  }),
+
+  openLibraryTab: (libraryPath) => set(s => {
+    const existing = s.tabs.find(t => t.kind === 'library' && t.libraryPath === libraryPath);
+    if (existing) s.activeTabId = existing.id;
+    else { const tab = makeLibraryTab(libraryPath); s.tabs.push(tab); s.activeTabId = tab.id; }
     syncPanelsToActiveTab(s);
   }),
 

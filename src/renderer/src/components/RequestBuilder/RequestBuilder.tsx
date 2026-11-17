@@ -252,6 +252,8 @@ export function RequestBuilder({ request }: Props) {
         proxy:           workspaceSettings?.proxy,
         tls,
         piiMaskPatterns: workspaceSettings?.piiMaskPatterns,
+        // Reusable libraries in scope for this request (sp.require).
+        libraries:       useStore.getState().getScopedLibraries(request.id),
       };
 
       // Session script values (sp.*.set from earlier sends) seed the scopes so an

@@ -117,9 +117,49 @@ sp.environment.set("otp", code);
 const code8 = sp.totp("JBSWY3DPEHPK3PXP", { digits: 8, period: 30, algorithm: "sha1" });
 ```
 
+## Send a request (sp.sendRequest)
+
+Send an HTTP request from a script (Postman-compatible). It is asynchronous: `await` it or pass a Node-style callback. Available in pre-request and post-response scripts; not in flow logic blocks or realtime (WebSocket/MQTT) scripts.
+
+```javascript
+// Await style - a bare string does a GET
+const res = await sp.sendRequest("https://api.example.com/health");
+sp.expect(res.code).to.equal(200);
+
+// Request object + extract a token
+const login = await sp.sendRequest({
+  url: "https://api.example.com/login",
+  method: "POST",
+  header: { "Content-Type": "application/json" },
+  body: { mode: "raw", raw: JSON.stringify({ user: "demo", pass: "secret" }) },
+});
+sp.environment.set("token", login.json().access_token);
+
+// Callback style
+sp.sendRequest("https://api.example.com/health", (err, res) => {
+  if (err) throw err;
+  sp.expect(res.code).to.equal(200);
+});
+```
+
+Response: `res.code`, `res.status`, `res.responseTime`, `res.headers.get(name)`, `res.headers.toObject()`, `res.json()`, `res.text()`. Request object: `url`, optional `method` (default GET), `header` (object or `[{key,value}]`), `body` (string, or `{mode:'raw'|'urlencoded'|'formdata'|'graphql', ...}`). Reuses the request's proxy/TLS; no auth handshakes or streaming; 60s ceiling.
+
 ## Available globals
 
 Scripts have access to: `JSON`, `Math`, `Date`, `parseInt`, `parseFloat`, `isNaN`, `isFinite`, `encodeURIComponent`, `decodeURIComponent`, `btoa`, `atob`, `console` (log/warn/error/info), `dayjs` (date library), `faker` (test data generation), `tv4` (JSON Schema validation), `DOMParser` (XML parsing).
+
+Scripts can `await` (they run inside an async context), so `sp.sendRequest` and any other promise can be awaited directly.
+
+## Reusable libraries (sp.require)
+
+Scripts are TypeScript (types are stripped before running). Shared helper code lives in reusable library files loaded with `sp.require('name')`:
+
+```javascript
+const { parseToken } = sp.require("auth");
+sp.environment.set("token", parseToken(sp.response.json()));
+```
+
+Libraries are `.ts` files under `lib/` in the workspace, scoped to the workspace, a collection, or a folder (innermost scope wins on a name clash). They use `export` to expose functions and values. `sp.require` also loads CommonJS npm packages installed in the workspace `node_modules`; ES-module-only packages are not supported because the sandbox is synchronous.
 
 ## Hooks
 

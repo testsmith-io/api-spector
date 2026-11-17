@@ -287,6 +287,13 @@ export function RunnerModal() {
       });
     }
 
+    // Attach the reusable libraries in scope for each item (workspace + collection
+    // + folder chain), so pre/post scripts can sp.require() them in the run.
+    {
+      const getScopedLibraries = useStore.getState().getScopedLibraries;
+      items = items.map(item => ({ ...item, libraries: getScopedLibraries(item.request.id) }));
+    }
+
     const env = resolveEnvironmentById(environments, (envIdOverride ?? selectedEnvId) || null);
 
     // Ask variables ({{@Message}}) anywhere in the run: prompt once up front,

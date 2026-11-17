@@ -25,7 +25,9 @@ import type {
 import { detectStreamKind, readStream } from './stream/parse';
 import { interpolate, buildUrl, mergeVars, buildDynamicVars, resolveDataRow, resolveInlineSecretRefs } from './interpolation';
 import { stripJsonComments } from '../shared/strip-json-comments';
+import type { ScriptLibrary } from '../shared/libraries';
 import { runScript } from './script-runner';
+import type { ScriptHttpRequest, ScriptHttpResponse } from './script-runner';
 import { runMqttTest } from './mqtt-test';
 import { runWsTest, runSocketIoTest } from './realtime-test';
 import {
@@ -683,6 +685,46 @@ export async function performHttpExchange(opts: ExchangeOptions): Promise<Exchan
   };
 }
 
+// sp.sendRequest transport
+
+/** Build the transport that backs `sp.sendRequest()` in scripts. It owns the
+ *  proxy / TLS dispatcher (cached per {proxy,tls}) and does a plain fetch with a
+ *  60s ceiling - no auth handshakes, no streaming: a lightweight side request. */
+export function makeScriptSendRequest(
+  proxy?: ProxyConfig,
+  tls?: TlsConfig,
+): (req: ScriptHttpRequest) => Promise<ScriptHttpResponse> {
+  return async (req) => {
+    const dispatcher = await buildDispatcher(proxy, tls);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60_000);
+    const start = Date.now();
+    try {
+      const headers = new Headers();
+      for (const [k, v] of Object.entries(req.headers)) headers.set(k, v);
+      const res = await fetch(req.url, {
+        method: req.method,
+        headers,
+        body: req.body,
+        dispatcher,
+        signal: controller.signal,
+      } as Parameters<typeof fetch>[1]);
+      const body = await res.text();
+      const outHeaders: Record<string, string> = {};
+      res.headers.forEach((value, key) => { outHeaders[key] = value; });
+      return {
+        status: res.status,
+        statusText: res.statusText,
+        headers: outHeaders,
+        body,
+        responseTime: Date.now() - start,
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+}
+
 // Status determination
 
 /**
@@ -724,6 +766,10 @@ export interface RunnerExecOptions {
   /** Variables from the request's folder chain (innermost wins). Readable and
    *  writable in scripts as `sp.folder`. */
   folderVars?: Record<string, string>
+  /** Reusable TypeScript libraries in scope, for sp.require() in pre/post scripts. */
+  libraries?: ScriptLibrary[]
+  /** Workspace dir, so sp.require() can also load npm packages from node_modules. */
+  libraryRoot?: string
   dispatcher: Dispatcher | undefined
   piiMaskPatterns: string[]
   proxy?: ProxyConfig
@@ -771,6 +817,9 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
   const { req, collectionVars, envVars, globals, dispatcher, piiMaskPatterns, proxy, tls, onScriptOutput } = opts;
   let { localVars } = opts;
   const folderVars = opts.folderVars ?? {};
+  const libraries = opts.libraries;
+  const libraryRoot = opts.libraryRoot;
+  const sendRequest = makeScriptSendRequest(proxy, tls);
 
   applyRequestDefaults(req);
 
@@ -911,7 +960,7 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
       envVars: { ...envVars }, collectionVars: { ...collectionVars },
       globals: { ...globals }, localVars: { ...localVars },
       folderVars: { ...updatedFolderVars },
-      piiMaskPatterns,
+      piiMaskPatterns, libraries, libraryRoot, sendRequest,
     });
     preScriptError = r.error;
     localVars = r.updatedLocalVars;
@@ -961,7 +1010,7 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
         envVars: updatedEnvVars, collectionVars: updatedCollectionVars,
         globals: updatedGlobals, localVars, folderVars: updatedFolderVars,
         response: scriptResponse,
-        piiMaskPatterns,
+        piiMaskPatterns, libraries, libraryRoot, sendRequest,
       });
       testResults = [...schemaTestResults, ...protocolFaultTests, ...r.testResults];
       consoleOutput = r.consoleOutput;

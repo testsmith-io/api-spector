@@ -20,10 +20,11 @@ import { InlineEdit } from '../common/InlineEdit';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { useConfirm } from '../common/useConfirm';
 import { DotsBtn } from '../common/ContextMenu';
+import { LibraryTreeGroup, requestNewLibrary } from './LibraryTreeGroup';
 import {
   PlayIcon, PlusIcon, FolderIcon, TagIcon, PencilIcon, TrashIcon, TableIcon,
   CopyIcon, ExpandAllIcon, CollapseAllIcon, SyncIcon, GearIcon, BanIcon,
-  SortAzIcon,
+  SortAzIcon, FileCodeIcon,
 } from '../common/icons';
 import { useT } from '../../i18n';
 
@@ -439,6 +440,14 @@ export function CollectionTree () {
             >
               {colExpand.value ? <CollapseAllIcon /> : <ExpandAllIcon />}
             </button>
+            <button
+              onClick={() => void requestNewLibrary( 'workspace' )}
+              title={t( 'New workspace library' )}
+              aria-label={t( 'New workspace library' )}
+              className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-surface-400 hover:text-surface-100 hover:bg-surface-800 transition-colors"
+            >
+              <FileCodeIcon />
+            </button>
           </div>
         )}
         <div className="flex-1 overflow-y-auto">
@@ -469,6 +478,7 @@ export function CollectionTree () {
             )
           ) : (
           <>
+          <LibraryTreeGroup scope="workspace" depth={0} />
           {colList.map( ( { data: col } ) => (
             <CollectionNode
               key={col.id}
@@ -704,6 +714,7 @@ function CollectionNode ( {
             { type: 'separator' },
             { type: 'item', label: t( 'Add request' ), icon: <PlusIcon />, onClick: () => onAddRequest( col.rootFolder.id ) },
             { type: 'item', label: t( 'Add folder' ), icon: <FolderIcon />, onClick: () => { setExpanded( true ); onAddFolder( col.rootFolder.id, 'New Folder' ); } },
+            { type: 'item', label: t( 'New library' ), icon: <FileCodeIcon />, onClick: () => { setExpanded( true ); void requestNewLibrary( 'collection', col.id ); } },
             { type: 'item', label: t( 'Sort A to Z' ), icon: <SortAzIcon />, onClick: () => sortChildren( col.id, col.rootFolder.id ) },
             { type: 'separator' },
             { type: 'item', label: t( 'Expand all' ), icon: <ExpandAllIcon />, onClick: expandAll },
@@ -724,6 +735,9 @@ function CollectionNode ( {
         </div>
       </div>
 
+      {expanded && (
+        <LibraryTreeGroup scope="collection" scopeId={col.id} depth={0} />
+      )}
       {expanded && (
         <FolderContents
           folder={col.rootFolder}
@@ -937,6 +951,7 @@ function FolderRow ( {
             { type: 'separator' },
             { type: 'item', label: t( 'Add request' ), icon: <PlusIcon />, onClick: onAddRequest },
             { type: 'item', label: t( 'Add sub-folder' ), icon: <FolderIcon />, onClick: () => { setExpanded( true ); onAddFolder(); } },
+            { type: 'item', label: t( 'New library' ), icon: <FileCodeIcon />, onClick: () => { setExpanded( true ); void requestNewLibrary( 'folder', folder.id ); } },
             { type: 'item', label: t( 'Sort A to Z' ), icon: <SortAzIcon />, onClick: () => sortChildren( collectionId, folder.id ) },
             { type: 'separator' },
             { type: 'item', label: t( 'Expand all' ), icon: <ExpandAllIcon />, onClick: () => { setExpanded( true ); onRequestExpand( collectFolderIds( folder ), true ); } },
@@ -1150,6 +1165,7 @@ function FolderContents ( {
   return (
     <>
       {confirmDialog}
+      <LibraryTreeGroup scope="folder" scopeId={folder.id} depth={depth} />
       <DropLine collectionId={collectionId} parentFolderId={folder.id} index={0} indent={dropIndent} />
       {children.map( ( child, k ) => (
         <React.Fragment key={child.type + ':' + child.id}>

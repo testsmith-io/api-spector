@@ -175,4 +175,30 @@ export const SNIPPET_GROUPS: SnippetGroup[] = [
       },
     ],
   },
+  {
+    group: 'Libraries (sp.require)',
+    items: [
+      {
+        label: 'Import a library',
+        code: `const lib = sp.require("library_name");`,
+      },
+      {
+        label: 'Import named exports',
+        code: `const { helper } = sp.require("library_name");`,
+      },
+    ],
+  },
+  {
+    group: 'Send a request (sp.sendRequest)',
+    items: [
+      {
+        label: 'GET a URL and read JSON',
+        code: `const res = await sp.sendRequest("https://api.example.com/health");\nsp.test("side request ok", () => {\n  sp.expect(res.code).to.equal(200);\n});`,
+      },
+      {
+        label: 'POST JSON, extract a token',
+        code: `const res = await sp.sendRequest({\n  url: "https://api.example.com/login",\n  method: "POST",\n  header: { "Content-Type": "application/json" },\n  body: { mode: "raw", raw: JSON.stringify({ user: "demo", pass: "secret" }) },\n});\nsp.environment.set("token", res.json().access_token);`,
+      },
+    ],
+  },
 ];

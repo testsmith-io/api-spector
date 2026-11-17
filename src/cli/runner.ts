@@ -25,6 +25,7 @@ import {
   maskPii,
   type RunnerExecResult,
 } from '../main/request-exec';
+import { readLibraryFiles, resolveRequestLibraries } from '../main/library-files';
 import { buildJsonReport, buildJUnitReport, buildHtmlReport, buildSarifReport } from '../shared/report';
 import { buildRunPlan, expandFolderDataSets, expandRunPlanWithData, resolveInheritedAuthAndHeaders, authIsConfigured } from '../shared/request-collection';
 import { askVarsInRequest, resolveAskValues, missingAskMessages } from '../shared/ask-vars';
@@ -134,6 +135,9 @@ async function main() {
     onError: relPath => console.error(color(`  [warn] Could not load collection: ${relPath}`, C.yellow)),
   });
   const environments = await loadEnvironments(workspace, wsDir);
+
+  // Reusable TypeScript libraries (lib/) for sp.require(), read once from disk.
+  const libContents = await readLibraryFiles(wsDir);
 
   // Resolve environment: --environment flag, else settings.defaultEnvironment.
   // selectEnvironment merges extends chains.
@@ -257,6 +261,9 @@ async function main() {
     // authed CLI runs.
     let items = buildRunPlan(col, null, filterTags);
     if (items.length === 0) continue;
+    // Attach the libraries in scope for each request (sp.require). Data/auth
+    // expansions below spread the item, so this propagates to their copies.
+    items = items.map(it => ({ ...it, libraries: resolveRequestLibraries(col, it.request.id, libContents) }));
 
     if (!firstColName) firstColName = col.name;
 
@@ -391,6 +398,7 @@ async function main() {
           globals: runGlobals,
           localVars: localInput,
           folderVars: folderInput,
+          libraries: item.libraries, libraryRoot: wsDir,
           dispatcher,
           piiMaskPatterns: piiPatterns,
           tls: effectiveTls,
@@ -464,7 +472,7 @@ async function main() {
             req: item.request,
             collectionVars: colInput,
             envVars: runEnvVars, globals: runGlobals, localVars: localInput,
-            folderVars: folderInput,
+            folderVars: folderInput, libraries: item.libraries, libraryRoot: wsDir,
             dispatcher, piiMaskPatterns: piiPatterns, tls: effectiveTls,
             expectStatus: item.expectStatus, owaspTag: item.owaspTag,
           });

@@ -5,6 +5,7 @@
 
 import type { ApiRequest, Environment } from './collection';
 import type { TestResult } from './execution';
+import type { ScriptLibrary } from '../libraries';
 
 export interface RunnerItem {
   request: ApiRequest
@@ -17,6 +18,9 @@ export interface RunnerItem {
   /** Id of the folder that directly owns this request - where `sp.folder.set`
    *  writes land so sibling requests in the same folder see them. */
   folderId?: string
+  /** Reusable TypeScript libraries in scope for this item (workspace +
+   *  collection + folder chain, merged innermost-wins), for sp.require(). */
+  libraries?: ScriptLibrary[]
   /** Per-iteration variable values (from data-driven dataset). */
   dataRow?: Record<string, string>
   /** Human-readable label, e.g. "2/5" when data-driven. */

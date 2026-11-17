@@ -4,6 +4,7 @@
 // Scripting & request execution (IPC payloads)
 
 import type { ApiRequest, Environment, TlsSettings } from './collection';
+import type { ScriptLibrary } from '../libraries';
 
 export interface TestResult {
   name: string
@@ -53,6 +54,10 @@ export interface SendRequestPayload {
   /** Folder/collection the auth was inherited from, for the console report only
    *  (the auth is already merged into `request.auth`). */
   inheritedAuthSource?: string
+  /** Reusable TypeScript libraries in scope for this request (workspace +
+   *  collection + folder chain, merged innermost-wins). Reachable in scripts via
+   *  sp.require('<name>'). */
+  libraries?: ScriptLibrary[]
 }
 
 /** One frame from a streamed response (SSE / NDJSON / raw chunk). Emitted live

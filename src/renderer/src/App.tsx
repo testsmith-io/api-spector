@@ -1,39 +1,46 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import type { ApiRequest, Collection } from '../../shared/types';
 import { findFolder } from '../../shared/folder-tree';
+import { libNameFromPath } from '../../shared/libraries';
 import { useStore } from './store';
 import { useAutoSave } from './hooks/useAutoSave';
 import { useWorkspaceLoader } from './hooks/useWorkspaceLoader';
 import { CollectionTree } from './components/CollectionTree/CollectionTree';
 import { RequestBuilder } from './components/RequestBuilder/RequestBuilder';
 import { ResponseViewer } from './components/ResponseViewer/ResponseViewer';
-import { PerformancePanel } from './components/Performance/PerformancePanel';
-import { PerfPlansPanel } from './components/Performance/PerfPlansPanel';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
-import { GeneratorPanel } from './components/GeneratorPanel/GeneratorPanel';
-import { HistoryPanel } from './components/History/HistoryPanel';
 import { WelcomeScreen } from './components/common/WelcomeScreen';
 import { Toolbar } from './components/common/Toolbar';
 import { RunnerModal } from './components/Runner/RunnerModal';
 import { CoverageModal } from './components/Coverage/CoverageModal';
 import { CompareModal } from './components/Compare/CompareModal';
 import { CollectionPanel } from './components/CollectionPanel/CollectionPanel';
+import { LibraryEditorPane } from './components/common/LibraryEditorPane';
 import { FolderPanel } from './components/CollectionPanel/FolderPanel';
-import { MockPanel } from './components/MockPanel/MockPanel';
-import { MockDetailPanel } from './components/MockPanel/MockDetailPanel';
-import { RecorderPanel } from './components/MockPanel/RecorderPanel';
-import { ContractPanel } from './components/ContractPanel/ContractPanel';
-import { ContractResultsPanel } from './components/ContractPanel/ContractResultsPanel';
-import { ContractDesignerModal } from './components/ContractPanel/ContractDesignerModal';
-import { GitDiffPane } from './components/GitPanel/GitDiffPane';
-import { GitPanel } from './components/GitPanel/GitPanel';
-import { FlowsPanel } from './components/Flows/FlowsPanel';
-import { FlowCanvas } from './components/Flows/FlowCanvas';
 import { CommandPalette } from './components/common/CommandPalette';
-import { DocsGeneratorModal } from './components/common/DocsGeneratorModal';
+
+// Heavy, route-level panels are code-split so they stay out of the initial
+// bundle and load only when their sidebar tab / view is opened. @xyflow/react
+// (Flows) is the single largest renderer dependency; Performance, Git, Contract,
+// Mock and Generator pull their own weight too.
+const PerformancePanel      = lazy(() => import('./components/Performance/PerformancePanel').then(m => ({ default: m.PerformancePanel })));
+const PerfPlansPanel        = lazy(() => import('./components/Performance/PerfPlansPanel').then(m => ({ default: m.PerfPlansPanel })));
+const GeneratorPanel        = lazy(() => import('./components/GeneratorPanel/GeneratorPanel').then(m => ({ default: m.GeneratorPanel })));
+const HistoryPanel          = lazy(() => import('./components/History/HistoryPanel').then(m => ({ default: m.HistoryPanel })));
+const MockPanel             = lazy(() => import('./components/MockPanel/MockPanel').then(m => ({ default: m.MockPanel })));
+const MockDetailPanel       = lazy(() => import('./components/MockPanel/MockDetailPanel').then(m => ({ default: m.MockDetailPanel })));
+const RecorderPanel         = lazy(() => import('./components/MockPanel/RecorderPanel').then(m => ({ default: m.RecorderPanel })));
+const ContractPanel         = lazy(() => import('./components/ContractPanel/ContractPanel').then(m => ({ default: m.ContractPanel })));
+const ContractResultsPanel  = lazy(() => import('./components/ContractPanel/ContractResultsPanel').then(m => ({ default: m.ContractResultsPanel })));
+const ContractDesignerModal = lazy(() => import('./components/ContractPanel/ContractDesignerModal').then(m => ({ default: m.ContractDesignerModal })));
+const GitDiffPane           = lazy(() => import('./components/GitPanel/GitDiffPane').then(m => ({ default: m.GitDiffPane })));
+const GitPanel              = lazy(() => import('./components/GitPanel/GitPanel').then(m => ({ default: m.GitPanel })));
+const FlowsPanel            = lazy(() => import('./components/Flows/FlowsPanel').then(m => ({ default: m.FlowsPanel })));
+const FlowCanvas            = lazy(() => import('./components/Flows/FlowCanvas').then(m => ({ default: m.FlowCanvas })));
+const DocsGeneratorModal    = lazy(() => import('./components/common/DocsGeneratorModal').then(m => ({ default: m.DocsGeneratorModal })));
 import { UpdateToast } from './components/common/UpdateToast';
 import { ProductTour } from './components/common/ProductTour';
 import { useT } from './i18n';
@@ -175,7 +182,7 @@ const TAB_METHOD_COLORS: Record<string, string> = {
 // are scalar so React.memo's shallow compare catches no-op renders.
 interface TabRowProps {
   readonly tabId: string
-  readonly kind?: 'request' | 'folder' | 'collection'
+  readonly kind?: 'request' | 'folder' | 'collection' | 'library'
   readonly method?: string
   readonly name: string
   readonly isActive: boolean
@@ -209,6 +216,8 @@ const TabRow = React.memo( function TabRow ( {
           <svg className="w-3 h-3 shrink-0 text-amber-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M2 5a2 2 0 012-2h3.5l2 2H16a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V5z"/></svg>
         ) : kind === 'collection' ? (
           <svg className="w-3 h-3 shrink-0 text-blue-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4h14v2.5H3V4zm0 4.75h14v2.5H3v-2.5zM3 13.5h14V16H3v-2.5z"/></svg>
+        ) : kind === 'library' ? (
+          <svg className="w-3 h-3 shrink-0 text-emerald-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M7 3a1 1 0 00-1 1v12a1 1 0 001 1h8a1 1 0 001-1V7l-4-4H7zm4 1.5L14.5 8H11V4.5zM4 6a1 1 0 00-1 1v9a2 2 0 002 2h7a1 1 0 100-2H5V7a1 1 0 00-1-1z"/></svg>
         ) : method ? (
           <span className={`text-[10px] font-bold shrink-0 ${TAB_METHOD_COLORS[method] ?? 'text-gray-400'}`}>
             {method}
@@ -566,8 +575,10 @@ export default function App () {
       <CommandPalette />
       <UpdateToast />
       <ProductTour />
-      {contractDesignerOpen && <ContractDesignerModal seed={contractDesignerSeed ?? undefined} onClose={closeContractDesigner} />}
-      {docsModalOpen && <DocsGeneratorModal onClose={() => setDocsModalOpen( false )} />}
+      <Suspense fallback={null}>
+        {contractDesignerOpen && <ContractDesignerModal seed={contractDesignerSeed ?? undefined} onClose={closeContractDesigner} />}
+        {docsModalOpen && <DocsGeneratorModal onClose={() => setDocsModalOpen( false )} />}
+      </Suspense>
       {/* macOS drag region with centered title; hidden on Windows (native title bar). */}
       {window.electron.platform !== 'win32' && (
         <div className="drag-region flex-shrink-0 bg-surface-950 flex items-center justify-center">
@@ -689,6 +700,7 @@ export default function App () {
                     >‹</button>
                   </div>
                 </div>
+                <Suspense fallback={null}>
                 {sidebarTab === 'collections' ? <CollectionTree /> :
                   sidebarTab === 'history' ? <HistoryPanel /> :
                     sidebarTab === 'mocks' ? <MockPanel /> :
@@ -696,6 +708,7 @@ export default function App () {
                         sidebarTab === 'flows' ? <FlowsPanel /> :
                           sidebarTab === 'perf' ? <PerfPlansPanel /> :
                           <ContractPanel />}
+                </Suspense>
               </aside>
               {/* Sidebar resize handle */}
               <div
@@ -748,6 +761,8 @@ export default function App () {
                     } else if ( kind === 'folder' ) {
                       const root = tab.collectionId ? collections[tab.collectionId]?.data.rootFolder : undefined;
                       name = ( root && tab.folderId ? findFolder( root, tab.folderId )?.name : null ) ?? t( 'Folder' );
+                    } else if ( kind === 'library' ) {
+                      name = tab.libraryPath ? libNameFromPath( tab.libraryPath ) : t( 'Library' );
                     } else {
                       const req = tab.requestId ? requestsById.get( tab.requestId ) ?? null : null;
                       const exampleName = tab.exampleId ? req?.examples?.find( e => e.id === tab.exampleId )?.name : null;
@@ -819,6 +834,7 @@ export default function App () {
               </>
             )}
 
+            <Suspense fallback={<div className="flex-1" />}>
             {sidebarTab === 'flows' ? (
               <div className="flex-1 min-h-0 flex flex-col">
                 <FlowCanvas />
@@ -885,6 +901,8 @@ export default function App () {
               <div className="flex-1 min-h-0">
                 <CollectionPanel />
               </div>
+            ) : activeTab?.kind === 'library' && activeTab.libraryPath ? (
+              <LibraryEditorPane key={activeTab.libraryPath} path={activeTab.libraryPath} />
             ) : activeRequest ? (
               <div className="flex-1 flex min-h-0">
                 {/* Left pane: request builder */}
@@ -967,12 +985,13 @@ export default function App () {
                 <CollectionPanel />
               </div>
             )}
+            </Suspense>
           </main>
 
           {/* Generator panel (right drawer) */}
           {showGeneratorPanel && (
             <aside className="w-[480px] flex-shrink-0 border-l border-surface-800 flex flex-col overflow-hidden">
-              <GeneratorPanel />
+              <Suspense fallback={null}><GeneratorPanel /></Suspense>
             </aside>
           )}
         </div>
