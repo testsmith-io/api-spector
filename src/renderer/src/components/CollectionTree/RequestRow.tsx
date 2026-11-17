@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, memo } from 'react';
 import type { ApiRequest } from '../../../../shared/types';
 import { MethodBadge } from '../common/MethodBadge';
 import { SchemaSyncModal } from './SchemaSyncModal';
@@ -86,7 +86,7 @@ export interface RequestRowProps {
   readonly onSortExamples?: () => void
 }
 
-export function RequestRow({
+function RequestRowImpl({
   reqId, collectionId, name, url, method, protocol, authType, hookType, disabled, tags, isActive, indent, autoRename = false,
   examples = [], activeExampleId,
   onSelect, onRename, onDelete, onDuplicate, onUpdateTags, onSetHookType, onToggleDisabled,
@@ -448,3 +448,37 @@ function ExampleRow({ name, indent, isActive, reorderable, dragging, dragActive,
     </div>
   );
 }
+
+function sameStrings ( a: readonly string[], b: readonly string[] ): boolean {
+  if ( a === b ) return true;
+  if ( a.length !== b.length ) return false;
+  for ( let i = 0; i < a.length; i++ ) if ( a[i] !== b[i] ) return false;
+  return true;
+}
+function sameExamples ( a?: { id: string; name: string }[], b?: { id: string; name: string }[] ): boolean {
+  if ( a === b ) return true;
+  const la = a?.length ?? 0, lb = b?.length ?? 0;
+  if ( la !== lb ) return false;
+  for ( let i = 0; i < la; i++ ) if ( a![i].id !== b![i].id || a![i].name !== b![i].name ) return false;
+  return true;
+}
+
+// The tree rebuilds each row's callbacks and its tags/examples arrays on every
+// render, so a default memo compare never matches and all rows re-render on any
+// tree change (selecting one request re-renders the whole sidebar). Compare the
+// data/display props by value and treat the id-bound callbacks as stable, so
+// only rows whose data actually changed re-render.
+function rowPropsEqual ( p: RequestRowProps, n: RequestRowProps ): boolean {
+  return p.reqId === n.reqId && p.collectionId === n.collectionId && p.folderId === n.folderId
+    && p.name === n.name && p.url === n.url && p.method === n.method && p.protocol === n.protocol
+    && p.authType === n.authType && p.hookType === n.hookType && p.disabled === n.disabled
+    && p.isActive === n.isActive && p.autoRename === n.autoRename && p.indent === n.indent
+    && p.activeExampleId === n.activeExampleId
+    && sameStrings( p.tags, n.tags ) && sameExamples( p.examples, n.examples );
+}
+
+RequestRowImpl.displayName = 'RequestRow';
+export const RequestRow = memo( RequestRowImpl, rowPropsEqual );
+
+// Unmemoized implementation, exported for benchmarks only.
+export const RequestRowRaw = RequestRowImpl;

@@ -14,6 +14,16 @@ describe('translateScript — pm.* → sp.*', () => {
     expect(out).toContain('sp.globals.set("b", "2")');
     expect(out).not.toContain('pm.');
   });
+
+  it('translates pm.sendRequest', () => {
+    const out = translateScript(
+      `pm.sendRequest("https://x.test", (err, res) => { pm.expect(res.code).to.equal(200); });`,
+      'postman',
+    );
+    expect(out).toContain('sp.sendRequest("https://x.test"');
+    expect(out).toContain('sp.expect(res.code)');
+    expect(out).not.toContain('pm.');
+  });
 });
 
 describe('translateScript — require(\'moment\') → dayjs', () => {

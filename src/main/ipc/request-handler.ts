@@ -15,6 +15,7 @@ import type {
 } from '../../shared/types';
 import { interpolate, buildUrl, buildEnvVars, mergeVars, buildDynamicVars, resolveDataRow } from '../interpolation';
 import { runScript } from '../script-runner';
+import { getWorkspaceDir } from '../workspace-dir';
 import { getGlobals } from '../globals-store';
 import { buildProxyUri } from '../proxy-utils';
 import { validateSendRequestPayload } from './ipc-validate';
@@ -22,6 +23,7 @@ import {
   applyRequestDefaults,
   buildDispatcher,
   performHttpExchange,
+  makeScriptSendRequest,
   maskPii,
   maskHeaders,
   buildSchemaTestResults,
@@ -168,8 +170,12 @@ export function registerRequestHandler(ipc: IpcMain): void {
       forceStream,
       dataRow,
       inheritedAuthSource,
+      libraries,
     } = payload;
     applyRequestDefaults(req);
+
+    // Backs sp.sendRequest() in the pre/post scripts; reuses this send's proxy/TLS.
+    const sendRequest = makeScriptSendRequest(proxy, tls);
 
     // Streaming plumbing
     // Frames coalesced and flushed on a timer so a fast stream can't flood IPC
@@ -254,6 +260,9 @@ export function registerRequestHandler(ipc: IpcMain): void {
         // survive the run; otherwise updatedLocalVars would overwrite them with
         // {} and request-level vars would go un-interpolated at send time.
         localVars:      { ...localVars },
+        libraries,
+        libraryRoot: getWorkspaceDir() ?? undefined,
+        sendRequest,
       });
       preScriptMeta         = { error: result.error, consoleOutput: result.consoleOutput };
       localVars             = result.updatedLocalVars;
@@ -418,6 +427,9 @@ export function registerRequestHandler(ipc: IpcMain): void {
         // Pass the *unmasked* response so the script can extract real values
         // (tokens, ids, …). The displayed `response` keeps the redacted copy.
         response: scriptResponse,
+        libraries,
+        libraryRoot: getWorkspaceDir() ?? undefined,
+        sendRequest,
       });
       postTestResults       = result.testResults;
       postConsole           = result.consoleOutput;
@@ -477,7 +489,7 @@ export function registerRequestHandler(ipc: IpcMain): void {
     },
   ) => {
     const { script, envVars, collectionVars, globals } = payload;
-    const result = await runScript(script, { envVars, collectionVars, globals, localVars: {} });
+    const result = await runScript(script, { envVars, collectionVars, globals, localVars: {}, sendRequest: makeScriptSendRequest() });
     // Run-only: the hook's script writes are returned to the caller for in-run
     // threading, not persisted to globals.json.
     return {

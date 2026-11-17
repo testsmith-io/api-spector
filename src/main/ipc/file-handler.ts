@@ -16,6 +16,8 @@ import { stripEphemeralAuth } from '../../shared/request-collection';
 import { loadGlobals, getGlobals, setGlobals, persistGlobals } from '../globals-store';
 import { setSecretsConfig } from '../secrets';
 import { clearGitScopeCache } from './git-scope';
+import { readLibraryFiles } from '../library-files';
+import { setWorkspaceDir } from '../workspace-dir';
 
 const LAST_WS_FILE = join(app.getPath('userData'), 'last-workspace.json');
 const RECENTS_FILE = join(app.getPath('userData'), 'recent-workspaces.json');
@@ -143,6 +145,7 @@ function readmeContents(workspaceFileName: string): string {
     `mocks/                    ← saved mock servers (optional)`,
     `contracts/                ← pinned OpenAPI snapshots (optional)`,
     `flows/                    ← visual flows chaining saved requests (optional)`,
+    `lib/                      ← reusable TypeScript libraries for scripts (sp.require)`,
     `.gitignore                ← excludes secrets, generated docs, run reports`,
     `.vscode/settings.json     ← maps *.spector to JSON for editor highlighting`,
     '```',
@@ -356,7 +359,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
       return wrapCollectionAsWorkspace(wsPath, parsed as Collection);
     }
 
-    workspaceDir = dirname(wsPath);
+    workspaceDir = dirname(wsPath); setWorkspaceDir(workspaceDir);
     workspaceFile = wsPath;
     await loadGlobals(workspaceDir);
     await saveLastWorkspacePath(wsPath);
@@ -457,6 +460,25 @@ export function registerFileHandlers(ipc: IpcMain): void {
       // ENOENT (already gone): treat as success so callers can fire-and-forget.
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     }
+  });
+
+  // Reusable TypeScript library files under lib/ (path -> source). Scoped by
+  // convention: lib/*.ts (workspace), lib/collections/<id>/*.ts, lib/folders/<id>/*.ts.
+  handleIpc(ipc, IPC.file.loadLibraries, async () => {
+    if (!workspaceDir) return {};
+    return readLibraryFiles(workspaceDir);
+  });
+
+  handleIpc(ipc, IPC.file.saveLibrary, async (_e, relPath: string, content: string) => {
+    if (!workspaceDir) throw new Error('No workspace open');
+    const fullPath = resolve(workspaceDir, relPath);
+    const libRoot = resolve(workspaceDir, 'lib');
+    // Constrain writes to lib/ under the workspace.
+    if (fullPath !== libRoot && !fullPath.startsWith(libRoot + sep)) {
+      throw new Error(`Refusing to write a library outside lib/: ${relPath}`);
+    }
+    await mkdir(dirname(fullPath), { recursive: true });
+    await atomicWrite(fullPath, content);
   });
 
   // Secret-free snapshot for cloud sync: the manifest (minus machine-local
@@ -619,7 +641,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
       const workspace = JSON.parse(raw) as Workspace;
       // Set the module globals only after the load succeeds, so a stale path
       // doesn't leave the main process pretending a workspace is open.
-      workspaceDir = dirname(wsPath);
+      workspaceDir = dirname(wsPath); setWorkspaceDir(workspaceDir);
       workspaceFile = wsPath;
       await loadGlobals(workspaceDir);
       setSecretsConfig(workspace.settings?.secrets);
@@ -649,7 +671,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     }
     const parsed = JSON.parse(raw) as unknown;
     if (looksLikeCollection(parsed)) return null; // not a workspace
-    workspaceDir = dirname(wsPath);
+    workspaceDir = dirname(wsPath); setWorkspaceDir(workspaceDir);
     workspaceFile = wsPath;
     await loadGlobals(workspaceDir);
     await saveLastWorkspacePath(wsPath);
@@ -715,7 +737,7 @@ export function registerFileHandlers(ipc: IpcMain): void {
     if (found.length > 1) throw new Error('multiple workspace files found — open the folder and pick one');
     const wsPath = found[0];
     const parsed = JSON.parse(await readFile(wsPath, 'utf8')) as Workspace;
-    workspaceDir = dirname(wsPath);
+    workspaceDir = dirname(wsPath); setWorkspaceDir(workspaceDir);
     workspaceFile = wsPath;
     await loadGlobals(workspaceDir);
     await saveLastWorkspacePath(wsPath);
@@ -753,7 +775,7 @@ async function tryOpenWorkspaceInDir(dir: string): Promise<{ workspace: Workspac
   try {
     const raw = await readFile(wsPath, 'utf8');
     const workspace = JSON.parse(raw) as Workspace;
-    workspaceDir = dir;
+    workspaceDir = dir; setWorkspaceDir(workspaceDir);
     workspaceFile = wsPath;
     await loadGlobals(workspaceDir);
     setSecretsConfig(workspace.settings?.secrets);
@@ -934,7 +956,7 @@ async function scaffoldWorkspace(
   const wsPath = join(dir, wsFileName);
   await writeJson(wsPath, ws);
 
-  workspaceDir = dir;
+  workspaceDir = dir; setWorkspaceDir(workspaceDir);
   workspaceFile = wsPath;
   await loadGlobals(dir);
   await saveLastWorkspacePath(wsPath);
@@ -989,7 +1011,7 @@ async function wrapCollectionAsWorkspace(
   // collections/.
   await writeJson(collFilePath, ws);
 
-  workspaceDir = dir;
+  workspaceDir = dir; setWorkspaceDir(workspaceDir);
   workspaceFile = collFilePath;
   await loadGlobals(dir);
   await saveLastWorkspacePath(collFilePath);

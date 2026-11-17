@@ -241,3 +241,107 @@ describe('runScript — sp.totp', () => {
     expect(result.error).toContain('Invalid base32');
   });
 });
+
+// sp.sendRequest
+
+import type { ScriptHttpRequest, ScriptHttpResponse } from '../main/script-runner';
+
+/** Records the last request and returns a canned response. */
+function fakeTransport(canned: Partial<ScriptHttpResponse> = {}) {
+  const calls: ScriptHttpRequest[] = [];
+  const send = async (req: ScriptHttpRequest): Promise<ScriptHttpResponse> => {
+    calls.push(req);
+    return {
+      status: 200,
+      statusText: 'OK',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ access_token: 'abc123' }),
+      responseTime: 5,
+      ...canned,
+    };
+  };
+  return { calls, send };
+}
+
+describe('runScript — sp.sendRequest', () => {
+  it('awaits a GET from a bare URL string and exposes a Postman-style response', async () => {
+    const t = fakeTransport();
+    const result = await runScript(
+      `const res = await sp.sendRequest("https://api.example.com/health");
+       sp.environment.set("code", String(res.code));
+       sp.environment.set("ct", res.headers.get("Content-Type"));
+       sp.environment.set("token", res.json().access_token);`,
+      { ...baseCtx, sendRequest: t.send },
+    );
+    expect(result.error).toBeUndefined();
+    expect(t.calls[0]).toEqual({ url: 'https://api.example.com/health', method: 'GET', headers: {} });
+    expect(result.updatedEnvVars['code']).toBe('200');
+    expect(result.updatedEnvVars['ct']).toBe('application/json'); // header lookup is case-insensitive
+    expect(result.updatedEnvVars['token']).toBe('abc123');
+  });
+
+  it('normalizes a POST request object (method, header map, raw body)', async () => {
+    const t = fakeTransport();
+    const result = await runScript(
+      `await sp.sendRequest({
+         url: "https://api.example.com/login",
+         method: "post",
+         header: { "Content-Type": "application/json" },
+         body: { mode: "raw", raw: JSON.stringify({ user: "demo" }) },
+       });`,
+      { ...baseCtx, sendRequest: t.send },
+    );
+    expect(result.error).toBeUndefined();
+    expect(t.calls[0].method).toBe('POST');
+    expect(t.calls[0].headers['Content-Type']).toBe('application/json');
+    expect(t.calls[0].body).toBe('{"user":"demo"}');
+  });
+
+  it('encodes a urlencoded body and sets the content-type', async () => {
+    const t = fakeTransport();
+    await runScript(
+      `await sp.sendRequest({ url: "https://x.test", method: "POST", body: { mode: "urlencoded", urlencoded: [{ key: "a", value: "1 2" }, { key: "b", value: "x&y" }] } });`,
+      { ...baseCtx, sendRequest: t.send },
+    );
+    expect(t.calls[0].body).toBe('a=1%202&b=x%26y');
+    expect(t.calls[0].headers['Content-Type']).toBe('application/x-www-form-urlencoded');
+  });
+
+  it('supports Node-style callbacks', async () => {
+    const t = fakeTransport();
+    const result = await runScript(
+      `sp.sendRequest("https://api.example.com/health", (err, res) => {
+         sp.test("ok", () => { sp.expect(res.code).to.equal(200); });
+       });`,
+      { ...baseCtx, sendRequest: t.send },
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.testResults).toEqual([{ name: 'ok', passed: true }]);
+  });
+
+  it('reports a clear error when no transport is wired', async () => {
+    const result = await runScript(
+      `await sp.sendRequest("https://api.example.com/health");`,
+      baseCtx,
+    );
+    expect(result.error).toContain('sp.sendRequest is not available');
+  });
+
+  it('logs the outgoing request', async () => {
+    const t = fakeTransport();
+    const result = await runScript(
+      `await sp.sendRequest("https://api.example.com/ping");`,
+      { ...baseCtx, sendRequest: t.send },
+    );
+    expect(result.consoleOutput).toContain('[sendRequest] GET https://api.example.com/ping');
+  });
+
+  it('still maps assertion-failure line numbers 1:1 under the async wrapper', async () => {
+    const result = await runScript(
+      `const a = 1;\nsp.test("t", () => {\n  sp.expect(a).to.equal(2);\n});`,
+      baseCtx,
+    );
+    expect(result.testResults[0].passed).toBe(false);
+    expect(result.testResults[0].error).toContain('(line 3)');
+  });
+});

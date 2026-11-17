@@ -20,6 +20,7 @@ import { createEnvironmentsSlice, type EnvironmentsSlice } from './slices/enviro
 import { createMocksSlice, type MocksSlice } from './slices/mocks-slice';
 import { createFlowsSlice, type FlowsSlice } from './slices/flows-slice';
 import { createUiSlice, type UiSlice } from './slices/ui-slice';
+import { createLibrariesSlice, type LibrariesSlice } from './slices/libraries-slice';
 
 // Re-exports: components import these helpers from the store, not src/shared.
 export { uniqueName, colRelPath } from '../../../shared/naming-utils';
@@ -75,7 +76,7 @@ interface WorkspaceActions {
 
 export type FullState =
   WorkspaceState & WorkspaceActions &
-  TabsSlice & CollectionsSlice & EnvironmentsSlice & MocksSlice & FlowsSlice & UiSlice &
+  TabsSlice & CollectionsSlice & EnvironmentsSlice & MocksSlice & FlowsSlice & UiSlice & LibrariesSlice &
   WsSlice & SocketIoSlice & GraphqlWsSlice & MqttSlice & GrpcSlice & StreamSlice & HistorySlice & RunnerSlice & RecorderSlice & ContractSlice
 
 export const useStore: UseBoundStore<StoreApi<FullState>> = create<FullState>()(
@@ -97,6 +98,7 @@ export const useStore: UseBoundStore<StoreApi<FullState>> = create<FullState>()(
     ...createMocksSlice(set, get, api),
     ...createFlowsSlice(set, get, api),
     ...createUiSlice(set, get, api),
+    ...createLibrariesSlice(set, get, api),
 
     // Workspace-level state
     workspace: null,
@@ -119,6 +121,7 @@ export const useStore: UseBoundStore<StoreApi<FullState>> = create<FullState>()(
       s.activeTabId         = null;
       s.activeCollectionId  = null;
       s.globals             = {};
+      s.libraryContents     = {};
       s.sessionScriptVars   = { env: {}, collection: {}, folder: {}, globals: {} };
       s.runnerResults       = [];
       s.runnerRunning       = false;

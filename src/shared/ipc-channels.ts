@@ -36,6 +36,10 @@ export const IPC = {
     loadFlow:            'file:loadFlow',
     loadHistory:         'file:loadHistory',
     saveHistory:         'file:saveHistory',
+    /** Read every reusable library file under lib/ (path -> TypeScript source). */
+    loadLibraries:       'file:loadLibraries',
+    /** Write one library file under lib/ (path, content). */
+    saveLibrary:         'file:saveLibrary',
   },
 
   // Native dialogs

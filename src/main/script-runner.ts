@@ -60,6 +60,8 @@ function makeSandboxDOMParser() {
   };
 }
 import type { TestResult, ResponsePayload } from '../shared/types';
+import type { ScriptLibrary } from '../shared/libraries';
+import { transpileScript, buildRequire, makeExternalRequire } from './script-modules';
 import type { faker as FakerType } from '@faker-js/faker';
 
 // @faker-js/faker v10 is ESM-only - must use dynamic import
@@ -93,6 +95,34 @@ export interface ScriptContext {
    *  Each needs a `payload` string (behind .json()/.text()); other fields pass through.
    *  Takes precedence over `mqttMessages`. */
   messages?: ({ payload: string; timestamp: number } & Record<string, unknown>)[]
+  /** Reusable TypeScript library files in scope for this run (workspace +
+   *  collection + folder chain, already merged innermost-wins). Reachable from
+   *  the script via `sp.require('<name>')`. */
+  libraries?: ScriptLibrary[]
+  /** Workspace directory. When set, sp.require() can also load CommonJS npm
+   *  packages from `<libraryRoot>/node_modules`. */
+  libraryRoot?: string
+  /** Transport for sp.sendRequest(). Injected by the caller (it owns the
+   *  dispatcher / proxy / TLS); absent in contexts without an HTTP layer
+   *  (flow logic blocks, realtime tests), where sp.sendRequest throws. */
+  sendRequest?: (req: ScriptHttpRequest) => Promise<ScriptHttpResponse>
+}
+
+/** Normalized request handed to the sp.sendRequest transport. */
+export interface ScriptHttpRequest {
+  url: string
+  method: string
+  headers: Record<string, string>
+  body?: string
+}
+
+/** Raw response the transport returns; sp.sendRequest wraps it for the script. */
+export interface ScriptHttpResponse {
+  status: number
+  statusText: string
+  headers: Record<string, string>
+  body: string
+  responseTime: number
 }
 
 export interface ScriptOutput {
@@ -256,6 +286,95 @@ class AssertionError extends Error {
   }
 }
 
+// sp.sendRequest input normalization (Postman-compatible)
+
+/** Accepts a url string or a request object and produces the transport's shape.
+ *  Postman shapes supported: `{ url, method, header, body }` where header is an
+ *  object or a [{key,value}] list, and body is a string or a mode object
+ *  (raw / urlencoded / formdata / graphql). */
+function normalizeSendHeaders(h: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!h) return out;
+  if (Array.isArray(h)) {
+    for (const item of h) {
+      if (item && typeof item === 'object') {
+        const rec = item as Record<string, unknown>;
+        if (typeof rec.key === 'string' && rec.disabled !== true) {
+          out[rec.key] = rec.value == null ? '' : String(rec.value);
+        }
+      }
+    }
+  } else if (typeof h === 'object') {
+    for (const [k, v] of Object.entries(h as Record<string, unknown>)) out[k] = v == null ? '' : String(v);
+  }
+  return out;
+}
+
+function normalizeSendBody(b: unknown, headers: Record<string, string>): string | undefined {
+  if (b == null) return undefined;
+  if (typeof b === 'string') return b;
+  if (typeof b !== 'object') return String(b);
+  const o = b as Record<string, unknown>;
+  const mode = typeof o.mode === 'string' ? o.mode : undefined;
+  const hasCT = Object.keys(headers).some(k => k.toLowerCase() === 'content-type');
+
+  if (mode === 'raw' || (!mode && typeof o.raw === 'string')) {
+    return typeof o.raw === 'string' ? o.raw : undefined;
+  }
+  if (mode === 'urlencoded' || mode === 'formdata') {
+    const list = mode === 'urlencoded' ? o.urlencoded : o.formdata;
+    const encoded = (Array.isArray(list) ? list : [])
+      .filter((p): p is Record<string, unknown> => !!p && typeof p === 'object' && typeof (p as Record<string, unknown>).key === 'string' && (p as Record<string, unknown>).disabled !== true)
+      .map(p => `${encodeURIComponent(String(p.key))}=${encodeURIComponent(p.value == null ? '' : String(p.value))}`)
+      .join('&');
+    if (!hasCT) headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    return encoded;
+  }
+  if (mode === 'graphql' && o.graphql && typeof o.graphql === 'object') {
+    const g = o.graphql as Record<string, unknown>;
+    const payload: Record<string, unknown> = { query: g.query };
+    if (g.variables !== undefined) payload.variables = g.variables;
+    if (!hasCT) headers['Content-Type'] = 'application/json';
+    return JSON.stringify(payload);
+  }
+  // Fallback: a plain object is sent as JSON.
+  if (!hasCT) headers['Content-Type'] = 'application/json';
+  return JSON.stringify(o);
+}
+
+function normalizeSendInput(input: unknown): ScriptHttpRequest {
+  if (typeof input === 'string') return { url: input, method: 'GET', headers: {} };
+  if (input && typeof input === 'object') {
+    const o = input as Record<string, unknown>;
+    const url = typeof o.url === 'string' ? o.url : o.url != null ? String(o.url) : '';
+    if (!url) throw new Error('sp.sendRequest: a url is required');
+    const method = typeof o.method === 'string' && o.method.trim() ? o.method.toUpperCase() : 'GET';
+    const headers = normalizeSendHeaders(o.header ?? o.headers);
+    const body = normalizeSendBody(o.body, headers);
+    return { url, method, headers, body };
+  }
+  throw new Error('sp.sendRequest: expected a url string or a request object');
+}
+
+/** Wraps the transport's raw response in a Postman-style response object:
+ *  `.code`, `.status`, `.responseTime`, `.headers.get()`, `.json()`, `.text()`. */
+function makeSendResponse(raw: ScriptHttpResponse) {
+  let parsed: unknown;
+  const lower: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw.headers)) lower[k.toLowerCase()] = v;
+  return {
+    code: raw.status,
+    status: raw.statusText,
+    responseTime: raw.responseTime,
+    headers: {
+      get: (name: string) => lower[name.toLowerCase()] ?? null,
+      toObject: () => ({ ...raw.headers }),
+    },
+    json: () => { if (parsed === undefined) parsed = JSON.parse(raw.body); return parsed; },
+    text: () => raw.body,
+  };
+}
+
 // Build sp object
 
 function buildAt(
@@ -363,6 +482,37 @@ function buildAt(
 
       return String(binCode % 10 ** digits).padStart(digits, '0');
     },
+
+    /** Send an HTTP request from a script. Postman-compatible:
+     *    const res = await sp.sendRequest('https://...')
+     *    sp.sendRequest({ url, method, header, body }, (err, res) => { ... })
+     *  Returns a promise resolving to a response with .code/.status/.json()/
+     *  .text()/.headers.get()/.responseTime. Needs a transport (ctx.sendRequest);
+     *  unavailable in flow logic blocks and realtime tests. */
+    sendRequest: (input: unknown, callback?: (err: Error | null, res?: unknown) => void): Promise<unknown> => {
+      const run = async (): Promise<unknown> => {
+        if (!ctx.sendRequest) throw new Error('sp.sendRequest is not available in this context');
+        const normalized = normalizeSendInput(input);
+        consoleOutput.push(`[sendRequest] ${normalized.method} ${normalized.url}`);
+        const raw = await ctx.sendRequest(normalized);
+        return makeSendResponse(raw);
+      };
+      const promise = run();
+      // Guard against a process-level unhandled rejection when the caller neither
+      // awaits the result nor passes a callback. Awaiting the returned promise
+      // still surfaces the error normally.
+      promise.catch(() => {});
+      if (typeof callback === 'function') {
+        promise.then(
+          res => callback(null, res),
+          err => callback(err instanceof Error ? err : new Error(String(err))),
+        );
+        // Swallow rejection on the returned promise: the callback already owns
+        // the error, so awaiting it as well must not double-report / reject.
+        return promise.catch(() => undefined);
+      }
+      return promise;
+    },
   };
 
   // Realtime test messages exposed as sp.messages with per-message .json()/.text().
@@ -423,6 +573,7 @@ function buildSandbox(
   testResults: TestResult[],
   consoleOutput: string[],
   faker: typeof FakerType,
+  timeoutMs = 5000,
 ): Record<string, unknown> {
   const sp = buildAt(scriptCtx, testResults, consoleOutput);
   const captureConsole = {
@@ -431,7 +582,7 @@ function buildSandbox(
     error: (...args: unknown[]) => consoleOutput.push('[error] ' + args.map(String).join(' ')),
     info:  (...args: unknown[]) => consoleOutput.push('[info] ' + args.map(String).join(' ')),
   };
-  return {
+  const sandbox: Record<string, unknown> = {
     sp,
     data: scriptCtx.data ?? {},
     DOMParser: makeSandboxDOMParser,
@@ -454,6 +605,11 @@ function buildSandbox(
     setTimeout: undefined,  // not available in sync vm context
     setInterval: undefined,
   };
+  // sp.require('<name>') resolves a scoped library; libraries share these same
+  // globals and are evaluated lazily on first require. An external resolver lets
+  // it fall back to CommonJS npm packages in the workspace's node_modules.
+  sp.require = buildRequire(scriptCtx.libraries, sandbox, timeoutMs, makeExternalRequire(scriptCtx.libraryRoot));
+  return sandbox;
 }
 
 // Main entry point
@@ -495,12 +651,40 @@ export async function runScript(
     mqttMessages:   ctx.mqttMessages,
     messages:       ctx.messages,
     piiMaskPatterns: ctx.piiMaskPatterns,
+    libraries:      ctx.libraries,
+    libraryRoot:    ctx.libraryRoot,
+    sendRequest:    ctx.sendRequest,
   };
 
-  const sandbox = buildSandbox(scriptCtx, testResults, consoleOutput, faker);
+  const sandbox = buildSandbox(scriptCtx, testResults, consoleOutput, faker, timeoutMs);
+
+  // Strip TypeScript types before running. Keeps lines 1:1 so `script.js:LINE`
+  // still points at the user's source; a type/syntax error surfaces as an error.
+  let runnable: string;
+  try {
+    runnable = transpileScript(code);
+  } catch (err) {
+    const line = scriptLineOf(err);
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      testResults,
+      consoleOutput,
+      updatedEnvVars:        envVarsCopy,
+      updatedCollectionVars: collectionCopy,
+      updatedGlobals:        globalsCopy,
+      updatedLocalVars:      localVarsCopy,
+      updatedFolderVars:     folderCopy,
+      error: (line ? `Line ${line}: ` : '') + message,
+    };
+  }
 
   try {
-    vm.runInNewContext(code, sandbox, { timeout: timeoutMs, filename: 'script.js' });
+    // Wrap in an async IIFE so scripts may `await` (e.g. sp.sendRequest). The
+    // opening token stays on the body's first physical line, so a thrown error's
+    // `script.js:LINE` still maps 1:1 to the user's source. The vm timeout bounds
+    // the synchronous portion; the awaited promise is bounded by the transport.
+    const completion = vm.runInNewContext(`(async () => {${runnable}\n})()`, sandbox, { timeout: timeoutMs, filename: 'script.js' });
+    await completion;
   } catch (err) {
     const line = scriptLineOf(err);
     const message = err instanceof Error ? err.message : String(err);
@@ -563,9 +747,11 @@ export async function evaluateExpression(
     response: ctx.response,
     piiMaskPatterns: ctx.piiMaskPatterns,
     data: ctx.data,
+    libraries: ctx.libraries,
+    libraryRoot: ctx.libraryRoot,
   };
 
-  const sandbox = buildSandbox(scriptCtx, testResults, consoleOutput, faker);
+  const sandbox = buildSandbox(scriptCtx, testResults, consoleOutput, faker, timeoutMs);
 
   const scopes = {
     updatedEnvVars: envVarsCopy,

@@ -35,6 +35,9 @@ const POSTMAN_RULES: Rule[] = [
   [/\bpm\.test\(/g,                                'sp.test('],
   [/\bpm\.expect\(/g,                              'sp.expect('],
 
+  // Send a request from a script (async; supports callback or await)
+  [/\bpm\.sendRequest\(/g,                         'sp.sendRequest('],
+
   // Response - status
   [/\bpm\.response\.to\.have\.status\(/g,          'sp.response.to.have.status('],
   [/\bpm\.response\.code\b/g,                      'sp.response.code'],

@@ -9,6 +9,7 @@ import { buildEnvVars } from '../interpolation';
 import { getGlobals } from '../globals-store';
 import { buildDispatcher, executeRunnerRequest, HookSkipTracker, type RunnerExecResult } from '../request-exec';
 import { runPlanConcurrent } from '../../shared/run-concurrent';
+import { getWorkspaceDir } from '../workspace-dir';
 
 // IPC handler
 
@@ -72,6 +73,8 @@ export function registerRunnerHandler ( ipc: IpcMain ): void {
       globals: runGlobals,
       localVars: { ...runLocalVars, ...item.dataRow },
       folderVars: { ...( item.folderVars ?? {} ), ...( item.folderId ? runFolderVars[item.folderId] ?? {} : {} ) },
+      libraries: item.libraries,
+      libraryRoot: getWorkspaceDir() ?? undefined,
       dispatcher, piiMaskPatterns, proxy, tls,
       expectStatus: item.expectStatus, owaspTag: item.owaspTag,
     } );
