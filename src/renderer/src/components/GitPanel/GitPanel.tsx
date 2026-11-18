@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Testsmith.io
 // SPDX-License-Identifier: MIT
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useStore } from '../../store';
 import type { GitStatus, GitRepoInfo, GitCommit, GitBranch, GitRemote, GitStash, GitTag, GitFile, CiPlatform } from '../../../../shared/types';
 import { Toast, useToast } from '../common/Toast';
@@ -203,8 +203,15 @@ function ChangesTab({ status, onRefresh, reloadWorkspace, scoped }: { readonly s
       onRefresh();
     } catch (e) {
       const msg = String(e);
-      // A pull that stops on conflicts leaves them in the working tree.
-      showToast(/conflict/i.test(msg) ? t('Pull stopped on conflicts - resolve them below') : msg, false);
+      // The upstream was deleted/renamed on the remote (e.g. master merged into
+      // main and removed): git has no ref to merge. Point at Fetch + switch
+      // rather than surfacing the raw "no such ref was fetched" wording.
+      if (/no such ref was fetched|no tracking information/i.test(msg)) {
+        showToast(t('The upstream branch no longer exists on the remote. Fetch, then switch to the branch you want under Remote.'), false);
+      } else {
+        // A pull that stops on conflicts leaves them in the working tree.
+        showToast(/conflict/i.test(msg) ? t('Pull stopped on conflicts - resolve them below') : msg, false);
+      }
       onRefresh();
     }
     finally { setPulling(false); }
@@ -716,6 +723,17 @@ function BranchesTab({ onRefresh, reloadWorkspace }: { readonly onRefresh: () =>
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // On first open, quietly refresh remote-tracking refs so newly created or
+  // renamed remote branches (e.g. a server-side master -> main) appear without
+  // the user hunting for the Fetch button first. Best-effort: offline or no
+  // remote just leaves the cached list in place. --prune drops stale remotes.
+  const autoFetched = useRef(false);
+  useEffect(() => {
+    if (autoFetched.current) return;
+    autoFetched.current = true;
+    electron.gitFetch().then(() => load()).catch(() => { /* offline / no remote */ });
+  }, [load]);
 
   // git aborts a checkout that would clobber uncommitted work (wording varies).
   // On that failure, offer to stash and retry; any other error propagates.
