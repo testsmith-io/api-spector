@@ -303,6 +303,7 @@
   "Loading diff…": "Loading diff…",
   "No changes.": "No changes.",
   "Pull successful": "Pull successful",
+  "The upstream branch no longer exists on the remote. Fetch, then switch to the branch you want under Remote.": "The upstream branch no longer exists on the remote. Fetch, then switch to the branch you want under Remote.",
   "Push successful": "Push successful",
   "no branch": "no branch",
   "Pull (:count behind)": "Pull (:count behind)",
