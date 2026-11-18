@@ -52,7 +52,14 @@ export function registerGitHandlers(ipc: IpcMain): void {
     const dir = getWorkspaceDir();
     if (!dir) throw new Error('No workspace open');
     // Initialize a repo in the workspace dir itself (a standalone 'own' repo).
-    await simpleGit(dir).init();
+    // Honour a configured init.defaultBranch; otherwise name the first branch
+    // 'main' rather than letting git fall back to its built-in 'master'.
+    const g = simpleGit(dir);
+    let configuredDefault = '';
+    try {
+      configuredDefault = (await g.raw(['config', '--get', 'init.defaultBranch'])).trim();
+    } catch { /* unset: git exits non-zero */ }
+    await g.init(configuredDefault ? [] : ['-b', 'main']);
     clearGitScopeCache(); // the dir just became a repo root
     // Keep secrets / generated artifacts out of git on a pre-existing workspace.
     await ensureGitignore(dir);
