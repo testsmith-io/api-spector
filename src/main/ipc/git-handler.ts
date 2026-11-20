@@ -14,6 +14,7 @@ import {
   toRepoPath, fromRepoPath, scopePathspec, isWithinScope, resolveFromRoot,
 } from './git-scope';
 import { BRANCH_REF_FORMAT, parseBranchRefs } from '../git-branch-parse';
+import { planCheckout } from '../git-checkout-plan';
 
 // True when a rebase is mid-flight. State lives in `rebase-merge`/`rebase-apply`;
 // `rev-parse --git-path` resolves those even for linked worktrees.
@@ -249,24 +250,13 @@ export function registerGitHandlers(ipc: IpcMain): void {
       await g.checkoutLocalBranch(branch);
       return;
     }
-
-    // A remote ref ("origin/feature-x") with no matching local branch: create a
-    // tracking branch instead of erroring, matching "click remote to switch".
-    const m = /^([^/]+)\/(.+)$/.exec(branch);
-    if (m) {
-      const remote     = m[1];
-      const localName  = m[2];
-      const localList  = await g.branchLocal();
-      if (!localList.all.includes(localName)) {
-        await g.checkoutBranch(localName, `${remote}/${localName}`);
-        return;
-      }
-      // local exists with the same name - plain checkout of the local one.
-      await g.checkout(localName);
-      return;
-    }
-
-    await g.checkout(branch);
+    // Decide against the real local-branch list - a '/' in the name does NOT mean
+    // "remote" (feat/… and fix/… are local). Guessing by slash wrongly turned a
+    // switch-to-feat/foo into "create branch foo tracking feat/foo".
+    const localList = await g.branchLocal();
+    const plan = planCheckout(branch, localList.all);
+    if (plan.kind === 'track') await g.checkoutBranch(plan.name, plan.startPoint);
+    else                       await g.checkout(plan.name);
   });
 
   handleIpc(ipc, IPC.git.deleteBranch, async (_e, name: string, force: boolean = false) => {
