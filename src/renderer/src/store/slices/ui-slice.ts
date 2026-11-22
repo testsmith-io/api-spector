@@ -43,6 +43,9 @@ export interface UiSliceState {
   collectionPanelOpen: boolean
   /** Show the folder panel (docs/data/variables). Exclusive with a request tab / collection panel. */
   folderPanel: { collectionId: string; folderId: string } | null
+  /** Active folder-panel sub-tab per folder (keyed by folderId), so returning to
+   *  a folder restores the tab you left it on instead of resetting to docs. */
+  folderPanelTabs: Record<string, 'documentation' | 'data' | 'variables'>
   coverageOpen: boolean
   compareOpen: boolean
 
@@ -80,6 +83,8 @@ export interface UiSliceActions {
   setCollectionPanelOpen: (open: boolean) => void
   /** Bring the folder panel (docs/data/variables) to the front for a folder. */
   openFolderPanel: (collectionId: string, folderId: string) => void
+  /** Remember which folder-panel sub-tab a folder is on. */
+  setFolderPanelTab: (folderId: string, tab: 'documentation' | 'data' | 'variables') => void
   setCoverageOpen: (open: boolean) => void
   setCoverageSpec: (spec: string) => void
   setCompareOpen: (open: boolean) => void
@@ -109,6 +114,7 @@ export const createUiSlice: StateCreator<
   subTabCycle: { nonce: 0, pane: 'request', dir: 1 },
   collectionPanelOpen: false,
   folderPanel: null,
+  folderPanelTabs: {},
   coverageOpen: false,
   compareOpen: false,
 
@@ -168,6 +174,7 @@ export const createUiSlice: StateCreator<
     else set(s => { s.collectionPanelOpen = true; s.folderPanel = null; });
   },
   openFolderPanel: (collectionId, folderId) => get().openFolderTab(collectionId, folderId),
+  setFolderPanelTab: (folderId, tab) => set(s => { s.folderPanelTabs[folderId] = tab; }),
 
   setCoverageOpen: (open) => set(s => { s.coverageOpen = open; }),
 

@@ -7,12 +7,14 @@ import { useStore } from '../../store';
 import { KVTable } from '../RequestBuilder/KVTable';
 import { Modal } from '../common/Modal';
 import { AuthEditor, type AuthEditorPatch } from '../common/AuthEditor';
+import { ScopeScriptsEditor } from '../common/ScopeScriptsEditor';
 import { useT } from '../../i18n';
 
-// Config only (auth + headers inherited by the folder's requests). Documentation,
-// data tables and variables live in the folder panel (click the folder), mirroring
-// how a collection splits its panel (content) from its settings modal (config).
-type ModalTab = 'auth' | 'headers'
+// Config only (auth + headers + scripts inherited by the folder's requests).
+// Documentation, data tables and variables live in the folder panel (click the
+// folder), mirroring how a collection splits its panel (content) from its
+// settings modal (config).
+type ModalTab = 'auth' | 'headers' | 'scripts'
 
 interface Props {
   readonly collectionId: string
@@ -27,13 +29,19 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
   const [activeTab, setActiveTab] = useState<ModalTab>('auth');
   const [auth, setAuth]           = useState<AuthConfig>(folder.auth ?? { type: 'none' });
   const [headers, setHeaders]     = useState<KeyValuePair[]>(folder.headers ?? []);
+  const [preScript, setPreScript]   = useState(folder.preRequestScript ?? '');
+  const [postScript, setPostScript] = useState(folder.postRequestScript ?? '');
 
   function patchAuth(patch: AuthEditorPatch) {
     setAuth(prev => ({ ...prev, ...patch } as AuthConfig));
   }
 
   function save() {
-    updateFolder(collectionId, folder.id, { auth, headers });
+    updateFolder(collectionId, folder.id, {
+      auth, headers,
+      preRequestScript:  preScript.trim()  ? preScript  : undefined,
+      postRequestScript: postScript.trim() ? postScript : undefined,
+    });
     onClose();
   }
 
@@ -54,7 +62,7 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
 
         {/* Tabs */}
         <div className="flex border-b border-surface-800 px-4 shrink-0">
-          {(['auth', 'headers'] as ModalTab[]).map(tab => (
+          {(['auth', 'headers', 'scripts'] as ModalTab[]).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -89,6 +97,16 @@ export function FolderSettingsModal({ collectionId, folder, onClose }: Props) {
               keyPlaceholder={t('Header-Name')}
               valuePlaceholder={t('value')}
               headerMode
+            />
+          )}
+          {activeTab === 'scripts' && (
+            <ScopeScriptsEditor
+              pre={preScript}
+              post={postScript}
+              onChange={patch => {
+                if (patch.preRequestScript  !== undefined) setPreScript(patch.preRequestScript);
+                if (patch.postRequestScript !== undefined) setPostScript(patch.postRequestScript);
+              }}
             />
           )}
         </div>

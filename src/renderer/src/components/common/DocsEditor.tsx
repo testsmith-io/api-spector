@@ -128,7 +128,7 @@ export function DocsEditor({ value, onChange, placeholder, onGenerate, aiAvailab
           <button
             onClick={generate}
             disabled={generating || !aiAvailable}
-            title={aiAvailable ? t('Generate documentation with AI from this item') : t('Configure an OpenAI key in Settings → AI to enable this')}
+            title={aiAvailable ? t('Generate documentation with AI from this item') : t('Choose an AI provider in Settings → AI to enable this')}
             className="ml-auto px-2.5 py-0.5 text-[10px] font-medium rounded bg-surface-800 hover:bg-surface-700 disabled:opacity-50 disabled:hover:bg-surface-800 text-surface-200 transition-colors flex items-center gap-1"
           >
             {generating ? t('Generating…') : t('✦ Generate with AI')}

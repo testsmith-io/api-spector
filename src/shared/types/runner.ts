@@ -21,6 +21,12 @@ export interface RunnerItem {
   /** Reusable TypeScript libraries in scope for this item (workspace +
    *  collection + folder chain, merged innermost-wins), for sp.require(). */
   libraries?: ScriptLibrary[]
+  /** Scope-level pre-request scripts (collection + folder chain, outer->inner)
+   *  run before this request's own pre-request script. Set for non-hook items. */
+  inheritedPreScripts?: string[]
+  /** Scope-level post-request scripts (folder chain + collection, inner->outer)
+   *  run after this request's own post-request script. Set for non-hook items. */
+  inheritedPostScripts?: string[]
   /** Per-iteration variable values (from data-driven dataset). */
   dataRow?: Record<string, string>
   /** Human-readable label, e.g. "2/5" when data-driven. */

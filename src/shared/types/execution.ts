@@ -54,6 +54,12 @@ export interface SendRequestPayload {
   /** Folder/collection the auth was inherited from, for the console report only
    *  (the auth is already merged into `request.auth`). */
   inheritedAuthSource?: string
+  /** Scope-level pre-request scripts (collection + folder chain, outer->inner),
+   *  run before the request's own pre-request script. */
+  inheritedPreScripts?: string[]
+  /** Scope-level post-request scripts (folder chain + collection, inner->outer),
+   *  run after the request's own post-request script. */
+  inheritedPostScripts?: string[]
   /** Reusable TypeScript libraries in scope for this request (workspace +
    *  collection + folder chain, merged innermost-wins). Reachable in scripts via
    *  sp.require('<name>'). */

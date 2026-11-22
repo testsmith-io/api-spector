@@ -22,7 +22,10 @@ export function FolderPanel() {
   const openRunner    = useStore(s => s.openRunner);
   const aiAvailable   = useAiAvailable();
 
-  const [activeTab, setActiveTab] = useState<'documentation' | 'data' | 'variables'>('documentation');
+  // Active sub-tab is remembered per folder in the store, so leaving for a
+  // request and returning restores the tab you were on (not a fresh Documentation).
+  const folderPanelTabs  = useStore(s => s.folderPanelTabs);
+  const setFolderPanelTab = useStore(s => s.setFolderPanelTab);
 
   // Draft rows for the variables editor: kept in state so a blank new row survives
   // until it has a key (a Record<string,string> can't). Reseeded when the folder changes.
@@ -46,6 +49,7 @@ export function FolderPanel() {
   const cid = folderPanel.collectionId;
   const ds: DataSet = folder.dataSet ?? { columns: [], rows: [] };
   const iterCount = ds.rows.length;
+  const activeTab = folderPanelTabs[folder.id] ?? 'documentation';
 
   function setVars(rows: KeyValuePair[]) {
     setVarRows(rows);
@@ -96,7 +100,7 @@ export function FolderPanel() {
         ] as const).map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => setFolderPanelTab(folder.id, tab.id)}
             className={`px-3 py-1.5 text-xs transition-colors border-b-2 -mb-px ${
               activeTab === tab.id ? 'border-blue-500 text-white' : 'border-transparent text-surface-400 hover:text-white'
             }`}

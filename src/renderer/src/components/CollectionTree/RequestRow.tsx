@@ -423,7 +423,7 @@ function ExampleRow({ name, indent, isActive, reorderable, dragging, dragActive,
       onDragLeave={() => setOver(false)}
       onDrop={e => { if (dragActive) { e.preventDefault(); e.stopPropagation(); } setOver(false); onDropOn(); }}
     >
-      <FileCodeIcon className={`shrink-0 ${isActive ? 'text-blue-300' : 'text-surface-500'}`} />
+      <FileCodeIcon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-blue-300' : 'text-surface-500'}`} />
       <div className="flex-1 min-w-0">
         {renaming ? (
           <InlineEdit

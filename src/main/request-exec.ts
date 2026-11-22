@@ -770,6 +770,12 @@ export interface RunnerExecOptions {
   libraries?: ScriptLibrary[]
   /** Workspace dir, so sp.require() can also load npm packages from node_modules. */
   libraryRoot?: string
+  /** Scope-level pre-request scripts (collection + folder chain, outer->inner),
+   *  run before the request's own pre-request script. */
+  inheritedPreScripts?: string[]
+  /** Scope-level post-request scripts (folder chain + collection, inner->outer),
+   *  run after the request's own post-request script. */
+  inheritedPostScripts?: string[]
   dispatcher: Dispatcher | undefined
   piiMaskPatterns: string[]
   proxy?: ProxyConfig
@@ -819,6 +825,8 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
   const folderVars = opts.folderVars ?? {};
   const libraries = opts.libraries;
   const libraryRoot = opts.libraryRoot;
+  const inheritedPreScripts = opts.inheritedPreScripts ?? [];
+  const inheritedPostScripts = opts.inheritedPostScripts ?? [];
   const sendRequest = makeScriptSendRequest(proxy, tls);
 
   applyRequestDefaults(req);
@@ -954,15 +962,18 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
   }
   if (Object.keys(inlineSecrets).length) vars = { ...vars, ...inlineSecrets };
 
-  // Pre-request script
-  if (req.preRequestScript?.trim()) {
-    const r = await runScript(interpolate(req.preRequestScript, vars), {
-      envVars: { ...envVars }, collectionVars: { ...collectionVars },
-      globals: { ...globals }, localVars: { ...localVars },
+  // Pre-request scripts: inherited collection/folder (outer->inner), then the
+  // request's own. Each threads its var writes into the next.
+  const preScripts = [...inheritedPreScripts, req.preRequestScript]
+    .filter((s): s is string => Boolean(s?.trim()));
+  for (const script of preScripts) {
+    const r = await runScript(interpolate(script, vars), {
+      envVars: { ...updatedEnvVars }, collectionVars: { ...updatedCollectionVars },
+      globals: { ...updatedGlobals }, localVars: { ...localVars },
       folderVars: { ...updatedFolderVars },
       piiMaskPatterns, libraries, libraryRoot, sendRequest,
     });
-    preScriptError = r.error;
+    preScriptError = preScriptError ?? r.error;
     localVars = r.updatedLocalVars;
     updatedEnvVars = r.updatedEnvVars;
     updatedCollectionVars = r.updatedCollectionVars;
@@ -1005,16 +1016,20 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
     let consoleOutput: string[] = [];
     let postScriptError: string | undefined;
 
-    if (req.postRequestScript?.trim()) {
-      const r = await runScript(interpolate(req.postRequestScript, vars), {
+    // Post-request scripts: the request's own, then inherited folder/collection
+    // (inner->outer). Each threads its var writes; test results accumulate.
+    const postScripts = [req.postRequestScript, ...inheritedPostScripts]
+      .filter((s): s is string => Boolean(s?.trim()));
+    for (const script of postScripts) {
+      const r = await runScript(interpolate(script, vars), {
         envVars: updatedEnvVars, collectionVars: updatedCollectionVars,
         globals: updatedGlobals, localVars, folderVars: updatedFolderVars,
         response: scriptResponse,
         piiMaskPatterns, libraries, libraryRoot, sendRequest,
       });
-      testResults = [...schemaTestResults, ...protocolFaultTests, ...r.testResults];
-      consoleOutput = r.consoleOutput;
-      postScriptError = r.error;
+      testResults = [...testResults, ...r.testResults];
+      consoleOutput = [...consoleOutput, ...r.consoleOutput];
+      postScriptError = postScriptError ?? r.error;
       updatedEnvVars = r.updatedEnvVars;
       updatedCollectionVars = r.updatedCollectionVars;
       updatedGlobals = r.updatedGlobals;
@@ -1022,6 +1037,7 @@ export async function executeRunnerRequest(opts: RunnerExecOptions): Promise<Run
       localVars = r.updatedLocalVars;
       // Run-only: script var writes are not persisted to disk.
       onScriptOutput?.('post', r.consoleOutput, r.error);
+      vars = mergeVars(updatedEnvVars, updatedCollectionVars, updatedGlobals, localVars, dynamicVars, updatedFolderVars);
     }
 
     // Data-table access-control assertion: when a row carries `expectStatus`,

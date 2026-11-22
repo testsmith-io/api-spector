@@ -170,6 +170,8 @@ export function registerRequestHandler(ipc: IpcMain): void {
       forceStream,
       dataRow,
       inheritedAuthSource,
+      inheritedPreScripts = [],
+      inheritedPostScripts = [],
       libraries,
     } = payload;
     applyRequestDefaults(req);
@@ -250,12 +252,16 @@ export function registerRequestHandler(ipc: IpcMain): void {
     let updatedGlobals        = { ...mergedGlobals };
     let updatedFolderVars     = { ...folderVars };
 
-    if (req.preRequestScript?.trim()) {
-      const result = await runScript(interpolate(req.preRequestScript, vars), {
-        envVars:        { ...envVars },
-        collectionVars: { ...collectionVars },
-        globals:        { ...mergedGlobals },
-        folderVars:     { ...folderVars },
+    // Pre-request scripts: inherited collection/folder scripts (outer->inner),
+    // then the request's own. Each threads its var writes into the next.
+    const preScripts = [...inheritedPreScripts, req.preRequestScript]
+      .filter((s): s is string => Boolean(s?.trim()));
+    for (const script of preScripts) {
+      const result = await runScript(interpolate(script, vars), {
+        envVars:        { ...updatedEnvVars },
+        collectionVars: { ...updatedCollectionVars },
+        globals:        { ...updatedGlobals },
+        folderVars:     { ...updatedFolderVars },
         // Seed the script's local scope with the resolved local vars so they
         // survive the run; otherwise updatedLocalVars would overwrite them with
         // {} and request-level vars would go un-interpolated at send time.
@@ -264,7 +270,10 @@ export function registerRequestHandler(ipc: IpcMain): void {
         libraryRoot: getWorkspaceDir() ?? undefined,
         sendRequest,
       });
-      preScriptMeta         = { error: result.error, consoleOutput: result.consoleOutput };
+      preScriptMeta = {
+        error:         preScriptMeta.error ?? result.error,
+        consoleOutput: [...preScriptMeta.consoleOutput, ...result.consoleOutput],
+      };
       localVars             = result.updatedLocalVars;
       updatedEnvVars        = result.updatedEnvVars;
       updatedCollectionVars = result.updatedCollectionVars;
@@ -417,29 +426,36 @@ export function registerRequestHandler(ipc: IpcMain): void {
     let postConsole: string[] = [];
     let postError: string | undefined;
 
-    if (req.postRequestScript?.trim() && !response.error) {
-      const result = await runScript(interpolate(req.postRequestScript, vars), {
-        envVars:        { ...updatedEnvVars },
-        collectionVars: { ...updatedCollectionVars },
-        globals:        { ...updatedGlobals },
-        folderVars:     { ...updatedFolderVars },
-        localVars:      { ...localVars },
-        // Pass the *unmasked* response so the script can extract real values
-        // (tokens, ids, …). The displayed `response` keeps the redacted copy.
-        response: scriptResponse,
-        libraries,
-        libraryRoot: getWorkspaceDir() ?? undefined,
-        sendRequest,
-      });
-      postTestResults       = result.testResults;
-      postConsole           = result.consoleOutput;
-      postError             = result.error;
-      updatedEnvVars        = result.updatedEnvVars;
-      updatedCollectionVars = result.updatedCollectionVars;
-      updatedGlobals        = result.updatedGlobals;
-      updatedFolderVars     = result.updatedFolderVars;
-      localVars             = result.updatedLocalVars;
-      // Run-only: script variable writes (globals included) are not persisted.
+    // Post-request scripts: the request's own, then inherited folder/collection
+    // (inner->outer). Each threads its var writes; test results accumulate.
+    const postScripts = [req.postRequestScript, ...inheritedPostScripts]
+      .filter((s): s is string => Boolean(s?.trim()));
+    if (postScripts.length && !response.error) {
+      for (const script of postScripts) {
+        const result = await runScript(interpolate(script, vars), {
+          envVars:        { ...updatedEnvVars },
+          collectionVars: { ...updatedCollectionVars },
+          globals:        { ...updatedGlobals },
+          folderVars:     { ...updatedFolderVars },
+          localVars:      { ...localVars },
+          // Pass the *unmasked* response so the script can extract real values
+          // (tokens, ids, …). The displayed `response` keeps the redacted copy.
+          response: scriptResponse,
+          libraries,
+          libraryRoot: getWorkspaceDir() ?? undefined,
+          sendRequest,
+        });
+        postTestResults       = [...postTestResults, ...result.testResults];
+        postConsole           = [...postConsole, ...result.consoleOutput];
+        postError             = postError ?? result.error;
+        updatedEnvVars        = result.updatedEnvVars;
+        updatedCollectionVars = result.updatedCollectionVars;
+        updatedGlobals        = result.updatedGlobals;
+        updatedFolderVars     = result.updatedFolderVars;
+        localVars             = result.updatedLocalVars;
+        // Run-only: script variable writes (globals included) are not persisted.
+        vars = mergeVars(updatedEnvVars, updatedCollectionVars, updatedGlobals, localVars, dynamicVars, updatedFolderVars);
+      }
     }
 
     // HTTP 4xx/5xx with no tests at all: surface a synthetic failure. If tests

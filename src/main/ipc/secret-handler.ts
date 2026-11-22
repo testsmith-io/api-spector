@@ -78,9 +78,16 @@ export function registerSecretHandlers(ipc: IpcMain): void {
     await persistSecretStore();
   });
 
-  /** Whether a secret exists (store or env); never returns the value itself. */
+  /** Whether a secret exists (store or env); never returns the value itself.
+   *  Must NOT decrypt: a presence check should never pop the OS keychain ACL
+   *  prompt. Decrypting here made simply opening Settings (which checks whether
+   *  an AI key is set) prompt for keychain access. External-scheme refs still
+   *  resolve, since existence can only be known by asking the manager. */
   handleIpc(ipc, IPC.secret.has, async (_e, ref: string) => {
-    return { has: (await getSecret(ref)) != null };
+    if (hasSecretScheme(ref)) {
+      return { has: (await resolveExternalSecret(ref)) != null };
+    }
+    return { has: ref in secretStore || process.env[ref] != null };
   });
 
   /** Remove a secret from the OS-encrypted store. */

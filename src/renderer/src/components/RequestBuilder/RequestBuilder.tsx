@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../../store';
 import type { ApiRequest, HttpMethod, KeyValuePair, RunRequestResult } from '../../../../shared/types';
-import { getHooksForRequest, authIsConfigured, inheritedAuthWithSource } from '../../../../shared/request-collection';
+import { getHooksForRequest, authIsConfigured, inheritedAuthWithSource, resolveInheritedScripts } from '../../../../shared/request-collection';
 import { findFolderContaining } from '../../../../shared/folder-tree';
 import { syncParamsFromUrl, buildPreviewUrl } from '../../../../shared/url-params';
 import { resolveEnvironmentById, withEnvOverrides } from '../../hooks/useActiveEnvironment';
@@ -309,6 +309,14 @@ export function RequestBuilder({ request }: Props) {
         ? getHooksForRequest(request.id, collection)
         : { before: [], after: [] };
 
+      // Collection/folder pre & post scripts wrap only the main request (not hooks).
+      // Resolve against the request's owning collection (searched, like inherited
+      // auth/headers), not just the active one.
+      const owningCollection = Object.values(collections).find(c => request.id in c.data.requests)?.data ?? collection;
+      const inheritedScripts = owningCollection
+        ? resolveInheritedScripts(request.id, owningCollection)
+        : { pre: [], post: [] };
+
       // Run before hooks
       for (const hook of hooks.before) {
         const start = Date.now();
@@ -374,6 +382,8 @@ export function RequestBuilder({ request }: Props) {
           environment: freshEnv,
           request: mergedRequest,
           inheritedAuthSource,
+          inheritedPreScripts: inheritedScripts.pre,
+          inheritedPostScripts: inheritedScripts.post,
           folderVars,
           collectionVars: { ...collectionVars, ...liveLocalVars },
           globals: liveGlobals,
