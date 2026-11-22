@@ -20,6 +20,10 @@ export const IPC = {
     serializeWorkspace: 'file:serializeWorkspace',
     /** Apply a pulled snapshot to disk (backs up first; merges local secrets). */
     applyWorkspaceSnapshot: 'file:applyWorkspaceSnapshot',
+    /** Write the workspace's portable settings to a user-chosen JSON file. */
+    exportSettings:      'file:exportSettings',
+    /** Read a settings file the user picks; returns its portable settings. */
+    importSettings:      'file:importSettings',
     getLastWorkspace:    'file:getLastWorkspace',
     getRecentWorkspaces: 'file:getRecentWorkspaces',
     saveWorkspace:       'file:saveWorkspace',

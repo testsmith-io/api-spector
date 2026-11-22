@@ -151,6 +151,12 @@ export interface Folder {
   tags?: string[]
   auth?: AuthConfig
   headers?: KeyValuePair[]
+  /** Script run before every request in this folder, after the collection's and
+   *  any outer folder's pre-request script and before the request's own. */
+  preRequestScript?: string
+  /** Script run after every request in this folder, after the request's own
+   *  post-request script and before any outer folder's / the collection's. */
+  postRequestScript?: string
   /** Variables scoped to this folder. Override collection/environment; overridden
    *  by an inner folder, the request, and local (script) vars. Only enabled ones
    *  live here. */
@@ -197,6 +203,12 @@ export interface Collection {
   auth?: AuthConfig
   /** Headers inherited by all requests in this collection (can be overridden at folder or request level). */
   headers?: KeyValuePair[]
+  /** Script run before every request in this collection, before any folder's and
+   *  the request's own pre-request script. */
+  preRequestScript?: string
+  /** Script run after every request in this collection, after the request's own
+   *  and any folder's post-request script. */
+  postRequestScript?: string
 }
 
 // Environment / Variables

@@ -51,7 +51,7 @@ const { electron } = window;
 
 function IconCollections () {
   return (
-    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+    <svg viewBox="0 0 20 20" fill="currentColor" width="22" height="22">
       <path d="M2 6a2 2 0 012-2h4l2 2h4a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
     </svg>
   );
@@ -59,7 +59,7 @@ function IconCollections () {
 
 function IconHistory () {
   return (
-    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+    <svg viewBox="0 0 20 20" fill="currentColor" width="22" height="22">
       <path
         fillRule="evenodd"
         d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
@@ -71,7 +71,7 @@ function IconHistory () {
 
 function IconMock () {
   return (
-    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+    <svg viewBox="0 0 20 20" fill="currentColor" width="22" height="22">
       <path fillRule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm14 1a1 1 0 11-2 0 1 1 0 012 0zM2 13a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2zm14 1a1 1 0 11-2 0 1 1 0 012 0z" clipRule="evenodd" />
     </svg>
   );
@@ -79,7 +79,7 @@ function IconMock () {
 
 function IconContract () {
   return (
-    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+    <svg viewBox="0 0 20 20" fill="currentColor" width="22" height="22">
       <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 14a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 5.477V17H13a1 1 0 110 2H7a1 1 0 110-2h2V5.477L6.237 6.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 14a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.788l1.599.799L9 3.323V3a1 1 0 011-1z" clipRule="evenodd" />
     </svg>
   );
@@ -87,7 +87,7 @@ function IconContract () {
 
 function IconGit () {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22">
       <circle cx="6"  cy="6"  r="2.5" />
       <circle cx="6"  cy="18" r="2.5" />
       <circle cx="18" cy="6"  r="2.5" />
@@ -99,7 +99,7 @@ function IconGit () {
 
 function IconFlows () {
   return (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="22" height="22">
       <rect x="2" y="7.5" width="5" height="5" rx="1" />
       <rect x="13" y="2.5" width="5" height="5" rx="1" />
       <rect x="13" y="12.5" width="5" height="5" rx="1" />
@@ -110,7 +110,7 @@ function IconFlows () {
 
 function IconPerf () {
   return (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="22" height="22">
       <path d="M2.8 13.3a7.2 7.2 0 0 1 14.4 0" />
       <path d="M3.4 15.4h13.2" />
       <path d="M10 13.3l3.8-3.6" />
@@ -124,6 +124,7 @@ function ActivityBarBtn ( {
   onClick,
   title,
   badge,
+  beta,
   children,
   dataTour,
 }: {
@@ -131,21 +132,30 @@ function ActivityBarBtn ( {
   readonly onClick: () => void
   readonly title: string
   readonly badge?: number
+  readonly beta?: boolean
   readonly children: React.ReactNode
   readonly dataTour?: string
 } ) {
+  const t = useT();
   return (
     <div className="relative group/ab" data-tour={dataTour}>
       <button
         onClick={onClick}
-        aria-label={title}
+        aria-label={beta ? `${title} (${t( 'Beta' )})` : title}
         aria-pressed={active}
-        className={`relative w-10 h-10 flex items-center justify-center rounded transition-colors ${active
+        className={`relative w-10 h-10 flex flex-col items-center justify-center rounded transition-colors ${active
           ? 'text-white bg-surface-800'
           : 'text-surface-600 hover:text-surface-300 hover:bg-surface-800/50'
           }`}
       >
         {children}
+        {/* "Beta" sits under the glyph as part of the icon. aria-hidden because
+            the aria-label already carries it (axe: label-content-name-mismatch). */}
+        {beta && (
+          <span aria-hidden="true" className="text-[7px] font-bold uppercase tracking-tight text-amber-400 leading-none mt-px">
+            {t( 'Beta' )}
+          </span>
+        )}
       </button>
       {/* Badge lives outside the button so it isn't visible text conflicting with
           the aria-label (axe: label-content-name-mismatch). */}
@@ -155,8 +165,11 @@ function ActivityBarBtn ( {
         </span>
       )}
       <div className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 hidden group-hover/ab:block">
-        <span className="whitespace-nowrap rounded px-2 py-1 text-[11px] bg-surface-900 text-[var(--text-primary)] border border-surface-700 shadow-lg">
+        <span className="whitespace-nowrap rounded px-2 py-1 text-[11px] bg-surface-900 text-[var(--text-primary)] border border-surface-700 shadow-lg inline-flex items-center gap-1.5">
           {title}
+          {beta && (
+            <span className="text-[8px] font-bold uppercase tracking-wide px-1 py-px rounded bg-amber-500/20 text-amber-400">{t( 'Beta' )}</span>
+          )}
         </span>
       </div>
     </div>
@@ -633,6 +646,7 @@ export default function App () {
                 active={sidebarOpen && sidebarTab === 'perf'}
                 onClick={() => selectPanel( 'perf' )}
                 title={t( 'Performance testing' )}
+                beta
                 dataTour="perf"
               >
                 <IconPerf />

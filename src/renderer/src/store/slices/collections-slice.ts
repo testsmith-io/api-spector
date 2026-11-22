@@ -160,6 +160,7 @@ export interface CollectionsSliceActions {
   // Collection TLS
   updateCollectionTls: (id: string, tls: TlsSettings | undefined) => void
   updateCollectionAuthAndHeaders: (id: string, auth: AuthConfig, headers: KeyValuePair[]) => void
+  updateCollectionScripts: (id: string, preRequestScript: string | undefined, postRequestScript: string | undefined) => void
   updateCollectionDescription: (id: string, description: string) => void
   updateCollectionVariables: (id: string, variables: Record<string, string>, disabled?: Record<string, string>) => void
 }
@@ -380,6 +381,13 @@ export const createCollectionsSlice: StateCreator<
     if (!s.collections[id]) return;
     s.collections[id].data.auth    = auth;
     s.collections[id].data.headers = headers;
+    s.collections[id].dirty = true;
+  }),
+
+  updateCollectionScripts: (id, preRequestScript, postRequestScript) => set(s => {
+    if (!s.collections[id]) return;
+    s.collections[id].data.preRequestScript  = preRequestScript;
+    s.collections[id].data.postRequestScript = postRequestScript;
     s.collections[id].dirty = true;
   }),
 

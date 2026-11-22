@@ -102,6 +102,12 @@ const api = {
     ipcRenderer.invoke(IPC.file.serializeWorkspace),
   applyWorkspaceSnapshot: (snap: { manifest: Workspace; files: Record<string, string> }): Promise<{ ok: boolean; filesWritten: number; collections: number; workspace: Workspace; workspacePath: string }> =>
     ipcRenderer.invoke(IPC.file.applyWorkspaceSnapshot, snap),
+  /** Export the workspace's portable settings to a user-chosen JSON file. */
+  exportSettings: (settings: Workspace['settings']): Promise<boolean> =>
+    ipcRenderer.invoke(IPC.file.exportSettings, settings),
+  /** Pick a settings file and return its portable settings (null if cancelled). */
+  importSettings: (): Promise<Workspace['settings'] | null> =>
+    ipcRenderer.invoke(IPC.file.importSettings),
   newWorkspace: (): Promise<{ workspace: Workspace; workspacePath: string; enclosingRepo?: { name: string; scope: string } } | null> =>
     ipcRenderer.invoke(IPC.file.newWorkspace),
   closeWorkspace: (): Promise<void> =>

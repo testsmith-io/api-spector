@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { useEffect, useState } from 'react';
-import { AI_OPENAI_TOKEN_REF, DEFAULT_AI_MODEL } from '../../../shared/types';
+import { AI_PROVIDERS, aiTokenRef, DEFAULT_AI_MODEL, type AiProvider } from '../../../shared/types';
 import { STORAGE_KEYS } from './storage-keys';
 import type { ApiRequest, Collection, Folder, GenerateDocsInput } from '../../../shared/types';
 
@@ -13,25 +13,36 @@ const { electron } = window;
 // itself lives only in the OS keychain (see AI_OPENAI_TOKEN_REF).
 const CFG_KEY = STORAGE_KEYS.ai;
 
-export interface AiConfig { model: string }
+export interface AiConfig { provider: AiProvider; model: string; baseUrl: string }
 
 export function getAiConfig(): AiConfig {
-  try { return { model: DEFAULT_AI_MODEL, ...JSON.parse(localStorage.getItem(CFG_KEY) || '{}') }; }
-  catch { return { model: DEFAULT_AI_MODEL }; }
+  const base: AiConfig = { provider: 'openai', model: DEFAULT_AI_MODEL, baseUrl: '' };
+  try {
+    const saved = JSON.parse(localStorage.getItem(CFG_KEY) || '{}') as Partial<AiConfig>;
+    const provider = saved.provider && AI_PROVIDERS[saved.provider] ? saved.provider : 'openai';
+    return { provider, model: saved.model ?? base.model, baseUrl: saved.baseUrl ?? '' };
+  } catch { return base; }
 }
 
 export function setAiConfig(cfg: AiConfig): void {
   try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch { /* private mode */ }
 }
 
-// Cache the "is a key configured" check so every DocsEditor doesn't hit IPC.
+// Cache the "is this provider usable" check so every DocsEditor doesn't hit IPC.
 let availableCache: boolean | null = null;
 export function invalidateAiAvailable() { availableCache = null; }
 
 async function checkAvailable(): Promise<boolean> {
   if (availableCache != null) return availableCache;
-  try { availableCache = (await electron.hasSecret(AI_OPENAI_TOKEN_REF)).has; }
-  catch { availableCache = false; }
+  try {
+    const cfg = getAiConfig();
+    const meta = AI_PROVIDERS[cfg.provider];
+    // Keyless providers (local Ollama) are usable once a base URL exists;
+    // otherwise the button turns on when a key is stored for this provider.
+    availableCache = meta.needsKey
+      ? (await electron.hasSecret(aiTokenRef(cfg.provider))).has
+      : Boolean(cfg.baseUrl.trim() || meta.defaultBaseUrl);
+  } catch { availableCache = false; }
   return availableCache ?? false;
 }
 
@@ -42,8 +53,9 @@ export function useAiAvailable(): boolean {
   return available;
 }
 
-export async function generateDocs(input: Omit<GenerateDocsInput, 'model'>): Promise<string> {
-  return electron.generateAiDocs({ ...input, model: getAiConfig().model });
+export async function generateDocs(input: Omit<GenerateDocsInput, 'model' | 'provider' | 'baseUrl'>): Promise<string> {
+  const cfg = getAiConfig();
+  return electron.generateAiDocs({ ...input, provider: cfg.provider, model: cfg.model, baseUrl: cfg.baseUrl });
 }
 
 // Context builders (readable summaries fed to the model)

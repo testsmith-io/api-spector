@@ -399,6 +399,8 @@ async function main() {
           localVars: localInput,
           folderVars: folderInput,
           libraries: item.libraries, libraryRoot: wsDir,
+          inheritedPreScripts: item.inheritedPreScripts,
+          inheritedPostScripts: item.inheritedPostScripts,
           dispatcher,
           piiMaskPatterns: piiPatterns,
           tls: effectiveTls,
@@ -473,6 +475,8 @@ async function main() {
             collectionVars: colInput,
             envVars: runEnvVars, globals: runGlobals, localVars: localInput,
             folderVars: folderInput, libraries: item.libraries, libraryRoot: wsDir,
+            inheritedPreScripts: item.inheritedPreScripts,
+            inheritedPostScripts: item.inheritedPostScripts,
             dispatcher, piiMaskPatterns: piiPatterns, tls: effectiveTls,
             expectStatus: item.expectStatus, owaspTag: item.owaspTag,
           });

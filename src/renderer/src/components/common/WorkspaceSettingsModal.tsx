@@ -6,12 +6,13 @@ import { useStore } from '../../store';
 import { Modal } from './Modal';
 import { LOCALES, useLocale, useT, type Locale } from '../../i18n';
 import { START_TOUR_EVENT } from './ProductTour';
-import { AI_OPENAI_TOKEN_REF, DEFAULT_AI_MODEL } from '../../../../shared/types';
+import { AI_PROVIDERS, aiTokenRef, type AiProvider } from '../../../../shared/types';
 import { getAiConfig, setAiConfig, invalidateAiAvailable } from '../../lib/ai';
 import { labelCls, inputCls } from '../../lib/ui-classes';
 import { useConfirm } from './useConfirm';
 import { SyncSettingsPanel } from './SyncSettingsPanel';
 import { VarInput } from './VarInput';
+import { mergeSettings } from '../../../../shared/workspace-settings-transfer';
 
 const { electron } = window;
 
@@ -98,19 +99,38 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
     }
   }
 
-  // AI state. Key lives only in the OS keychain, model in localStorage
-  // (per-machine); nothing reaches the .spector file or version control.
-  const [aiModel, setAiModel] = useState(getAiConfig().model);
-  const [aiKey, setAiKey]     = useState('');
+  // AI state. Keys live only in the OS keychain (one per provider); the chosen
+  // provider/model/base URL live in localStorage (per-machine); nothing reaches
+  // the .spector file or version control.
+  const [aiProvider, setAiProvider] = useState<AiProvider>(() => getAiConfig().provider);
+  const [aiModel, setAiModel]   = useState(() => getAiConfig().model);
+  const [aiBaseUrl, setAiBaseUrl] = useState(() => {
+    const c = getAiConfig();
+    return c.baseUrl || AI_PROVIDERS[c.provider].defaultBaseUrl;
+  });
+  const [aiKey, setAiKey]       = useState('');
   const [aiKeySet, setAiKeySet] = useState(false);
+  const aiMeta = AI_PROVIDERS[aiProvider];
+
+  // Re-check whether a key is stored whenever the provider changes.
   React.useEffect(() => {
     let live = true;
-    electron.hasSecret(AI_OPENAI_TOKEN_REF).then(r => { if (live) setAiKeySet(r.has); }).catch(() => { /* none */ });
+    electron.hasSecret(aiTokenRef(aiProvider)).then(r => { if (live) setAiKeySet(r.has); }).catch(() => { if (live) setAiKeySet(false); });
     return () => { live = false; };
-  }, []);
+  }, [aiProvider]);
+
+  // Switching provider resets the model and base URL to that provider's defaults
+  // and clears the key input (the saved key, if any, stays in the keychain).
+  function changeAiProvider(id: AiProvider) {
+    const meta = AI_PROVIDERS[id];
+    setAiProvider(id);
+    setAiModel(meta.defaultModel);
+    setAiBaseUrl(meta.defaultBaseUrl);
+    setAiKey('');
+  }
 
   async function removeAiKey() {
-    await electron.deleteSecret(AI_OPENAI_TOKEN_REF);
+    await electron.deleteSecret(aiTokenRef(aiProvider));
     setAiKey('');
     setAiKeySet(false);
     invalidateAiAvailable();
@@ -169,9 +189,13 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
     setPatterns(prev => prev.filter(x => x !== p));
   }
 
-  async function save() {
+  // Build the settings object from the current form state (not yet persisted).
+  // Shared by Save and Export, so Export reflects in-progress edits rather than
+  // only the last saved values. Side effects (keychain writes, AI config) are
+  // kept out of here and stay in save().
+  function buildSettings(): NonNullable<NonNullable<typeof workspace>['settings']> {
     // Start from the existing settings so live-applied appearance (theme, zoom)
-    // isn't wiped by this form's rebuild.
+    // and anything this form doesn't manage are preserved.
     const settings: NonNullable<NonNullable<typeof workspace>['settings']> = {
       ...workspace?.settings,
     };
@@ -192,7 +216,12 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
       rejectUnauthorized,
     };
 
-    settings.piiMaskPatterns = patterns;
+    // Commit a pattern typed into the box but not yet added with Enter/Add, so
+    // Save and Export do not silently drop it.
+    const pendingPattern = newPattern.trim().toLowerCase();
+    settings.piiMaskPatterns = pendingPattern && !patterns.includes(pendingPattern)
+      ? [...patterns, pendingPattern]
+      : patterns;
 
     if (cloudEnabled || cloudTokenSet || cloudToken.trim()) {
       settings.cloud = {
@@ -202,11 +231,6 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
     } else {
       delete settings.cloud;
     }
-    if (cloudToken.trim()) await electron.setSecret('cloud:token', cloudToken.trim());
-
-    // AI: key to the keychain, model to localStorage, nothing into `settings`.
-    if (aiKey.trim()) { await electron.setSecret(AI_OPENAI_TOKEN_REF, aiKey.trim()); invalidateAiAvailable(); }
-    setAiConfig({ model: aiModel.trim() || DEFAULT_AI_MODEL });
 
     if (defaultEnvironment) settings.defaultEnvironment = defaultEnvironment;
     else delete settings.defaultEnvironment;
@@ -251,6 +275,20 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
     if (Object.keys(secrets).length) settings.secrets = secrets;
     else delete settings.secrets;
 
+    return settings;
+  }
+
+  async function save() {
+    const settings = buildSettings();
+
+    if (cloudToken.trim()) await electron.setSecret('cloud:token', cloudToken.trim());
+
+    // AI: key to the keychain (one per provider), provider/model/base URL to
+    // localStorage, nothing into `settings`.
+    if (aiKey.trim()) await electron.setSecret(aiTokenRef(aiProvider), aiKey.trim());
+    setAiConfig({ provider: aiProvider, model: aiModel.trim() || aiMeta.defaultModel, baseUrl: aiBaseUrl.trim() });
+    invalidateAiAvailable();
+
     updateWorkspaceSettings(settings);
 
     const updated = useStore.getState().workspace;
@@ -262,6 +300,45 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
       await electron.saveHistory(useStore.getState().history).catch(() => {});
     }
     onClose();
+  }
+
+  // Export / import the Workspace Settings block (not collections or
+  // environments). The portable subset excludes the machine-local cloud/sync.
+  const [transfer, setTransfer] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null);
+
+  async function exportSettings() {
+    try {
+      const ok = await electron.exportSettings(buildSettings());
+      if (ok) setTransfer({ kind: 'ok', msg: t('Settings exported.') });
+    } catch (e) {
+      setTransfer({ kind: 'err', msg: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  async function importSettings() {
+    let imported: NonNullable<typeof workspace>['settings'] | null | undefined;
+    try {
+      imported = await electron.importSettings();
+    } catch (e) {
+      setTransfer({ kind: 'err', msg: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+    if (!imported) return; // cancelled
+    const incoming = imported;
+    confirm(
+      t('Import these settings? This replaces the current TLS, privacy, appearance, and secrets-connection settings. Collections and environments are not affected.'),
+      () => {
+        void (async () => {
+          const merged = mergeSettings(workspace?.settings, incoming);
+          updateWorkspaceSettings(merged);
+          if (merged.theme) setTheme(merged.theme);
+          if (typeof merged.zoom === 'number') setZoom(merged.zoom);
+          const updated = useStore.getState().workspace;
+          if (updated) await electron.saveWorkspace(updated);
+          onClose();
+        })();
+      },
+    );
   }
 
   function zoomStep(dir: 1 | -1) {
@@ -292,8 +369,10 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
       title={t('Workspace Settings')}
     >
         {confirmDialog}
-        {/* Tabs */}
-        <div className="flex border-b border-surface-800 flex-shrink-0 px-4">
+        {/* Tabs. Wrap so every tab stays reachable: the row is wider than the
+            560px panel now, and without wrapping the last tab (AI) spilled off
+            the right edge, leaving no way to reach the AI key settings. */}
+        <div className="flex flex-wrap border-b border-surface-800 flex-shrink-0 px-4">
           {tabs.map(tab => (
             <button
               key={tab.id}
@@ -378,7 +457,10 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
                   className="mt-0.5"
                 />
                 <span className="flex flex-col gap-0.5">
-                  <span className="text-surface-200">{t('Enable performance testing')}</span>
+                  <span className="text-surface-200 flex items-center gap-1.5">
+                    {t('Enable performance testing')}
+                    <span className="text-[8px] font-bold uppercase tracking-wide px-1 py-px rounded bg-amber-500/20 text-amber-400">{t('Beta')}</span>
+                  </span>
                   <span className="text-surface-600 text-[11px]">
                     {t('Show the Performance (load) testing view and its left-nav icon. Off by default so it stays out of the way of functional testing.')}
                   </span>
@@ -639,32 +721,64 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
           {activeTab === 'ai' && (
             <>
               <p className="text-surface-600 text-[11px] leading-relaxed">
-                {t('Optional. Configure an OpenAI key to generate documentation from the Docs tab of a request, folder, or collection. The key is stored only in your OS keychain and never written to the workspace file or version control.')}
+                {t('Optional. Generate documentation from the Docs tab of a request, folder, or collection. Pick a provider below. API keys are stored only in your OS keychain, never in the workspace file or version control.')}
               </p>
+
               <div className="flex flex-col gap-1">
-                <label className={labelCls}>{t('OpenAI API key')}</label>
-                <input
-                  type="password"
-                  value={aiKey}
-                  onChange={e => setAiKey(e.target.value)}
-                  placeholder={aiKeySet ? t('•••••••• (stored in keychain - type to replace)') : 'sk-...'}
-                  autoComplete="off"
-                  className={`${inputCls} placeholder-surface-600`}
-                />
-                {aiKeySet && (
-                  <button onClick={() => confirm(t('Remove the stored OpenAI key?'), () => { void removeAiKey(); })} className="self-start text-[11px] text-red-400 hover:text-red-300 mt-0.5">{t('Remove key')}</button>
-                )}
+                <label className={labelCls}>{t('Provider')}</label>
+                <select
+                  value={aiProvider}
+                  onChange={e => changeAiProvider(e.target.value as AiProvider)}
+                  aria-label={t('Provider')}
+                  className="bg-surface-800 border border-surface-700 rounded px-2.5 py-1.5 focus:outline-none focus:border-blue-500"
+                >
+                  {Object.values(AI_PROVIDERS).map(p => (
+                    <option key={p.id} value={p.id}>{p.label}</option>
+                  ))}
+                </select>
               </div>
+
+              {aiMeta.baseUrlEditable && (
+                <div className="flex flex-col gap-1">
+                  <label className={labelCls}>{t('Base URL')}</label>
+                  <input
+                    value={aiBaseUrl}
+                    onChange={e => setAiBaseUrl(e.target.value)}
+                    placeholder={aiMeta.defaultBaseUrl || 'https://...'}
+                    aria-label={t('Base URL')}
+                    className={`${inputCls} placeholder-surface-600 font-mono`}
+                  />
+                </div>
+              )}
+
+              {aiMeta.needsKey && (
+                <div className="flex flex-col gap-1">
+                  <label className={labelCls}>{t('API key')}</label>
+                  <input
+                    type="password"
+                    value={aiKey}
+                    onChange={e => setAiKey(e.target.value)}
+                    placeholder={aiKeySet ? t('•••••••• (stored in keychain - type to replace)') : t('Paste your API key')}
+                    autoComplete="off"
+                    className={`${inputCls} placeholder-surface-600`}
+                  />
+                  {aiKeySet && (
+                    <button onClick={() => confirm(t('Remove the stored key for this provider?'), () => { void removeAiKey(); })} className="self-start text-[11px] text-red-400 hover:text-red-300 mt-0.5">{t('Remove key')}</button>
+                  )}
+                </div>
+              )}
+
               <div className="flex flex-col gap-1">
                 <label className={labelCls}>{t('Model')}</label>
                 <input
                   value={aiModel}
                   onChange={e => setAiModel(e.target.value)}
-                  placeholder="gpt-4o-mini"
+                  placeholder={aiMeta.defaultModel || 'model-id'}
                   className={`${inputCls} placeholder-surface-600`}
                 />
-                <p className="text-[10px] text-surface-600">{t('Any OpenAI chat model id (e.g. gpt-4o-mini, gpt-4o). Stored per-machine, not in the workspace.')}</p>
               </div>
+
+              {aiMeta.hint && <p className="text-[10px] text-surface-600">{aiMeta.hint}</p>}
             </>
           )}
 
@@ -845,10 +959,29 @@ export function WorkspaceSettingsModal({ onClose, initialTab }: { readonly onClo
         </div>
 
         {/* Footer */}
-        <div className="flex gap-2 px-4 py-3 border-t border-surface-800 flex-shrink-0">
+        <div className="flex items-center gap-2 px-4 py-3 border-t border-surface-800 flex-shrink-0">
+          <button
+            onClick={exportSettings}
+            title={t("Save this workspace's settings to a file you can import into another workspace")}
+            className="px-3 py-1.5 bg-surface-800 hover:bg-surface-700 rounded text-xs transition-colors"
+          >
+            {t('Export settings')}
+          </button>
+          <button
+            onClick={importSettings}
+            title={t('Load settings from a file exported from another workspace')}
+            className="px-3 py-1.5 bg-surface-800 hover:bg-surface-700 rounded text-xs transition-colors"
+          >
+            {t('Import settings')}
+          </button>
+          {transfer && (
+            <span className={`text-[11px] ${transfer.kind === 'ok' ? 'text-green-400' : 'text-red-400'}`}>
+              {transfer.kind === 'ok' ? '✓' : '✗'} {transfer.msg}
+            </span>
+          )}
           <button
             onClick={save}
-            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-xs font-medium transition-colors"
+            className="ml-auto px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-xs font-medium transition-colors"
           >
             {t('Save')}
           </button>

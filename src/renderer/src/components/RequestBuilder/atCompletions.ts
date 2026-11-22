@@ -3,7 +3,7 @@
 
 import type { CompletionContext, CompletionResult, Completion } from '@codemirror/autocomplete';
 import { autocompletion } from '@codemirror/autocomplete';
-import { hoverTooltip, showTooltip, type Tooltip } from '@codemirror/view';
+import { hoverTooltip, showTooltip, type EditorView, type Tooltip } from '@codemirror/view';
 import { StateField } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
 import { FAKER_NS_ALL, FAKER_ALL } from './fakerCatalog';
@@ -102,6 +102,78 @@ const HEADERS_METHODS: Completion[] = [
   { label: 'get',      type: 'function', detail: '(name)', info: 'Get a header value by name (case-insensitive)' },
   { label: 'toObject', type: 'function', detail: '()',     info: 'Return all headers as a plain object' },
 ];
+
+// Parameter hints for dayjs methods that take arguments. Drives both the
+// completion detail and the signatureHelp tooltip; a method absent here is a
+// no-arg method. Scoped to a dayjs(...) chain so generic names (add/get/set) do
+// not mis-hint on unrelated objects.
+const DAYJS_SIGS: Record<string, string> = {
+  format:   '(template?)',
+  add:      '(value, unit)',
+  subtract: '(value, unit)',
+  diff:     '(date, unit?, asFloat?)',
+  startOf:  '(unit)',
+  endOf:    '(unit)',
+  isBefore: '(date, unit?)',
+  isAfter:  '(date, unit?)',
+  isSame:   '(date, unit?)',
+  get:      '(unit)',
+  set:      '(unit, value)',
+};
+
+// A dayjs method completion that inserts `name()` and leaves the cursor inside
+// the parens for methods that take arguments (so the signature tooltip shows at
+// once and the user does not type the parens), or after them for no-arg methods.
+function dayjsMethod(label: string, info: string): Completion {
+  const sig = DAYJS_SIGS[label];
+  return {
+    label, type: 'function', detail: sig ?? '()', info,
+    apply: (view: EditorView, _c: Completion, from: number, to: number) => {
+      const anchor = from + label.length + (sig ? 1 : 2);
+      view.dispatch({ changes: { from, to, insert: `${label}()` }, selection: { anchor } });
+      // The signature tooltip is computed from the cursor-in-parens selection,
+      // but it does not surface during the completion-accept update. Re-assert
+      // the selection on the next tick (a standalone selection transaction, like
+      // a manual click into the parens) so the hint renders.
+      if (sig) setTimeout(() => { try { view.dispatch({ selection: { anchor } }); } catch { /* view gone */ } }, 0);
+    },
+  };
+}
+
+// dayjs() instance methods (core, plugin-free). Offered after a dayjs(...) call,
+// so `dayjs().` and chained `dayjs().add(1,'day').` complete.
+const DAYJS_METHODS: Completion[] = [
+  dayjsMethod('format',      'Format the date, e.g. format("YYYY-MM-DD HH:mm")'),
+  dayjsMethod('toISOString', 'ISO 8601 string in UTC'),
+  dayjsMethod('valueOf',     'Unix timestamp in milliseconds'),
+  dayjsMethod('unix',        'Unix timestamp in seconds'),
+  dayjsMethod('toDate',      'Native Date object'),
+  dayjsMethod('toString',    'Date as a string'),
+  dayjsMethod('add',         'Add time, e.g. add(1, "day")'),
+  dayjsMethod('subtract',    'Subtract time, e.g. subtract(2, "hour")'),
+  dayjsMethod('diff',        'Difference from another date'),
+  dayjsMethod('startOf',     'Start of a unit, e.g. startOf("day")'),
+  dayjsMethod('endOf',       'End of a unit, e.g. endOf("month")'),
+  dayjsMethod('isBefore',    'Whether this date is before another'),
+  dayjsMethod('isAfter',     'Whether this date is after another'),
+  dayjsMethod('isSame',      'Whether this date equals another'),
+  dayjsMethod('isValid',     'Whether the date is valid'),
+  dayjsMethod('year',        'Get the year'),
+  dayjsMethod('month',       'Get the month (0-11)'),
+  dayjsMethod('date',        'Get the day of the month'),
+  dayjsMethod('day',         'Get the day of the week (0-6)'),
+  dayjsMethod('hour',        'Get the hour'),
+  dayjsMethod('minute',      'Get the minute'),
+  dayjsMethod('second',      'Get the second'),
+  dayjsMethod('get',         'Get a unit value'),
+  dayjsMethod('set',         'Set a unit value'),
+  dayjsMethod('clone',       'Clone the dayjs object'),
+];
+
+// The time-unit argument shared by dayjs add/subtract/startOf/endOf/diff/get/set.
+const DAYJS_UNITS: Completion[] = [
+  'year', 'quarter', 'month', 'week', 'day', 'date', 'hour', 'minute', 'second', 'millisecond',
+].map(label => ({ label, type: 'enum', info: 'dayjs time unit' }));
 
 // chai assertion chain (sp.expect(...).to.be.equal(...))
 // Language chains pass through; leaf methods/getters check. We offer context-aware
@@ -537,6 +609,25 @@ export function makeAtCompletionSource(varNames: string[], libraries: LibrarySou
       return { from: context.pos - fakerMatch[1].length, options: FAKER_NAMESPACES, validFor: /^\w*$/ };
     }
 
+    // dayjs(...).xxx and chained dayjs()....().xxx - a member access on a `)`
+    // when a dayjs( call appears earlier on the line (dayjs objects chain).
+    const dayjsDot = /\)\s*\.(\w*)$/.exec(textBefore);
+    if (dayjsDot && /\bdayjs\s*\(/.test(textBefore)) {
+      return { from: context.pos - dayjsDot[1].length, options: DAYJS_METHODS, validFor: /^\w*$/ };
+    }
+
+    // Unit argument inside a dayjs unit-taking method: complete 'day', 'hour', ...
+    // inside the quotes, e.g. add(1, 'da | startOf('mon.
+    const dayjsUnit = /\b(?:add|subtract|startOf|endOf|diff|get|set)\s*\([^()]*['"]([a-zA-Z]*)$/.exec(textBefore);
+    if (dayjsUnit && /\bdayjs\s*\(/.test(textBefore)) {
+      const q = dayjsUnit[1].toLowerCase();
+      return {
+        from: context.pos - dayjsUnit[1].length,
+        options: DAYJS_UNITS.filter(o => o.label.toLowerCase().includes(q)),
+        validFor: /^[a-zA-Z]*$/,
+      };
+    }
+
     // Top-level identifiers: sandbox globals (sp, faker, dayjs, ...) plus names
     // imported via sp.require. Drives Ctrl+Space and as-you-type suggestions in a
     // neutral position. Skipped after a dot (member access, handled above) and
@@ -572,9 +663,17 @@ export function atCompletionExtension(varNames: string[], libraries: LibrarySour
 /** CodeMirror extension: a parameter-hint tooltip while the cursor is inside a
  *  call to a library function, e.g. `parseToken(` shows `parseToken(body)`. */
 export function signatureHelpExtension(libraries: LibrarySource[] = []) {
-  const sigs: Record<string, string> = {};
-  for (const lib of libraries) for (const [n, s] of Object.entries(parseLibrarySignatures(lib.code))) sigs[n] ??= s;
-  if (!Object.keys(sigs).length) return [];
+  const libSigs: Record<string, string> = {};
+  for (const lib of libraries) for (const [n, s] of Object.entries(parseLibrarySignatures(lib.code))) libSigs[n] ??= s;
+
+  // The parameter hint for the call the cursor sits in. Library functions match
+  // by name; dayjs methods match only when a dayjs(...) call precedes them on the
+  // line, so an unrelated obj.add() / map.set() shows no misleading hint.
+  const sigFor = (name: string, before: string): string | null => {
+    if (name in libSigs) return libSigs[name];
+    if (name in DAYJS_SIGS && /\bdayjs\s*\(/.test(before)) return DAYJS_SIGS[name];
+    return null;
+  };
 
   const field = StateField.define<readonly Tooltip[]>({
     create: () => [],
@@ -583,8 +682,10 @@ export function signatureHelpExtension(libraries: LibrarySource[] = []) {
       const sel = tr.state.selection.main;
       if (!sel.empty) return [];
       const line = tr.state.doc.lineAt(sel.head);
-      const name = callNameBeforeCursor(line.text.slice(0, sel.head - line.from));
-      if (!name || !(name in sigs)) return [];
+      const before = line.text.slice(0, sel.head - line.from);
+      const name = callNameBeforeCursor(before);
+      const sig = name ? sigFor(name, before) : null;
+      if (!name || !sig) return [];
       return [{
         pos: sel.head,
         above: true,
@@ -592,7 +693,7 @@ export function signatureHelpExtension(libraries: LibrarySource[] = []) {
           const dom = document.createElement('div');
           dom.style.cssText = 'padding:3px 8px;font:11px/1.5 ui-monospace,SFMono-Regular,monospace;';
           const nm = document.createElement('span'); nm.style.color = '#60a5fa'; nm.textContent = name;
-          const pr = document.createElement('span'); pr.style.color = '#cbd5e1'; pr.textContent = sigs[name];
+          const pr = document.createElement('span'); pr.style.color = '#cbd5e1'; pr.textContent = sig;
           dom.append(nm, pr);
           return { dom };
         },

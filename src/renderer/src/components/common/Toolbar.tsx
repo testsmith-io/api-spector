@@ -16,7 +16,7 @@ import { useT } from '../../i18n';
 // Document icon for the "Generate docs" action.
 function DocIcon () {
   return (
-    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M14 3v5h5M8.5 13h7M8.5 16.5h5" />
     </svg>
@@ -26,7 +26,7 @@ function DocIcon () {
 // Import icon (arrow down into a tray).
 function ImportIcon () {
   return (
-    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v10m0 0l-3.5-3.5M12 13l3.5-3.5" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3" />
     </svg>
@@ -36,7 +36,7 @@ function ImportIcon () {
 // Workspace-action icons (stroke style matches the shared set)
 function Svg ({ children }: { readonly children: ReactNode }) {
   return (
-    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
       {children}
     </svg>
   );
@@ -341,7 +341,7 @@ export function Toolbar({ onOpenDocs: _onOpenDocs }: { readonly onOpenDocs?: () 
               className="p-1.5 bg-surface-800 hover:bg-surface-700 rounded transition-colors"
               aria-label={t('Workspace settings')}
             >
-              <GearIcon />
+              <GearIcon className="w-4 h-4" />
             </button>
           </Tooltip>
         </div>

@@ -23,6 +23,8 @@ interface ImportOption {
   label: string
   description: string
   supportsUrl?: boolean
+  /** Still maturing; shown with a Beta badge. */
+  beta?: boolean
 }
 
 const OPTIONS: ImportOption[] = [
@@ -34,7 +36,7 @@ const OPTIONS: ImportOption[] = [
   { id: 'http',     label: 'HTTP file', description: '.http / .rest (REST Client)' },
   { id: 'har',      label: 'HAR',      description: 'HTTP Archive (.har) from devtools or a proxy' },
   { id: 'arazzo',   label: 'Arazzo',   description: 'Workflow spec -> Flows. Select the .arazzo file AND its OpenAPI spec file(s)' },
-  { id: 'soapui',   label: 'SoapUI / ReadyAPI', description: 'Project XML -> requests; Groovy scripts converted to sp.*' },
+  { id: 'soapui',   label: 'SoapUI / ReadyAPI', description: 'Project XML -> requests; Groovy scripts converted to sp.*', beta: true },
   { id: 'spector',  label: 'API Spector', description: 'An existing .spector / .json collection' },
   { id: 'curl',     label: 'cURL',     description: 'Paste a curl command' },
 ];
@@ -639,7 +641,12 @@ export function ImportModal({ onImport, onClose }: Props) {
                   : 'border-surface-700 bg-surface-800 hover:bg-surface-750 text-surface-300'
               }`}
             >
-              <div className="text-xs font-semibold">{opt.label}</div>
+              <div className="text-xs font-semibold flex items-center gap-1.5">
+                {opt.label}
+                {opt.beta && (
+                  <span className="text-[8px] font-bold uppercase tracking-wide px-1 py-px rounded bg-amber-500/20 text-amber-400">{t('Beta')}</span>
+                )}
+              </div>
               <div className="text-[10px] text-surface-500 mt-0.5">{t(opt.description)}</div>
             </button>
           ))}

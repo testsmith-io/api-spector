@@ -368,6 +368,32 @@ export function resolveInheritedAuthAndHeaders(
   return { auth: inheritedAuth, headers: inheritedHeaders };
 }
 
+/** Scope-level (collection + folder) scripts that wrap a request, in execution
+ *  order. `pre` runs outer->inner (collection, then root folder down to the
+ *  request's folder) before the request's own pre-request script; `post` runs
+ *  inner->outer (request's folder up to the collection) after the request's own
+ *  post-request script. The request's own scripts are NOT included here. */
+export function resolveInheritedScripts(
+  requestId: string,
+  collection: Collection,
+): { pre: string[]; post: string[] } {
+  const path = folderPathTo(collection.rootFolder, requestId); // root -> immediate folder
+
+  const pre: string[] = [];
+  if (collection.preRequestScript?.trim()) pre.push(collection.preRequestScript);
+  for (const folder of path) {
+    if (folder.preRequestScript?.trim()) pre.push(folder.preRequestScript);
+  }
+
+  const post: string[] = [];
+  for (const folder of [...path].reverse()) {
+    if (folder.postRequestScript?.trim()) post.push(folder.postRequestScript);
+  }
+  if (collection.postRequestScript?.trim()) post.push(collection.postRequestScript);
+
+  return { pre, post };
+}
+
 /** One header a request inherits, tagged with the level it comes from. */
 export interface InheritedHeader {
   key: string
@@ -447,7 +473,16 @@ export function buildRunPlan(
 ): RunnerItem[] {
   const collectionVars = collection.collectionVariables ?? {};
 
-  const tag = (items: RunnerItem[]) => items.map(i => ({ ...i, collection: collection.name }));
+  const tag = (items: RunnerItem[]) => items.map(i => {
+    const tagged: RunnerItem = { ...i, collection: collection.name };
+    // Collection/folder pre & post scripts wrap each real request (never a hook).
+    if (!i.isHook) {
+      const { pre, post } = resolveInheritedScripts(i.request.id, collection);
+      if (pre.length) tagged.inheritedPreScripts = pre;
+      if (post.length) tagged.inheritedPostScripts = post;
+    }
+    return tagged;
+  });
 
   // Whole-collection run
   if (!folderId) {

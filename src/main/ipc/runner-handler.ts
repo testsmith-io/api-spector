@@ -75,6 +75,8 @@ export function registerRunnerHandler ( ipc: IpcMain ): void {
       folderVars: { ...( item.folderVars ?? {} ), ...( item.folderId ? runFolderVars[item.folderId] ?? {} : {} ) },
       libraries: item.libraries,
       libraryRoot: getWorkspaceDir() ?? undefined,
+      inheritedPreScripts: item.inheritedPreScripts,
+      inheritedPostScripts: item.inheritedPostScripts,
       dispatcher, piiMaskPatterns, proxy, tls,
       expectStatus: item.expectStatus, owaspTag: item.owaspTag,
     } );

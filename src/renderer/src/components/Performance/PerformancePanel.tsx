@@ -324,6 +324,7 @@ export function PerformancePanel() {
       {/* Header */}
       <div className="flex items-center gap-2 px-5 pt-4 pb-3 flex-shrink-0">
         <span className="text-xs font-bold text-amber-100 bg-amber-700 rounded px-2 py-1">{t('PERF')}</span>
+        <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400">{t('Beta')}</span>
         <h2 className="text-sm font-semibold text-surface-100 truncate">{plan.name}</h2>
         <span className="text-[11px] text-surface-500">{t('Load test a request or a flow, separate from your functional tests.')}</span>
       </div>

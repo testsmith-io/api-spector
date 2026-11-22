@@ -41,7 +41,14 @@ export function Modal({
   useEffect(() => {
     if (!closeOnEscape) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (e.key !== 'Escape') return;
+      // Already handled (e.g. a code editor closed its autocomplete popup).
+      if (e.defaultPrevented) return;
+      // Escape inside a code editor stays in the editor (dismiss autocomplete /
+      // signature help), it must not close the dialog out from under the user.
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('.cm-editor')) return;
+      onClose();
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

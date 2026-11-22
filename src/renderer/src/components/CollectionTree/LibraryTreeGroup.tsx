@@ -166,7 +166,7 @@ export function LibraryTreeGroup({ scope, scopeId, depth }: Props) {
             onClick={() => openLibraryTab(path)}
             onDoubleClick={() => setRenaming(lib.name)}
           >
-            <span className="text-surface-500 shrink-0"><FileCodeIcon /></span>
+            <span className="text-surface-500 shrink-0"><FileCodeIcon className="w-3.5 h-3.5" /></span>
             <span className="text-xs font-mono truncate flex-1" title={lib.name}>{lib.name}</span>
             <DotsBtn items={[
               { type: 'item', label: t('Rename'), icon: <PencilIcon />, onClick: () => setRenaming(lib.name) },

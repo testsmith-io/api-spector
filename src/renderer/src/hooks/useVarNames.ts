@@ -8,8 +8,8 @@ import { DYNAMIC_VAR_NAMES } from '../components/RequestBuilder/atCompletions';
 import { collectFolderVars } from '../../../shared/folder-tree';
 import type { Folder } from '../../../shared/types';
 
-// Keys from sp.*.set("key", ...) calls in scripts
-const SCRIPT_SET_RE = /\bsp\.(?:variables|collectionVariables|environment|globals)\.set\(\s*["']([^"']+)["']/g;
+// Keys from sp.*.set("key", ...) calls in scripts (any writable scope)
+const SCRIPT_SET_RE = /\bsp\.(?:variables|collectionVariables|environment|globals|folder)\.set\(\s*["']([^"']+)["']/g;
 
 function extractScriptVarNames(script: string | undefined): string[] {
   if (!script) return [];
@@ -59,10 +59,15 @@ export function useVarNames(): string[] {
       if (col) {
         Object.keys(col.collectionVariables ?? {}).forEach(k => names.add(k));
         // Data-table columns become {{variable}} placeholders per row; offer
-        // the collection's and every folder's.
+        // the collection's and every folder's. Scope pre/post scripts' .set()
+        // keys are scanned too, so they autocomplete before the first run.
         (col.dataSet?.columns ?? []).forEach(c => { if (c) names.add(c); });
+        extractScriptVarNames(col.preRequestScript).forEach(k => names.add(k));
+        extractScriptVarNames(col.postRequestScript).forEach(k => names.add(k));
         const addFolderCols = (f: Folder): void => {
           (f.dataSet?.columns ?? []).forEach(c => { if (c) names.add(c); });
+          extractScriptVarNames(f.preRequestScript).forEach(k => names.add(k));
+          extractScriptVarNames(f.postRequestScript).forEach(k => names.add(k));
           f.folders.forEach(addFolderCols);
         };
         addFolderCols(col.rootFolder);

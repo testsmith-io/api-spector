@@ -13,6 +13,7 @@ import { simpleGit } from 'simple-git';
 import type { Collection, Environment, Workspace, Flow } from '../../shared/types';
 import { externalizeDataSets, inlineDataSets } from '../data-files';
 import { stripEphemeralAuth } from '../../shared/request-collection';
+import { buildSettingsFile, parseSettingsFile } from '../../shared/workspace-settings-transfer';
 import { loadGlobals, getGlobals, setGlobals, persistGlobals } from '../globals-store';
 import { setSecretsConfig } from '../secrets';
 import { clearGitScopeCache } from './git-scope';
@@ -549,6 +550,35 @@ export function registerFileHandlers(ipc: IpcMain): void {
       workspace: merged,
       workspacePath: workspaceFile,
     };
+  });
+
+  // Export the workspace's portable settings (everything except the machine-local
+  // cloud/sync blocks) to a JSON file the user picks. Returns false if cancelled.
+  handleIpc(ipc, IPC.file.exportSettings, async (_e, settings: Workspace['settings']) => {
+    const base = workspaceFile ? basename(workspaceFile).replace(/\.(spector|json)$/i, '') : 'workspace';
+    const result = await dialog.showSaveDialog({
+      title: 'Export Workspace Settings',
+      defaultPath: `${base}-settings.json`,
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePath) return false;
+    const file = buildSettingsFile(settings, new Date().toISOString());
+    await writeFile(result.filePath, JSON.stringify(file, null, 2), 'utf8');
+    return true;
+  });
+
+  // Import a settings file the user picks: parse + validate, then return its
+  // portable settings for the renderer to merge and persist. Returns null if
+  // cancelled; throws (surfaced to the renderer) when the file is not one of ours.
+  handleIpc(ipc, IPC.file.importSettings, async (): Promise<Workspace['settings'] | null> => {
+    const result = await dialog.showOpenDialog({
+      title: 'Import Workspace Settings',
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+      properties: ['openFile'],
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    const text = await readFile(result.filePaths[0], 'utf8');
+    return parseSettingsFile(text);
   });
 
   // Opt-in session-history persistence: a plain JSON array in the workspace
